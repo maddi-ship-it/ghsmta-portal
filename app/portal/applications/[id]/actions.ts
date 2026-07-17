@@ -1,9 +1,155 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ApplicationStatus } from "@/lib/types";
+import type {
+  ApplicationQuestion,
+  ApplicationStatus,
+} from "@/lib/types";
+
+function answerValue(question: ApplicationQuestion, formData: FormData): unknown {
+  const fieldName = `question_${question.id}`;
+
+  switch (question.question_type) {
+    case "multi_select":
+      return formData.getAll(fieldName).map(String).filter(Boolean);
+
+    case "checkbox":
+    case "signature_acknowledgement":
+      return formData.get(fieldName) === "true";
+
+    case "number": {
+      const raw = String(formData.get(fieldName) ?? "").trim();
+      if (!raw) return "";
+      const numberValue = Number(raw);
+      return Number.isFinite(numberValue) ? numberValue : raw;
+    }
+
+    case "content":
+      return null;
+
+    default:
+      return String(formData.get(fieldName) ?? "").trim();
+  }
+}
+
+function isMissingRequiredAnswer(
+  question: ApplicationQuestion,
+  value: unknown,
+): boolean {
+  if (!question.required || question.question_type === "content") return false;
+
+  if (
+    question.question_type === "checkbox" ||
+    question.question_type === "signature_acknowledgement"
+  ) {
+    return value !== true;
+  }
+
+  if (Array.isArray(value)) return value.length === 0;
+  return value === null || value === undefined || String(value).trim() === "";
+}
+
+async function getEditableApplication(applicationId: string) {
+  const profile = await requireProfile();
+  const supabase = await createClient();
+  const { data: application, error } = await supabase
+    .from("applications")
+    .select("id,applicant_user_id,status,form_version_id")
+    .eq("id", applicationId)
+    .single();
+
+  if (error || !application) throw new Error("Application not found.");
+
+  const canEdit =
+    profile.role === "owner" ||
+    (profile.role === "applicant" &&
+      application.applicant_user_id === profile.id &&
+      application.status === "draft");
+
+  if (!canEdit) throw new Error("This application is read-only.");
+  if (!application.form_version_id) throw new Error("This application has no form version.");
+
+  return { profile, supabase, application };
+}
+
+async function persistApplicationAnswers(
+  applicationId: string,
+  formData: FormData,
+) {
+  const { profile, supabase, application } = await getEditableApplication(applicationId);
+
+  const { data: questionData, error: questionError } = await supabase
+    .from("application_questions")
+    .select("id,form_version_id,section_id,question_key,label,description,question_type,required,options,settings,visibility_rule,sort_order,active,created_at,updated_at")
+    .eq("form_version_id", application.form_version_id)
+    .eq("active", true);
+
+  if (questionError) throw new Error(questionError.message);
+
+  const questions = (questionData ?? []) as ApplicationQuestion[];
+  const answerMap = new Map<string, unknown>();
+  const rows = questions
+    .filter((question) => question.question_type !== "content")
+    .map((question) => {
+      const value = answerValue(question, formData);
+      answerMap.set(question.id, value);
+      return {
+        application_id: applicationId,
+        question_id: question.id,
+        value,
+        updated_by: profile.id,
+      };
+    });
+
+  if (rows.length > 0) {
+    const { error } = await supabase
+      .from("application_answers")
+      .upsert(rows, { onConflict: "application_id,question_id" });
+
+    if (error) throw new Error(error.message);
+  }
+
+  return { supabase, questions, answerMap };
+}
+
+export async function saveApplicationAnswers(applicationId: string, formData: FormData) {
+  await persistApplicationAnswers(applicationId, formData);
+
+  revalidatePath(`/portal/applications/${applicationId}`);
+  redirect(`/portal/applications/${applicationId}?saved=1`);
+}
+
+export async function submitApplication(applicationId: string, formData: FormData) {
+  const { supabase, questions, answerMap } = await persistApplicationAnswers(
+    applicationId,
+    formData,
+  );
+
+  const missing = questions.filter((question) =>
+    isMissingRequiredAnswer(question, answerMap.get(question.id)),
+  );
+
+  if (missing.length > 0) {
+    revalidatePath(`/portal/applications/${applicationId}`);
+    redirect(`/portal/applications/${applicationId}?error=required&missing=${missing.length}`);
+  }
+
+  const { error } = await supabase
+    .from("applications")
+    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .eq("id", applicationId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/portal/applications/${applicationId}`);
+  revalidatePath("/portal/admin/applications");
+  revalidatePath("/portal");
+  redirect(`/portal/applications/${applicationId}?submitted=1`);
+}
 
 export async function updateApplication(id: string, formData: FormData) {
   await requireProfile(["owner"]);
@@ -14,14 +160,24 @@ export async function updateApplication(id: string, formData: FormData) {
 
   if (!schoolName) throw new Error("School name is required.");
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("applications").update({
+  const updatePayload: Record<string, unknown> = {
     school_name: schoolName,
     production_title: productionTitle || null,
     status,
     owner_notes: ownerNotes || null,
-    submitted_at: status === "submitted" ? new Date().toISOString() : undefined,
-  }).eq("id", id);
+  };
+
+  if (status === "submitted") {
+    updatePayload.submitted_at = new Date().toISOString();
+  } else if (status === "draft") {
+    updatePayload.submitted_at = null;
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("applications")
+    .update(updatePayload)
+    .eq("id", id);
 
   if (error) throw new Error(error.message);
   revalidatePath(`/portal/applications/${id}`);
