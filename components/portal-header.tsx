@@ -10,7 +10,7 @@ export function PortalHeader({ profile }: { profile: Profile }) {
       <div className="container portal-header-inner">
         <Link href="/portal" className="brand">
           <span className="brand-mark">G</span>
-          <span className="brand-copy">GHSMTA<small>Awards Portal</small></span>
+          <span className="brand-copy">GHSMTA<small>Portal</small></span>
         </Link>
         <nav className="portal-nav" aria-label="Portal navigation">
           <Link href="/portal">Dashboard</Link>
