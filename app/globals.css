@@ -344,3 +344,123 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   .owner-controls-grid { grid-template-columns: 1fr; }
   .owner-notes-field { grid-column: auto; }
 }
+
+/* Multi-program and staged application additions */
+.cycle-card {
+  gap: 1rem;
+}
+
+.cycle-card-heading,
+.cycle-actions,
+.inline-form-grid {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cycle-card-heading > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.cycle-card-heading small,
+.data-table td small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+}
+
+.cycle-actions details {
+  min-width: min(100%, 28rem);
+}
+
+.builder-stage {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stage-heading-panel {
+  border-top: 4px solid var(--blue);
+}
+
+.stage-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.stage-tab {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.15rem 0.65rem;
+  align-items: center;
+  padding: 0.9rem;
+  color: inherit;
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+}
+
+.stage-tab > span {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--soft-blue);
+  font-weight: 800;
+}
+
+.stage-tab strong,
+.stage-tab small {
+  min-width: 0;
+}
+
+.stage-tab small {
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.stage-tab-active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 15%, transparent);
+}
+
+.stage-tab-active > span {
+  color: white;
+  background: var(--blue);
+}
+
+.owner-application-tools,
+.form-duplicate-panel,
+.archive-source-panel {
+  margin-bottom: 1.25rem;
+}
+
+.inline-form-grid {
+  align-items: end;
+}
+
+.inline-form-grid .field {
+  flex: 1 1 15rem;
+}
+
+@media (max-width: 720px) {
+  .stage-tabs {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-snap-type: x proximity;
+  }
+
+  .stage-tab {
+    flex: 0 0 15rem;
+    scroll-snap-align: start;
+  }
+}

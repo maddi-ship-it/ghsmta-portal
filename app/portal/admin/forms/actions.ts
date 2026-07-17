@@ -85,12 +85,14 @@ export async function createSection(formVersionId: string, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const sortOrder = parseSortOrder(formData.get("sort_order"));
+  const stageId = String(formData.get("stage_id") ?? "").trim();
 
   if (!title) throw new Error("Section title is required.");
 
   const supabase = await createClient();
   const { error } = await supabase.from("application_sections").insert({
     form_version_id: formVersionId,
+    stage_id: stageId || null,
     title,
     description: description || null,
     sort_order: sortOrder,
@@ -110,13 +112,19 @@ export async function updateSection(
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const sortOrder = parseSortOrder(formData.get("sort_order"));
+  const stageId = String(formData.get("stage_id") ?? "").trim();
 
   if (!title) throw new Error("Section title is required.");
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("application_sections")
-    .update({ title, description: description || null, sort_order: sortOrder })
+    .update({
+      stage_id: stageId || null,
+      title,
+      description: description || null,
+      sort_order: sortOrder,
+    })
     .eq("id", sectionId)
     .eq("form_version_id", formVersionId);
 
@@ -246,4 +254,99 @@ export async function deleteQuestion(formVersionId: string, questionId: string) 
 
   if (error) throw new Error(error.message);
   revalidatePath(`/portal/admin/forms/${formVersionId}`);
+}
+
+
+export async function createStage(formVersionId: string, formData: FormData) {
+  await requireProfile(["owner"]);
+
+  const title = String(formData.get("title") ?? "").trim();
+  const suppliedKey = String(formData.get("stage_key") ?? "").trim();
+  const stageKey = slugifyQuestionKey(suppliedKey || title);
+  const description = String(formData.get("description") ?? "").trim();
+  const sortOrder = parseSortOrder(formData.get("sort_order"));
+  const isInitial = formData.get("is_initial") === "on";
+
+  if (!title || !stageKey) throw new Error("Stage title and key are required.");
+
+  const supabase = await createClient();
+  if (isInitial) {
+    const { error: clearError } = await supabase
+      .from("application_stages")
+      .update({ is_initial: false })
+      .eq("form_version_id", formVersionId);
+    if (clearError) throw new Error(clearError.message);
+  }
+
+  const { error } = await supabase.from("application_stages").insert({
+    form_version_id: formVersionId,
+    stage_key: stageKey,
+    title,
+    description: description || null,
+    sort_order: sortOrder,
+    is_initial: isInitial,
+    applicant_visible: true,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/portal/admin/forms/${formVersionId}`);
+}
+
+export async function updateStage(
+  formVersionId: string,
+  stageId: string,
+  formData: FormData,
+) {
+  await requireProfile(["owner"]);
+
+  const title = String(formData.get("title") ?? "").trim();
+  const stageKey = slugifyQuestionKey(String(formData.get("stage_key") ?? title));
+  const description = String(formData.get("description") ?? "").trim();
+  const sortOrder = parseSortOrder(formData.get("sort_order"));
+  const isInitial = formData.get("is_initial") === "on";
+  const applicantVisible = formData.get("applicant_visible") === "on";
+
+  if (isInitial) {
+    const supabase = await createClient();
+    const { error: clearError } = await supabase
+      .from("application_stages")
+      .update({ is_initial: false })
+      .eq("form_version_id", formVersionId)
+      .neq("id", stageId);
+    if (clearError) throw new Error(clearError.message);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("application_stages")
+    .update({
+      stage_key: stageKey,
+      title,
+      description: description || null,
+      sort_order: sortOrder,
+      is_initial: isInitial,
+      applicant_visible: applicantVisible,
+    })
+    .eq("id", stageId)
+    .eq("form_version_id", formVersionId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/portal/admin/forms/${formVersionId}`);
+}
+
+export async function duplicateFormVersion(
+  sourceFormVersionId: string,
+  formData: FormData,
+) {
+  await requireProfile(["owner"]);
+  const targetCycleId = String(formData.get("target_cycle_id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!targetCycleId) throw new Error("Choose a target program.");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("duplicate_form_version", {
+    p_source_form_version_id: sourceFormVersionId,
+    p_target_cycle_id: targetCycleId,
+    p_name: name || null,
+  });
+  if (error) throw new Error(error.message);
+  redirect(`/portal/admin/forms/${String(data)}`);
 }

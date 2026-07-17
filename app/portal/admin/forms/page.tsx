@@ -13,7 +13,7 @@ export default async function FormsPage() {
   const [{ data: cycles }, { data: versions, error }] = await Promise.all([
     supabase
       .from("award_cycles")
-      .select("id,name,season_year,opens_at,closes_at,is_active,created_at,updated_at")
+      .select("id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at")
       .order("season_year", { ascending: false }),
     supabase
       .from("application_form_versions")
@@ -30,7 +30,7 @@ export default async function FormsPage() {
       <div className="page-heading">
         <div>
           <h1>Application forms</h1>
-          <p>Create a versioned application for each awards cycle.</p>
+          <p>Create staged, versioned forms for every application program.</p>
         </div>
       </div>
 
@@ -77,11 +77,11 @@ export default async function FormsPage() {
           <div className="panel-header"><h2>Create form version</h2></div>
           <div className="panel-body">
             {awardCycles.length === 0 ? (
-              <p>Create an awards cycle before creating its application form.</p>
+              <p>Create an application program before creating its form.</p>
             ) : (
               <form action={createFormVersion} className="form-stack">
                 <div className="field">
-                  <label htmlFor="cycle_id">Awards cycle</label>
+                  <label htmlFor="cycle_id">Application program</label>
                   <select className="select" id="cycle_id" name="cycle_id" required>
                     <option value="">Select a cycle</option>
                     {awardCycles.map((cycle) => (
