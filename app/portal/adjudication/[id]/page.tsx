@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import {
   categoryAverage,
   formatScore,
+  quarterScoreOptions,
 } from "@/lib/adjudication";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -104,6 +105,17 @@ export default async function AdjudicationApplicationPage({
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
   const scale = (scaleResult.data ?? []) as ScoringScaleLevel[];
+  const scoreOptions = quarterScoreOptions(
+  rubric.score_min,
+  rubric.score_max,
+);
+
+const scaleLabels = new Map(
+  scale.map((level) => [
+    Number(level.score),
+    level.label,
+  ]),
+);
   const assignments = (assignmentsResult.data ?? []) as AdjudicatorAssignment[];
   const scorecards = (scorecardsResult.data ?? []) as AdjudicationScorecard[];
   const feedback = (feedbackResult.data ?? []) as AdjudicationPanelFeedback[];
@@ -168,10 +180,31 @@ export default async function AdjudicationApplicationPage({
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
       {query.error === "required" && <div className="form-error page-message">Complete the missing scores and all four comment quadrants before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
 
-      <nav className="score-category-tabs" aria-label="Scoring categories">
-        {categories.map((category, index) => <a href={`#category-${category.id}`} key={category.id}><span>{index + 1}</span>{category.title}</a>)}
-      </nav>
+      <div className="adjudication-score-layout">
+        <aside className="score-category-sidebar">
+          <div className="score-category-sidebar-heading">
+            <span className="eyebrow">Scorecard</span>
+            <h2>Categories</h2>
+            <p>Select a category to jump to that section.</p>
+          </div>
 
+          <nav
+            className="score-category-tabs"
+            aria-label="Scoring categories"
+          >
+            {categories.map((category, index) => (
+              <a
+                href={`#category-${category.id}`}
+                key={category.id}
+              >
+                <span>{index + 1}</span>
+                <strong>{category.title}</strong>
+              </a>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="adjudication-score-content">
       {profile.role === "adjudicator" ? (
         <form className="scorecard-form">
           <section className="panel score-guide-panel">
@@ -205,8 +238,30 @@ export default async function AdjudicationApplicationPage({
                         <article className="criterion-card" key={criterion.id}>
                           <div className="criterion-copy"><h3>{criterion.title}</h3>{criterion.description && <p>{criterion.description}</p>}</div>
                           <div className="criterion-entry">
-                            <div className="field"><label htmlFor={`score_${criterion.id}`}>Score</label><select className="select score-select" id={`score_${criterion.id}`} name={`score_${criterion.id}`} defaultValue={savedScore?.score ?? ""} disabled={readOnly}><option value="">—</option>{scale.map((level) => <option value={level.score} key={level.id}>{formatScore(level.score)} — {level.label}</option>)}</select></div>
-                            <div className="field"><label htmlFor={`observation_${criterion.id}`}>Criterion observation</label><textarea className="textarea compact-textarea" id={`observation_${criterion.id}`} name={`observation_${criterion.id}`} defaultValue={savedScore?.observation ?? ""} disabled={readOnly} /></div>
+<div className="field">
+  <label htmlFor={`score_${criterion.id}`}>Score</label>
+
+  <select
+    className="select score-select"
+    id={`score_${criterion.id}`}
+    name={`score_${criterion.id}`}
+    defaultValue={savedScore?.score ?? ""}
+    disabled={readOnly}
+  >
+    <option value="">—</option>
+
+    {scoreOptions.map((score) => {
+      const label = scaleLabels.get(score);
+
+      return (
+        <option value={score} key={score}>
+          {score.toFixed(2)}
+          {label ? ` — ${label}` : ""}
+        </option>
+      );
+    })}
+  </select>
+</div>                            <div className="field"><label htmlFor={`observation_${criterion.id}`}>Criterion observation</label><textarea className="textarea compact-textarea" id={`observation_${criterion.id}`} name={`observation_${criterion.id}`} defaultValue={savedScore?.observation ?? ""} disabled={readOnly} /></div>
                           </div>
                         </article>
                       );
@@ -284,6 +339,8 @@ export default async function AdjudicationApplicationPage({
           {profile.role === "owner" && <section className="panel release-panel"><div className="panel-header"><div><h2>Release results to the school</h2><p>This creates a separate snapshot. Raw adjudicator scores, identities, observations, and private notes are never exposed to applicant accounts.</p></div></div><div className="panel-body"><form action={releaseAdjudicationResults.bind(null, id)} className="form-stack"><div className="release-choice-grid"><label className="check-card"><input name="release_scores" type="checkbox" /><span><strong>Release category averages</strong><small>Schools receive panel category averages only—not individual adjudicator scores.</small></span></label><label className="check-card"><input name="release_feedback" type="checkbox" /><span><strong>Release approved narratives</strong><small>Only approved final comments are included.</small></span></label></div><div className="field"><label htmlFor="release_notes">Release note</label><textarea className="textarea compact-textarea" id="release_notes" name="release_notes" defaultValue={release?.release_notes ?? ""} /></div><button className="button button-dark" type="submit">Release selected results</button></form></div></section>}
         </>
       )}
+        </div>
+      </div>
     </>
   );
 }

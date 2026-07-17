@@ -508,23 +508,106 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 .badge-scorecard-locked { color: #067647; background: #ecfdf3; }
 .badge-scorecard-reopened { color: #854a0e; background: #fffaeb; }
 
-.score-category-tabs {
+.adjudication-score-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 260px)
+    minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.adjudication-score-content {
+  min-width: 0;
+}
+
+.score-category-sidebar {
   position: sticky;
   z-index: 11;
-  top: calc(70px + env(safe-area-inset-top));
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  margin: 0 0 20px;
-  padding: 10px;
+  top: calc(
+    88px + env(safe-area-inset-top)
+  );
+  max-height: calc(
+    100vh - 110px -
+    env(safe-area-inset-top)
+  );
+  overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(246,247,250,.96);
+  border-radius: 18px;
+  background: rgba(246,247,250,.97);
+  box-shadow:
+    0 12px 34px rgba(7,20,47,.08);
   backdrop-filter: blur(14px);
   scrollbar-width: thin;
 }
-.score-category-tabs a { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 999px; background: white; border: 1px solid var(--line); font-size: .82rem; font-weight: 800; }
-.score-category-tabs span { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 50%; color: white; background: var(--navy-800); font-size: .72rem; }
+
+.score-category-sidebar-heading {
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.score-category-sidebar-heading .eyebrow {
+  color: var(--navy-700);
+}
+
+.score-category-sidebar-heading h2 {
+  margin: 4px 0 5px;
+  font-family: Georgia, serif;
+  font-size: 1.25rem;
+}
+
+.score-category-sidebar-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+.score-category-tabs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+}
+
+.score-category-tabs a {
+  display: grid;
+  grid-template-columns:
+    30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--navy-900);
+  background: transparent;
+  font-size: .82rem;
+  line-height: 1.3;
+}
+
+.score-category-tabs a:hover,
+.score-category-tabs a:focus-visible {
+  border-color: var(--line);
+  background: white;
+  box-shadow:
+    0 5px 16px rgba(7,20,47,.07);
+}
+
+.score-category-tabs strong {
+  min-width: 0;
+  font-weight: 800;
+}
+
+.score-category-tabs span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  background: var(--navy-800);
+  font-size: .72rem;
+}
 
 .scorecard-form { display: grid; gap: 20px; }
 .score-guide-panel { overflow: hidden; }
@@ -628,7 +711,49 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   .mobile-portal-nav { scrollbar-width: none; }
   .mobile-portal-nav a span { font-size: 1.15rem; line-height: 1; }
   .mobile-portal-nav a small { max-width: 100%; overflow: hidden; font-size: .64rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-  .score-category-tabs { top: calc(62px + env(safe-area-inset-top)); }
+  .adjudication-score-layout {
+    display: block;
+  }
+
+  .score-category-sidebar {
+    position: sticky;
+    top: calc(
+      62px + env(safe-area-inset-top)
+    );
+    z-index: 11;
+    max-height: none;
+    overflow: visible;
+    margin-bottom: 20px;
+    border-radius: 16px;
+  }
+
+  .score-category-sidebar-heading {
+    display: none;
+  }
+
+  .score-category-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  .score-category-tabs a {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: white;
+    white-space: nowrap;
+  }
+
+  .score-category-tabs span {
+    width: 23px;
+    height: 23px;
+  }
 }
 
 @media (max-width: 700px) {
