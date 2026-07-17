@@ -1,0 +1,114 @@
+import type {
+  AdjudicationCategoryComment,
+  AdjudicationScore,
+  AdjudicationScorecard,
+  ScoringCategory,
+  ScoringCriterion,
+} from "@/lib/types";
+
+export function average(values: Array<number | null | undefined>) {
+  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (numeric.length === 0) return null;
+  return numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+}
+
+export function categoryAverage(
+  categoryId: string,
+  criteria: ScoringCriterion[],
+  scorecards: AdjudicationScorecard[],
+  scores: AdjudicationScore[],
+) {
+  const criterionIds = new Set(
+    criteria.filter((criterion) => criterion.category_id === categoryId).map((criterion) => criterion.id),
+  );
+  const submittedCardIds = new Set(
+    scorecards.filter((card) => card.status === "submitted" || card.status === "locked").map((card) => card.id),
+  );
+  return average(
+    scores
+      .filter((score) => submittedCardIds.has(score.scorecard_id) && criterionIds.has(score.criterion_id))
+      .map((score) => score.score),
+  );
+}
+
+export function completedCriterionCount(
+  scorecardId: string,
+  criteria: ScoringCriterion[],
+  scores: AdjudicationScore[],
+) {
+  const scoreMap = new Map(
+    scores.filter((score) => score.scorecard_id === scorecardId).map((score) => [score.criterion_id, score.score]),
+  );
+  return criteria.filter((criterion) => scoreMap.get(criterion.id) != null).length;
+}
+
+export function formatScore(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+export function commentsForCategory(
+  category: ScoringCategory,
+  scorecards: AdjudicationScorecard[],
+  comments: AdjudicationCategoryComment[],
+) {
+  const submittedCardIds = new Set(
+    scorecards.filter((card) => card.status === "submitted" || card.status === "locked").map((card) => card.id),
+  );
+  return comments.filter(
+    (comment) => comment.category_id === category.id && submittedCardIds.has(comment.scorecard_id),
+  );
+}
+
+export function buildCommentContext(
+  category: ScoringCategory,
+  criteria: ScoringCriterion[],
+  comments: AdjudicationCategoryComment[],
+) {
+  const criterionText = criteria
+    .filter((criterion) => criterion.category_id === category.id)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((criterion) => `- ${criterion.title}${criterion.description ? `: ${criterion.description}` : ""}`)
+    .join("\n");
+
+  const rawComments = comments
+    .filter((comment) => comment.is_applicable)
+    .map((comment, index) => {
+      const parts = [
+        comment.subject_name ? `Subject: ${comment.subject_name}` : null,
+        comment.successes ? `Successes: ${comment.successes}` : null,
+        comment.success_examples ? `Success examples: ${comment.success_examples}` : null,
+        comment.growth_areas ? `Opportunities for growth: ${comment.growth_areas}` : null,
+        comment.growth_examples ? `Growth examples: ${comment.growth_examples}` : null,
+      ].filter(Boolean);
+      return `Adjudicator ${index + 1}\n${parts.join("\n")}`;
+    })
+    .join("\n\n");
+
+  return { criterionText, rawComments };
+}
+
+export function applyPromptTemplate(
+  template: string,
+  values: Record<string, string>,
+) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{{${key}}}`, value),
+    template,
+  );
+}
+
+export function extractOpenAIText(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const response = payload as {
+    output_text?: string;
+    output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  };
+  if (response.output_text?.trim()) return response.output_text.trim();
+  for (const item of response.output ?? []) {
+    for (const content of item.content ?? []) {
+      if (content.type === "output_text" && content.text?.trim()) return content.text.trim();
+    }
+  }
+  return "";
+}

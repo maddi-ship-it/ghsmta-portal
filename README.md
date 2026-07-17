@@ -74,3 +74,36 @@ For a durable App Store product, the Expo companion app is the recommended long-
 6. Email notifications and deadlines
 7. File uploads and document review
 8. Audit-log viewer and exports
+
+## Adjudication scoring and AI narratives
+
+Run migrations in order through:
+
+```text
+supabase/migrations/005_adjudication_scoring_and_ai.sql
+```
+
+Then seed the rubric recovered from the 2025–2026 scoring workbook:
+
+```bash
+node scripts/seed-2025-2026-scoring.mjs
+```
+
+The scoring module includes:
+
+- 15 GHSMTA scoring categories and 58 criteria from the supplied workbook
+- private adjudicator scorecards and four-part comment quadrants
+- advisory/owner panel review
+- owner-edited ChatGPT prompt and AI-assisted panel narratives
+- owner approval and explicit score/feedback release
+- school access only to released category averages and approved narrative snapshots
+- responsive category tabs and full bottom navigation on phone and iPad layouts
+
+For AI narrative generation, add these server-only variables locally and in Vercel:
+
+```env
+OPENAI_API_KEY=sk-YOUR_OPENAI_API_KEY
+OPENAI_MODEL=gpt-5-mini
+```
+
+Never prefix the OpenAI key with `NEXT_PUBLIC_`.
