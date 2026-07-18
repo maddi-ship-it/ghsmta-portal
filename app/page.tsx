@@ -32,7 +32,7 @@ export default function LandingPage() {
           </Link>
           <nav className="nav-actions" aria-label="Primary navigation">
             <Link className="button button-secondary" href="/login">Sign-In</Link>
-            <Link className="button button-primary" href="/signup">Start an application</Link>
+            <Link className="button button-primary" href="/signup">Sign-Up</Link>
           </nav>
         </div>
       </header>
