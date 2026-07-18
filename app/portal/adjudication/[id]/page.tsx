@@ -217,7 +217,7 @@ export default async function AdjudicationApplicationPage({
           <section className="panel score-guide-panel">
             <div className="panel-header"><div><h2>Scoring guide</h2><p>Use the 1–10 scale in 0.25-point increments. Scores remain private to you, advisory members, and owners.</p></div></div>
             <div className="score-scale-grid">
-              {scale.map((level) => <div key={level.id}><strong>{formatScore(level.score)}</strong><span>{level.label}</span><small>{level.description}</small></div>)}
+              {scale.map((level) => <div key={level.id}><strong>{formatScore(level.score)}</strong><span>{level.label}</span></div>)}
             </div>
           </section>
 
