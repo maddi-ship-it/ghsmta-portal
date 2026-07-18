@@ -70,28 +70,28 @@
         {
           "criterion_key": "vocal_performance_vocal_technique_and_musical_accuracy_pitch_rhythm_diction_brea",
           "title": "VOCAL PERFORMANCE: Vocal Technique and Musical Accuracy (Pitch, Rhythm, Diction, Breath Support)",
-          "description": "Determine how well the music direction supports vocal performance through strong technique and accuracy. The performances should consistently demonstrate pitch accuracy, rhythmic precision, controlled breath support, fluid vocal transitions, and clear diction. The ensemble and soloists should reflect intentional vocal shaping, unified tone, and musical consistency throughout, with attention to phrasing and dynamic expression that support the emotional arc of the music.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "stylistic_choices_lyric_interpretation_and_emotional_storytelling_phrasing_dynam",
           "title": "STYLISTIC CHOICES: Lyric Interpretation and Emotional Storytelling (Phrasing, Dynamics, Expressivity)",
-          "description": "Assess how effectively the music direction shapes vocal delivery to reflect character, intention, and style. There should be purposeful choices in phrasing, dynamics, inflection, and tone that enhance the emotional meaning of each lyric. Both soloists and ensemble members should demonstrate expressivity and nuance that support their characters and the narrative arc. Accent, dialect, and vocal style should be consistent with the world of the musical while contributing to the authenticity and clarity of the storytelling.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "balance_and_blend_balance_and_blend_soloist_vs_ensemble_vocal_parts_voice_vs_acc",
           "title": "BALANCE AND BLEND: Balance and Blend (Soloist vs. Ensemble, Vocal Parts, Voice vs. Accompaniment)",
-          "description": "Evaluate how effectively the music direction ensures balanced and blended sound across vocal and instrumental elements.  Assess the relationship between soloists and ensemble voices, among harmonized vocal parts, and between singers and instrumental accompaniment (live or track). Performers should be clearly heard without overpowering each other or the music overpowering the voices, demonstrating a collaborative and unified sound that supports clarity, storytelling, and musicality.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "story_depiction_musical_storytelling_through_pacing_transitions_and_energy_tempo",
           "title": "STORY DEPICTION: Musical Storytelling Through Pacing, Transitions, and Energy (Tempo, Flow, Section-to-Section Integration)",
-          "description": "Determine how effectively music direction supports the dramatic arc of the story through musical transitions, pacing, and energy. Performers should demonstrate an understanding of how songs function as extensions of dialogue and character development. The transition from spoken word to song should feel seamless, and the tempo, phrasing, and energy should reflect the emotional stakes of the moment. Ensemble and solo work should feel rhythmically alive, emotionally connected, and narratively driven.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         }
@@ -110,28 +110,28 @@
         {
           "criterion_key": "musicianship_musicianship_and_technical_accuracy_intonation_rhythm_ensemble_prec",
           "title": "MUSICIANSHIP: Musicianship and Technical Accuracy (Intonation, Rhythm, Ensemble Precision)",
-          "description": "Evaluate the precision and overall musicality of the orchestra or instrumental ensemble. The music should reflect accurate intonation, solid rhythmic execution, and a unified sound across sections. Performers should effectively follow the conductor or musical cues, demonstrate confident entrances and cutoffs, and play cohesively as an ensemble. The difficulty of the music should be appropriately matched to the musicians’ abilities and executed with consistent clarity, energy, and stylistic awareness.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "equipment_availability_instruments_stands_lighting_and_music_readiness",
           "title": "EQUIPMENT AVAILABILITY: Instruments, stands, lighting, and music readiness.",
-          "description": "Determine whether the instrumental ensemble has the necessary resources to perform effectively and safely. The orchestra should have access to appropriate instruments for the show’s style, readable music, proper stand and lighting setups, and a well-prepared physical environment. Equipment should support accurate, confident performance and reflect thoughtful planning by the music department.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "balance_and_blend_balance_blend_and_collaboration_with_performers_instrumental_m",
           "title": "BALANCE AND BLEND: Balance, Blend, and Collaboration with Performers (Instrumental Mix, Vocal Support, Dynamic Sensitivity)",
-          "description": "Assess how well the orchestra balances internal instrumental sections and supports the vocalists throughout the production. The execution of the music should be a carefully managed blend of instrumental voices, ensuring that no section overpowers another and that singers are supported, not overwhelmed. The ensemble should exhibit sensitivity to dynamics and adjust as needed to maintain a cohesive musical experience that prioritizes both storytelling and musical clarity.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "collaboration_of_stage_action_adaptability_and_responsiveness_to_stage_action_cu",
           "title": "COLLABORATION OF STAGE ACTION: Adaptability and Responsiveness to Stage Action (Cues, Tempo Adjustments, Live Timing)",
-          "description": "Evaluate the orchestra’s ability to adapt in real time to the needs of the stage performance. Musicians who should be alert and responsive to dynamic changes, tempo shifts, and unexpected variations in performance. The ensemble should enhance storytelling by supporting emotional transitions, scenic pacing, and actor delivery, adjusting in the moment with flexibility and precision. Close alignment with stage action ensures that music is not only accurate, but also alive and responsive to the theatrical context.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         }
@@ -150,35 +150,35 @@
         {
           "criterion_key": "execution_and_synchronization_clarity_precision_timing_memorization",
           "title": "EXECUTION AND SYNCHRONIZATION: Clarity, Precision, Timing, Memorization",
-          "description": "Evaluates how cleanly and consistently the choreography is performed by the ensemble or cast. Precision of movement, synchronized timing, and full memorization reflect the level of preparation and rehearsal. The choreography should appear confident, unified, and rhythmically tight across all performers.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "storytelling_through_movement_emotional_connection_narrative_function_style",
           "title": "STORYTELLING THROUGH MOVEMENT:  Emotional Connection, Narrative Function, Style",
-          "description": "Evaluates how well the choreography supports and enhances the storytelling of the production. Movement should serve a narrative purpose, reveal emotional subtext, and reflect the style and tone of the musical. The choreography that deepens audience understanding of character, plot, or theme—rather than simply adding energy or decoration.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "use_of_space_and_formations_levels_shapes_traffic_patterns",
           "title": "USE OF SPACE AND FORMATIONS: Levels, Shapes, Traffic Patterns",
-          "description": "Effective use of the stage space offering levels, stage pictures and variety of patterns. The amount of students in the choreography was appropriate for the alotted dance space and took advantage of set pieces to provide visual appeal.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "safety_suitability_and_performer_adaptation_challenge_level_risk_management_move",
           "title": "SAFETY, SUITABILITY, AND PERFORMER ADAPTATION: Challenge Level, Risk Management, Movement Modification",
-          "description": "This criterion evaluates whether choreography is appropriately tailored to the performers’ skill level and safely executed. It considers the physical demands of the movement, the safety measures taken for high-risk elements (e.g., lifts, combat, acrobatics), and how well choreography was adapted to fit the cast's abilities while remaining in sync with the music and narrative. Challenging movement should be executed confidently and safely, without compromising performer well-being or storytelling clarity. To see the particular guidelines for theatrical weaponry use, please refer to the AEA guidelines below.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         },
         {
           "criterion_key": "collaboration_to_achieve_the_director_s_vision_integration_of_choreography_with_",
           "title": "COLLABORATION TO ACHIEVE THE DIRECTOR'S VISION: Integration of choreography with staging, storytelling, design, and musical elements",
-          "description": "Reflects how effectively the choreography works in concert with the director’s overall vision and the contributions of other creative departments such as music direction, scenic design, and costuming. It reflects intentional, integrated choices that support storytelling, tone, and staging across all elements, rather than choreography existing in isolation or in conflict with other production components.",
+          "description": " ",
           "weight": 1,
           "sort_order": 5
         }
@@ -197,28 +197,28 @@
         {
           "criterion_key": "characterization_commitment_and_focus_intention_presence_and_immersion",
           "title": "CHARACTERIZATION: Commitment and Focus (Intention, Presence, and Immersion)",
-          "description": "Demonstrated well-developed characters with objectives and evolution; consistently maintained the characters throughout the show. They have a clear focus, are intentional, and fully immersed in the scene, regardless of whether featured or in the background. Each performer contributes to the atmosphere and storytelling with active, believable engagement.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "skill_execution_vocal_unity_and_expressive_support_blend_diction_dynamics_charac",
           "title": "SKILL EXECUTION: Vocal Unity and Expressive Support (Blend, Diction, Dynamics, Character Voice & Vocal Quality)",
-          "description": "This criterion evaluates how well the ensemble uses vocal technique to support storytelling and maintain cohesion. Assessing precision in harmonies, clarity in diction, expressive use of dynamics, and consistent character voice. Performers demonstrate intentional vocal choices that reflect character, advance the narrative, and align with the emotional tone of the scene—enhancing both their individual contributions and the overall impact of the ensemble and overarching narrative.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "movement_precision_and_spatial_awareness_choreographic_unity_traffic_flow_group_",
           "title": "MOVEMENT PRECISION AND SPATIAL AWARENESS: Choreographic Unity, Traffic Flow, Group Formations",
-          "description": "Evaluates the ensemble’s ability to execute movement with clarity, control, and awareness of spacing and patterns. Assesing synchronized choreography, smooth transitions, and intentional formations that support storytelling. Performers move confidently through shared space, maintaining character and purpose while contributing to clean visuals and fluid traffic flow that enhance the overall composition of the scene.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "connection_support_of_style_and_world_of_the_show_tone_genre_physicality",
           "title": "CONNECTION: Support of Style and World of the Show (Tone, Genre, Physicality)",
-          "description": "Ensemble members demonstrate on-stage relationships with other characters without pulling focus, working as a cohesive team/cast. Evaluates how effectively the ensemble embodies the tone and style of the production through consistent physical and vocal choices. Assess how performers adapt their energy, movement, and vocal quality to suit the genre (whether classic, contemporary, stylized, or naturalistic) and who contribute to a unified theatrical world. Their presence reinforces the director’s vision and helps transport the audience into the story’s setting and emotional landscape.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         }
@@ -237,21 +237,21 @@
         {
           "criterion_key": "fluidity_of_technical_cues_and_stage_transitions",
           "title": "FLUIDITY OF TECHNICAL CUES AND STAGE TRANSITIONS",
-          "description": "Demonstrated smooth integration and execution of all technical elements within the production (sound, lighting, spotlights, projection, special fx (fog, smog, haze, fire, etc.). Assess seamlessness of transitions, well-timed, and in rhythm with the pacing and emotional tone of the show. Technical elements should enhance, not interrupt, the storytelling, demonstrating clear communication among the technical team and integration with the director’s staging.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "creative_collaboration_and_technical_integration",
           "title": "CREATIVE COLLABORATION AND TECHNICAL INTEGRATION",
-          "description": "Evaluate how effectively the technical team supports and enhances the creative vision of the production through integrated design and execution. The technical work should feel like an extension of the storytelling, not an afterthought or disconnected layer.Technical components should feel purposeful, artistically cohesive, and well-coordinated with direction, choreography, and performance to elevate the overall theatrical experience. Assess the thoughtful implementation of special features (such as projections, atmospheric effects, Foley artistry, flying, or automated elements) that serve the story and style.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "crew_professionalism_and_execution",
           "title": "CREW: Professionalism and Execution",
-          "description": "This criterion evaluates the performance and professionalism of the backstage crew, including their execution of cues, transitions, and assigned responsibilities. Assess if they were a well-trained, well-dressed crew that operates as a cohesive unit—communicating effectively, following procedures, and supporting the production with minimal disruption. Strong leadership (e.g., stage manager or crew heads) should be evident through confident cue calling and coordination that results in smooth, timely transitions and a controlled backstage environment.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         }
@@ -270,28 +270,28 @@
         {
           "criterion_key": "focal_points_visibility_and_focus_illumination_and_actor_spectacle_clarity",
           "title": "FOCAL POINTS: Visibility and Focus (Illumination and Actor/Spectacle Clarity)",
-          "description": "Evaluate how effectively the lighting design guides the audience’s attention by illuminating key moments, performers, and visual elements. The design should be consistent in clarity and visibility, enhancing storytelling, ensuring that actors, choreography, and design features are clearly seen. Lighting choices should reinforce staging and composition, directing focus with purpose while maintaining aesthetic cohesion.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "story_elements_mood_tone_and_artistic_design",
           "title": "STORY ELEMENTS: Mood, Tone, and Artistic Design",
-          "description": "Assess how lighting is used to support the thematic and emotional storytelling of the production. The design should consist of intentional use of color, texture, and light direction to establish mood, suggest time of day or location, and reinforce the style and tone of the show. Strong designs incorporate dynamic effects (such as specials, gobos, shadows, or stylized moments) to artistically enhance narrative beats and immerse the audience in the world of the musical.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "creative_collaboration",
           "title": "CREATIVE COLLABORATION",
-          "description": "Evaluates how effectively the technical team contributes to the production’s artistic storytelling through coordinated, creative choices. Assess the strong collaboration with the director and design team, where every technical element (lighting, sound, effects, and transitions) works intentionally to heighten the emotional, visual, and narrative impact. The best examples showcase a deep understanding of how technical artistry can serve and enhance the overall theatrical experience.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "equipment_use_and_setup",
           "title": "EQUIPMENT: Use and Setup",
-          "description": "Determine the quality and appropriateness of the lighting equipment used to support the design and storytelling of the production. Assess fixture choices, effective programming that allows for consistent execution that suits the size, style, and tone of the musical. Consideration is given to the flexibility, focus, and responsiveness of the lighting setup (whether traditional or digital) and how well it enables the design vision to be realized clearly and cleanly throughout the performance.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         }
@@ -310,28 +310,28 @@
         {
           "criterion_key": "story_elements_aesthetic_and_intentional_use_of_sound",
           "title": "STORY ELEMENTS: Aesthetic and Intentional Use of Sound",
-          "description": "Evaluates the artistic and intentional use of sound design in the production. Assessment reflects on creative integration of effects, ambiance, and transitions that support the emotional and narrative flow of the show. Effective sound design shapes the world of the story, aligns with the director’s vision, and elevates audience immersion through stylistic and technical cohesion.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "balance_between_orchestra_track_and_voices",
           "title": "BALANCE: Between Orchestra/Track and Voices",
-          "description": "Evaluates how well the sound design achieves a clear, intentional balance between music and vocals.  Design and programming should ensure consistent audibility and blend across soloists, ensemble members, and instrumentalists—whether performing with a live orchestra or a track. Balance should support storytelling and emotional nuance without overpowering or obscuring any vocal or musical elements.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "creative_collaboration",
           "title": "CREATIVE COLLABORATION",
-          "description": "Evaluates how well the sound design collaborates with direction and other creative teams to reinforce the tone, pacing, and world of the production. The assessment should reflect on  the use of a unified approach where sound is not only technically effective but artistically aligned with lighting, blocking, transitions, and music. Design choices should feel purposeful and integrated rather than layered on.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "equipment_use_and_setup",
           "title": "EQUIPMENT: Use and Setup",
-          "description": "Evaluates how well the sound equipment is selected, configured, and implemented to support the production’s needs and design goals. Assessment reflects the reliability and appropriateness of the system to  deliver consistent clarity and presence across vocals, effects, and music. Thoughtful mic placement, coverage, and responsiveness are essential to a strong audio experience.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         }
@@ -350,35 +350,35 @@
         {
           "criterion_key": "storytelling_through_scenic_concept_and_visual_design",
           "title": "STORYTELLING: Through Scenic Concept and Visual Design",
-          "description": "Evaluates how well the scenic design communicates and enhances the story, setting, and emotional arc of the production. This area is a reflection of a cohesive visual concept that supports the director’s vision, period, and style of the show. Scenic elements, including backdrops, set pieces, levels, and texture, should feel purposeful and imaginative, contributing to mood, transitions, and narrative clarity throughout the performance.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "construction_quality_and_functionality",
           "title": "CONSTRUCTION QUALITY AND FUNCTIONALITY",
-          "description": "Assess s the durability, adaptability, and practicality of the scenic elements.  Sets should be well-constructed, safely built, and functional for storytelling demands, including movement, choreography, and transitions. Scenic units, platforms, props, and furniture should contribute to the show’s world while enhancing actors’ ability to move fluidly through scenes. The construction should maximize available space and support both visual and narrative effectiveness.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "use_of_space_levels_and_movement_pathways",
           "title": "USE OF SPACE,  LEVELS AND MOVEMENT PATHWAYS",
-          "description": "Determine how effectively the scenic design utilizes vertical and horizontal space to support blocking, choreography, and visual storytelling. There should be purposeful use of levels, depth, and actor pathways that enable smooth movement, dynamic staging, and strong visual composition. Scenery should guide the audience’s focus while also providing variety and flexibility for performers throughout the production.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "visual_statement_mediums_and_detail",
           "title": "VISUAL STATEMENT: Mediums and Detail",
-          "description": "Evaluate the creativity and craftsmanship of the materials, textures, finishes, and stylistic details used in the scenic design. Assess the choices of construction materials, painting techniques, surface treatments, and decorative elements that contribute to the show’s world. Scenic elements should not only be functional, but also visually compelling and consistent in aesthetic, scale, and detail across the production.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         },
         {
           "criterion_key": "creative_collaboration",
           "title": "CREATIVE COLLABORATION",
-          "description": "Evaluates how effectively the scenic designer and construction team work in partnership with the director and other creative departments to support the production’s concept. Evaluate how the scenery not only reflects artistic intent but also functions in harmony with choreography, blocking, lighting, and costume design. Design choices and construction solutions should demonstrate intentionality, innovation/creativity, and alignment with the production’s tone and storytelling needs.",
+          "description": " ",
           "weight": 1,
           "sort_order": 5
         }
@@ -397,28 +397,28 @@
         {
           "criterion_key": "story_elements_storytelling_through_style_color_and_period_accuracy",
           "title": "STORY ELEMENTS: Storytelling Through Style, Color, and Period Accuracy",
-          "description": "This criterion evaluates how costume design choices reinforce narrative, character, and setting through the intentional use of color palette, silhouette, fabric, and period accuracy. Assessment reflects design work that communicates theme and tone while supporting the believability of time and place. The use of style and visual storytelling should be specific, cohesive, and enhance the audience’s understanding of the world of the production.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "visual_statement_construction_fit_and_functionality",
           "title": "VISUAL STATEMENT: Construction, Fit, and Functionality",
-          "description": "Impactful use of shapes, textures, colors, and attention to detail to enhance the overall artistic vision. Assessed by the quality of costume construction, the appropriateness of fit for each performer, and how well the garments support the demands of performance. The clean build or alterations, being appropriately tailored, and durable enough for movement, quick changes, and full-stage use. Costumes should contribute to the production’s visual identity while allowing performers to act, sing, and dance with ease and confidence.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "individual_characterization_accessories_hair_wig_cohesive_look",
           "title": "INDIVIDUAL CHARACTERIZATION: Accessories, Hair/Wig, Cohesive Look",
-          "description": "Evaluates how well costume design supports individual character identity through thoughtful choices in accessories, hair/wig styling, and the overall look that demonstrates appropriateness to the style and artistic vision of the musical. The assessment looks at consistent and intentional details that reinforce character traits, status, and arc (physical and aesthetic appearance, economic status, social class, occupation, gender, age, relationship between characters, etc.). These elements should align with the world of the production and function cohesively with each performer’s movement, voice, and role in the story.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "creative_collaboration",
           "title": "CREATIVE COLLABORATION",
-          "description": "Evaluates the effectiveness of the costume designer and construction team in collaborating with the director, choreographer, and other departments to support the production’s aesthetic and storytelling goals.  Intentional costume choices should complement character, movement, staging, and visual tone. The design and execution should enhance both narrative and performance without impeding transitions, choreography, or technical elements.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         }
@@ -437,21 +437,21 @@
         {
           "criterion_key": "character_development_arc",
           "title": "CHARACTER DEVELOPMENT & ARC",
-          "description": "Assess how clearly and compellingly the performer develops and sustains the character’s emotional journey throughout the production. Their choices should be intentional and grounded in a thorough understanding of the character’s backstory and motivations. Performers demonstrate clear objectives, present-moment responsiveness, and dynamic relationships with scene partners. Strong scores reflect vulnerability, active listening, and character evolution aligned with the show’s narrative structure.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "technical_artistic_skill_vocal_technique_and_musical_storytelling",
           "title": "TECHNICAL/ARTISTIC SKILL: Vocal Technique and Musical Storytelling",
-          "description": "Evaluate the performer’s vocal technique and how effectively their singing supports the character’s emotional arc and the advancement of the story. High scores reflect mastery in pitch accuracy, breath control, diction, articulation, phrasing, and musical timing. Performers should use their voice with expressive clarity, stylistic awareness, and character-appropriate choices that integrate seamlessly with movement, acting, and the pacing of the production.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "performance_stage_presence_focus_physical_commitment_and_connection",
           "title": "PERFORMANCE: Stage Presence, Focus, Physical Commitment, and Connection",
-          "description": "This criterion evaluates the performer’s presence, confidence, and ability to maintain focus, energy, and character throughout the production. The performer should remain physically and emotionally connected to the role and to scene partners, directing focus with intention and embodying the style and emotional tone of the production. Movement, line delivery, and expression should feel organic and appropriately paced, reinforcing the director’s vision while demonstrating collaboration, commitment, and joy in performance.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         }
@@ -470,21 +470,21 @@
         {
           "criterion_key": "character_development_arc",
           "title": "CHARACTER DEVELOPMENT & ARC",
-          "description": "Assess how clearly and compellingly the performer develops and sustains the character’s emotional journey throughout the production. Their choices should be intentional and grounded in a thorough understanding of the character’s backstory and motivations. Performers demonstrate clear objectives, present-moment responsiveness, and dynamic relationships with scene partners. Strong scores reflect vulnerability, active listening, and character evolution aligned with the show’s narrative structure.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "technical_artistic_skill_vocal_technique_and_musical_storytelling",
           "title": "TECHNICAL/ARTISTIC SKILL: Vocal Technique and Musical Storytelling",
-          "description": "Evaluate the performer’s vocal technique and how effectively their singing supports the character’s emotional arc and the advancement of the story. High scores reflect mastery in pitch accuracy, breath control, diction, articulation, phrasing, and musical timing. Performers should use their voice with expressive clarity, stylistic awareness, and character-appropriate choices that integrate seamlessly with movement, acting, and the pacing of the production.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "performance_stage_presence_focus_physical_commitment_and_connection",
           "title": "PERFORMANCE: Stage Presence, Focus, Physical Commitment, and Connection",
-          "description": "Determine the performer’s presence, confidence, and ability to maintain focus, energy, and character throughout the production. The performer should remain physically and emotionally connected to the role and to scene partners, directing focus with intention and embodying the style and emotional tone of the production. Movement, line delivery, and expression should feel organic and appropriately paced, reinforcing the director’s vision while demonstrating collaboration, commitment, and joy in performance.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         }
@@ -503,21 +503,21 @@
         {
           "criterion_key": "character_development_character_specificity_and_relationship_development",
           "title": "CHARACTER DEVELOPMENT: Character Specificity and Relationship Development",
-          "description": "Evaluate how clearly the performer establishes a distinct and believable character, even within a limited role. High scores reflect a thorough understanding of the character’s backstory and objectives, as well as present-moment choices that are intentional and emotionally grounded. Performers demonstrate dynamic relationships with scene partners through active listening, appropriate focus sharing, and emotionally connected interactions. The characterization should be specific, consistent, and in support of the overall narrative.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "technical_artistic_skill_vocal_movement_technique",
           "title": "TECHNICAL/ARTISTIC SKILL: Vocal & Movement Technique",
-          "description": "Assess the performer’s vocal and physical technique as it applies to the storytelling demands of their role. The performer should demonstrate confidence and consistency in  pitch accuracy, diction, articulation, breath control, phrasing, and movement precision. Performers use their bodies and voices with stylistic clarity and purpose, maintaining character integrity while supporting the rhythm, tone, and pace of each scene or musical number.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "connection_presence_timing_and_ensemble_contribution",
           "title": "CONNECTION: Presence, Timing, and Ensemble Contribution",
-          "description": "Evaluate how effectively the performer engages with the audience, scene partners, and ensemble through presence, timing, and active support of the world of the production. The performer should remain focused and in character throughout, using physical and vocal choices that enhance individual and ensemble storytelling. Their energy and timing contribute to the rhythm and clarity of scenes, while also sharing focus appropriately and helping to elevate moments they do not lead.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         }
@@ -536,21 +536,21 @@
         {
           "criterion_key": "character_development_character_specificity_and_relationship_development",
           "title": "CHARACTER DEVELOPMENT: Character Specificity and Relationship Development",
-          "description": "Evaluate how clearly the performer establishes a distinct and believable character, even within a limited role. High scores reflect a thorough understanding of the character’s backstory and objectives, as well as present-moment choices that are intentional and emotionally grounded. Performers demonstrate dynamic relationships with scene partners through active listening, appropriate focus sharing, and emotionally connected interactions. The characterization should be specific, consistent, and in support of the overall narrative.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "technical_artistic_skill_vocal_movement_technique",
           "title": "TECHNICAL/ARTISTIC SKILL: Vocal & Movement Technique",
-          "description": "Assess the performer’s vocal and physical technique as it applies to the storytelling demands of their role. The performer should demonstrate confidence and consistency in  pitch accuracy, diction, articulation, breath control, phrasing, and movement precision. Performers use their bodies and voices with stylistic clarity and purpose, maintaining character integrity while supporting the rhythm, tone, and pace of each scene or musical number.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "connection_presence_timing_and_ensemble_contribution",
           "title": "CONNECTION: Presence, Timing, and Ensemble Contribution",
-          "description": "Evaluate how effectively the performer engages with the audience, scene partners, and ensemble through presence, timing, and active support of the world of the production. The performer should remain focused and in character throughout, using physical and vocal choices that enhance individual and ensemble storytelling. Their energy and timing contribute to the rhythm and clarity of scenes, while also sharing focus appropriately and helping to elevate moments they do not lead.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         }
@@ -569,21 +569,21 @@
         {
           "criterion_key": "character_development_character_impact_and_memorability",
           "title": "CHARACTER DEVELOPMENT: Character Impact and Memorability",
-          "description": "Assess how effectively the performer creates a memorable, character-specific presence in a limited stage time. The performer should have clear objectives, make bold choices, and have a deep understanding of the character’s function within the story. Performers should demonstrate intentionality, present-moment responsiveness, and dynamic relationships, using voice, movement, and emotional connection to make a lasting impact. Even in brief scenes, the character should contribute meaningfully to the overall narrative and emotional arc of the production.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "technical_artistic_skill_vocal_and_physical_expression_in_short_scenes_or_solos",
           "title": "TECHNICAL/ARTISTIC SKILL: Vocal and Physical Expression in Short Scenes or Solos",
-          "description": "Evaluate the performer’s use of vocal and physical technique to support storytelling within a brief appearance. The performer should demonstrate control, clarity, and expressive choices in pitch, diction, breath support, phrasing, movement, and gestures. Even in short scenes or solos, the performer should demonstrate a strong understanding of timing, rhythm, and physical presence, using these tools to enhance character and leave a lasting impression.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "performance_timing_focus_and_scene_awareness",
           "title": "PERFORMANCE: Timing, Focus, and Scene Awareness",
-          "description": "Evaluating how well the performer stays present and connected within their scene, contributing to the timing, rhythm, and clarity of the moment. The performer demonstrates strong spatial and emotional awareness, precise cue pickup, behaviors that are consistently in-character, and appropriate sharing of focus. Even with brief stage time, the performer should elevate the scene by enhancing ensemble flow, reacting authentically, and grounding the character’s purpose within the larger storytelling arc.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         }
@@ -602,42 +602,42 @@
         {
           "criterion_key": "artistic_vision_unification_of_staging_design_tone_and_drive",
           "title": "ARTISTIC VISION: Unification of Staging, Design, Tone, and Drive",
-          "description": "Evaluate the director’s ability to create and sustain a cohesive artistic vision throughout the production. Consider the intentional unification of staging, tone, pacing, and all design elements—including lights, sound, set, props, and costumes—to serve the story and overall desired vision. The production should feel fluid and cohesive, with clear momentum and a visual and emotional throughline that reflects the director’s leadership and concept.",
+          "description": " ",
           "weight": 1,
           "sort_order": 1
         },
         {
           "criterion_key": "story_depiction_structure_authors_intent_style_setting_cultural_background",
           "title": "STORY DEPICTION: Structure, Author’s Intent, Style, Setting, Cultural Background",
-          "description": "Assess how well the direction reflects and supports the structure, meaning, and stylistic integrity of the script. There is a clear understanding of the author's intent, the cultural and historical context, and the theatrical conventions of the piece. Whether staying traditional or interpreting the work through a fresh lens, the director should maintain the core message of the show while using staging, tone, and storytelling choices that support the world of the script.",
+          "description": " ",
           "weight": 1,
           "sort_order": 2
         },
         {
           "criterion_key": "casting_physical_and_vocal_suitability_character_authenticity",
           "title": "CASTING: Physical and Vocal Suitability, Character Authenticity",
-          "description": "Determine how effectively the director casts performers who embody the physical, vocal, and emotional qualities needed for their roles. The casting choices align with character traits, story demands, and the stylistic world of the show. Roles should be filled by students who can authentically portray the character’s age, status, and personality through voice, movement, and emotional range, while also fitting within the director’s concept and vision.",
+          "description": " ",
           "weight": 1,
           "sort_order": 3
         },
         {
           "criterion_key": "stage_space_blocking_and_use",
           "title": "STAGE SPACE: Blocking and Use",
-          "description": "Evaluate how effectively the director uses stage space to shape storytelling, composition, and audience focus. Blocking should be purposeful and align with character objectives, scene transitions that are swift and intentional, and fluid movement that adapts to setting changes. Blocking should guide the audience’s eye, reinforce relationships, and support the pacing and tone of the production. The staging should demonstrate respect for and integration of all production areas, allowing lighting, scenery, and ensemble work to function cohesively.",
+          "description": " ",
           "weight": 1,
           "sort_order": 4
         },
         {
           "criterion_key": "main_character_development_motivation_objective_vocal_clarity_staging_emotional_",
           "title": "MAIN CHARACTER DEVELOPMENT: Motivation, Objective, Vocal Clarity, Staging, Emotional Range",
-          "description": "Assess the director’s ability to guide performers in creating layered and intentional portrayals of principal characters. There should be clear character objectives, consistent pacing and rhythm, and purposeful movement that supports the emotional journey of the role. Performers demonstrate vocal clarity, articulation, and expressive delivery, while using physicality, props, and costumes effectively. Character development should align with the story arc and director’s vision while remaining safe, grounded, and emotionally resonant throughout the production.",
+          "description": " ",
           "weight": 1,
           "sort_order": 5
         },
         {
           "criterion_key": "ensemble_character_development_collective_intent_focus_individualization_support",
           "title": "ENSEMBLE CHARACTER DEVELOPMENT: Collective Intent, Focus, Individualization, Supportive Action",
-          "description": "Determine how effectively the director guides the ensemble to perform with purpose, character specificity, and unified storytelling. The ensemble remains actively engaged throughout each scene, with individual performers demonstrating distinct character choices that support the story without drawing unnecessary focus. The ensemble functions as both individuals and a cohesive unit, contributing to mood, rhythm, and narrative progression while showing awareness of their role in the broader storytelling landscape.",
+          "description": " ",
           "weight": 1,
           "sort_order": 6
         }
