@@ -1,0 +1,133 @@
+
+> ghsmta-awards-backbone@0.1.0 build
+> next build
+
+▲ Next.js 16.2.10 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 5 errors:
+./app/portal/adjudication/[id]/page.tsx:10:1
+Module not found: Can't resolve '@/components/rich-text-field'
+  [90m 8 |[0m [36mimport[0m { [33mAdjudicatorAutosave[0m } [36mfrom[0m [32m"@/components/adjudicator-autosave"[0m;
+  [90m 9 |[0m [36mimport[0m { [33mOwnerLiveAdjudicationReview[0m } [36mfrom[0m [32m"@/components/owner-live-adjudication-review"[0m;
+[31m[1m>[0m [90m10 |[0m [36mimport[0m { [33mRichTextField[0m } [36mfrom[0m [32m"@/components/rich-text-field"[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m11 |[0m [36mimport[0m { [33mScorecardSubmitControls[0m } [36mfrom[0m [32m"@/components/scorecard-submit-controls"[0m;
+  [90m12 |[0m [36mimport[0m { requireProfile } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m13 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m"@/lib/supabase/server"[0m;
+
+Import map: aliased to relative './components/rich-text-field' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./app/portal/adjudication/[id]/actions.ts:13:1
+Module not found: Can't resolve '@/lib/rich-text'
+  [90m11 |[0m } [36mfrom[0m [32m"@/lib/adjudication"[0m;
+  [90m12 |[0m [36mimport[0m { requireProfile } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m13 |[0m [36mimport[0m { richTextHasContent, sanitizeRichTextHtml } [36mfrom[0m [32m"@/lib/rich-text"[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m14 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m"@/lib/supabase/server"[0m;
+  [90m15 |[0m [36mimport[0m [36mtype[0m {
+  [90m16 |[0m   [33mAdjudicationCategoryComment[0m,
+
+Import map: aliased to relative './lib/rich-text' inside of [project]/
+
+
+Import trace:
+  Server Component:
+    ./app/portal/adjudication/[id]/actions.ts
+    ./app/portal/adjudication/[id]/page.tsx
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./components/owner-live-adjudication-review.tsx:12:1
+Module not found: Can't resolve '@/lib/rich-text'
+  [90m10 |[0m [36mimport[0m { formatScore } [36mfrom[0m [32m"@/lib/adjudication"[0m;
+  [90m11 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m"@/lib/supabase/client"[0m;
+[31m[1m>[0m [90m12 |[0m [36mimport[0m { richTextHasContent, richTextToPlainText, sanitizeRichTextHtml } [36mfrom[0m [32m"@/lib/rich-text"[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m13 |[0m [36mimport[0m [36mtype[0m {
+  [90m14 |[0m   [33mAdjudicationCategoryComment[0m,
+  [90m15 |[0m   [33mAdjudicationPanelFeedback[0m,
+
+Import map: aliased to relative './lib/rich-text' inside of [project]/
+
+
+Import trace:
+  Server Component:
+    ./components/owner-live-adjudication-review.tsx
+    ./app/portal/adjudication/[id]/page.tsx
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./components/scorecard-submit-controls.tsx:6:1
+Module not found: Can't resolve '@/lib/rich-text'
+  [90m4 |[0m
+  [90m5 |[0m [36mimport[0m { saveAdjudicatorScorecard } [36mfrom[0m [32m"@/app/portal/adjudication/[id]/actions"[0m;
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { richTextHasContent } [36mfrom[0m [32m"@/lib/rich-text"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m [36mtype[0m { [33mScoringCategory[0m, [33mScoringCriterion[0m } [36mfrom[0m [32m"@/lib/types"[0m;
+  [90m8 |[0m
+  [90m9 |[0m [36mtype[0m [33mCompletionState[0m = {
+
+Import map: aliased to relative './lib/rich-text' inside of [project]/
+
+
+Import trace:
+  Server Component:
+    ./components/scorecard-submit-controls.tsx
+    ./app/portal/adjudication/[id]/page.tsx
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./lib/adjudication.ts:9:1
+Module not found: Can't resolve '@/lib/rich-text'
+  [90m 7 |[0m } [36mfrom[0m [32m"@/lib/types"[0m;
+  [90m 8 |[0m
+[31m[1m>[0m [90m 9 |[0m [36mimport[0m { richTextToPlainText } [36mfrom[0m [32m"@/lib/rich-text"[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m10 |[0m
+  [90m11 |[0m [36mexport[0m [36mfunction[0m average(values: [33mArray[0m<number | [36mnull[0m | [36mundefined[0m>) {
+  [90m12 |[0m   [36mconst[0m numeric = values.filter((value): value is number => [36mtypeof[0m value === [32m"number"[0m && [33mNumber[0m.isFinite(value));
+
+Import map: aliased to relative './lib/rich-text' inside of [project]/
+
+
+Import traces:
+  Server Component:
+    ./lib/adjudication.ts
+    ./app/portal/results/page.tsx
+
+  Client Component Browser:
+    ./lib/adjudication.ts [Client Component Browser]
+    ./components/owner-live-adjudication-review.tsx [Client Component Browser]
+    ./components/owner-live-adjudication-review.tsx [Server Component]
+    ./app/portal/adjudication/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/adjudication.ts [Client Component SSR]
+    ./components/owner-live-adjudication-review.tsx [Client Component SSR]
+    ./components/owner-live-adjudication-review.tsx [Server Component]
+    ./app/portal/adjudication/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./app/portal/adjudication/[id]/page.tsx:10:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./app/portal/adjudication/[id]/actions.ts:13:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./components/owner-live-adjudication-review.tsx:12:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./components/scorecard-submit-controls.tsx:6:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./lib/adjudication.ts:9:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)

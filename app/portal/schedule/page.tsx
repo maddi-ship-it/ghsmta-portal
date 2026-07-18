@@ -377,7 +377,7 @@ export default async function SchedulePage({
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="school_booking_opens_at">Scheduled school opening</label>
+                <label htmlFor="school_booking_opens_at">Releases for Selection</label>
                 <input
                   className="input"
                   id="school_booking_opens_at"
