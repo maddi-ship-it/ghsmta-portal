@@ -1526,3 +1526,178 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   .mobile-panel-comment-label { display: block; }
   .personal-score-column { max-width: 260px; }
 }
+
+/* GHSMTA full-width scoring workspace — START */
+
+/* Break the scoring workspace out of the portal's centered content column. */
+.adjudication-score-layout {
+  width: calc(100vw - 24px);
+  max-width: 1920px;
+  margin-left: calc(50% - 50vw + 12px);
+  grid-template-columns: minmax(210px, 238px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.adjudication-score-content,
+.scorecard-form {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+/* Put the category navigation against the left edge of the workspace. */
+.score-category-sidebar {
+  top: calc(76px + env(safe-area-inset-top));
+  max-height: calc(100vh - 92px - env(safe-area-inset-top));
+  border-radius: 14px;
+}
+
+/* The scoring guide remains available, but does not consume card-within-card space. */
+.score-guide-panel {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.score-guide-panel .panel-header {
+  padding-inline: 0;
+}
+
+/* Remove the outer card/container around each scoring category. */
+.score-category-panel.panel {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.score-category-panel > .panel-header {
+  padding: 24px 0 14px;
+  border-bottom: 2px solid var(--navy-800);
+  background: transparent;
+}
+
+.score-category-panel > .panel-body {
+  padding: 16px 0 34px;
+}
+
+/* Use all available width for criterion, three comment columns, and score. */
+.collaborative-criterion-table {
+  overflow: visible;
+  width: 100%;
+  margin: 18px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+}
+
+.collaborative-criterion-table-header,
+.collaborative-criterion-row {
+  grid-template-columns:
+    minmax(190px, .72fr)
+    minmax(0, 3fr)
+    minmax(108px, 124px);
+  min-width: 0;
+  gap: 10px;
+}
+
+.collaborative-criterion-table-header {
+  top: calc(64px + env(safe-area-inset-top));
+  padding: 10px 12px;
+}
+
+.collaborative-criterion-row {
+  padding: 14px 12px;
+}
+
+.panel-comment-columns {
+  grid-template-columns:
+    repeat(var(--panel-comment-count), minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.panel-comment-column-headings span {
+  padding-inline: 7px;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.panel-criterion-comment {
+  padding: 9px;
+  border-radius: 10px;
+}
+
+.panel-criterion-comment-peer {
+  min-height: 132px;
+}
+
+.panel-criterion-comment .rich-text-editor {
+  min-height: 88px;
+}
+
+.personal-score-column {
+  padding: 9px;
+  border-radius: 10px;
+}
+
+.private-category-notes {
+  margin-top: 14px;
+}
+
+/* Very wide displays can show larger comment columns without stretching forever. */
+@media (min-width: 1700px) {
+  .adjudication-score-layout {
+    width: calc(100vw - 40px);
+    margin-left: calc(50% - 50vw + 20px);
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .collaborative-criterion-table-header,
+  .collaborative-criterion-row {
+    grid-template-columns:
+      minmax(220px, .8fr)
+      minmax(0, 3fr)
+      126px;
+    gap: 12px;
+  }
+}
+
+/* Keep the existing single-column mobile experience. */
+@media (max-width: 1100px) {
+  .adjudication-score-layout {
+    display: block;
+    width: auto;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .score-category-sidebar {
+    max-height: none;
+  }
+
+  .collaborative-criterion-table {
+    overflow: visible;
+    border-radius: 10px;
+  }
+
+  .collaborative-criterion-table-header {
+    display: none;
+  }
+
+  .collaborative-criterion-row {
+    grid-template-columns: 1fr;
+    min-width: 0;
+    gap: 14px;
+  }
+
+  .panel-comment-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* GHSMTA full-width scoring workspace — END */
