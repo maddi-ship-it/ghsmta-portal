@@ -47,6 +47,40 @@ export function formatScore(value: number | null | undefined) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+export function quarterScoreOptions(
+  minimum: number,
+  maximum: number,
+): number[] {
+  const increment = 0.25;
+  const optionCount = Math.round(
+    (maximum - minimum) / increment,
+  );
+
+  return Array.from(
+    { length: optionCount + 1 },
+    (_, index) =>
+      Number(
+        (
+          maximum -
+          index * increment
+        ).toFixed(2),
+      ),
+  );
+}
+
+export function isQuarterPointScore(
+  value: number,
+  minimum: number,
+  maximum: number,
+): boolean {
+  return (
+    Number.isFinite(value) &&
+    value >= minimum &&
+    value <= maximum &&
+    Number.isInteger(value * 4)
+  );
+}
+
 export function commentsForCategory(
   category: ScoringCategory,
   scorecards: AdjudicationScorecard[],
@@ -112,3 +146,4 @@ export function extractOpenAIText(payload: unknown): string {
   }
   return "";
 }
+
