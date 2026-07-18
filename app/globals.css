@@ -779,3 +779,139 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   .score-scale-grid > div { border-right: 0; }
 }
 .input-static { display: flex; align-items: center; min-height: 48px; color: var(--muted); background: #f7f8fb; }
+
+/* Live adjudication autosave and owner review */
+.autosave-status {
+  position: sticky;
+  z-index: 10;
+  top: calc(82px + env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 8px 22px rgba(7,20,47,.08);
+  font-size: .78rem;
+  font-weight: 800;
+  backdrop-filter: blur(12px);
+}
+.autosave-status > span,
+.live-review-status > span {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+.autosave-status-pending > span,
+.autosave-status-saving > span,
+.live-review-status-connecting > span { background: #f79009; }
+.autosave-status-saved > span,
+.live-review-status-live > span { background: #12b76a; }
+.autosave-status-error > span,
+.live-review-status-error > span { background: #f04438; }
+
+.live-review-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid #b7d7c7;
+  border-radius: 15px;
+  background: #f2fbf6;
+}
+.live-review-status > div { display: grid; gap: 3px; }
+.live-review-status strong,
+.live-review-status small { display: block; }
+.live-review-status small { color: var(--muted); }
+.live-review-status .button { margin-left: auto; }
+.live-review-status-error { border-color: #fecdca; background: #fff6f5; }
+
+.raw-comment-card-heading,
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.raw-comment-card-heading { margin-bottom: 12px; }
+.raw-comment-card-heading h4 { margin: 0; }
+.live-comment-updated {
+  display: block;
+  margin-top: 12px;
+  color: var(--muted);
+}
+.live-score-observation {
+  display: block;
+  max-width: 220px;
+  margin: 6px auto 0;
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.35;
+  white-space: normal;
+}
+.criterion-score-table th small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.text-button {
+  padding: 0;
+  border: 0;
+  color: var(--navy-700);
+  background: transparent;
+  font: inherit;
+  font-size: .76rem;
+  font-weight: 900;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Application search, filtering, and sorting */
+.application-filter-panel { margin-bottom: 22px; }
+.application-filter-form {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.6fr) repeat(6, minmax(145px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+.application-filter-search { min-width: 0; }
+.application-filter-submit { min-height: 48px; }
+.table-date { display: block; font-weight: 800; }
+
+@media (max-width: 1300px) {
+  .application-filter-form {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .application-filter-search { grid-column: span 2; }
+}
+
+@media (max-width: 900px) {
+  .autosave-status {
+    top: calc(70px + env(safe-area-inset-top));
+  }
+  .application-filter-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .application-filter-search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 620px) {
+  .application-filter-form { grid-template-columns: 1fr; }
+  .application-filter-search { grid-column: auto; }
+  .application-filter-submit { width: 100%; }
+  .live-review-status { align-items: flex-start; }
+  .live-review-status .button { width: 100%; margin-left: 0; }
+  .field-label-row { align-items: flex-start; flex-direction: column; }
+}

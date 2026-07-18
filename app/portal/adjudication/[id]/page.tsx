@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
-  categoryAverage,
   formatScore,
   quarterScoreOptions,
 } from "@/lib/adjudication";
+import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
+import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -25,11 +26,8 @@ import type {
 } from "@/lib/types";
 
 import {
-  generatePanelComment,
   releaseAdjudicationResults,
-  reopenAdjudicatorScorecard,
   saveAdjudicatorScorecard,
-  savePanelFeedback,
 } from "./actions";
 
 function scorecardStatusLabel(status: string) {
@@ -106,16 +104,17 @@ export default async function AdjudicationApplicationPage({
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
   const scale = (scaleResult.data ?? []) as ScoringScaleLevel[];
   const scoreOptions = quarterScoreOptions(
-  rubric.score_min,
-  rubric.score_max,
-);
+    Number(rubric.score_min),
+    Number(rubric.score_max),
+  );
 
-const scaleLabels = new Map(
-  scale.map((level) => [
-    Number(level.score),
-    level.label,
-  ]),
-);
+  const scaleLabels = new Map(
+    scale.map((level) => [
+      Number(level.score),
+      level.label,
+    ]),
+  );
+
   const assignments = (assignmentsResult.data ?? []) as AdjudicatorAssignment[];
   const scorecards = (scorecardsResult.data ?? []) as AdjudicationScorecard[];
   const feedback = (feedbackResult.data ?? []) as AdjudicationPanelFeedback[];
@@ -149,8 +148,6 @@ const scaleLabels = new Map(
       adjudicatorProfiles = (data ?? []) as Profile[];
     }
   }
-  const profileMap = new Map(adjudicatorProfiles.map((item) => [item.id, item]));
-
   const ownScorecard = profile.role === "adjudicator" ? scorecards[0] ?? null : null;
   const ownScoreMap = new Map(
     scores.filter((score) => score.scorecard_id === ownScorecard?.id).map((score) => [score.criterion_id, score]),
@@ -207,8 +204,12 @@ const scaleLabels = new Map(
         <div className="adjudication-score-content">
       {profile.role === "adjudicator" ? (
         <form className="scorecard-form">
+          <AdjudicatorAutosave
+            applicationId={id}
+            disabled={readOnly}
+          />
           <section className="panel score-guide-panel">
-            <div className="panel-header"><div><h2>Scoring guide</h2><p>Use the same 1–10 scale across each criterion. Scores remain private to you, advisory members, and owners.</p></div></div>
+            <div className="panel-header"><div><h2>Scoring guide</h2><p>Use the 1–10 scale in 0.25-point increments. Scores remain private to you, advisory members, and owners.</p></div></div>
             <div className="score-scale-grid">
               {scale.map((level) => <div key={level.id}><strong>{formatScore(level.score)}</strong><span>{level.label}</span><small>{level.description}</small></div>)}
             </div>
@@ -238,30 +239,33 @@ const scaleLabels = new Map(
                         <article className="criterion-card" key={criterion.id}>
                           <div className="criterion-copy"><h3>{criterion.title}</h3>{criterion.description && <p>{criterion.description}</p>}</div>
                           <div className="criterion-entry">
-<div className="field">
-  <label htmlFor={`score_${criterion.id}`}>Score</label>
+                            <div className="field">
+                              <label htmlFor={`score_${criterion.id}`}>
+                                Score
+                              </label>
 
-  <select
-    className="select score-select"
-    id={`score_${criterion.id}`}
-    name={`score_${criterion.id}`}
-    defaultValue={savedScore?.score ?? ""}
-    disabled={readOnly}
-  >
-    <option value="">—</option>
+                              <select
+                                className="select score-select"
+                                id={`score_${criterion.id}`}
+                                name={`score_${criterion.id}`}
+                                defaultValue={savedScore?.score ?? ""}
+                                disabled={readOnly}
+                              >
+                                <option value="">—</option>
 
-    {scoreOptions.map((score) => {
-      const label = scaleLabels.get(score);
+                                {scoreOptions.map((score) => {
+                                  const label = scaleLabels.get(score);
 
-      return (
-        <option value={score} key={score}>
-          {score.toFixed(2)}
-          {label ? ` — ${label}` : ""}
-        </option>
-      );
-    })}
-  </select>
-</div>                            <div className="field"><label htmlFor={`observation_${criterion.id}`}>Criterion observation</label><textarea className="textarea compact-textarea" id={`observation_${criterion.id}`} name={`observation_${criterion.id}`} defaultValue={savedScore?.observation ?? ""} disabled={readOnly} /></div>
+                                  return (
+                                    <option value={score} key={score}>
+                                      {score.toFixed(2)}
+                                      {label ? ` — ${label}` : ""}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                            <div className="field"><label htmlFor={`observation_${criterion.id}`}>Criterion observation</label><textarea className="textarea compact-textarea" id={`observation_${criterion.id}`} name={`observation_${criterion.id}`} defaultValue={savedScore?.observation ?? ""} disabled={readOnly} /></div>
                           </div>
                         </article>
                       );
@@ -286,57 +290,72 @@ const scaleLabels = new Map(
         </form>
       ) : (
         <>
-          <section className="metric-grid adjudication-review-metrics" aria-label="Panel progress">
-            <article className="metric-card"><span className="metric-label">Assigned</span><strong className="metric-value">{assignments.length}</strong></article>
-            <article className="metric-card"><span className="metric-label">Submitted</span><strong className="metric-value">{scorecards.filter((card) => card.status === "submitted" || card.status === "locked").length}</strong></article>
-            <article className="metric-card"><span className="metric-label">Scores released</span><strong className="metric-text">{release?.scores_released_at ? new Date(release.scores_released_at).toLocaleDateString() : "Not released"}</strong></article>
-            <article className="metric-card"><span className="metric-label">Feedback released</span><strong className="metric-text">{release?.feedback_released_at ? new Date(release.feedback_released_at).toLocaleDateString() : "Not released"}</strong></article>
-          </section>
+          <OwnerLiveAdjudicationReview
+            applicationId={id}
+            isOwner={profile.role === "owner"}
+            categories={categories}
+            criteria={criteria}
+            assignments={assignments}
+            profiles={adjudicatorProfiles}
+            initialScorecards={scorecards}
+            initialScores={scores}
+            initialComments={comments}
+            initialFeedback={feedback}
+            release={release}
+          />
 
-          <section className="panel panel-progress-section">
-            <div className="panel-header"><h2>Panel scorecards</h2></div>
-            <div className="panel-body panelist-grid">
-              {assignments.map((assignment) => {
-                const adjudicator = profileMap.get(assignment.adjudicator_user_id);
-                const card = scorecards.find((item) => item.assignment_id === assignment.id);
-                return <article className="panelist-card" key={assignment.id}><div><strong>{adjudicator?.full_name ?? adjudicator?.email ?? "Adjudicator"}</strong><small>{card?.submitted_at ? `Submitted ${new Date(card.submitted_at).toLocaleString()}` : assignment.due_at ? `Due ${new Date(assignment.due_at).toLocaleString()}` : "No due date"}</small></div><span className={`badge badge-scorecard-${card?.status ?? assignment.status}`}>{scorecardStatusLabel(card?.status ?? assignment.status)}</span>{profile.role === "owner" && card && (card.status === "submitted" || card.status === "locked") && <form action={reopenAdjudicatorScorecard.bind(null, id, card.id)}><button className="button button-secondary button-compact" type="submit">Reopen</button></form>}</article>;
-              })}
-              {assignments.length === 0 && <p>No adjudicators have been assigned.</p>}
-            </div>
-          </section>
-
-          {categories.map((category, categoryIndex) => {
-            const categoryCriteria = criteria.filter((criterion) => criterion.category_id === category.id);
-            const categoryFeedback = feedback.find((item) => item.category_id === category.id);
-            const average = categoryAverage(category.id, criteria, scorecards, scores);
-            const submittedCards = scorecards.filter((card) => card.status === "submitted" || card.status === "locked");
-            return (
-              <section className="panel score-category-panel panel-review-category" id={`category-${category.id}`} key={category.id}>
-                <div className="panel-header scoring-category-header"><div><span className="section-order">Category {categoryIndex + 1}</span><h2>{category.title}</h2>{category.guidance && <p>{category.guidance}</p>}</div><div className="category-average"><span>Panel average</span><strong>{formatScore(average)}</strong></div></div>
-
-                <div className="table-wrap criterion-score-table"><table className="data-table"><thead><tr><th>Criterion</th>{submittedCards.map((card) => <th key={card.id}>{profileMap.get(card.adjudicator_user_id)?.full_name?.split(" ")[0] ?? "Panelist"}</th>)}<th>Average</th></tr></thead><tbody>{categoryCriteria.map((criterion) => { const criterionScores = submittedCards.map((card) => scores.find((score) => score.scorecard_id === card.id && score.criterion_id === criterion.id)?.score ?? null); const numeric = criterionScores.filter((value): value is number => typeof value === "number"); const criterionAverage = numeric.length ? numeric.reduce((sum, value) => sum + value, 0) / numeric.length : null; return <tr key={criterion.id}><td><strong>{criterion.title}</strong><small>{criterion.description}</small></td>{criterionScores.map((value, index) => <td key={`${criterion.id}-${index}`}>{formatScore(value)}</td>)}<td><strong>{formatScore(criterionAverage)}</strong></td></tr>; })}</tbody></table></div>
-
-                <div className="panel-body">
-                  <h3>Adjudicator comment quadrants</h3>
-                  <div className="raw-comment-grid">
-                    {submittedCards.map((card) => {
-                      const panelist = profileMap.get(card.adjudicator_user_id);
-                      const comment = comments.find((item) => item.scorecard_id === card.id && item.category_id === category.id);
-                      return <article className="raw-comment-card" key={card.id}><h4>{panelist?.full_name ?? panelist?.email ?? "Adjudicator"}</h4>{comment?.subject_name && <p><strong>Subject:</strong> {comment.subject_name}</p>}{comment && !comment.is_applicable ? <p><strong>Not applicable:</strong> {comment.not_applicable_reason ?? "No reason entered"}</p> : <><p><strong>Successes:</strong> {comment?.successes ?? "—"}</p><p><strong>Examples:</strong> {comment?.success_examples ?? "—"}</p><p><strong>Growth:</strong> {comment?.growth_areas ?? "—"}</p><p><strong>Growth examples:</strong> {comment?.growth_examples ?? "—"}</p></>}</article>;
-                    })}
-                    {submittedCards.length === 0 && <p>No submitted comments are available yet.</p>}
-                  </div>
-
-                  <div className="panel-feedback-editor">
-                    <div className="panel-feedback-heading"><div><h3>School-facing panel narrative</h3><p>AI creates a draft from the submitted quadrants. An owner must review, edit, and approve it before release.</p></div>{profile.role === "owner" && <form action={generatePanelComment.bind(null, id, category.id)}><button className="button button-secondary" type="submit">Generate with ChatGPT</button></form>}</div>
-                    {profile.role === "owner" ? <form action={savePanelFeedback.bind(null, id, category.id)} className="form-stack"><div className="field"><label htmlFor={`final_comment_${category.id}`}>Final panel comment</label><textarea className="textarea narrative-textarea" id={`final_comment_${category.id}`} name="final_comment" defaultValue={categoryFeedback?.final_comment ?? ""} /></div><label className="check-row"><input name="approved" type="checkbox" defaultChecked={categoryFeedback?.status === "approved"} />Approved for school release</label><button className="button button-dark" type="submit">Save panel narrative</button></form> : <div className="narrative-preview">{categoryFeedback?.final_comment || "No panel narrative has been prepared yet."}</div>}
-                  </div>
+          {profile.role === "owner" && (
+            <section className="panel release-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Release results to the school</h2>
+                  <p>
+                    This creates a separate snapshot. Raw adjudicator scores,
+                    identities, observations, and private notes are never exposed
+                    to applicant accounts.
+                  </p>
                 </div>
-              </section>
-            );
-          })}
-
-          {profile.role === "owner" && <section className="panel release-panel"><div className="panel-header"><div><h2>Release results to the school</h2><p>This creates a separate snapshot. Raw adjudicator scores, identities, observations, and private notes are never exposed to applicant accounts.</p></div></div><div className="panel-body"><form action={releaseAdjudicationResults.bind(null, id)} className="form-stack"><div className="release-choice-grid"><label className="check-card"><input name="release_scores" type="checkbox" /><span><strong>Release category averages</strong><small>Schools receive panel category averages only—not individual adjudicator scores.</small></span></label><label className="check-card"><input name="release_feedback" type="checkbox" /><span><strong>Release approved narratives</strong><small>Only approved final comments are included.</small></span></label></div><div className="field"><label htmlFor="release_notes">Release note</label><textarea className="textarea compact-textarea" id="release_notes" name="release_notes" defaultValue={release?.release_notes ?? ""} /></div><button className="button button-dark" type="submit">Release selected results</button></form></div></section>}
+              </div>
+              <div className="panel-body">
+                <form
+                  action={releaseAdjudicationResults.bind(null, id)}
+                  className="form-stack"
+                >
+                  <div className="release-choice-grid">
+                    <label className="check-card">
+                      <input name="release_scores" type="checkbox" />
+                      <span>
+                        <strong>Release category averages</strong>
+                        <small>
+                          Schools receive panel category averages only—not
+                          individual adjudicator scores.
+                        </small>
+                      </span>
+                    </label>
+                    <label className="check-card">
+                      <input name="release_feedback" type="checkbox" />
+                      <span>
+                        <strong>Release approved narratives</strong>
+                        <small>Only approved final comments are included.</small>
+                      </span>
+                    </label>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="release_notes">Release note</label>
+                    <textarea
+                      className="textarea compact-textarea"
+                      id="release_notes"
+                      name="release_notes"
+                      defaultValue={release?.release_notes ?? ""}
+                    />
+                  </div>
+                  <button className="button button-dark" type="submit">
+                    Release selected results
+                  </button>
+                </form>
+              </div>
+            </section>
+          )}
         </>
       )}
         </div>

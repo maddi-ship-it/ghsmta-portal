@@ -7,6 +7,7 @@ import {
   applyPromptTemplate,
   buildCommentContext,
   extractOpenAIText,
+  isQuarterPointScore,
 } from "@/lib/adjudication";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -23,11 +24,21 @@ function formText(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
 }
 
-export async function saveAdjudicatorScorecard(
+type PersistScorecardResult = {
+  missing: string[];
+  submitted: boolean;
+  savedAt: string;
+};
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unable to save the scorecard.";
+}
+
+async function persistAdjudicatorScorecard(
   applicationId: string,
   submit: boolean,
   formData: FormData,
-) {
+): Promise<PersistScorecardResult> {
   const adjudicator = await requireProfile(["adjudicator"]);
   const supabase = await createClient();
 
@@ -49,6 +60,19 @@ export async function saveAdjudicatorScorecard(
   if (scorecard.status === "submitted" || scorecard.status === "locked") {
     throw new Error("This scorecard has already been submitted.");
   }
+
+  const { data: rubricData, error: rubricError } = await supabase
+    .from("scoring_rubrics")
+    .select("score_min, score_max")
+    .eq("id", scorecard.rubric_id)
+    .single();
+
+  if (rubricError || !rubricData) {
+    throw new Error(rubricError?.message ?? "Scoring rubric not found.");
+  }
+
+  const scoreMinimum = Number(rubricData.score_min);
+  const scoreMaximum = Number(rubricData.score_max);
 
   const { data: categoryData, error: categoryError } = await supabase
     .from("scoring_categories")
@@ -111,10 +135,20 @@ export async function saveAdjudicatorScorecard(
     for (const criterion of criteria.filter((item) => item.category_id === category.id)) {
       const rawScore = formText(formData, `score_${criterion.id}`);
       const numericScore = rawScore ? Number(rawScore) : null;
-      const validScore = numericScore != null && Number.isFinite(numericScore) && numericScore >= 1 && numericScore <= 10;
+      const validScore =
+        numericScore != null &&
+        isQuarterPointScore(numericScore, scoreMinimum, scoreMaximum);
+
+      if (rawScore && !validScore) {
+        throw new Error(
+          `Scores must be entered between ${scoreMinimum} and ${scoreMaximum} in 0.25-point increments.`,
+        );
+      }
+
       if (submit && isApplicable && !validScore) {
         missing.push(`${category.title}: ${criterion.title}`);
       }
+
       scoreRows.push({
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
@@ -146,6 +180,7 @@ export async function saveAdjudicatorScorecard(
     : scorecard.status === "reopened"
       ? "reopened"
       : "draft";
+
   const { error: cardUpdateError } = await supabase
     .from("adjudication_scorecards")
     .update({
@@ -166,14 +201,40 @@ export async function saveAdjudicatorScorecard(
   );
   if (assignmentError) throw new Error(assignmentError.message);
 
-  if (hasMissingItems) {
+  return {
+    missing,
+    submitted: shouldSubmit,
+    savedAt: now,
+  };
+}
+
+export async function autosaveAdjudicatorScorecard(
+  applicationId: string,
+  formData: FormData,
+) {
+  try {
+    const result = await persistAdjudicatorScorecard(applicationId, false, formData);
+    return { ok: true as const, savedAt: result.savedAt };
+  } catch (error) {
+    return { ok: false as const, error: errorMessage(error) };
+  }
+}
+
+export async function saveAdjudicatorScorecard(
+  applicationId: string,
+  submit: boolean,
+  formData: FormData,
+) {
+  const result = await persistAdjudicatorScorecard(applicationId, submit, formData);
+
+  if (result.missing.length > 0) {
     revalidatePath(`/portal/adjudication/${applicationId}`);
-    redirect(`/portal/adjudication/${applicationId}?error=required&missing=${missing.length}`);
+    redirect(`/portal/adjudication/${applicationId}?error=required&missing=${result.missing.length}`);
   }
 
   revalidatePath(`/portal/adjudication/${applicationId}`);
   revalidatePath("/portal/adjudication");
-  redirect(`/portal/adjudication/${applicationId}?${submit ? "submitted" : "saved"}=1`);
+  redirect(`/portal/adjudication/${applicationId}?${result.submitted ? "submitted" : "saved"}=1`);
 }
 
 export async function reopenAdjudicatorScorecard(
@@ -222,14 +283,14 @@ export async function generatePanelComment(
   const [{ data: categoryData }, { data: criteriaData }, { data: cardsData }] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("id", categoryId).single(),
     supabase.from("scoring_criteria").select("*").eq("category_id", categoryId).eq("active", true).order("sort_order"),
-    supabase.from("adjudication_scorecards").select("*").eq("application_id", applicationId).in("status", ["submitted", "locked"]),
+    supabase.from("adjudication_scorecards").select("*").eq("application_id", applicationId).in("status", ["draft", "reopened", "submitted", "locked"]),
   ]);
 
   if (!categoryData) throw new Error("Scoring category not found.");
   const category = categoryData as ScoringCategory;
   const criteria = (criteriaData ?? []) as ScoringCriterion[];
   const scorecards = (cardsData ?? []) as AdjudicationScorecard[];
-  if (scorecards.length === 0) throw new Error("No submitted adjudicator scorecards are available.");
+  if (scorecards.length === 0) throw new Error("No adjudicator scorecards are available.");
 
   const { data: commentsData, error: commentsError } = await supabase
     .from("adjudication_category_comments")
@@ -239,7 +300,7 @@ export async function generatePanelComment(
   if (commentsError) throw new Error(commentsError.message);
   const comments = (commentsData ?? []) as AdjudicationCategoryComment[];
   const { criterionText, rawComments } = buildCommentContext(category, criteria, comments);
-  if (!rawComments.trim()) throw new Error("No submitted category comments are available to synthesize.");
+  if (!rawComments.trim()) throw new Error("No category comments are available to synthesize.");
 
   const { data: cyclePromptData } = await supabase
     .from("ai_prompt_templates")

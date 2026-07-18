@@ -31,7 +31,7 @@ export default function LandingPage() {
             </span>
           </Link>
           <nav className="nav-actions" aria-label="Primary navigation">
-            <Link className="button button-secondary" href="/login">Staff sign in</Link>
+            <Link className="button button-secondary" href="/login">Sign-In</Link>
             <Link className="button button-primary" href="/signup">Start an application</Link>
           </nav>
         </div>
