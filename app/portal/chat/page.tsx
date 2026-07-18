@@ -1,7 +1,11 @@
+import type {
+  ChatChannel,
+  ChatMember,
+  ChatThread,
+} from "@/components/teams-chat";
 import { TeamsChat } from "@/components/teams-chat";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ChatChannel, ChatThread } from "@/components/teams-chat";
 
 export default async function ChatPage({
   searchParams,
@@ -27,18 +31,28 @@ export default async function ChatPage({
   const selectedChannel = requestedChannel ?? channels[0] ?? null;
 
   let threads: ChatThread[] = [];
+  let members: ChatMember[] = [];
 
   if (selectedChannel) {
-    const { data, error } = await supabase.rpc(
-      "get_chat_channel_threads",
-      { p_channel_id: selectedChannel.channel_id },
-    );
+    const [threadResult, memberResult] = await Promise.all([
+      supabase.rpc("get_chat_channel_threads", {
+        p_channel_id: selectedChannel.channel_id,
+      }),
+      supabase.rpc("get_chat_channel_members", {
+        p_channel_id: selectedChannel.channel_id,
+      }),
+    ]);
 
-    if (error) {
-      throw new Error(error.message);
+    if (threadResult.error) {
+      throw new Error(threadResult.error.message);
     }
 
-    threads = (data ?? []) as ChatThread[];
+    if (memberResult.error) {
+      throw new Error(memberResult.error.message);
+    }
+
+    threads = (threadResult.data ?? []) as ChatThread[];
+    members = (memberResult.data ?? []) as ChatMember[];
 
     await supabase.rpc("mark_chat_channel_read", {
       p_channel_id: selectedChannel.channel_id,
@@ -52,8 +66,8 @@ export default async function ChatPage({
           <span className="eyebrow">Communication</span>
           <h1>GHSMTA Chat</h1>
           <p>
-            Teams-style channels for schools, adjudicators, applicants,
-            owners, and the advisory committee.
+            Applicant Community uses threaded discussions. School and staff
+            channels use a live message feed.
           </p>
         </div>
       </div>
@@ -61,6 +75,7 @@ export default async function ChatPage({
       <TeamsChat
         key={selectedChannel?.channel_id ?? "no-channel"}
         initialChannels={channels}
+        initialMembers={members}
         initialThreads={threads}
         profile={profile}
         selectedChannelId={selectedChannel?.channel_id ?? null}

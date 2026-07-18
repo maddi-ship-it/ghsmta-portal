@@ -10,8 +10,40 @@ type ChatActionResult = {
   error?: string;
 };
 
+type ChannelMode = {
+  channel_type:
+    | "school"
+    | "applicant_community"
+    | "general"
+    | "networking"
+    | "advisory_committee";
+};
+
 function formText(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
+}
+
+async function readChannelMode(channelId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("chat_channels")
+    .select("channel_type")
+    .eq("id", channelId)
+    .single();
+
+  if (error || !data) {
+    return {
+      supabase,
+      channel: null,
+      error: error?.message ?? "Chat channel not found.",
+    };
+  }
+
+  return {
+    supabase,
+    channel: data as ChannelMode,
+    error: null,
+  };
 }
 
 export async function createChatPost(
@@ -36,7 +68,20 @@ export async function createChatPost(
     };
   }
 
-  const supabase = await createClient();
+  const { supabase, channel, error: channelError } =
+    await readChannelMode(channelId);
+
+  if (channelError || !channel) {
+    return { ok: false, error: channelError ?? "Chat channel not found." };
+  }
+
+  if (channel.channel_type !== "applicant_community") {
+    return {
+      ok: false,
+      error: "Only Applicant Community uses threaded conversations.",
+    };
+  }
+
   const { error } = await supabase.from("chat_posts").insert({
     channel_id: channelId,
     author_id: profile.id,
@@ -45,10 +90,7 @@ export async function createChatPost(
   });
 
   if (error) {
-    return {
-      ok: false,
-      error: error.message,
-    };
+    return { ok: false, error: error.message };
   }
 
   revalidatePath("/portal/chat");
@@ -77,7 +119,20 @@ export async function createChatReply(
     };
   }
 
-  const supabase = await createClient();
+  const { supabase, channel, error: channelError } =
+    await readChannelMode(channelId);
+
+  if (channelError || !channel) {
+    return { ok: false, error: channelError ?? "Chat channel not found." };
+  }
+
+  if (channel.channel_type !== "applicant_community") {
+    return {
+      ok: false,
+      error: "Replies are only available in Applicant Community.",
+    };
+  }
+
   const { error } = await supabase.from("chat_replies").insert({
     channel_id: channelId,
     post_id: postId,
@@ -86,10 +141,57 @@ export async function createChatReply(
   });
 
   if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/portal/chat");
+  return { ok: true };
+}
+
+export async function createChatMessage(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  const profile = await requireProfile();
+  const channelId = formText(formData, "channel_id");
+  const body = formText(formData, "body");
+
+  if (!channelId || !body) {
     return {
       ok: false,
-      error: error.message,
+      error: "Enter a message before sending.",
     };
+  }
+
+  if (body.length > 5000) {
+    return {
+      ok: false,
+      error: "The message is longer than the allowed limit.",
+    };
+  }
+
+  const { supabase, channel, error: channelError } =
+    await readChannelMode(channelId);
+
+  if (channelError || !channel) {
+    return { ok: false, error: channelError ?? "Chat channel not found." };
+  }
+
+  if (channel.channel_type === "applicant_community") {
+    return {
+      ok: false,
+      error: "Start a threaded conversation in Applicant Community instead.",
+    };
+  }
+
+  const { error } = await supabase.from("chat_posts").insert({
+    channel_id: channelId,
+    author_id: profile.id,
+    subject: "Message",
+    body,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
   }
 
   revalidatePath("/portal/chat");
@@ -109,10 +211,9 @@ export async function moderateChatPost(
   }
 
   const supabase = await createClient();
-
   const { data: post, error: readError } = await supabase
     .from("chat_posts")
-    .select("id,pinned,locked")
+    .select("id,pinned,locked,chat_channels!inner(channel_type)")
     .eq("id", postId)
     .single();
 
@@ -120,6 +221,17 @@ export async function moderateChatPost(
     return {
       ok: false,
       error: readError?.message ?? "Chat post not found.",
+    };
+  }
+
+  const relatedChannel = Array.isArray(post.chat_channels)
+    ? post.chat_channels[0]
+    : post.chat_channels;
+
+  if (relatedChannel?.channel_type !== "applicant_community") {
+    return {
+      ok: false,
+      error: "Thread moderation is only available in Applicant Community.",
     };
   }
 

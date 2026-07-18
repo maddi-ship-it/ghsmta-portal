@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  FormEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
 
 import {
+  createChatMessage,
   createChatPost,
   createChatReply,
   moderateChatPost,
@@ -38,6 +42,12 @@ export type ChatChannel = {
   unread_count: number;
 };
 
+export type ChatMember = {
+  user_id: string;
+  display_name: string;
+  user_role: AppRole;
+};
+
 export type ChatReply = {
   id: string;
   body: string;
@@ -62,6 +72,16 @@ export type ChatThread = {
   author_role: AppRole;
   reply_count: number;
   replies: ChatReply[];
+};
+
+type FlatMessage = {
+  id: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  author_id: string;
+  author_name: string;
+  author_role: AppRole;
 };
 
 type ChannelGroup = {
@@ -133,28 +153,289 @@ function initials(name: string) {
     .join("");
 }
 
+function escapeRegularExpression(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function MentionedMessage({
+  body,
+  members,
+  currentUserId,
+}: {
+  body: string;
+  members: ChatMember[];
+  currentUserId: string;
+}) {
+  const mentionNames = members
+    .map((member) => member.display_name.trim())
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+
+  if (mentionNames.length === 0) {
+    return <>{body}</>;
+  }
+
+  const pattern = new RegExp(
+    `(@(?:${mentionNames.map(escapeRegularExpression).join("|")}))`,
+    "gi",
+  );
+
+  const memberByMention = new Map(
+    members.map((member) => [
+      `@${member.display_name}`.toLowerCase(),
+      member,
+    ]),
+  );
+
+  return (
+    <>
+      {body.split(pattern).map((part, index) => {
+        const member = memberByMention.get(part.toLowerCase());
+
+        if (!member) {
+          return <span key={`${part}-${index}`}>{part}</span>;
+        }
+
+        return (
+          <span
+            className={
+              member.user_id === currentUserId
+                ? "chat-mention chat-mention-self"
+                : "chat-mention"
+            }
+            key={`${member.user_id}-${index}`}
+          >
+            {part}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+function MentionTextarea({
+  id,
+  name,
+  members,
+  placeholder,
+  rows,
+  required = true,
+  className = "textarea",
+}: {
+  id: string;
+  name: string;
+  members: ChatMember[];
+  placeholder: string;
+  rows: number;
+  required?: boolean;
+  className?: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [value, setValue] = useState("");
+  const [query, setQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const suggestions = useMemo(() => {
+    if (query === null) {
+      return [];
+    }
+
+    const normalized = query.trim().toLowerCase();
+
+    return members
+      .filter((member) =>
+        member.display_name.toLowerCase().includes(normalized),
+      )
+      .slice(0, 8);
+  }, [members, query]);
+
+  useEffect(() => {
+    const form = textareaRef.current?.form;
+
+    if (!form) {
+      return;
+    }
+
+    const reset = () => {
+      setValue("");
+      setQuery(null);
+      setMentionStart(null);
+      setActiveIndex(0);
+    };
+
+    form.addEventListener("reset", reset);
+    return () => form.removeEventListener("reset", reset);
+  }, []);
+
+  const detectMention = (nextValue: string, cursor: number) => {
+    const beforeCursor = nextValue.slice(0, cursor);
+    const match = beforeCursor.match(/(^|\s)@([^\s@]*)$/);
+
+    if (!match) {
+      setQuery(null);
+      setMentionStart(null);
+      return;
+    }
+
+    setQuery(match[2] ?? "");
+    setMentionStart(cursor - (match[2]?.length ?? 0) - 1);
+    setActiveIndex(0);
+  };
+
+  const selectMention = (member: ChatMember) => {
+    const textarea = textareaRef.current;
+
+    if (!textarea || mentionStart === null) {
+      return;
+    }
+
+    const cursor = textarea.selectionStart;
+    const insertion = `@${member.display_name} `;
+    const nextValue =
+      value.slice(0, mentionStart) + insertion + value.slice(cursor);
+    const nextCursor = mentionStart + insertion.length;
+
+    setValue(nextValue);
+    setQuery(null);
+    setMentionStart(null);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggestions.length === 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((current) => (current + 1) % suggestions.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex(
+        (current) => (current - 1 + suggestions.length) % suggestions.length,
+      );
+    } else if (event.key === "Enter" && query !== null) {
+      event.preventDefault();
+      const selected = suggestions[activeIndex];
+
+      if (selected) {
+        selectMention(selected);
+      }
+    } else if (event.key === "Escape") {
+      setQuery(null);
+      setMentionStart(null);
+    }
+  };
+
+  return (
+    <div className="mention-composer">
+      <textarea
+        className={className}
+        id={id}
+        maxLength={5000}
+        name={name}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          const cursor = event.target.selectionStart;
+          setValue(nextValue);
+          detectMention(nextValue, cursor);
+        }}
+        onClick={(event) => {
+          detectMention(value, event.currentTarget.selectionStart);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        ref={textareaRef}
+        required={required}
+        rows={rows}
+        value={value}
+      />
+
+      {suggestions.length > 0 && (
+        <div className="mention-suggestions" role="listbox">
+          {suggestions.map((member, index) => (
+            <button
+              aria-selected={index === activeIndex}
+              className={
+                index === activeIndex
+                  ? "mention-suggestion mention-suggestion-active"
+                  : "mention-suggestion"
+              }
+              key={member.user_id}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectMention(member)}
+              role="option"
+              type="button"
+            >
+              <span className="user-avatar teams-avatar teams-avatar-small">
+                {initials(member.display_name)}
+              </span>
+              <span>
+                <strong>{member.display_name}</strong>
+                <small>{roleName(member.user_role)}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <small className="mention-help">Type @ to tag someone in this channel.</small>
+    </div>
+  );
+}
+
+function MessageBody({
+  children,
+  members,
+  currentUserId,
+}: {
+  children: string;
+  members: ChatMember[];
+  currentUserId: string;
+}) {
+  return (
+    <p className="teams-message-body">
+      <MentionedMessage
+        body={children}
+        currentUserId={currentUserId}
+        members={members}
+      />
+    </p>
+  );
+}
+
 export function TeamsChat({
   profile,
   initialChannels,
   selectedChannelId,
   initialThreads,
+  initialMembers,
 }: {
   profile: Profile;
   initialChannels: ChatChannel[];
   selectedChannelId: string | null;
   initialThreads: ChatThread[];
+  initialMembers: ChatMember[];
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [channels, setChannels] = useState(initialChannels);
   const [threads, setThreads] = useState(initialThreads);
+  const [members, setMembers] = useState(initialMembers);
   const [channelSearch, setChannelSearch] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const feedEndRef = useRef<HTMLDivElement>(null);
 
   const activeChannel = channels.find(
     (channel) => channel.channel_id === selectedChannelId,
   );
+  const isThreaded = activeChannel?.channel_type === "applicant_community";
 
   const groups = useMemo<ChannelGroup[]>(() => {
     const filtered = channels.filter((channel) => {
@@ -187,29 +468,68 @@ export function TeamsChat({
       .filter((group) => group.channels.length > 0);
   }, [channelSearch, channels]);
 
-  const loadThreads = useCallback(async () => {
+  const messages = useMemo<FlatMessage[]>(() => {
+    return threads
+      .flatMap((thread) => [
+        {
+          id: thread.post_id,
+          body: thread.body,
+          created_at: thread.created_at,
+          updated_at: thread.updated_at,
+          author_id: thread.author_id,
+          author_name: thread.author_name,
+          author_role: thread.author_role,
+        },
+        ...thread.replies.map((reply) => ({
+          id: reply.id,
+          body: reply.body,
+          created_at: reply.created_at,
+          updated_at: reply.updated_at,
+          author_id: reply.author_id,
+          author_name: reply.author_name,
+          author_role: reply.author_role,
+        })),
+      ])
+      .sort(
+        (left, right) =>
+          new Date(left.created_at).getTime() -
+          new Date(right.created_at).getTime(),
+      );
+  }, [threads]);
+
+  const loadChannel = useCallback(async () => {
     if (!selectedChannelId) {
       return;
     }
 
-    const { data, error } = await supabase.rpc(
-      "get_chat_channel_threads",
-      { p_channel_id: selectedChannelId },
-    );
-
-    if (!error) {
-      setThreads((data ?? []) as ChatThread[]);
-      await supabase.rpc("mark_chat_channel_read", {
+    const [threadResult, memberResult] = await Promise.all([
+      supabase.rpc("get_chat_channel_threads", {
         p_channel_id: selectedChannelId,
-      });
-      setChannels((current) =>
-        current.map((channel) =>
-          channel.channel_id === selectedChannelId
-            ? { ...channel, unread_count: 0 }
-            : channel,
-        ),
-      );
+      }),
+      supabase.rpc("get_chat_channel_members", {
+        p_channel_id: selectedChannelId,
+      }),
+    ]);
+
+    if (!threadResult.error) {
+      setThreads((threadResult.data ?? []) as ChatThread[]);
     }
+
+    if (!memberResult.error) {
+      setMembers((memberResult.data ?? []) as ChatMember[]);
+    }
+
+    await supabase.rpc("mark_chat_channel_read", {
+      p_channel_id: selectedChannelId,
+    });
+
+    setChannels((current) =>
+      current.map((channel) =>
+        channel.channel_id === selectedChannelId
+          ? { ...channel, unread_count: 0 }
+          : channel,
+      ),
+    );
   }, [selectedChannelId, supabase]);
 
   useEffect(() => {
@@ -227,7 +547,7 @@ export function TeamsChat({
           table: "chat_posts",
           filter: `channel_id=eq.${selectedChannelId}`,
         },
-        () => void loadThreads(),
+        () => void loadChannel(),
       )
       .on(
         "postgres_changes",
@@ -237,61 +557,59 @@ export function TeamsChat({
           table: "chat_replies",
           filter: `channel_id=eq.${selectedChannelId}`,
         },
-        () => void loadThreads(),
+        () => void loadChannel(),
       )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(subscription);
     };
-  }, [loadThreads, selectedChannelId, supabase]);
+  }, [loadChannel, selectedChannelId, supabase]);
+
+  useEffect(() => {
+    if (!isThreaded) {
+      feedEndRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [isThreaded, messages.length]);
+
+  const runFormAction = (
+    form: HTMLFormElement,
+    action: (formData: FormData) => Promise<{ ok: boolean; error?: string }>,
+    successMessage: string,
+  ) => {
+    const formData = new FormData(form);
+    setStatus(null);
+
+    startTransition(async () => {
+      const result = await action(formData);
+
+      if (!result.ok) {
+        setStatus(result.error ?? "The message could not be sent.");
+        return;
+      }
+
+      form.reset();
+      setStatus(successMessage);
+      await loadChannel();
+    });
+  };
 
   const submitPost = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    setStatus(null);
-
-    startTransition(async () => {
-      const result = await createChatPost(formData);
-
-      if (!result.ok) {
-        setStatus(result.error ?? "The conversation could not be posted.");
-        return;
-      }
-
-      form.reset();
-      setStatus("Conversation posted.");
-      await loadThreads();
-    });
+    runFormAction(event.currentTarget, createChatPost, "Conversation posted.");
   };
 
-  const submitReply = (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const submitReply = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    setStatus(null);
-
-    startTransition(async () => {
-      const result = await createChatReply(formData);
-
-      if (!result.ok) {
-        setStatus(result.error ?? "The reply could not be sent.");
-        return;
-      }
-
-      form.reset();
-      setStatus("Reply sent.");
-      await loadThreads();
-    });
+    runFormAction(event.currentTarget, createChatReply, "Reply sent.");
   };
 
-  const moderate = (
-    postId: string,
-    operation: "pin" | "lock",
-  ) => {
+  const submitMessage = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    runFormAction(event.currentTarget, createChatMessage, "Message sent.");
+  };
+
+  const moderate = (postId: string, operation: "pin" | "lock") => {
     const formData = new FormData();
     formData.set("post_id", postId);
     formData.set("operation", operation);
@@ -305,7 +623,7 @@ export function TeamsChat({
         return;
       }
 
-      await loadThreads();
+      await loadChannel();
     });
   };
 
@@ -323,13 +641,275 @@ export function TeamsChat({
     );
   }
 
+  let channelContent: ReactNode;
+
+  if (isThreaded) {
+    channelContent = (
+      <>
+        <form className="teams-new-post" onSubmit={submitPost}>
+          <input
+            name="channel_id"
+            type="hidden"
+            value={activeChannel.channel_id}
+          />
+          <div className="teams-new-post-heading">
+            <span className="user-avatar teams-avatar">
+              {initials(profile.full_name ?? profile.email ?? "User")}
+            </span>
+            <div>
+              <strong>Start a new conversation</strong>
+              <p>Post a topic, then continue the discussion in its thread.</p>
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="chat-subject">Subject</label>
+            <input
+              className="input"
+              id="chat-subject"
+              maxLength={180}
+              name="subject"
+              placeholder="What is this conversation about?"
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="chat-body">Message</label>
+            <MentionTextarea
+              className="textarea teams-message-textarea"
+              id="chat-body"
+              members={members}
+              name="body"
+              placeholder="Write a message to Applicant Community"
+              rows={4}
+            />
+          </div>
+          <div className="teams-composer-footer">
+            <span>{status}</span>
+            <button
+              className="button button-dark"
+              disabled={isPending}
+              type="submit"
+            >
+              {isPending ? "Posting…" : "Post conversation"}
+            </button>
+          </div>
+        </form>
+
+        <div className="teams-thread-feed" aria-live="polite">
+          {threads.length === 0 ? (
+            <div className="empty-state teams-thread-empty">
+              <h2>No conversations yet.</h2>
+              <p>Start the first thread in Applicant Community.</p>
+            </div>
+          ) : (
+            threads.map((thread) => (
+              <article className="teams-thread-card" key={thread.post_id}>
+                <div className="teams-thread-root">
+                  <span className="user-avatar teams-avatar">
+                    {initials(thread.author_name)}
+                  </span>
+                  <div className="teams-thread-content">
+                    <div className="teams-message-meta">
+                      <strong>{thread.author_name}</strong>
+                      <span>{roleName(thread.author_role)}</span>
+                      <time dateTime={thread.created_at}>
+                        {formatTimestamp(thread.created_at)}
+                      </time>
+                    </div>
+                    <div className="teams-thread-subject-row">
+                      <h2>{thread.subject}</h2>
+                      <div className="teams-thread-badges">
+                        {thread.pinned && <span className="badge">Pinned</span>}
+                        {thread.locked && <span className="badge">Locked</span>}
+                      </div>
+                    </div>
+                    <MessageBody
+                      currentUserId={profile.id}
+                      members={members}
+                    >
+                      {thread.body}
+                    </MessageBody>
+
+                    {profile.role === "owner" && (
+                      <div className="teams-owner-controls">
+                        <button
+                          className="button button-secondary button-compact"
+                          disabled={isPending}
+                          onClick={() => moderate(thread.post_id, "pin")}
+                          type="button"
+                        >
+                          {thread.pinned ? "Unpin" : "Pin"}
+                        </button>
+                        <button
+                          className="button button-secondary button-compact"
+                          disabled={isPending}
+                          onClick={() => moderate(thread.post_id, "lock")}
+                          type="button"
+                        >
+                          {thread.locked ? "Unlock replies" : "Lock replies"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="teams-reply-thread">
+                  {thread.replies.map((reply) => (
+                    <div className="teams-reply" key={reply.id}>
+                      <span className="user-avatar teams-avatar teams-avatar-small">
+                        {initials(reply.author_name)}
+                      </span>
+                      <div>
+                        <div className="teams-message-meta">
+                          <strong>{reply.author_name}</strong>
+                          <span>{roleName(reply.author_role)}</span>
+                          <time dateTime={reply.created_at}>
+                            {formatTimestamp(reply.created_at)}
+                          </time>
+                        </div>
+                        <MessageBody
+                          currentUserId={profile.id}
+                          members={members}
+                        >
+                          {reply.body}
+                        </MessageBody>
+                      </div>
+                    </div>
+                  ))}
+
+                  {!thread.locked ? (
+                    <form className="teams-reply-form" onSubmit={submitReply}>
+                      <input
+                        name="channel_id"
+                        type="hidden"
+                        value={activeChannel.channel_id}
+                      />
+                      <input
+                        name="post_id"
+                        type="hidden"
+                        value={thread.post_id}
+                      />
+                      <label
+                        className="sr-only"
+                        htmlFor={`reply-${thread.post_id}`}
+                      >
+                        Reply to {thread.subject}
+                      </label>
+                      <MentionTextarea
+                        id={`reply-${thread.post_id}`}
+                        members={members}
+                        name="body"
+                        placeholder="Reply to this conversation"
+                        rows={2}
+                      />
+                      <button
+                        className="button button-secondary button-compact"
+                        disabled={isPending}
+                        type="submit"
+                      >
+                        Reply
+                      </button>
+                    </form>
+                  ) : (
+                    <p className="teams-thread-locked-note">
+                      Replies are closed for this conversation.
+                    </p>
+                  )}
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </>
+    );
+  } else {
+    channelContent = (
+      <div className="teams-message-channel">
+        <div className="teams-message-feed" aria-live="polite">
+          {messages.length === 0 ? (
+            <div className="empty-state teams-message-empty">
+              <h2>No messages yet.</h2>
+              <p>Send the first message in this channel.</p>
+            </div>
+          ) : (
+            messages.map((message) => {
+              const ownMessage = message.author_id === profile.id;
+
+              return (
+                <article
+                  className={
+                    ownMessage
+                      ? "teams-chat-message teams-chat-message-own"
+                      : "teams-chat-message"
+                  }
+                  key={message.id}
+                >
+                  {!ownMessage && (
+                    <span className="user-avatar teams-avatar">
+                      {initials(message.author_name)}
+                    </span>
+                  )}
+                  <div className="teams-chat-message-column">
+                    {!ownMessage && (
+                      <div className="teams-message-meta">
+                        <strong>{message.author_name}</strong>
+                        <span>{roleName(message.author_role)}</span>
+                      </div>
+                    )}
+                    <div className="teams-chat-bubble">
+                      <MentionedMessage
+                        body={message.body}
+                        currentUserId={profile.id}
+                        members={members}
+                      />
+                    </div>
+                    <time dateTime={message.created_at}>
+                      {formatTimestamp(message.created_at)}
+                    </time>
+                  </div>
+                </article>
+              );
+            })
+          )}
+          <div ref={feedEndRef} />
+        </div>
+
+        <form className="teams-message-composer" onSubmit={submitMessage}>
+          <input
+            name="channel_id"
+            type="hidden"
+            value={activeChannel.channel_id}
+          />
+          <MentionTextarea
+            className="textarea teams-message-composer-textarea"
+            id="channel-message"
+            members={members}
+            name="body"
+            placeholder={`Message ${activeChannel.channel_name}`}
+            rows={2}
+          />
+          <div className="teams-message-composer-actions">
+            <span>{status}</span>
+            <button
+              className="button button-dark"
+              disabled={isPending}
+              type="submit"
+            >
+              {isPending ? "Sending…" : "Send"}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="teams-chat-shell">
       <aside className="teams-channel-rail">
         <div className="teams-channel-rail-heading">
           <span className="eyebrow">GHSMTA Teams</span>
           <h2>Chat</h2>
-          <p>Channels and threaded conversations</p>
+          <p>Community threads and channel messages</p>
         </div>
 
         <div className="teams-channel-search field">
@@ -384,12 +964,14 @@ export function TeamsChat({
         <header className="teams-channel-header">
           <div>
             <span className="eyebrow">
-              {channelGroupLabel(activeChannel.channel_type)}
+              {isThreaded ? "Threaded community" : "Channel messages"}
             </span>
             <h1>{activeChannel.channel_name}</h1>
             <p>
               {activeChannel.channel_description ??
-                "Threaded GHSMTA portal conversation"}
+                (isThreaded
+                  ? "Start topics and continue the discussion in threads."
+                  : "A chronological message feed for this channel.")}
             </p>
           </div>
 
@@ -411,164 +993,7 @@ export function TeamsChat({
           </label>
         </header>
 
-        <form className="teams-new-post" onSubmit={submitPost}>
-          <input
-            name="channel_id"
-            type="hidden"
-            value={activeChannel.channel_id}
-          />
-          <div className="teams-new-post-heading">
-            <div>
-              <span className="user-avatar teams-avatar">
-                {initials(profile.full_name ?? profile.email ?? "User")}
-              </span>
-            </div>
-            <div>
-              <strong>Start a new conversation</strong>
-              <p>Post an update or question, then continue in the thread.</p>
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="chat-subject">Subject</label>
-            <input
-              className="input"
-              id="chat-subject"
-              maxLength={180}
-              name="subject"
-              placeholder="What is this conversation about?"
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="chat-body">Message</label>
-            <textarea
-              className="textarea teams-message-textarea"
-              id="chat-body"
-              maxLength={5000}
-              name="body"
-              placeholder="Write a message to this channel"
-              required
-              rows={4}
-            />
-          </div>
-          <div className="teams-composer-footer">
-            <span>{status}</span>
-            <button className="button button-dark" disabled={isPending} type="submit">
-              {isPending ? "Posting…" : "Post conversation"}
-            </button>
-          </div>
-        </form>
-
-        <div className="teams-thread-feed" aria-live="polite">
-          {threads.length === 0 ? (
-            <div className="empty-state teams-thread-empty">
-              <h2>No conversations yet.</h2>
-              <p>Start the first thread in this channel.</p>
-            </div>
-          ) : (
-            threads.map((thread) => (
-              <article className="teams-thread-card" key={thread.post_id}>
-                <div className="teams-thread-root">
-                  <span className="user-avatar teams-avatar">
-                    {initials(thread.author_name)}
-                  </span>
-                  <div className="teams-thread-content">
-                    <div className="teams-message-meta">
-                      <strong>{thread.author_name}</strong>
-                      <span>{roleName(thread.author_role)}</span>
-                      <time dateTime={thread.created_at}>
-                        {formatTimestamp(thread.created_at)}
-                      </time>
-                    </div>
-                    <div className="teams-thread-subject-row">
-                      <h2>{thread.subject}</h2>
-                      <div className="teams-thread-badges">
-                        {thread.pinned && <span className="badge">Pinned</span>}
-                        {thread.locked && <span className="badge">Locked</span>}
-                      </div>
-                    </div>
-                    <p className="teams-message-body">{thread.body}</p>
-
-                    {profile.role === "owner" && (
-                      <div className="teams-owner-controls">
-                        <button
-                          className="button button-secondary button-compact"
-                          disabled={isPending}
-                          onClick={() => moderate(thread.post_id, "pin")}
-                          type="button"
-                        >
-                          {thread.pinned ? "Unpin" : "Pin"}
-                        </button>
-                        <button
-                          className="button button-secondary button-compact"
-                          disabled={isPending}
-                          onClick={() => moderate(thread.post_id, "lock")}
-                          type="button"
-                        >
-                          {thread.locked ? "Unlock replies" : "Lock replies"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="teams-reply-thread">
-                  {thread.replies.map((reply) => (
-                    <div className="teams-reply" key={reply.id}>
-                      <span className="user-avatar teams-avatar teams-avatar-small">
-                        {initials(reply.author_name)}
-                      </span>
-                      <div>
-                        <div className="teams-message-meta">
-                          <strong>{reply.author_name}</strong>
-                          <span>{roleName(reply.author_role)}</span>
-                          <time dateTime={reply.created_at}>
-                            {formatTimestamp(reply.created_at)}
-                          </time>
-                        </div>
-                        <p className="teams-message-body">{reply.body}</p>
-                      </div>
-                    </div>
-                  ))}
-
-                  {!thread.locked ? (
-                    <form className="teams-reply-form" onSubmit={submitReply}>
-                      <input
-                        name="channel_id"
-                        type="hidden"
-                        value={activeChannel.channel_id}
-                      />
-                      <input name="post_id" type="hidden" value={thread.post_id} />
-                      <label className="sr-only" htmlFor={`reply-${thread.post_id}`}>
-                        Reply to {thread.subject}
-                      </label>
-                      <textarea
-                        className="textarea"
-                        id={`reply-${thread.post_id}`}
-                        maxLength={5000}
-                        name="body"
-                        placeholder="Reply to this conversation"
-                        required
-                        rows={2}
-                      />
-                      <button
-                        className="button button-secondary button-compact"
-                        disabled={isPending}
-                        type="submit"
-                      >
-                        Reply
-                      </button>
-                    </form>
-                  ) : (
-                    <p className="teams-thread-locked-note">
-                      Replies are closed for this conversation.
-                    </p>
-                  )}
-                </div>
-              </article>
-            ))
-          )}
-        </div>
+        {channelContent}
       </section>
     </div>
   );
