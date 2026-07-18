@@ -105,19 +105,6 @@ async function persistAdjudicatorScorecard(
     const requestedNotApplicable = formData.get(`not_applicable_${category.id}`) === "on";
     const isApplicable = !(category.allow_not_applicable && requestedNotApplicable);
     const notApplicableReason = formText(formData, `not_applicable_reason_${category.id}`);
-    const successes = sanitizeRichTextHtml(
-      formText(formData, `successes_${category.id}`),
-    );
-    const successExamples = sanitizeRichTextHtml(
-      formText(formData, `success_examples_${category.id}`),
-    );
-    const growthAreas = sanitizeRichTextHtml(
-      formText(formData, `growth_areas_${category.id}`),
-    );
-    const growthExamples = sanitizeRichTextHtml(
-      formText(formData, `growth_examples_${category.id}`),
-    );
-
     if (submit && !isApplicable && !notApplicableReason) {
       missing.push(`${category.title}: explain why it is not applicable`);
     }
@@ -131,20 +118,6 @@ async function persistAdjudicatorScorecard(
       missing.push(`${category.title}: ${category.subject_label}`);
     }
 
-    if (submit && isApplicable) {
-      if (!richTextHasContent(successes)) {
-        missing.push(`${category.title}: successes`);
-      }
-      if (!richTextHasContent(successExamples)) {
-        missing.push(`${category.title}: success examples`);
-      }
-      if (!richTextHasContent(growthAreas)) {
-        missing.push(`${category.title}: opportunities for growth`);
-      }
-      if (!richTextHasContent(growthExamples)) {
-        missing.push(`${category.title}: growth examples`);
-      }
-    }
 
     commentRows.push({
       scorecard_id: scorecard.id,
@@ -152,18 +125,13 @@ async function persistAdjudicatorScorecard(
       subject_name: formText(formData, `subject_name_${category.id}`) || null,
       is_applicable: isApplicable,
       not_applicable_reason: isApplicable ? null : notApplicableReason || null,
-      successes: successes || null,
-      success_examples: successExamples || null,
-      growth_areas: growthAreas || null,
-      growth_examples: growthExamples || null,
       private_notes: formText(formData, `private_notes_${category.id}`) || null,
     });
 
     for (const criterion of criteria.filter((item) => item.category_id === category.id)) {
       const rawScore = formText(formData, `score_${criterion.id}`);
-      const observation = formText(
-        formData,
-        `observation_${criterion.id}`,
+      const observation = sanitizeRichTextHtml(
+        formText(formData, `observation_${criterion.id}`),
       );
       const numericScore = rawScore ? Number(rawScore) : null;
       const validScore =
@@ -180,7 +148,11 @@ async function persistAdjudicatorScorecard(
         missing.push(`${category.title}: ${criterion.title} score`);
       }
 
-      if (submit && isApplicable && !observation) {
+      if (
+        submit &&
+        isApplicable &&
+        !richTextHasContent(observation)
+      ) {
         missing.push(`${category.title}: ${criterion.title} observation`);
       }
 

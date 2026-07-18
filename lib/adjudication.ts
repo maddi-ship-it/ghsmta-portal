@@ -112,11 +112,13 @@ export function buildCommentContext(
     .map((comment, index) => {
       const observations = categoryCriteria
         .map((criterion) => {
-          const observation = scores.find(
-            (score) =>
-              score.scorecard_id === comment.scorecard_id &&
-              score.criterion_id === criterion.id,
-          )?.observation?.trim();
+          const observation = richTextToPlainText(
+            scores.find(
+              (score) =>
+                score.scorecard_id === comment.scorecard_id &&
+                score.criterion_id === criterion.id,
+            )?.observation,
+          );
 
           return observation
             ? `- ${criterion.title}: ${observation}`

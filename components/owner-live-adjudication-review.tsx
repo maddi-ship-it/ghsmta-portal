@@ -573,7 +573,9 @@ export function OwnerLiveAdjudicationReview({
                           <td key={`${criterion.id}-${index}`}>
                             <strong>{formatScore(row?.score)}</strong>
                             {row?.observation && (
-                              <small className="live-score-observation">{row.observation}</small>
+                              <div className="live-score-observation">
+                                <RichTextPreview value={row.observation} />
+                              </div>
                             )}
                           </td>
                         ))}

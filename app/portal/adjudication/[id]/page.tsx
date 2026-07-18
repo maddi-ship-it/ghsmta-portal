@@ -6,8 +6,8 @@ import {
   quarterScoreOptions,
 } from "@/lib/adjudication";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
+import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
-import { RichTextField } from "@/components/rich-text-field";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -110,12 +110,11 @@ export default async function AdjudicationApplicationPage({
     Number(rubric.score_max),
   );
 
-  const scaleLabels = new Map(
-    scale.map((level) => [
-      Number(level.score),
-      level.label,
-    ]),
-  );
+  const scoreChoices = scoreOptions.map((score) => ({
+    value: score,
+    label:
+      scale.find((level) => Number(level.score) === score)?.label ?? null,
+  }));
 
   const assignments = (assignmentsResult.data ?? []) as AdjudicatorAssignment[];
   const scorecards = (scorecardsResult.data ?? []) as AdjudicationScorecard[];
@@ -142,6 +141,17 @@ export default async function AdjudicationApplicationPage({
   const scores = (scoresResult.data ?? []) as AdjudicationScore[];
   const comments = (commentsResult.data ?? []) as AdjudicationCategoryComment[];
 
+  const sharedObservationResult =
+    profile.role === "adjudicator"
+      ? await supabase.rpc("get_shared_adjudication_observations", {
+          p_application_id: id,
+        })
+      : { data: [], error: null };
+
+  if (sharedObservationResult.error) {
+    throw new Error(sharedObservationResult.error.message);
+  }
+
   let adjudicatorProfiles: Profile[] = [];
   if (profile.role !== "adjudicator") {
     const profileIds = [...new Set(assignments.map((assignment) => assignment.adjudicator_user_id))];
@@ -151,12 +161,6 @@ export default async function AdjudicationApplicationPage({
     }
   }
   const ownScorecard = profile.role === "adjudicator" ? scorecards[0] ?? null : null;
-  const ownScoreMap = new Map(
-    scores.filter((score) => score.scorecard_id === ownScorecard?.id).map((score) => [score.criterion_id, score]),
-  );
-  const ownCommentMap = new Map(
-    comments.filter((comment) => comment.scorecard_id === ownScorecard?.id).map((comment) => [comment.category_id, comment]),
-  );
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
 
   return (
@@ -177,7 +181,7 @@ export default async function AdjudicationApplicationPage({
       {query.submitted && <div className="notice page-message">Your scorecard was submitted and is now read-only.</div>}
       {query.generated && <div className="notice page-message">The AI narrative draft was generated. Review and edit it before approval.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
-      {query.error === "required" && <div className="form-error page-message">Complete every required subject field, score, criterion observation, and comment field before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
+      {query.error === "required" && <div className="form-error page-message">Complete every required subject field, score, and criterion comment before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
 
       <div className="adjudication-score-layout">
         <aside className="score-category-sidebar">
@@ -217,102 +221,29 @@ export default async function AdjudicationApplicationPage({
             </div>
           </section>
 
-          {categories.map((category, categoryIndex) => {
-            const categoryCriteria = criteria.filter((criterion) => criterion.category_id === category.id);
-            const categoryComment = ownCommentMap.get(category.id);
-            return (
-              <section className="panel score-category-panel" id={`category-${category.id}`} key={category.id}>
-                <div className="panel-header scoring-category-header">
-                  <div><span className="section-order">Category {categoryIndex + 1}</span><h2>{category.title}</h2>{category.guidance && <p>{category.guidance}</p>}</div>
-                </div>
-                <div className="panel-body">
-                  {category.subject_label && <div className="field"><label htmlFor={`subject_name_${category.id}`}>{category.subject_label}</label><input className="input" id={`subject_name_${category.id}`} name={`subject_name_${category.id}`} defaultValue={categoryComment?.subject_name ?? ""} disabled={readOnly} /></div>}
-                  {category.allow_not_applicable && (
-                    <div className="not-applicable-box">
-                      <label className="check-row"><input name={`not_applicable_${category.id}`} type="checkbox" defaultChecked={categoryComment ? !categoryComment.is_applicable : false} disabled={readOnly} />This category is not applicable</label>
-                      <div className="field"><label htmlFor={`not_applicable_reason_${category.id}`}>Reason when not applicable</label><input className="input" id={`not_applicable_reason_${category.id}`} name={`not_applicable_reason_${category.id}`} defaultValue={categoryComment?.not_applicable_reason ?? ""} disabled={readOnly} /></div>
-                    </div>
-                  )}
-
-                  <div className="criterion-list">
-                    {categoryCriteria.map((criterion) => {
-                      const savedScore = ownScoreMap.get(criterion.id);
-                      return (
-                        <article className="criterion-card" key={criterion.id}>
-                          <div className="criterion-copy"><h3>{criterion.title}</h3>{criterion.description && <p>{criterion.description}</p>}</div>
-                          <div className="criterion-entry">
-                            <div className="field">
-                              <label htmlFor={`score_${criterion.id}`}>
-                                Score
-                              </label>
-
-                              <select
-                                className="select score-select"
-                                id={`score_${criterion.id}`}
-                                name={`score_${criterion.id}`}
-                                defaultValue={savedScore?.score ?? ""}
-                                disabled={readOnly}
-                              >
-                                <option value="">—</option>
-
-                                {scoreOptions.map((score) => {
-                                  const label = scaleLabels.get(score);
-
-                                  return (
-                                    <option value={score} key={score}>
-                                      {score.toFixed(2)}
-                                      {label ? ` — ${label}` : ""}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            </div>
-                            <div className="field"><label htmlFor={`observation_${criterion.id}`}>Criterion observation</label><textarea className="textarea compact-textarea" id={`observation_${criterion.id}`} name={`observation_${criterion.id}`} defaultValue={savedScore?.observation ?? ""} disabled={readOnly} /></div>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-
-                  <div className="comment-quadrant-grid">
-                    <RichTextField
-                      defaultValue={categoryComment?.successes}
-                      disabled={readOnly}
-                      id={`successes_${category.id}`}
-                      label="Successes"
-                      name={`successes_${category.id}`}
-                      placeholder="Brief strengths or successful choices"
-                    />
-                    <RichTextField
-                      defaultValue={categoryComment?.success_examples}
-                      disabled={readOnly}
-                      id={`success_examples_${category.id}`}
-                      label="Specific success examples"
-                      name={`success_examples_${category.id}`}
-                      placeholder="Moments, songs, scenes, or technical examples"
-                    />
-                    <RichTextField
-                      defaultValue={categoryComment?.growth_areas}
-                      disabled={readOnly}
-                      id={`growth_areas_${category.id}`}
-                      label="Opportunities for growth"
-                      name={`growth_areas_${category.id}`}
-                      placeholder="Constructive areas for continued development"
-                    />
-                    <RichTextField
-                      defaultValue={categoryComment?.growth_examples}
-                      disabled={readOnly}
-                      id={`growth_examples_${category.id}`}
-                      label="Specific growth examples"
-                      name={`growth_examples_${category.id}`}
-                      placeholder="Observed moments supporting the feedback"
-                    />
-                  </div>
-                  <div className="field"><label htmlFor={`private_notes_${category.id}`}>Private adjudicator notes</label><textarea className="textarea compact-textarea" id={`private_notes_${category.id}`} name={`private_notes_${category.id}`} defaultValue={categoryComment?.private_notes ?? ""} disabled={readOnly} /><small className="field-help">Private notes are never included in the school release or sent to OpenAI.</small></div>
-                </div>
-              </section>
-            );
-          })}
+          <CollaborativeAdjudicatorScorecard
+            applicationId={id}
+            categories={categories}
+            criteria={criteria}
+            currentUserId={profile.id}
+            currentUserName={profile.full_name ?? profile.email ?? "Adjudicator"}
+            initialPanelRows={(sharedObservationResult.data ?? []) as Array<{
+              panel_order: number;
+              adjudicator_user_id: string;
+              adjudicator_name: string;
+              criterion_id: string | null;
+              observation: string | null;
+              updated_at: string | null;
+            }>}
+            ownComments={comments.filter(
+              (comment) => comment.scorecard_id === ownScorecard?.id,
+            )}
+            ownScores={scores.filter(
+              (score) => score.scorecard_id === ownScorecard?.id,
+            )}
+            readOnly={readOnly}
+            scoreOptions={scoreChoices}
+          />
 
           <section className="panel"><div className="panel-body"><div className="field"><label htmlFor="scorecard_internal_notes">Overall private notes</label><textarea className="textarea" id="scorecard_internal_notes" name="scorecard_internal_notes" defaultValue={ownScorecard?.internal_notes ?? ""} disabled={readOnly} /></div></div></section>
 

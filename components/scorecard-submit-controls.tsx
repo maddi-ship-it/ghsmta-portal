@@ -11,13 +11,6 @@ type CompletionState = {
   missingCount: number;
 };
 
-const COMMENT_FIELDS = [
-  "successes",
-  "success_examples",
-  "growth_areas",
-  "growth_examples",
-] as const;
-
 function formText(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
 }
@@ -56,20 +49,15 @@ function evaluateCompletion(
         missingCount += 1;
       }
 
-      if (!formText(formData, `observation_${criterion.id}`)) {
-        missingCount += 1;
-      }
-    }
-
-    for (const field of COMMENT_FIELDS) {
       if (
         !richTextHasContent(
-          formText(formData, `${field}_${category.id}`),
+          formText(formData, `observation_${criterion.id}`),
         )
       ) {
         missingCount += 1;
       }
     }
+
   }
 
   return {
