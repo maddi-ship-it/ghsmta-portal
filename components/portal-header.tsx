@@ -14,6 +14,7 @@ type NavItem = {
 function navItems(profile: Profile): NavItem[] {
   const items: NavItem[] = [
     { href: "/portal", label: "Dashboard", shortLabel: "Home", icon: "⌂" },
+    { href: "/portal/schedule", label: "Scheduling", shortLabel: "Schedule", icon: "◷" },
   ];
 
   if (profile.role === "applicant") {
