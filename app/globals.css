@@ -1234,3 +1234,149 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   .schedule-slot-body { padding-left: 20px; }
 }
 
+
+/* Recurring schedule creation and timed school access */
+.schedule-owner-tools-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, .9fr);
+  gap: 20px;
+  margin-bottom: 24px;
+  align-items: start;
+}
+.schedule-tool-panel { margin: 0; }
+.schedule-tool-panel .panel-header { align-items: flex-start; }
+.schedule-tool-panel .panel-header h2 { margin: 4px 0; }
+.schedule-tool-panel .panel-header p { max-width: 720px; margin: 0; color: var(--muted); }
+.schedule-recurring-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+.schedule-recurring-instructions,
+.schedule-weekday-field { grid-column: 1 / -1; }
+.schedule-weekday-field {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.schedule-weekday-field legend { padding: 0 6px; font-weight: 850; }
+.schedule-weekday-field small { display: block; margin-top: 8px; color: var(--muted); }
+.schedule-weekday-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.schedule-weekday-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  font-size: .8rem;
+  font-weight: 800;
+}
+.schedule-weekday-option input { width: 17px; height: 17px; }
+.input-with-suffix { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.input-with-suffix .input { border-radius: 12px 0 0 12px; }
+.input-with-suffix span {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-radius: 0 12px 12px 0;
+  color: var(--muted);
+  background: #f8f9fc;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.schedule-recurring-submit { display: grid; gap: 7px; justify-items: start; }
+.schedule-recurring-submit small { color: var(--muted); }
+.schedule-bulk-access-form { display: grid; gap: 16px; }
+.schedule-bulk-selection-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.schedule-bulk-selection-heading small { color: var(--muted); }
+.schedule-bulk-slot-list {
+  display: grid;
+  gap: 8px;
+  max-height: 470px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+.schedule-bulk-slot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: white;
+  cursor: pointer;
+}
+.schedule-bulk-slot:has(input:checked) {
+  border-color: #9fb1d9;
+  background: #f5f7fc;
+  box-shadow: 0 0 0 2px rgba(0,22,153,.06);
+}
+.schedule-bulk-slot input { width: 19px; height: 19px; }
+.schedule-bulk-slot-main,
+.schedule-bulk-slot-time { display: grid; min-width: 0; gap: 3px; }
+.schedule-bulk-slot-main strong,
+.schedule-bulk-slot-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schedule-bulk-slot-main small,
+.schedule-bulk-slot-time small { color: var(--muted); }
+.schedule-bulk-slot-time { text-align: right; }
+.schedule-bulk-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.schedule-bulk-submit { min-height: 48px; }
+.schedule-slot-status-stack { display: grid; justify-items: end; gap: 7px; }
+.schedule-school-access-badge { max-width: 220px; text-align: right; white-space: normal; }
+.compact-empty-state { padding: 18px; }
+.compact-empty-state h3 { margin: 0 0 5px; }
+.compact-empty-state p { margin: 0; }
+
+@media (max-width: 1250px) {
+  .schedule-owner-tools-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .schedule-recurring-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .schedule-recurring-form,
+  .schedule-bulk-action-grid { grid-template-columns: 1fr; }
+  .schedule-recurring-instructions,
+  .schedule-weekday-field { grid-column: auto; }
+  .schedule-recurring-submit .button,
+  .schedule-bulk-submit { width: 100%; }
+  .schedule-bulk-selection-heading { align-items: flex-start; flex-direction: column; }
+  .schedule-bulk-slot {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .schedule-bulk-slot-time,
+  .schedule-bulk-slot > .badge {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
+  .schedule-slot-status-stack { justify-items: start; }
+  .schedule-school-access-badge { text-align: left; }
+}

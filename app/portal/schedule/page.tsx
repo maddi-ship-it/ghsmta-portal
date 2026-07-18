@@ -1,3 +1,5 @@
+import { ScheduleBulkAccessForm } from "@/components/schedule-bulk-access-form";
+import { ScheduleRecurringSlotsForm } from "@/components/schedule-recurring-slots-form";
 import { requireProfile } from "@/lib/auth";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -25,6 +27,10 @@ type ScheduleSlot = {
   location: string | null;
   school_instructions: string | null;
   status: ScheduleSlotStatus;
+  school_booking_opens_at: string | null;
+  school_booking_closes_at: string | null;
+  series_id: string | null;
+  series_sequence: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -115,6 +121,35 @@ function staffRoleLabel(role: AppRole) {
   return role === "advisory_member" ? "Advisory" : roleLabel(role);
 }
 
+function formatAccessDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function schoolAccessLabel(slot: ScheduleSlot, serverTime: number) {
+  if (!slot.school_booking_opens_at) return "Hidden";
+
+  const opensAt = new Date(slot.school_booking_opens_at).getTime();
+  const closesAt = slot.school_booking_closes_at
+    ? new Date(slot.school_booking_closes_at).getTime()
+    : null;
+
+  if (opensAt > serverTime) {
+    return `Opens ${formatAccessDateTime(slot.school_booking_opens_at)}`;
+  }
+
+  if (closesAt && closesAt <= serverTime) return "School selection closed";
+
+  return closesAt
+    ? `Open until ${formatAccessDateTime(slot.school_booking_closes_at!)}`
+    : "Open to schools";
+}
+
 export default async function SchedulePage({
   searchParams,
 }: {
@@ -132,7 +167,7 @@ export default async function SchedulePage({
     supabase
       .from("schedule_slots")
       .select(
-        "id,cycle_id,title,starts_at,ends_at,location,school_instructions,status,created_at,updated_at",
+        "id,cycle_id,title,starts_at,ends_at,location,school_instructions,status,school_booking_opens_at,school_booking_closes_at,series_id,series_sequence,created_at,updated_at",
       )
       .order("starts_at", { ascending: true }),
     supabase
@@ -229,6 +264,29 @@ export default async function SchedulePage({
       )
     : null;
 
+  const ownerBulkSlots =
+    profile.role === "owner"
+      ? slots
+          .filter(
+            (slot) =>
+              slot.status !== "cancelled" &&
+              new Date(slot.starts_at).getTime() > serverTime,
+          )
+          .map((slot) => {
+            const cycle = cycleMap.get(slot.cycle_id);
+            return {
+              id: slot.id,
+              title: slot.title,
+              program: cycle
+                ? `${cycle.season_year} — ${cycle.name}`
+                : "Program",
+              date: formatSlotDate(slot.starts_at),
+              time: `${formatSlotTime(slot.starts_at, slot.ends_at)} ET`,
+              accessLabel: schoolAccessLabel(slot, serverTime),
+            };
+          })
+      : [];
+
   return (
     <>
       <div className="page-heading schedule-page-heading">
@@ -305,6 +363,37 @@ export default async function SchedulePage({
                   <option value="cancelled">Cancelled</option>
                 </select>
               </div>
+              <div className="field">
+                <label htmlFor="school_access_mode">School selection</label>
+                <select
+                  className="select"
+                  defaultValue="hidden"
+                  id="school_access_mode"
+                  name="school_access_mode"
+                >
+                  <option value="hidden">Keep hidden from schools</option>
+                  <option value="open_now">Open to schools now</option>
+                  <option value="scheduled">Schedule opening</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="school_booking_opens_at">Scheduled school opening</label>
+                <input
+                  className="input"
+                  id="school_booking_opens_at"
+                  name="school_booking_opens_at"
+                  type="datetime-local"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="school_booking_closes_at">School selection closes</label>
+                <input
+                  className="input"
+                  id="school_booking_closes_at"
+                  name="school_booking_closes_at"
+                  type="datetime-local"
+                />
+              </div>
               <div className="field schedule-create-instructions">
                 <label htmlFor="school_instructions">School instructions</label>
                 <textarea
@@ -320,6 +409,19 @@ export default async function SchedulePage({
             </form>
           </div>
         </section>
+      )}
+
+      {profile.role === "owner" && (
+        <div className="schedule-owner-tools-grid">
+          <ScheduleRecurringSlotsForm
+            cycles={cycles.map((cycle) => ({
+              id: cycle.id,
+              name: cycle.name,
+              season_year: cycle.season_year,
+            }))}
+          />
+          <ScheduleBulkAccessForm slots={ownerBulkSlots} />
+        </div>
       )}
 
       {profile.role === "applicant" && bookedSlot && bookedApplication ? (
@@ -351,8 +453,16 @@ export default async function SchedulePage({
         <section className="schedule-slot-grid">
           {slots.length === 0 ? (
             <div className="panel empty-state schedule-empty-state">
-              <h3>No schedule slots are configured.</h3>
-              <p>Slots will appear here when an owner creates them.</p>
+              <h3>
+                {profile.role === "applicant"
+                  ? "No schedule slots are currently open."
+                  : "No schedule slots are configured."}
+              </h3>
+              <p>
+                {profile.role === "applicant"
+                  ? "GHSMTA will make slots available when school selection opens."
+                  : "Slots will appear here when an owner creates them."}
+              </p>
             </div>
           ) : (
             slots.map((slot) => {
@@ -383,8 +493,14 @@ export default async function SchedulePage({
                 slot.status === "open" &&
                 !isPast &&
                 !currentEnrollment;
+              const schoolAccessOpen =
+                Boolean(slot.school_booking_opens_at) &&
+                new Date(slot.school_booking_opens_at!).getTime() <= serverTime &&
+                (!slot.school_booking_closes_at ||
+                  new Date(slot.school_booking_closes_at).getTime() > serverTime);
               const canSchoolBook =
                 slot.status === "open" &&
+                schoolAccessOpen &&
                 !isPast &&
                 !slotAvailability?.is_booked &&
                 slotApplications.length > 0;
@@ -404,9 +520,16 @@ export default async function SchedulePage({
                       <h2>{slot.title}</h2>
                       <p>{formatSlotDate(slot.starts_at)}</p>
                     </div>
-                    <span className={`badge schedule-status schedule-status-${slot.status}`}>
-                      {statusLabel(slot.status)}
-                    </span>
+                    <div className="schedule-slot-status-stack">
+                      <span className={`badge schedule-status schedule-status-${slot.status}`}>
+                        {statusLabel(slot.status)}
+                      </span>
+                      {profile.role === "owner" && (
+                        <span className="badge schedule-school-access-badge">
+                          {schoolAccessLabel(slot, serverTime)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="panel-body schedule-slot-body">
@@ -587,6 +710,34 @@ export default async function SchedulePage({
                                     defaultValue={slot.school_instructions ?? ""}
                                     name="school_instructions"
                                   />
+                                </div>
+                                <div className="two-column-grid">
+                                  <div className="field">
+                                    <label>School selection opens</label>
+                                    <input
+                                      className="input"
+                                      defaultValue={
+                                        slot.school_booking_opens_at
+                                          ? localInputValue(slot.school_booking_opens_at)
+                                          : ""
+                                      }
+                                      name="school_booking_opens_at"
+                                      type="datetime-local"
+                                    />
+                                  </div>
+                                  <div className="field">
+                                    <label>School selection closes</label>
+                                    <input
+                                      className="input"
+                                      defaultValue={
+                                        slot.school_booking_closes_at
+                                          ? localInputValue(slot.school_booking_closes_at)
+                                          : ""
+                                      }
+                                      name="school_booking_closes_at"
+                                      type="datetime-local"
+                                    />
+                                  </div>
                                 </div>
                                 <div className="field">
                                   <label>Status</label>
