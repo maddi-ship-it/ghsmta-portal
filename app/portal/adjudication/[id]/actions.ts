@@ -102,29 +102,79 @@ async function persistAdjudicatorScorecard(
   const missing: string[] = [];
 
   for (const category of categories) {
-    const requestedNotApplicable = formData.get(`not_applicable_${category.id}`) === "on";
-    const isApplicable = !(category.allow_not_applicable && requestedNotApplicable);
-    const notApplicableReason = formText(formData, `not_applicable_reason_${category.id}`);
-    if (submit && !isApplicable && !notApplicableReason) {
-      missing.push(`${category.title}: explain why it is not applicable`);
+    const usesEligibilityControl =
+      formData.get(`eligibility_control_${category.id}`) === "1";
+
+    const isEligible = usesEligibilityControl
+      ? formData.get(`eligible_${category.id}`) === "on"
+      : !(
+          category.allow_not_applicable &&
+          formData.get(`not_applicable_${category.id}`) === "on"
+        );
+
+    const ineligibilityReason =
+      formText(formData, `ineligibility_reason_${category.id}`) ||
+      formText(formData, `not_applicable_reason_${category.id}`);
+
+    const rawRangeStart = formText(
+      formData,
+      `score_range_start_${category.id}`,
+    );
+
+    const rangeMinimum = rawRangeStart
+      ? Number(rawRangeStart)
+      : null;
+
+    const rangeMaximum = rangeMinimum == null
+      ? null
+      : Number((rangeMinimum + 2).toFixed(2));
+
+    const validRange =
+      rangeMinimum != null &&
+      rangeMaximum != null &&
+      isQuarterPointScore(
+        rangeMinimum,
+        scoreMinimum,
+        scoreMaximum - 2,
+      ) &&
+      rangeMaximum <= scoreMaximum;
+
+    if (rawRangeStart && !validRange) {
+      throw new Error(
+        `The ${category.title} range must span exactly two points within the scoring scale.`,
+      );
+    }
+
+    if (submit && !isEligible && !ineligibilityReason) {
+      missing.push(`${category.title}: explain why it is not eligible`);
+    }
+
+    if (submit && isEligible && !validRange) {
+      missing.push(`${category.title}: select a 2-point scoring range`);
     }
 
     if (
       submit &&
-      isApplicable &&
+      isEligible &&
       category.subject_label &&
       !formText(formData, `subject_name_${category.id}`)
     ) {
       missing.push(`${category.title}: ${category.subject_label}`);
     }
 
-
     commentRows.push({
       scorecard_id: scorecard.id,
       category_id: category.id,
-      subject_name: formText(formData, `subject_name_${category.id}`) || null,
-      is_applicable: isApplicable,
-      not_applicable_reason: isApplicable ? null : notApplicableReason || null,
+      subject_name: isEligible
+        ? formText(formData, `subject_name_${category.id}`) || null
+        : null,
+      is_applicable: isEligible,
+      is_eligible: isEligible,
+      not_applicable_reason: isEligible
+        ? null
+        : ineligibilityReason || null,
+      score_range_min: isEligible && validRange ? rangeMinimum : null,
+      score_range_max: isEligible && validRange ? rangeMaximum : null,
       private_notes: formText(formData, `private_notes_${category.id}`) || null,
     });
 
@@ -144,13 +194,13 @@ async function persistAdjudicatorScorecard(
         );
       }
 
-      if (submit && isApplicable && !validScore) {
+      if (submit && isEligible && !validScore) {
         missing.push(`${category.title}: ${criterion.title} score`);
       }
 
       if (
         submit &&
-        isApplicable &&
+        isEligible &&
         !richTextHasContent(observation)
       ) {
         missing.push(`${category.title}: ${criterion.title} observation`);
@@ -159,8 +209,8 @@ async function persistAdjudicatorScorecard(
       scoreRows.push({
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
-        score: isApplicable && validScore ? numericScore : null,
-        observation: isApplicable ? observation || null : null,
+        score: isEligible && validScore ? numericScore : null,
+        observation: isEligible ? observation || null : null,
       });
     }
   }

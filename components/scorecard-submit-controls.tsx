@@ -24,15 +24,28 @@ function evaluateCompletion(
   let missingCount = 0;
 
   for (const category of categories) {
-    const notApplicable =
-      category.allow_not_applicable &&
-      formData.get(`not_applicable_${category.id}`) === "on";
+    const usesEligibilityControl =
+      formData.get(`eligibility_control_${category.id}`) === "1";
 
-    if (notApplicable) {
-      if (!formText(formData, `not_applicable_reason_${category.id}`)) {
+    const eligible = usesEligibilityControl
+      ? formData.get(`eligible_${category.id}`) === "on"
+      : !(
+          category.allow_not_applicable &&
+          formData.get(`not_applicable_${category.id}`) === "on"
+        );
+
+    if (!eligible) {
+      if (
+        !formText(formData, `ineligibility_reason_${category.id}`) &&
+        !formText(formData, `not_applicable_reason_${category.id}`)
+      ) {
         missingCount += 1;
       }
       continue;
+    }
+
+    if (!formText(formData, `score_range_start_${category.id}`)) {
+      missingCount += 1;
     }
 
     if (

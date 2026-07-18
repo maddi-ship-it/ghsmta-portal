@@ -276,7 +276,10 @@ export type AdjudicationCategoryComment = {
   category_id: string;
   subject_name: string | null;
   is_applicable: boolean;
+  is_eligible: boolean;
   not_applicable_reason: string | null;
+  score_range_min: number | null;
+  score_range_max: number | null;
   successes: string | null;
   success_examples: string | null;
   growth_areas: string | null;

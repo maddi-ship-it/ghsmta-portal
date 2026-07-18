@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
+import { CategoryScoringControls } from "@/components/category-scoring-controls";
 import { RichTextField } from "@/components/rich-text-field";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -232,13 +233,26 @@ export function CollaborativeAdjudicatorScorecard({
             key={category.id}
           >
             <div className="panel-header scoring-category-header">
-              <div>
+              <div className="scoring-category-heading-copy">
                 <span className="section-order">
                   Category {categoryIndex + 1}
                 </span>
                 <h2>{category.title}</h2>
                 {category.guidance && <p>{category.guidance}</p>}
               </div>
+
+              <CategoryScoringControls
+                categoryId={category.id}
+                defaultEligible={
+                  categoryComment?.is_eligible ??
+                  categoryComment?.is_applicable ??
+                  true
+                }
+                defaultRangeStart={categoryComment?.score_range_min}
+                defaultReason={categoryComment?.not_applicable_reason}
+                disabled={readOnly}
+                scoreValues={scoreOptions.map((option) => option.value)}
+              />
             </div>
 
             <div className="panel-body">
@@ -254,41 +268,6 @@ export function CollaborativeAdjudicatorScorecard({
                     id={`subject_name_${category.id}`}
                     name={`subject_name_${category.id}`}
                   />
-                </div>
-              )}
-
-              {category.allow_not_applicable && (
-                <div className="not-applicable-box">
-                  <label className="check-row">
-                    <input
-                      defaultChecked={
-                        categoryComment
-                          ? !categoryComment.is_applicable
-                          : false
-                      }
-                      disabled={readOnly}
-                      name={`not_applicable_${category.id}`}
-                      type="checkbox"
-                    />
-                    This category is not applicable
-                  </label>
-
-                  <div className="field">
-                    <label
-                      htmlFor={`not_applicable_reason_${category.id}`}
-                    >
-                      Reason when not applicable
-                    </label>
-                    <input
-                      className="input"
-                      defaultValue={
-                        categoryComment?.not_applicable_reason ?? ""
-                      }
-                      disabled={readOnly}
-                      id={`not_applicable_reason_${category.id}`}
-                      name={`not_applicable_reason_${category.id}`}
-                    />
-                  </div>
                 </div>
               )}
 

@@ -606,6 +606,28 @@ export function OwnerLiveAdjudicationReview({
                           {scorecardStatusLabel(card.status)}
                         </span>
                       </div>
+                      {comment && (
+                        <div className="owner-category-decision-summary">
+                          <span
+                            className={[
+                              "badge",
+                              comment.is_eligible
+                                ? "badge-scorecard-submitted"
+                                : "badge-scorecard-reopened",
+                            ].join(" ")}
+                          >
+                            {comment.is_eligible ? "Eligible" : "Not eligible"}
+                          </span>
+
+                          {comment.score_range_min != null &&
+                            comment.score_range_max != null && (
+                              <span>
+                                2-point range: {Number(comment.score_range_min).toFixed(2)}–
+                                {Number(comment.score_range_max).toFixed(2)}
+                              </span>
+                            )}
+                        </div>
+                      )}
                       {comment?.subject_name && (
                         <p><strong>Subject:</strong> {comment.subject_name}</p>
                       )}

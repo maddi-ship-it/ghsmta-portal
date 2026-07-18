@@ -2304,3 +2304,214 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   }
 }
 /* GHSMTA channel chat modes and mentions — END */
+
+/* GHSMTA compact category scoring controls — START */
+.scoring-category-header {
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.scoring-category-heading-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.category-scoring-controls {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 190px);
+  gap: 8px 10px;
+  align-items: end;
+  flex: 0 0 auto;
+  min-width: 330px;
+}
+
+.category-eligibility-control {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+}
+
+.category-eligibility-control input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--navy-800);
+}
+
+.category-eligibility-control span {
+  display: grid;
+  gap: 1px;
+}
+
+.category-eligibility-control strong {
+  font-size: .78rem;
+}
+
+.category-eligibility-control small {
+  color: var(--muted);
+  font-size: .62rem;
+  line-height: 1.2;
+}
+
+.category-range-control,
+.category-ineligibility-reason {
+  display: grid;
+  gap: 4px;
+}
+
+.category-range-control > span,
+.category-ineligibility-reason > span {
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 900;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+
+.category-range-control .select,
+.category-ineligibility-reason .input {
+  min-height: 42px;
+  padding-block: 7px;
+  font-size: .78rem;
+}
+
+.category-ineligibility-reason {
+  grid-column: 1 / -1;
+}
+
+/* Fit approximately four empty criterion rows in a normal desktop viewport. */
+.collaborative-criterion-table-header,
+.collaborative-criterion-row {
+  grid-template-columns:
+    minmax(250px, .92fr)
+    minmax(0, 3fr)
+    minmax(104px, 118px);
+  gap: 7px;
+}
+
+.collaborative-criterion-table-header {
+  padding: 7px 10px;
+}
+
+.collaborative-criterion-row {
+  padding: 8px 10px;
+}
+
+.collaborative-criterion-row .criterion-copy {
+  padding: 3px 8px 3px 0;
+}
+
+.collaborative-criterion-row .criterion-copy h3 {
+  margin: 0 0 4px;
+  font-size: .78rem;
+  line-height: 1.25;
+}
+
+.collaborative-criterion-row .criterion-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .66rem;
+  line-height: 1.32;
+}
+
+.panel-comment-columns {
+  gap: 6px;
+}
+
+.panel-criterion-comment {
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.panel-criterion-comment-peer {
+  min-height: 78px;
+}
+
+.panel-criterion-comment .rich-text-toolbar {
+  gap: 3px;
+  padding: 4px;
+}
+
+.panel-criterion-comment .rich-text-toolbar-button {
+  min-height: 27px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: .66rem;
+}
+
+.panel-criterion-comment .rich-text-editor {
+  min-height: 48px;
+  max-height: 110px;
+  overflow-y: auto;
+  padding: 7px 9px;
+  font-size: .74rem;
+  line-height: 1.35;
+}
+
+.panel-criterion-comment .field > label {
+  margin-bottom: 4px;
+  font-size: .71rem;
+}
+
+.panel-criterion-comment-preview {
+  font-size: .72rem;
+  line-height: 1.35;
+}
+
+.panel-comment-empty {
+  font-size: .7rem;
+}
+
+.personal-score-column {
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.personal-score-column label {
+  font-size: .62rem;
+}
+
+.personal-score-column .select {
+  min-height: 39px;
+  padding-inline: 8px;
+  font-size: .76rem;
+}
+
+.owner-category-decision-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+@media (max-width: 1100px) {
+  .scoring-category-header {
+    display: grid;
+  }
+
+  .category-scoring-controls {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .category-scoring-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .category-ineligibility-reason {
+    grid-column: auto;
+  }
+}
+/* GHSMTA compact category scoring controls — END */
