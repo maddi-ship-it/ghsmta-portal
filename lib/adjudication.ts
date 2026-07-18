@@ -6,6 +6,8 @@ import type {
   ScoringCriterion,
 } from "@/lib/types";
 
+import { richTextToPlainText } from "@/lib/rich-text";
+
 export function average(values: Array<number | null | undefined>) {
   const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   if (numeric.length === 0) return null;
@@ -52,19 +54,11 @@ export function quarterScoreOptions(
   maximum: number,
 ): number[] {
   const increment = 0.25;
-  const optionCount = Math.round(
-    (maximum - minimum) / increment,
-  );
+  const optionCount = Math.round((maximum - minimum) / increment);
 
   return Array.from(
     { length: optionCount + 1 },
-    (_, index) =>
-      Number(
-        (
-          maximum -
-          index * increment
-        ).toFixed(2),
-      ),
+    (_, index) => Number((maximum - index * increment).toFixed(2)),
   );
 }
 
@@ -98,23 +92,62 @@ export function buildCommentContext(
   category: ScoringCategory,
   criteria: ScoringCriterion[],
   comments: AdjudicationCategoryComment[],
+  scores: AdjudicationScore[],
 ) {
-  const criterionText = criteria
+  const categoryCriteria = criteria
     .filter((criterion) => criterion.category_id === category.id)
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map((criterion) => `- ${criterion.title}${criterion.description ? `: ${criterion.description}` : ""}`)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const criterionText = categoryCriteria
+    .map(
+      (criterion) =>
+        `- ${criterion.title}${
+          criterion.description ? `: ${criterion.description}` : ""
+        }`,
+    )
     .join("\n");
 
   const rawComments = comments
     .filter((comment) => comment.is_applicable)
     .map((comment, index) => {
+      const observations = categoryCriteria
+        .map((criterion) => {
+          const observation = scores.find(
+            (score) =>
+              score.scorecard_id === comment.scorecard_id &&
+              score.criterion_id === criterion.id,
+          )?.observation?.trim();
+
+          return observation
+            ? `- ${criterion.title}: ${observation}`
+            : null;
+        })
+        .filter(Boolean)
+        .join("\n");
+
       const parts = [
         comment.subject_name ? `Subject: ${comment.subject_name}` : null,
-        comment.successes ? `Successes: ${comment.successes}` : null,
-        comment.success_examples ? `Success examples: ${comment.success_examples}` : null,
-        comment.growth_areas ? `Opportunities for growth: ${comment.growth_areas}` : null,
-        comment.growth_examples ? `Growth examples: ${comment.growth_examples}` : null,
+        observations ? `Criterion observations:\n${observations}` : null,
+        comment.successes
+          ? `Successes: ${richTextToPlainText(comment.successes)}`
+          : null,
+        comment.success_examples
+          ? `Success examples: ${richTextToPlainText(
+              comment.success_examples,
+            )}`
+          : null,
+        comment.growth_areas
+          ? `Opportunities for growth: ${richTextToPlainText(
+              comment.growth_areas,
+            )}`
+          : null,
+        comment.growth_examples
+          ? `Growth examples: ${richTextToPlainText(
+              comment.growth_examples,
+            )}`
+          : null,
       ].filter(Boolean);
+
       return `Adjudicator ${index + 1}\n${parts.join("\n")}`;
     })
     .join("\n\n");
@@ -146,4 +179,3 @@ export function extractOpenAIText(payload: unknown): string {
   }
   return "";
 }
-

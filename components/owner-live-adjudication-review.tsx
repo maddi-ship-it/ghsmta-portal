@@ -9,6 +9,7 @@ import {
 } from "@/app/portal/adjudication/[id]/actions";
 import { formatScore } from "@/lib/adjudication";
 import { createClient } from "@/lib/supabase/client";
+import { richTextHasContent, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/rich-text";
 import type {
   AdjudicationCategoryComment,
   AdjudicationPanelFeedback,
@@ -26,7 +27,26 @@ function scorecardStatusLabel(status: string) {
 }
 
 function uniqueText(values: Array<string | null | undefined>) {
-  return [...new Set(values.map((value) => value?.trim()).filter(Boolean))] as string[];
+  return [
+    ...new Set(
+      values
+        .map((value) => richTextToPlainText(value))
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function RichTextPreview({ value }: { value: string | null | undefined }) {
+  if (!richTextHasContent(value)) return <span>—</span>;
+
+  return (
+    <div
+      className="rich-text-preview"
+      dangerouslySetInnerHTML={{
+        __html: sanitizeRichTextHtml(value),
+      }}
+    />
+  );
 }
 
 function bulletSection(title: string, values: string[]) {
@@ -36,12 +56,32 @@ function bulletSection(title: string, values: string[]) {
 
 function composeLiveCommentDraft(
   category: ScoringCategory,
+  criteria: ScoringCriterion[],
+  scorecards: AdjudicationScorecard[],
+  scores: AdjudicationScore[],
   comments: AdjudicationCategoryComment[],
 ) {
   const applicable = comments.filter((comment) => comment.is_applicable);
   const notApplicable = comments.filter((comment) => !comment.is_applicable);
+  const scorecardIds = new Set(scorecards.map((scorecard) => scorecard.id));
+
+  const observations = criteria
+    .filter((criterion) => criterion.category_id === category.id)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .flatMap((criterion) =>
+      uniqueText(
+        scores
+          .filter(
+            (score) =>
+              scorecardIds.has(score.scorecard_id) &&
+              score.criterion_id === criterion.id,
+          )
+          .map((score) => score.observation),
+      ).map((observation) => `${criterion.title}: ${observation}`),
+    );
 
   const sections = [
+    bulletSection("Criterion observations:", observations),
     bulletSection(
       "Successes noted by the panel:",
       uniqueText(applicable.map((comment) => comment.successes)),
@@ -60,7 +100,9 @@ function composeLiveCommentDraft(
     ),
     bulletSection(
       "Not-applicable notes:",
-      uniqueText(notApplicable.map((comment) => comment.not_applicable_reason)),
+      uniqueText(
+        notApplicable.map((comment) => comment.not_applicable_reason),
+      ),
     ),
   ].filter(Boolean);
 
@@ -115,8 +157,9 @@ function LivePanelFeedbackEditor({
         <div>
           <h3>School-facing panel narrative</h3>
           <p>
-            This box follows the live adjudicator comments until you begin editing.
-            ChatGPT can turn the collected notes into a polished narrative.
+            This box follows live criterion observations and adjudicator comments
+            until you begin editing. ChatGPT can turn the collected notes into a
+            polished narrative.
           </p>
         </div>
         <form action={generatePanelComment.bind(null, applicationId, category.id)}>
@@ -141,7 +184,7 @@ function LivePanelFeedbackEditor({
                 setManualValue("");
               }}
             >
-              Refresh from live comments
+              Refresh from live notes
             </button>
           </div>
           <textarea
@@ -156,8 +199,8 @@ function LivePanelFeedbackEditor({
           />
           <small className="field-help">
             {followingLiveDraft
-              ? "Following live comments. Typing here will preserve your manual edit."
-              : "Manual edit preserved. Use Refresh from live comments to replace it."}
+              ? "Following live observations and comments. Typing here will preserve your manual edit."
+              : "Manual edit preserved. Use Refresh from live notes to replace it."}
           </small>
         </div>
         <label className="check-row">
@@ -462,7 +505,13 @@ export function OwnerLiveAdjudicationReview({
             comment.category_id === category.id &&
             visibleScorecards.some((scorecard) => scorecard.id === comment.scorecard_id),
         );
-        const liveDraft = composeLiveCommentDraft(category, categoryComments);
+        const liveDraft = composeLiveCommentDraft(
+          category,
+          categoryCriteria,
+          visibleScorecards,
+          scores,
+          categoryComments,
+        );
 
         return (
           <section
@@ -565,10 +614,22 @@ export function OwnerLiveAdjudicationReview({
                         </p>
                       ) : (
                         <>
-                          <p><strong>Successes:</strong> {comment?.successes ?? "—"}</p>
-                          <p><strong>Examples:</strong> {comment?.success_examples ?? "—"}</p>
-                          <p><strong>Growth:</strong> {comment?.growth_areas ?? "—"}</p>
-                          <p><strong>Growth examples:</strong> {comment?.growth_examples ?? "—"}</p>
+                          <div className="raw-comment-section">
+                            <strong>Successes:</strong>
+                            <RichTextPreview value={comment?.successes} />
+                          </div>
+                          <div className="raw-comment-section">
+                            <strong>Examples:</strong>
+                            <RichTextPreview value={comment?.success_examples} />
+                          </div>
+                          <div className="raw-comment-section">
+                            <strong>Growth:</strong>
+                            <RichTextPreview value={comment?.growth_areas} />
+                          </div>
+                          <div className="raw-comment-section">
+                            <strong>Growth examples:</strong>
+                            <RichTextPreview value={comment?.growth_examples} />
+                          </div>
                         </>
                       )}
                       {comment && (

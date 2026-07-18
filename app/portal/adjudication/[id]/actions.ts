@@ -10,9 +10,11 @@ import {
   isQuarterPointScore,
 } from "@/lib/adjudication";
 import { requireProfile } from "@/lib/auth";
+import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdjudicationCategoryComment,
+  AdjudicationScore,
   AdjudicationScorecard,
   AiPromptTemplate,
   Application,
@@ -103,20 +105,45 @@ async function persistAdjudicatorScorecard(
     const requestedNotApplicable = formData.get(`not_applicable_${category.id}`) === "on";
     const isApplicable = !(category.allow_not_applicable && requestedNotApplicable);
     const notApplicableReason = formText(formData, `not_applicable_reason_${category.id}`);
-    const successes = formText(formData, `successes_${category.id}`);
-    const successExamples = formText(formData, `success_examples_${category.id}`);
-    const growthAreas = formText(formData, `growth_areas_${category.id}`);
-    const growthExamples = formText(formData, `growth_examples_${category.id}`);
+    const successes = sanitizeRichTextHtml(
+      formText(formData, `successes_${category.id}`),
+    );
+    const successExamples = sanitizeRichTextHtml(
+      formText(formData, `success_examples_${category.id}`),
+    );
+    const growthAreas = sanitizeRichTextHtml(
+      formText(formData, `growth_areas_${category.id}`),
+    );
+    const growthExamples = sanitizeRichTextHtml(
+      formText(formData, `growth_examples_${category.id}`),
+    );
 
     if (submit && !isApplicable && !notApplicableReason) {
       missing.push(`${category.title}: explain why it is not applicable`);
     }
 
+    if (
+      submit &&
+      isApplicable &&
+      category.subject_label &&
+      !formText(formData, `subject_name_${category.id}`)
+    ) {
+      missing.push(`${category.title}: ${category.subject_label}`);
+    }
+
     if (submit && isApplicable) {
-      if (!successes) missing.push(`${category.title}: successes`);
-      if (!successExamples) missing.push(`${category.title}: success examples`);
-      if (!growthAreas) missing.push(`${category.title}: opportunities for growth`);
-      if (!growthExamples) missing.push(`${category.title}: growth examples`);
+      if (!richTextHasContent(successes)) {
+        missing.push(`${category.title}: successes`);
+      }
+      if (!richTextHasContent(successExamples)) {
+        missing.push(`${category.title}: success examples`);
+      }
+      if (!richTextHasContent(growthAreas)) {
+        missing.push(`${category.title}: opportunities for growth`);
+      }
+      if (!richTextHasContent(growthExamples)) {
+        missing.push(`${category.title}: growth examples`);
+      }
     }
 
     commentRows.push({
@@ -134,6 +161,10 @@ async function persistAdjudicatorScorecard(
 
     for (const criterion of criteria.filter((item) => item.category_id === category.id)) {
       const rawScore = formText(formData, `score_${criterion.id}`);
+      const observation = formText(
+        formData,
+        `observation_${criterion.id}`,
+      );
       const numericScore = rawScore ? Number(rawScore) : null;
       const validScore =
         numericScore != null &&
@@ -146,14 +177,18 @@ async function persistAdjudicatorScorecard(
       }
 
       if (submit && isApplicable && !validScore) {
-        missing.push(`${category.title}: ${criterion.title}`);
+        missing.push(`${category.title}: ${criterion.title} score`);
+      }
+
+      if (submit && isApplicable && !observation) {
+        missing.push(`${category.title}: ${criterion.title} observation`);
       }
 
       scoreRows.push({
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
         score: isApplicable && validScore ? numericScore : null,
-        observation: formText(formData, `observation_${criterion.id}`) || null,
+        observation: isApplicable ? observation || null : null,
       });
     }
   }
@@ -292,15 +327,44 @@ export async function generatePanelComment(
   const scorecards = (cardsData ?? []) as AdjudicationScorecard[];
   if (scorecards.length === 0) throw new Error("No adjudicator scorecards are available.");
 
-  const { data: commentsData, error: commentsError } = await supabase
-    .from("adjudication_category_comments")
-    .select("*")
-    .eq("category_id", categoryId)
-    .in("scorecard_id", scorecards.map((card) => card.id));
-  if (commentsError) throw new Error(commentsError.message);
-  const comments = (commentsData ?? []) as AdjudicationCategoryComment[];
-  const { criterionText, rawComments } = buildCommentContext(category, criteria, comments);
-  if (!rawComments.trim()) throw new Error("No category comments are available to synthesize.");
+  const scorecardIds = scorecards.map((card) => card.id);
+  const criterionIds = criteria.map((criterion) => criterion.id);
+
+  const [commentsResult, scoresResult] = await Promise.all([
+    supabase
+      .from("adjudication_category_comments")
+      .select("*")
+      .eq("category_id", categoryId)
+      .in("scorecard_id", scorecardIds),
+    criterionIds.length
+      ? supabase
+          .from("adjudication_scores")
+          .select("*")
+          .in("scorecard_id", scorecardIds)
+          .in("criterion_id", criterionIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (commentsResult.error) {
+    throw new Error(commentsResult.error.message);
+  }
+  if (scoresResult.error) {
+    throw new Error(scoresResult.error.message);
+  }
+
+  const comments = (commentsResult.data ?? []) as AdjudicationCategoryComment[];
+  const scores = (scoresResult.data ?? []) as AdjudicationScore[];
+  const { criterionText, rawComments } = buildCommentContext(
+    category,
+    criteria,
+    comments,
+    scores,
+  );
+  if (!rawComments.trim()) {
+    throw new Error(
+      "No category comments or criterion observations are available to synthesize.",
+    );
+  }
 
   const { data: cyclePromptData } = await supabase
     .from("ai_prompt_templates")

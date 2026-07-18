@@ -7,6 +7,8 @@ import {
 } from "@/lib/adjudication";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
+import { RichTextField } from "@/components/rich-text-field";
+import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -175,7 +177,7 @@ export default async function AdjudicationApplicationPage({
       {query.submitted && <div className="notice page-message">Your scorecard was submitted and is now read-only.</div>}
       {query.generated && <div className="notice page-message">The AI narrative draft was generated. Review and edit it before approval.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
-      {query.error === "required" && <div className="form-error page-message">Complete the missing scores and all four comment quadrants before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
+      {query.error === "required" && <div className="form-error page-message">Complete every required subject field, score, criterion observation, and comment field before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
 
       <div className="adjudication-score-layout">
         <aside className="score-category-sidebar">
@@ -273,10 +275,38 @@ export default async function AdjudicationApplicationPage({
                   </div>
 
                   <div className="comment-quadrant-grid">
-                    <div className="field"><label htmlFor={`successes_${category.id}`}>Successes</label><textarea className="textarea" id={`successes_${category.id}`} name={`successes_${category.id}`} defaultValue={categoryComment?.successes ?? ""} disabled={readOnly} placeholder="Brief strengths or successful choices" /></div>
-                    <div className="field"><label htmlFor={`success_examples_${category.id}`}>Specific success examples</label><textarea className="textarea" id={`success_examples_${category.id}`} name={`success_examples_${category.id}`} defaultValue={categoryComment?.success_examples ?? ""} disabled={readOnly} placeholder="Moments, songs, scenes, or technical examples" /></div>
-                    <div className="field"><label htmlFor={`growth_areas_${category.id}`}>Opportunities for growth</label><textarea className="textarea" id={`growth_areas_${category.id}`} name={`growth_areas_${category.id}`} defaultValue={categoryComment?.growth_areas ?? ""} disabled={readOnly} placeholder="Constructive areas for continued development" /></div>
-                    <div className="field"><label htmlFor={`growth_examples_${category.id}`}>Specific growth examples</label><textarea className="textarea" id={`growth_examples_${category.id}`} name={`growth_examples_${category.id}`} defaultValue={categoryComment?.growth_examples ?? ""} disabled={readOnly} placeholder="Observed moments supporting the feedback" /></div>
+                    <RichTextField
+                      defaultValue={categoryComment?.successes}
+                      disabled={readOnly}
+                      id={`successes_${category.id}`}
+                      label="Successes"
+                      name={`successes_${category.id}`}
+                      placeholder="Brief strengths or successful choices"
+                    />
+                    <RichTextField
+                      defaultValue={categoryComment?.success_examples}
+                      disabled={readOnly}
+                      id={`success_examples_${category.id}`}
+                      label="Specific success examples"
+                      name={`success_examples_${category.id}`}
+                      placeholder="Moments, songs, scenes, or technical examples"
+                    />
+                    <RichTextField
+                      defaultValue={categoryComment?.growth_areas}
+                      disabled={readOnly}
+                      id={`growth_areas_${category.id}`}
+                      label="Opportunities for growth"
+                      name={`growth_areas_${category.id}`}
+                      placeholder="Constructive areas for continued development"
+                    />
+                    <RichTextField
+                      defaultValue={categoryComment?.growth_examples}
+                      disabled={readOnly}
+                      id={`growth_examples_${category.id}`}
+                      label="Specific growth examples"
+                      name={`growth_examples_${category.id}`}
+                      placeholder="Observed moments supporting the feedback"
+                    />
                   </div>
                   <div className="field"><label htmlFor={`private_notes_${category.id}`}>Private adjudicator notes</label><textarea className="textarea compact-textarea" id={`private_notes_${category.id}`} name={`private_notes_${category.id}`} defaultValue={categoryComment?.private_notes ?? ""} disabled={readOnly} /><small className="field-help">Private notes are never included in the school release or sent to OpenAI.</small></div>
                 </div>
@@ -286,7 +316,22 @@ export default async function AdjudicationApplicationPage({
 
           <section className="panel"><div className="panel-body"><div className="field"><label htmlFor="scorecard_internal_notes">Overall private notes</label><textarea className="textarea" id="scorecard_internal_notes" name="scorecard_internal_notes" defaultValue={ownScorecard?.internal_notes ?? ""} disabled={readOnly} /></div></div></section>
 
-          {!readOnly && <div className="application-action-bar scorecard-action-bar"><button className="button button-secondary" formAction={saveAdjudicatorScorecard.bind(null, id, false)} type="submit">Save draft</button><button className="button button-dark" formAction={saveAdjudicatorScorecard.bind(null, id, true)} type="submit">Submit scorecard</button></div>}
+          {!readOnly && (
+            <div className="application-action-bar scorecard-action-bar">
+              <button
+                className="button button-secondary"
+                formAction={saveAdjudicatorScorecard.bind(null, id, false)}
+                type="submit"
+              >
+                Save draft
+              </button>
+              <ScorecardSubmitControls
+                applicationId={id}
+                categories={categories}
+                criteria={criteria}
+              />
+            </div>
+          )}
         </form>
       ) : (
         <>
