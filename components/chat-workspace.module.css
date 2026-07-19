@@ -988,3 +988,43 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.deletedMessage {
+  opacity: 0.78;
+}
+
+.deletedMessage .chatBubble,
+.deletedMessage .messageBody {
+  font-style: italic;
+}
+
+.messageFooter {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.messageDeleteButton {
+  appearance: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.18rem;
+}
+
+.messageDeleteButton:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.deletionReason {
+  color: var(--muted, #5d6473);
+  display: block;
+  font-size: 0.76rem;
+  margin-top: 0.3rem;
+}

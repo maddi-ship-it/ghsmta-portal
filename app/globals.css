@@ -4147,3 +4147,432 @@ body.modal-open {
     width: 100%;
   }
 }
+
+/* --------------------------------------------------------------------------
+   School file library
+   -------------------------------------------------------------------------- */
+
+.school-files-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(230px, 0.32fr) minmax(0, 1fr);
+}
+
+.school-files-sidebar,
+.school-files-main {
+  min-width: 0;
+}
+
+.school-file-application-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 68vh;
+  overflow: auto;
+}
+
+.school-file-application {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border, #d9dce5);
+  border-radius: 0.8rem;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.8rem;
+  text-align: left;
+  width: 100%;
+}
+
+.school-file-application:hover,
+.school-file-application.active {
+  background: #f3f3f9;
+  border-color: #001699;
+}
+
+.school-file-application span,
+.school-file-application small {
+  color: var(--muted, #62697a);
+}
+
+.school-files-heading {
+  align-items: center;
+}
+
+.school-file-upload-form {
+  align-items: end;
+  background: #f7f8fc;
+  border: 1px solid #e2e4ed;
+  border-radius: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(160px, 0.35fr) minmax(220px, 1fr) auto auto;
+  padding: 0.9rem;
+}
+
+.school-file-reviewer-toggle {
+  align-self: center;
+  max-width: 240px;
+}
+
+.school-files-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.school-files-toolbar > div {
+  display: grid;
+}
+
+.school-files-toolbar .input {
+  max-width: 320px;
+}
+
+.school-file-list {
+  border: 1px solid #e0e3ec;
+  border-radius: 0.9rem;
+  overflow: hidden;
+}
+
+.school-file-row {
+  align-items: center;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 0.85rem 1rem;
+}
+
+.school-file-row + .school-file-row {
+  border-top: 1px solid #e8eaf1;
+}
+
+.school-file-icon {
+  align-items: center;
+  background: #eef0fb;
+  border-radius: 0.65rem;
+  color: #001699;
+  display: inline-flex;
+  font-size: 1.25rem;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+.school-file-copy {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.school-file-copy strong,
+.school-file-copy span,
+.school-file-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.school-file-copy span,
+.school-file-copy small {
+  color: var(--muted, #62697a);
+}
+
+.school-file-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* --------------------------------------------------------------------------
+   Scheduling workspace, list view, and date waitlists
+   -------------------------------------------------------------------------- */
+
+.schedule-workspace-toolbar {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dfe2eb;
+  border-radius: 1rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 8;
+}
+
+.schedule-view-toggle {
+  background: #f0f1f7;
+  border-radius: 0.7rem;
+  display: inline-flex;
+  padding: 0.2rem;
+}
+
+.schedule-view-toggle a {
+  border-radius: 0.55rem;
+  color: #333a4b;
+  font-weight: 700;
+  padding: 0.55rem 0.85rem;
+  text-decoration: none;
+}
+
+.schedule-view-toggle a.active {
+  background: #001699;
+  color: #fff;
+}
+
+.schedule-workspace-filters {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 0.55rem;
+  justify-content: flex-end;
+}
+
+.schedule-workspace-filters .input {
+  max-width: 310px;
+}
+
+.schedule-workspace-filters .select {
+  max-width: 205px;
+}
+
+.schedule-slot-grid-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.schedule-slot-card-list {
+  overflow: visible;
+}
+
+.schedule-slot-card-list .schedule-slot-details > summary {
+  list-style: none;
+}
+
+.schedule-slot-card-list .schedule-slot-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.schedule-list-summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(180px, 1.35fr) minmax(150px, 1fr) 72px 72px auto auto;
+  padding: 0.9rem 1rem;
+}
+
+.schedule-list-summary:hover {
+  background: #f7f8fc;
+}
+
+.schedule-list-summary > span:not(.badge) {
+  display: grid;
+  min-width: 0;
+}
+
+.schedule-list-summary strong,
+.schedule-list-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-list-summary small {
+  color: var(--muted, #62697a);
+}
+
+.schedule-list-metric {
+  text-align: center;
+}
+
+.schedule-list-metric strong {
+  color: #001699;
+  font-size: 1.15rem;
+}
+
+.schedule-list-expand {
+  color: #001699;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.schedule-slot-card-list .schedule-slot-expanded {
+  border-top: 1px solid #e3e5ed;
+}
+
+.schedule-slot-card-cards .schedule-list-summary {
+  display: none;
+}
+
+.schedule-slot-card-cards .schedule-slot-details:not([open]) > .schedule-slot-expanded {
+  display: block;
+}
+
+.schedule-waitlist-panel,
+.schedule-owner-waitlist-panel {
+  margin: 1rem 0;
+}
+
+.schedule-waitlist-body,
+.schedule-owner-waitlist-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.schedule-waitlist-form {
+  align-items: end;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(150px, 0.7fr) minmax(180px, 1fr) auto;
+}
+
+.schedule-waitlist-list,
+.schedule-owner-waitlist-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.schedule-waitlist-row,
+.schedule-owner-waitlist-row {
+  align-items: center;
+  border: 1px solid #e1e4ed;
+  border-radius: 0.8rem;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(260px, auto);
+  padding: 0.8rem;
+}
+
+.schedule-waitlist-row > div:first-child,
+.schedule-owner-waitlist-row > div:first-child {
+  display: grid;
+}
+
+.schedule-waitlist-row span,
+.schedule-waitlist-row small,
+.schedule-owner-waitlist-row span,
+.schedule-owner-waitlist-row small {
+  color: var(--muted, #62697a);
+}
+
+.schedule-waitlist-actions,
+.schedule-waitlist-offer-form {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: flex-end;
+}
+
+.schedule-waitlist-offer-form .select {
+  min-width: 155px;
+}
+
+.schedule-waitlist-status {
+  text-transform: capitalize;
+}
+
+.schedule-waitlist-status-offered {
+  background: #fff4cc;
+  color: #725700;
+}
+
+.schedule-waitlist-status-waiting {
+  background: #edf0ff;
+  color: #001699;
+}
+
+@media (max-width: 1050px) {
+  .school-file-upload-form,
+  .schedule-waitlist-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .schedule-list-summary {
+    grid-template-columns: 1.2fr 1.2fr 1fr auto auto;
+  }
+
+  .schedule-list-location,
+  .schedule-list-metric:nth-of-type(5) {
+    display: none !important;
+  }
+
+  .schedule-workspace-toolbar,
+  .schedule-workspace-filters {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 760px) {
+  .school-files-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .school-file-application-list {
+    display: flex;
+    max-height: none;
+    overflow-x: auto;
+  }
+
+  .school-file-application {
+    min-width: 230px;
+  }
+
+  .school-file-upload-form,
+  .schedule-waitlist-form {
+    grid-template-columns: 1fr;
+  }
+
+  .school-files-toolbar,
+  .schedule-workspace-toolbar,
+  .schedule-workspace-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .school-files-toolbar .input,
+  .schedule-workspace-filters .input,
+  .schedule-workspace-filters .select {
+    max-width: none;
+    width: 100%;
+  }
+
+  .school-file-row {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .school-file-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .schedule-list-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .schedule-list-school,
+  .schedule-list-location,
+  .schedule-list-metric,
+  .schedule-list-expand {
+    display: none !important;
+  }
+
+  .schedule-waitlist-row,
+  .schedule-owner-waitlist-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-waitlist-actions,
+  .schedule-waitlist-offer-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

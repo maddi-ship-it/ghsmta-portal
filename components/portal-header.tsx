@@ -44,10 +44,16 @@ function navItems(
       badgeCount: chatMessageCount,
     },
     {
+      href: "/portal/files",
+      label: "School files",
+      shortLabel: "Files",
+      icon: "▱",
+    },
+    {
       href: "/portal/reference-documents",
       label: "Reference documents",
-      shortLabel: "Documents",
-      icon: "▱",
+      shortLabel: "Reference",
+      icon: "◫",
     },
     {
       href: "/portal/appeals",

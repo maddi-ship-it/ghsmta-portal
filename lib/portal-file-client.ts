@@ -15,6 +15,8 @@ export async function uploadPortalFiles({
   program,
   school,
   documentType,
+  documentCategory = "other",
+  reviewerVisible = true,
 }: {
   files: File[];
   contextType: PortalFileContext;
@@ -25,6 +27,8 @@ export async function uploadPortalFiles({
   program?: string | null;
   school?: string | null;
   documentType: string;
+  documentCategory?: string;
+  reviewerVisible?: boolean;
 }) {
   const supabase = createClient();
   const uploaded: Array<{ id: string; generatedName: string }> = [];
@@ -65,6 +69,8 @@ export async function uploadPortalFiles({
         mime_type: file.type || null,
         file_size: file.size,
         uploaded_by: userId,
+        document_category: documentCategory,
+        reviewer_visible: reviewerVisible,
       })
       .select("id")
       .single();

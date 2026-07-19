@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 
-import { uploadPortalFiles } from "@/lib/portal-file-client";
+import { submitPortalFeedback } from "@/app/portal/feedback/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 
@@ -119,75 +119,31 @@ export function PortalUtilities({
     };
   }, [profile.id, refreshUnreadCounts, supabase]);
 
-  async function submitFeedback(formData: FormData) {
+  async function submitFeedback(form: HTMLFormElement) {
     setSubmitting(true);
     setError(null);
     setMessage(null);
 
     try {
-      const requestType = String(
-        formData.get("request_type") ?? "bug_report",
-      ) as "bug_report" | "feature_request";
+      const formData = new FormData(form);
+      formData.set("page_url", window.location.href);
+      formData.set("page_path", window.location.pathname);
+      formData.set("browser_info", navigator.userAgent);
+      formData.set("screen_width", String(window.innerWidth));
+      formData.set("screen_height", String(window.innerHeight));
 
-      const title = String(formData.get("title") ?? "").trim();
-      const description = String(
-        formData.get("description") ?? "",
-      ).trim();
+      const result = await submitPortalFeedback(formData);
 
-      if (title.length < 3 || description.length < 10) {
-        throw new Error(
-          "Add a clear title and a detailed description.",
-        );
+      if (!result.ok) {
+        throw new Error(result.error ?? "Could not submit request.");
       }
 
-      const { data, error: insertError } = await supabase
-        .from("portal_feedback_requests")
-        .insert({
-          request_type: requestType,
-          title,
-          description,
-          priority: String(formData.get("priority") ?? "normal"),
-          page_url: window.location.href,
-          browser_info: navigator.userAgent,
-          submitted_by: profile.id,
-        })
-        .select("id")
-        .single();
-
-      if (insertError || !data) {
-        throw new Error(
-          insertError?.message ?? "Could not submit request.",
-        );
-      }
-
-      const files = formData
-        .getAll("files")
-        .filter(
-          (value): value is File =>
-            value instanceof File && value.size > 0,
-        );
-
-      if (files.length > 0) {
-        await uploadPortalFiles({
-          files,
-          contextType: requestType,
-          contextId: data.id as string,
-          userId: profile.id,
-          documentType:
-            requestType === "bug_report"
-              ? "Bug-Report"
-              : "Feature-Request",
-        });
-      }
-
+      form.reset();
       setMessage(
-        requestType === "bug_report"
-          ? "Bug report submitted."
-          : "Feature request submitted.",
+        `Request ${result.referenceCode ?? "submitted"} received.`,
       );
-
       router.refresh();
-      window.setTimeout(() => setOpen(false), 900);
+      window.setTimeout(() => setOpen(false), 1400);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -263,7 +219,7 @@ export function PortalUtilities({
               className="form-stack"
               onSubmit={(event) => {
                 event.preventDefault();
-                void submitFeedback(new FormData(event.currentTarget));
+                void submitFeedback(event.currentTarget);
               }}
             >
               <div className="form-grid two-column-form">

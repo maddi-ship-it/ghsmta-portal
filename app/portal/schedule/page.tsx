@@ -7,11 +7,16 @@ import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
 
 import {
+  acceptScheduleWaitlistOffer,
   bookOwnScheduleSlot,
   createScheduleSlot,
+  declineScheduleWaitlistOffer,
+  joinScheduleDateWaitlist,
   joinScheduleSlot,
   ownerAddStaff,
   ownerAssignSchool,
+  ownerOfferWaitlistSlot,
+  leaveScheduleDateWaitlist,
   removeScheduleSchoolBooking,
   removeScheduleStaff,
   updateOwnScheduleSchoolDetails,
@@ -82,12 +87,47 @@ type StaffEnrollment = {
   joined_at: string;
 };
 
-type ScheduleSort = "date_asc" | "date_desc" | "school_asc" | "school_desc";
+type ScheduleSort =
+  | "date_asc"
+  | "date_desc"
+  | "school_asc"
+  | "school_desc"
+  | "status"
+  | "staff_desc"
+  | "waitlist_desc";
+
+type ScheduleView = "list" | "cards";
+type ScheduleFilter =
+  | "all"
+  | "open"
+  | "booked"
+  | "unbooked"
+  | "waitlisted"
+  | "understaffed"
+  | "mine";
+
+type ScheduleWaitlistEntry = {
+  id: string;
+  cycle_id: string;
+  application_id: string;
+  requested_date: string;
+  time_preference: "morning" | "afternoon" | "evening" | "any";
+  status: "waiting" | "offered" | "accepted" | "declined" | "removed" | "expired";
+  offered_slot_id: string | null;
+  offer_expires_at: string | null;
+  applicant_notes: string | null;
+  owner_notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 type ScheduleSearchParams = {
   success?: string;
   error?: string;
   sort?: ScheduleSort;
+  view?: ScheduleView;
+  filter?: ScheduleFilter;
+  q?: string;
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -100,6 +140,32 @@ function formatSlotDate(value: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function easternDateKey(value: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: EASTERN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(new Date(value))
+    .reduce<Record<string, string>>((result, part) => {
+      if (part.type !== "literal") result[part.type] = part.value;
+      return result;
+    }, {});
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function formatWaitlistDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(`${value}T12:00:00Z`));
 }
 
 function formatSlotTime(start: string, end: string) {
@@ -179,12 +245,34 @@ export default async function SchedulePage({
 }) {
   const profile = await requireProfile();
   const params = await searchParams;
-  const selectedSort: ScheduleSort =
-    params.sort === "date_desc" ||
-    params.sort === "school_asc" ||
-    params.sort === "school_desc"
-      ? params.sort
-      : "date_asc";
+  const allowedSorts: ScheduleSort[] = [
+    "date_asc",
+    "date_desc",
+    "school_asc",
+    "school_desc",
+    "status",
+    "staff_desc",
+    "waitlist_desc",
+  ];
+  const selectedSort: ScheduleSort = allowedSorts.includes(params.sort as ScheduleSort)
+    ? (params.sort as ScheduleSort)
+    : "date_asc";
+  const selectedView: ScheduleView = params.view === "cards" ? "cards" : "list";
+  const allowedFilters: ScheduleFilter[] = [
+    "all",
+    "open",
+    "booked",
+    "unbooked",
+    "waitlisted",
+    "understaffed",
+    "mine",
+  ];
+  const selectedFilter: ScheduleFilter = allowedFilters.includes(
+    params.filter as ScheduleFilter,
+  )
+    ? (params.filter as ScheduleFilter)
+    : "all";
+  const scheduleSearch = (params.q ?? "").trim();
   const supabase = await createClient();
 
   const [
@@ -277,6 +365,21 @@ export default async function SchedulePage({
     }
   }
 
+  const { data: waitlistData, error: waitlistError } = await supabase
+    .from("schedule_date_waitlist")
+    .select(
+      "id,cycle_id,application_id,requested_date,time_preference,status,offered_slot_id,offer_expires_at,applicant_notes,owner_notes,created_at,updated_at",
+    )
+    .in("status", ["waiting", "offered", "accepted"])
+    .order("requested_date", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (waitlistError) {
+    throw new Error(`Schedule waitlist could not be loaded: ${waitlistError.message}`);
+  }
+
+  const waitlistEntries = (waitlistData ?? []) as ScheduleWaitlistEntry[];
+
   const availabilityMap = new Map(
     availability.map((item) => [item.slot_id, item]),
   );
@@ -291,30 +394,99 @@ export default async function SchedulePage({
     staffBySlot.set(enrollment.slot_id, existing);
   }
 
-  const displaySlots = [...slots].sort((left, right) => {
-    if (profile.role === "owner" && selectedSort.startsWith("school")) {
-      const leftSchool = bookingMap.get(left.id)?.school_name ?? null;
-      const rightSchool = bookingMap.get(right.id)?.school_name ?? null;
+  const waitlistCountByDate = new Map<string, number>();
+  for (const entry of waitlistEntries) {
+    if (!['waiting', 'offered'].includes(entry.status)) continue;
+    const key = `${entry.cycle_id}:${entry.requested_date}`;
+    waitlistCountByDate.set(key, (waitlistCountByDate.get(key) ?? 0) + 1);
+  }
 
-      if (leftSchool && !rightSchool) return -1;
-      if (!leftSchool && rightSchool) return 1;
+  const slotWaitlistCount = (slot: ScheduleSlot) =>
+    waitlistCountByDate.get(`${slot.cycle_id}:${easternDateKey(slot.starts_at)}`) ?? 0;
 
-      const schoolResult = (leftSchool ?? "").localeCompare(
-        rightSchool ?? "",
-        undefined,
-        { numeric: true, sensitivity: "base" },
-      );
+  const slotIsBooked = (slot: ScheduleSlot) =>
+    Boolean(bookingMap.get(slot.id)) || Boolean(availabilityMap.get(slot.id)?.is_booked);
 
-      if (schoolResult !== 0) {
-        return selectedSort === "school_desc" ? -schoolResult : schoolResult;
+  const normalizedSearch = scheduleSearch.toLowerCase();
+
+  const displaySlots = slots
+    .filter((slot) => {
+      const booking = bookingMap.get(slot.id);
+      const participants = staffBySlot.get(slot.id) ?? [];
+      const availabilityItem = availabilityMap.get(slot.id);
+      const cycle = cycleMap.get(slot.cycle_id);
+      const searchable = [
+        slot.title,
+        slot.location,
+        booking?.school_name,
+        booking?.production_title,
+        cycle?.name,
+        cycle?.season_year,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (normalizedSearch && !searchable.includes(normalizedSearch)) {
+        return false;
       }
-    }
 
-    const dateResult =
-      new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime();
+      switch (selectedFilter) {
+        case 'open':
+          return slot.status === 'open';
+        case 'booked':
+          return slotIsBooked(slot);
+        case 'unbooked':
+          return !slotIsBooked(slot);
+        case 'waitlisted':
+          return slotWaitlistCount(slot) > 0;
+        case 'understaffed':
+          return participants.length < 3;
+        case 'mine':
+          return Boolean(availabilityItem?.is_mine) ||
+            participants.some((participant) => participant.user_id === profile.id);
+        default:
+          return true;
+      }
+    })
+    .sort((left, right) => {
+      if (selectedSort.startsWith('school')) {
+        const leftSchool = bookingMap.get(left.id)?.school_name ?? '';
+        const rightSchool = bookingMap.get(right.id)?.school_name ?? '';
+        const result = leftSchool.localeCompare(rightSchool, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+        if (result !== 0) return selectedSort === 'school_desc' ? -result : result;
+      }
 
-    return selectedSort === "date_desc" ? -dateResult : dateResult;
-  });
+      if (selectedSort === 'status') {
+        const statusOrder: Record<ScheduleSlotStatus, number> = {
+          open: 0,
+          draft: 1,
+          closed: 2,
+          cancelled: 3,
+        };
+        const result = statusOrder[left.status] - statusOrder[right.status];
+        if (result !== 0) return result;
+      }
+
+      if (selectedSort === 'staff_desc') {
+        const result =
+          (staffBySlot.get(right.id)?.length ?? 0) -
+          (staffBySlot.get(left.id)?.length ?? 0);
+        if (result !== 0) return result;
+      }
+
+      if (selectedSort === 'waitlist_desc') {
+        const result = slotWaitlistCount(right) - slotWaitlistCount(left);
+        if (result !== 0) return result;
+      }
+
+      const dateResult =
+        new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime();
+      return selectedSort === 'date_desc' ? -dateResult : dateResult;
+    });
 
   const applicantBooking = availability.find((item) => item.is_mine);
   const bookedSlot = applicantBooking
@@ -349,6 +521,43 @@ export default async function SchedulePage({
             };
           })
       : [];
+
+  const applicationLookup = new Map(
+    [...applicantApplications, ...ownerApplications].map((application) => [
+      application.id,
+      application,
+    ]),
+  );
+
+  const applicantWaitlistEntries = waitlistEntries.filter((entry) =>
+    applicantApplications.some((application) => application.id === entry.application_id),
+  );
+
+  const applicantWaitlistDates = Array.from(
+    new Map(
+      slots
+        .filter(
+          (slot) =>
+            slot.status !== "cancelled" &&
+            new Date(slot.starts_at).getTime() > serverTime &&
+            applicantApplications.some(
+              (application) => application.cycle_id === slot.cycle_id,
+            ),
+        )
+        .map((slot) => [
+          `${slot.cycle_id}:${easternDateKey(slot.starts_at)}`,
+          {
+            cycleId: slot.cycle_id,
+            date: easternDateKey(slot.starts_at),
+            label: formatSlotDate(slot.starts_at),
+          },
+        ]),
+    ).values(),
+  );
+
+  const ownerWaitlistEntries = waitlistEntries.filter((entry) =>
+    ["waiting", "offered"].includes(entry.status),
+  );
 
   return (
     <>
@@ -475,36 +684,226 @@ export default async function SchedulePage({
       )}
 
       {profile.role === "owner" && (
-        <>
-          <ScheduleOwnerTools
-            cycles={cycles.map((cycle) => ({
-              id: cycle.id,
-              name: cycle.name,
-              season_year: cycle.season_year,
-            }))}
-            slots={ownerBulkSlots}
-          />
+        <ScheduleOwnerTools
+          cycles={cycles.map((cycle) => ({
+            id: cycle.id,
+            name: cycle.name,
+            season_year: cycle.season_year,
+          }))}
+          slots={ownerBulkSlots}
+        />
+      )}
 
-          <section className="schedule-sort-bar">
+      <section className="schedule-workspace-toolbar">
+        <div className="schedule-view-toggle" aria-label="Schedule view">
+          <Link
+            className={selectedView === "list" ? "active" : ""}
+            href={{
+              pathname: "/portal/schedule",
+              query: { ...params, view: "list" },
+            }}
+          >
+            List
+          </Link>
+          <Link
+            className={selectedView === "cards" ? "active" : ""}
+            href={{
+              pathname: "/portal/schedule",
+              query: { ...params, view: "cards" },
+            }}
+          >
+            Cards
+          </Link>
+        </div>
+
+        <form className="schedule-workspace-filters" method="get">
+          <input name="view" type="hidden" value={selectedView} />
+          <label className="sr-only" htmlFor="schedule_search">Search schedule</label>
+          <input
+            className="input"
+            defaultValue={scheduleSearch}
+            id="schedule_search"
+            name="q"
+            placeholder="Search school, production, location"
+            type="search"
+          />
+          <label className="sr-only" htmlFor="schedule_filter">Filter schedule</label>
+          <select className="select" defaultValue={selectedFilter} id="schedule_filter" name="filter">
+            <option value="all">All slots</option>
+            <option value="open">Open slots</option>
+            <option value="booked">Booked</option>
+            <option value="unbooked">Unbooked</option>
+            <option value="waitlisted">Has waitlist</option>
+            <option value="understaffed">Understaffed</option>
+            <option value="mine">My schedule</option>
+          </select>
+          <label className="sr-only" htmlFor="schedule_sort">Sort schedule</label>
+          <select className="select" defaultValue={selectedSort} id="schedule_sort" name="sort">
+            <option value="date_asc">Date — earliest first</option>
+            <option value="date_desc">Date — latest first</option>
+            <option value="school_asc">School — A to Z</option>
+            <option value="school_desc">School — Z to A</option>
+            <option value="status">Status</option>
+            <option value="staff_desc">Reviewer count</option>
+            <option value="waitlist_desc">Waitlist count</option>
+          </select>
+          <button className="button button-secondary button-compact" type="submit">Apply</button>
+          {(scheduleSearch || selectedFilter !== "all" || selectedSort !== "date_asc") && (
+            <Link className="text-button" href={`/portal/schedule?view=${selectedView}`}>Reset</Link>
+          )}
+        </form>
+      </section>
+
+      {profile.role === "applicant" && !bookedSlot && (
+        <section className="panel schedule-waitlist-panel">
+          <div className="panel-header">
             <div>
-              <span className="eyebrow">Schedule order</span>
-              <strong>Sort owner schedule</strong>
+              <span className="eyebrow">Date waitlist</span>
+              <h2>Join a preferred date</h2>
+              <p>Join a date waitlist when the available times do not work or are already full.</p>
             </div>
-            <form method="get" className="schedule-sort-form">
-              <label className="sr-only" htmlFor="schedule_sort">Sort schedule</label>
-              <select className="select" defaultValue={selectedSort} id="schedule_sort" name="sort">
-                <option value="date_asc">Date — earliest first</option>
-                <option value="date_desc">Date — latest first</option>
-                <option value="school_asc">School — A to Z</option>
-                <option value="school_desc">School — Z to A</option>
-              </select>
-              <button className="button button-secondary button-compact" type="submit">Apply sort</button>
-              {selectedSort !== "date_asc" && (
-                <Link className="text-button" href="/portal/schedule">Reset</Link>
-              )}
+            <span className="badge">{applicantWaitlistEntries.filter((entry) => ["waiting", "offered"].includes(entry.status)).length}</span>
+          </div>
+          <div className="panel-body schedule-waitlist-body">
+            <form action={joinScheduleDateWaitlist} className="schedule-waitlist-form">
+              <div className="field">
+                <label htmlFor="waitlist_application">Application</label>
+                <select className="select" id="waitlist_application" name="application_id" required>
+                  <option value="">Choose application</option>
+                  {applicantApplications.map((application) => (
+                    <option key={application.id} value={application.id}>
+                      {application.school_name}{application.production_title ? ` — ${application.production_title}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="waitlist_date">Preferred date</label>
+                <select className="select" id="waitlist_date" name="requested_date" required>
+                  <option value="">Choose date</option>
+                  {applicantWaitlistDates.map((option) => (
+                    <option key={`${option.cycleId}:${option.date}`} value={option.date}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="waitlist_preference">Time preference</label>
+                <select className="select" defaultValue="any" id="waitlist_preference" name="time_preference">
+                  <option value="any">Any time</option>
+                  <option value="morning">Morning</option>
+                  <option value="afternoon">Afternoon</option>
+                  <option value="evening">Evening</option>
+                </select>
+              </div>
+              <div className="field schedule-waitlist-notes">
+                <label htmlFor="waitlist_notes">Notes</label>
+                <input className="input" id="waitlist_notes" name="notes" placeholder="Travel or timing considerations" />
+              </div>
+              <button className="button button-dark" disabled={applicantWaitlistDates.length === 0} type="submit">
+                Join date waitlist
+              </button>
             </form>
-          </section>
-        </>
+
+            {applicantWaitlistEntries.length > 0 && (
+              <div className="schedule-waitlist-list">
+                {applicantWaitlistEntries.map((entry) => {
+                  const offeredSlot = entry.offered_slot_id
+                    ? slots.find((slot) => slot.id === entry.offered_slot_id)
+                    : null;
+                  return (
+                    <article className="schedule-waitlist-row" key={entry.id}>
+                      <div>
+                        <strong>{formatWaitlistDate(entry.requested_date)}</strong>
+                        <span>{entry.time_preference === "any" ? "Any time" : entry.time_preference}</span>
+                        {offeredSlot && (
+                          <small>Offered: {formatSlotTime(offeredSlot.starts_at, offeredSlot.ends_at)} ET</small>
+                        )}
+                      </div>
+                      <span className={`badge schedule-waitlist-status schedule-waitlist-status-${entry.status}`}>
+                        {entry.status}
+                      </span>
+                      <div className="schedule-waitlist-actions">
+                        {entry.status === "offered" && (
+                          <>
+                            <form action={acceptScheduleWaitlistOffer.bind(null, entry.id)}>
+                              <button className="button button-dark button-compact" type="submit">Accept</button>
+                            </form>
+                            <form action={declineScheduleWaitlistOffer.bind(null, entry.id)}>
+                              <button className="button button-secondary button-compact" type="submit">Decline</button>
+                            </form>
+                          </>
+                        )}
+                        {["waiting", "offered"].includes(entry.status) && (
+                          <form action={leaveScheduleDateWaitlist.bind(null, entry.id)}>
+                            <button className="text-button danger-text" type="submit">Leave</button>
+                          </form>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {profile.role === "owner" && ownerWaitlistEntries.length > 0 && (
+        <section className="panel schedule-owner-waitlist-panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">Owner queue</span>
+              <h2>Schedule date waitlist</h2>
+              <p>Offer an open slot on the school’s requested date.</p>
+            </div>
+            <span className="badge">{ownerWaitlistEntries.length}</span>
+          </div>
+          <div className="panel-body schedule-owner-waitlist-list">
+            {ownerWaitlistEntries.map((entry) => {
+              const application = applicationLookup.get(entry.application_id);
+              const eligibleSlots = slots.filter(
+                (slot) =>
+                  slot.cycle_id === entry.cycle_id &&
+                  slot.status === "open" &&
+                  easternDateKey(slot.starts_at) === entry.requested_date &&
+                  !bookingMap.has(slot.id) &&
+                  new Date(slot.starts_at).getTime() > serverTime,
+              );
+
+              return (
+                <article className="schedule-owner-waitlist-row" key={entry.id}>
+                  <div>
+                    <strong>{application?.school_name ?? "School"}</strong>
+                    <span>{application?.production_title || formatWaitlistDate(entry.requested_date)}</span>
+                    <small>{formatWaitlistDate(entry.requested_date)} · {entry.time_preference}</small>
+                  </div>
+                  <span className={`badge schedule-waitlist-status schedule-waitlist-status-${entry.status}`}>{entry.status}</span>
+                  <form action={ownerOfferWaitlistSlot.bind(null, entry.id)} className="schedule-waitlist-offer-form">
+                    <select className="select" defaultValue={entry.offered_slot_id ?? ""} name="slot_id" required>
+                      <option value="">Choose open slot</option>
+                      {eligibleSlots.map((slot) => (
+                        <option key={slot.id} value={slot.id}>
+                          {formatSlotTime(slot.starts_at, slot.ends_at)} ET · {slot.title}
+                        </option>
+                      ))}
+                    </select>
+                    <select className="select" defaultValue="24" name="expires_hours">
+                      <option value="12">12-hour offer</option>
+                      <option value="24">24-hour offer</option>
+                      <option value="48">48-hour offer</option>
+                      <option value="72">72-hour offer</option>
+                    </select>
+                    <button className="button button-secondary button-compact" disabled={eligibleSlots.length === 0} type="submit">
+                      {entry.status === "offered" ? "Update offer" : "Offer slot"}
+                    </button>
+                  </form>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {profile.role === "applicant" && bookedSlot && bookedApplication ? (
@@ -543,7 +942,7 @@ export default async function SchedulePage({
           </div>
         </section>
       ) : (
-        <section className="schedule-slot-grid">
+        <section className={`schedule-slot-grid schedule-slot-grid-${selectedView}`}>
           {displaySlots.length === 0 ? (
             <div className="panel empty-state schedule-empty-state">
               <h3>
@@ -603,9 +1002,49 @@ export default async function SchedulePage({
                 return null;
               }
 
+              const waitlistCount = slotWaitlistCount(slot);
+
               return (
-                <article className="panel schedule-slot-card" key={slot.id}>
-                  <div className="schedule-slot-accent" />
+                <article
+                  className={`panel schedule-slot-card schedule-slot-card-${selectedView}`}
+                  key={slot.id}
+                >
+                  <details className="schedule-slot-details" open={selectedView === "cards"}>
+                    <summary className="schedule-list-summary">
+                      <span className="schedule-list-date">
+                        <strong>{formatSlotDate(slot.starts_at)}</strong>
+                        <small>{formatSlotTime(slot.starts_at, slot.ends_at)} ET</small>
+                      </span>
+                      <span className="schedule-list-school">
+                        <strong>
+                          {booking?.school_name ||
+                            (slotAvailability?.is_mine
+                              ? "Your school"
+                              : slotAvailability?.is_booked
+                                ? "Booked"
+                                : "Open slot")}
+                        </strong>
+                        <small>{booking?.production_title || slot.title}</small>
+                      </span>
+                      <span className="schedule-list-location">
+                        <strong>{slot.location || visitDetails?.venue_name || "TBA"}</strong>
+                        <small>{cycle ? `${cycle.season_year} · ${cycle.name}` : "Program"}</small>
+                      </span>
+                      <span className="schedule-list-metric">
+                        <strong>{participants.length}</strong>
+                        <small>reviewers</small>
+                      </span>
+                      <span className="schedule-list-metric">
+                        <strong>{waitlistCount}</strong>
+                        <small>waitlist</small>
+                      </span>
+                      <span className={`badge schedule-status schedule-status-${slot.status}`}>
+                        {statusLabel(slot.status)}
+                      </span>
+                      <span className="schedule-list-expand">Details</span>
+                    </summary>
+                    <div className="schedule-slot-expanded">
+                      <div className="schedule-slot-accent" />
                   <div className="panel-header schedule-slot-header">
                     <div>
                       <span className="eyebrow">
@@ -971,6 +1410,8 @@ export default async function SchedulePage({
                       </>
                     )}
                   </div>
+                    </div>
+                  </details>
                 </article>
               );
             })

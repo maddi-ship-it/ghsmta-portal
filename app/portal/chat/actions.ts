@@ -260,6 +260,36 @@ export async function moderateChatPost(
   return { ok: true };
 }
 
+
+export async function ownerDeleteChatMessage(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  await requireProfile(["owner"]);
+
+  const messageId = formText(formData, "message_id");
+  const messageKind = formText(formData, "message_kind");
+  const reason = formText(formData, "reason");
+
+  if (!messageId || !["post", "reply"].includes(messageKind)) {
+    return { ok: false, error: "Chat message not found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("owner_soft_delete_chat_message", {
+    p_message_kind: messageKind,
+    p_message_id: messageId,
+    p_reason: reason || null,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+  return { ok: true };
+}
+
 export async function broadcastToActiveSchoolDms(
   formData: FormData,
 ): Promise<ChatActionResult> {

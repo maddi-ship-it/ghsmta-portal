@@ -20,6 +20,7 @@ import {
   createChatPost,
   createChatReply,
   moderateChatPost,
+  ownerDeleteChatMessage,
 } from "@/app/portal/chat/actions";
 import styles from "@/components/chat-workspace.module.css";
 import { createClient } from "@/lib/supabase/client";
@@ -66,6 +67,9 @@ export type ChatReply = {
   author_id: string;
   author_name: string;
   author_role: AppRole;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  deletion_reason: string | null;
 };
 
 export type ChatThread = {
@@ -80,6 +84,9 @@ export type ChatThread = {
   author_id: string;
   author_name: string;
   author_role: AppRole;
+  post_deleted_at: string | null;
+  post_deleted_by: string | null;
+  post_deletion_reason: string | null;
   reply_count: number;
   replies: ChatReply[];
 };
@@ -92,6 +99,9 @@ type FlatMessage = {
   author_id: string;
   author_name: string;
   author_role: AppRole;
+  message_kind: "post" | "reply";
+  deleted_at: string | null;
+  deletion_reason: string | null;
 };
 
 type ChannelGroup = {
@@ -733,6 +743,9 @@ export function TeamsChat({
           author_id: thread.author_id,
           author_name: thread.author_name,
           author_role: thread.author_role,
+          message_kind: "post" as const,
+          deleted_at: thread.post_deleted_at,
+          deletion_reason: thread.post_deletion_reason,
         },
         ...thread.replies.map((reply) => ({
           id: reply.id,
@@ -742,6 +755,9 @@ export function TeamsChat({
           author_id: reply.author_id,
           author_name: reply.author_name,
           author_role: reply.author_role,
+          message_kind: "reply" as const,
+          deleted_at: reply.deleted_at,
+          deletion_reason: reply.deletion_reason,
         })),
       ])
       .sort(
@@ -932,6 +948,46 @@ export function TeamsChat({
         return;
       }
 
+      await loadChannel();
+    });
+  };
+
+  const deleteMessage = (
+    messageId: string,
+    messageKind: "post" | "reply",
+  ) => {
+    const reason = window.prompt(
+      "Optional deletion reason. The original message will remain in the audit record.",
+      "",
+    );
+
+    if (reason === null) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Remove this message from the chat? Users will see a deletion placeholder.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("message_id", messageId);
+    formData.set("message_kind", messageKind);
+    formData.set("reason", reason);
+    setStatus(null);
+
+    startTransition(async () => {
+      const result = await ownerDeleteChatMessage(formData);
+
+      if (!result.ok) {
+        setStatus(result.error ?? "The message could not be removed.");
+        return;
+      }
+
+      setStatus("Message removed. The original remains in the audit record.");
       await loadChannel();
     });
   };
@@ -1156,7 +1212,14 @@ export function TeamsChat({
                 </div>
               ) : (
                 threads.map((thread) => (
-                  <article className={styles.threadCard} key={thread.post_id}>
+                  <article
+                    className={
+                      thread.post_deleted_at
+                        ? `${styles.threadCard} ${styles.deletedMessage}`
+                        : styles.threadCard
+                    }
+                    key={thread.post_id}
+                  >
                     <div className={styles.threadRoot}>
                       <span className={styles.avatar}>
                         {initials(thread.author_name)}
@@ -1188,22 +1251,37 @@ export function TeamsChat({
 
                         {profile.role === "owner" && (
                           <div className={styles.ownerControls}>
-                            <button
-                              className="button button-secondary button-compact"
-                              disabled={isPending}
-                              onClick={() => moderate(thread.post_id, "pin")}
-                              type="button"
-                            >
-                              {thread.pinned ? "Unpin" : "Pin"}
-                            </button>
-                            <button
-                              className="button button-secondary button-compact"
-                              disabled={isPending}
-                              onClick={() => moderate(thread.post_id, "lock")}
-                              type="button"
-                            >
-                              {thread.locked ? "Unlock replies" : "Lock replies"}
-                            </button>
+                            {!thread.post_deleted_at && (
+                              <>
+                                <button
+                                  className="button button-secondary button-compact"
+                                  disabled={isPending}
+                                  onClick={() => moderate(thread.post_id, "pin")}
+                                  type="button"
+                                >
+                                  {thread.pinned ? "Unpin" : "Pin"}
+                                </button>
+                                <button
+                                  className="button button-secondary button-compact"
+                                  disabled={isPending}
+                                  onClick={() => moderate(thread.post_id, "lock")}
+                                  type="button"
+                                >
+                                  {thread.locked ? "Unlock replies" : "Lock replies"}
+                                </button>
+                                <button
+                                  className="button button-secondary button-compact danger-text"
+                                  disabled={isPending}
+                                  onClick={() => deleteMessage(thread.post_id, "post")}
+                                  type="button"
+                                >
+                                  Delete message
+                                </button>
+                              </>
+                            )}
+                            {thread.post_deleted_at && thread.post_deletion_reason && (
+                              <small>Reason: {thread.post_deletion_reason}</small>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1211,7 +1289,14 @@ export function TeamsChat({
 
                     <div className={styles.replyThread}>
                       {thread.replies.map((reply) => (
-                        <div className={styles.reply} key={reply.id}>
+                        <div
+                          className={
+                            reply.deleted_at
+                              ? `${styles.reply} ${styles.deletedMessage}`
+                              : styles.reply
+                          }
+                          key={reply.id}
+                        >
                           <span
                             className={`${styles.avatar} ${styles.avatarSmall}`}
                           >
@@ -1232,6 +1317,21 @@ export function TeamsChat({
                                 members={members}
                               />
                             </p>
+                            {profile.role === "owner" && !reply.deleted_at && (
+                              <button
+                                className={`${styles.messageDeleteButton} danger-text`}
+                                disabled={isPending}
+                                onClick={() => deleteMessage(reply.id, "reply")}
+                                type="button"
+                              >
+                                Delete
+                              </button>
+                            )}
+                            {profile.role === "owner" && reply.deletion_reason && (
+                              <small className={styles.deletionReason}>
+                                Reason: {reply.deletion_reason}
+                              </small>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1309,11 +1409,13 @@ export function TeamsChat({
                         </div>
                       )}
                       <article
-                        className={
-                          ownMessage
-                            ? `${styles.chatMessage} ${styles.chatMessageOwn}`
-                            : styles.chatMessage
-                        }
+                        className={[
+                          styles.chatMessage,
+                          ownMessage ? styles.chatMessageOwn : "",
+                          message.deleted_at ? styles.deletedMessage : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
                         {!ownMessage && (
                           <span className={styles.avatar}>
@@ -1334,9 +1436,29 @@ export function TeamsChat({
                               members={members}
                             />
                           </div>
-                          <time dateTime={message.created_at}>
-                            {formatTime(message.created_at)}
-                          </time>
+                          <div className={styles.messageFooter}>
+                            <time dateTime={message.created_at}>
+                              {formatTime(message.created_at)}
+                            </time>
+                            {profile.role === "owner" && !message.deleted_at && (
+                              <button
+                                className={`${styles.messageDeleteButton} danger-text`}
+                                disabled={isPending}
+                                onClick={() =>
+                                  deleteMessage(message.id, message.message_kind)
+                                }
+                                type="button"
+                              >
+                                Delete
+                              </button>
+                            )}
+                            {profile.role === "owner" &&
+                              message.deletion_reason && (
+                                <small className={styles.deletionReason}>
+                                  Reason: {message.deletion_reason}
+                                </small>
+                              )}
+                          </div>
                         </div>
                       </article>
                     </Fragment>

@@ -731,3 +731,88 @@ export async function ownerUpdateScheduleSchoolDetails(slotId: string, formData:
   revalidateSchedule();
   scheduleRedirect("success", "School visit details updated.");
 }
+
+export async function joinScheduleDateWaitlist(formData: FormData) {
+  await requireProfile(["applicant"]);
+
+  const applicationId = text(formData, "application_id");
+  const requestedDate = text(formData, "requested_date");
+  const timePreference = text(formData, "time_preference") || "any";
+  const notes = text(formData, "notes");
+
+  if (!applicationId || !requestedDate) {
+    scheduleRedirect("error", "Choose an application and waitlist date.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("join_schedule_date_waitlist", {
+    p_application_id: applicationId,
+    p_requested_date: requestedDate,
+    p_time_preference: timePreference,
+    p_notes: notes || null,
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect("success", "Your school joined the date waitlist.");
+}
+
+export async function leaveScheduleDateWaitlist(waitlistId: string) {
+  await requireProfile(["applicant"]);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("leave_schedule_date_waitlist", {
+    p_waitlist_id: waitlistId,
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect("success", "Your school left the date waitlist.");
+}
+
+export async function ownerOfferWaitlistSlot(
+  waitlistId: string,
+  formData: FormData,
+) {
+  await requireProfile(["owner"]);
+  const slotId = text(formData, "slot_id");
+  const expiresHours = Number(text(formData, "expires_hours") || "24");
+
+  if (!slotId) {
+    scheduleRedirect("error", "Choose an open slot for this waitlist offer.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("owner_offer_waitlist_slot", {
+    p_waitlist_id: waitlistId,
+    p_slot_id: slotId,
+    p_expires_hours: Number.isFinite(expiresHours) ? expiresHours : 24,
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect("success", "Schedule slot offered to the waitlisted school.");
+}
+
+export async function acceptScheduleWaitlistOffer(waitlistId: string) {
+  await requireProfile(["applicant"]);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("accept_schedule_waitlist_offer", {
+    p_waitlist_id: waitlistId,
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect("success", "Schedule offer accepted and reservation confirmed.");
+}
+
+export async function declineScheduleWaitlistOffer(waitlistId: string) {
+  await requireProfile(["applicant"]);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decline_schedule_waitlist_offer", {
+    p_waitlist_id: waitlistId,
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect("success", "Schedule offer declined.");
+}
