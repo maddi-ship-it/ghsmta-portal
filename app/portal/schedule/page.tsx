@@ -8,16 +8,12 @@ import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
 
 import {
-  acceptScheduleWaitlistOffer,
   bookOwnScheduleSlot,
   createScheduleSlot,
-  declineScheduleWaitlistOffer,
-  joinScheduleDateWaitlist,
   joinScheduleSlot,
   ownerAddStaff,
   ownerAssignSchool,
-  ownerOfferWaitlistSlot,
-  leaveScheduleDateWaitlist,
+  ownerOfferNextSlotWaitlist,
   removeScheduleSchoolBooking,
   removeScheduleStaff,
   updateOwnScheduleSchoolDetails,
@@ -109,12 +105,11 @@ type ScheduleFilter =
 
 type ScheduleWaitlistEntry = {
   id: string;
+  slot_id: string;
   cycle_id: string;
   application_id: string;
-  requested_date: string;
-  time_preference: "morning" | "afternoon" | "evening" | "any";
   status: "waiting" | "offered" | "accepted" | "declined" | "removed" | "expired";
-  offered_slot_id: string | null;
+  queue_rank: number;
   offer_expires_at: string | null;
   applicant_notes: string | null;
   owner_notes: string | null;
@@ -141,32 +136,6 @@ function formatSlotDate(value: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
-}
-
-function easternDateKey(value: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: EASTERN_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-    .formatToParts(new Date(value))
-    .reduce<Record<string, string>>((result, part) => {
-      if (part.type !== "literal") result[part.type] = part.value;
-      return result;
-    }, {});
-
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-function formatWaitlistDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(`${value}T12:00:00Z`));
 }
 
 function formatSlotTime(start: string, end: string) {
@@ -376,14 +345,14 @@ export default async function SchedulePage({
 
   const waitlistResult = activeCycleIds.length
     ? await supabase
-        .from("schedule_date_waitlist")
+        .from("schedule_slot_waitlist")
         .select(
-          "id,cycle_id,application_id,requested_date,time_preference,status,offered_slot_id,offer_expires_at,applicant_notes,owner_notes,created_at,updated_at",
+          "id,slot_id,cycle_id,application_id,status,queue_rank,offer_expires_at,applicant_notes,owner_notes,created_at,updated_at",
         )
         .in("cycle_id", activeCycleIds)
         .in("status", ["waiting", "offered", "accepted"])
-        .order("requested_date", { ascending: true })
-        .order("created_at", { ascending: true })
+        .order("slot_id", { ascending: true })
+        .order("queue_rank", { ascending: true })
     : { data: [], error: null };
   const { data: waitlistData, error: waitlistError } = waitlistResult;
 
@@ -407,15 +376,13 @@ export default async function SchedulePage({
     staffBySlot.set(enrollment.slot_id, existing);
   }
 
-  const waitlistCountByDate = new Map<string, number>();
+  const waitlistCountBySlot = new Map<string, number>();
   for (const entry of waitlistEntries) {
-    if (!['waiting', 'offered'].includes(entry.status)) continue;
-    const key = `${entry.cycle_id}:${entry.requested_date}`;
-    waitlistCountByDate.set(key, (waitlistCountByDate.get(key) ?? 0) + 1);
+    if (!["waiting", "offered"].includes(entry.status)) continue;
+    waitlistCountBySlot.set(entry.slot_id, (waitlistCountBySlot.get(entry.slot_id) ?? 0) + 1);
   }
 
-  const slotWaitlistCount = (slot: ScheduleSlot) =>
-    waitlistCountByDate.get(`${slot.cycle_id}:${easternDateKey(slot.starts_at)}`) ?? 0;
+  const slotWaitlistCount = (slot: ScheduleSlot) => waitlistCountBySlot.get(slot.id) ?? 0;
 
   const slotIsBooked = (slot: ScheduleSlot) =>
     Boolean(bookingMap.get(slot.id)) || Boolean(availabilityMap.get(slot.id)?.is_booked);
@@ -546,28 +513,6 @@ export default async function SchedulePage({
     applicantApplications.some((application) => application.id === entry.application_id),
   );
 
-  const applicantWaitlistDates = Array.from(
-    new Map(
-      slots
-        .filter(
-          (slot) =>
-            slot.status !== "cancelled" &&
-            new Date(slot.starts_at).getTime() > serverTime &&
-            applicantApplications.some(
-              (application) => application.cycle_id === slot.cycle_id,
-            ),
-        )
-        .map((slot) => [
-          `${slot.cycle_id}:${easternDateKey(slot.starts_at)}`,
-          {
-            cycleId: slot.cycle_id,
-            date: easternDateKey(slot.starts_at),
-            label: formatSlotDate(slot.starts_at),
-          },
-        ]),
-    ).values(),
-  );
-
   const ownerWaitlistEntries = waitlistEntries.filter((entry) =>
     ["waiting", "offered"].includes(entry.status),
   );
@@ -579,6 +524,9 @@ export default async function SchedulePage({
         const slotApplications = applicantApplications.filter(
           (application) => application.cycle_id === slot.cycle_id,
         );
+        const myWaitlist = applicantWaitlistEntries.find(
+          (entry) => entry.slot_id === slot.id && ["waiting", "offered"].includes(entry.status),
+        ) ?? null;
         const isPast = new Date(slot.starts_at).getTime() <= serverTime;
         const schoolAccessOpen =
           Boolean(slot.school_booking_opens_at) &&
@@ -597,6 +545,7 @@ export default async function SchedulePage({
             ? `${cycle.season_year} · ${cycle.name}`
             : "Program",
           waitlistCount: slotWaitlistCount(slot),
+          myWaitlist,
           applications: slotApplications.map((application) => ({
             id: application.id,
             label: `${application.school_name}${
@@ -816,154 +765,23 @@ export default async function SchedulePage({
         </form>
       </section>
 
-      {profile.role === "applicant" && !bookedSlot && (
-        <details
-          className="panel schedule-waitlist-panel schedule-waitlist-disclosure"
-          open={applicantWaitlistEntries.some((entry) => entry.status === "offered")}
-        >
-          <summary className="panel-header">
-            <div>
-              <span className="eyebrow">Date waitlist</span>
-              <h2>Join a preferred date</h2>
-              <p>Join a date waitlist when the available times do not work or are already full.</p>
-            </div>
-            <span className="badge">{applicantWaitlistEntries.filter((entry) => ["waiting", "offered"].includes(entry.status)).length}</span>
-          </summary>
-          <div className="panel-body schedule-waitlist-body">
-            <form action={joinScheduleDateWaitlist} className="schedule-waitlist-form">
-              <div className="field">
-                <label htmlFor="waitlist_application">Application</label>
-                <select className="select" id="waitlist_application" name="application_id" required>
-                  <option value="">Choose application</option>
-                  {applicantApplications.map((application) => (
-                    <option key={application.id} value={application.id}>
-                      {application.school_name}{application.production_title ? ` — ${application.production_title}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="waitlist_date">Preferred date</label>
-                <select className="select" id="waitlist_date" name="requested_date" required>
-                  <option value="">Choose date</option>
-                  {applicantWaitlistDates.map((option) => (
-                    <option key={`${option.cycleId}:${option.date}`} value={option.date}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="waitlist_preference">Time preference</label>
-                <select className="select" defaultValue="any" id="waitlist_preference" name="time_preference">
-                  <option value="any">Any time</option>
-                  <option value="morning">Morning</option>
-                  <option value="afternoon">Afternoon</option>
-                  <option value="evening">Evening</option>
-                </select>
-              </div>
-              <div className="field schedule-waitlist-notes">
-                <label htmlFor="waitlist_notes">Notes</label>
-                <input className="input" id="waitlist_notes" name="notes" placeholder="Travel or timing considerations" />
-              </div>
-              <button className="button button-dark" disabled={applicantWaitlistDates.length === 0} type="submit">
-                Join date waitlist
-              </button>
-            </form>
-
-            {applicantWaitlistEntries.length > 0 && (
-              <div className="schedule-waitlist-list">
-                {applicantWaitlistEntries.map((entry) => {
-                  const offeredSlot = entry.offered_slot_id
-                    ? slots.find((slot) => slot.id === entry.offered_slot_id)
-                    : null;
-                  return (
-                    <article className="schedule-waitlist-row" key={entry.id}>
-                      <div>
-                        <strong>{formatWaitlistDate(entry.requested_date)}</strong>
-                        <span>{entry.time_preference === "any" ? "Any time" : entry.time_preference}</span>
-                        {offeredSlot && (
-                          <small>Offered: {formatSlotTime(offeredSlot.starts_at, offeredSlot.ends_at)} ET</small>
-                        )}
-                      </div>
-                      <span className={`badge schedule-waitlist-status schedule-waitlist-status-${entry.status}`}>
-                        {entry.status}
-                      </span>
-                      <div className="schedule-waitlist-actions">
-                        {entry.status === "offered" && (
-                          <>
-                            <form action={acceptScheduleWaitlistOffer.bind(null, entry.id)}>
-                              <button className="button button-dark button-compact" type="submit">Accept</button>
-                            </form>
-                            <form action={declineScheduleWaitlistOffer.bind(null, entry.id)}>
-                              <button className="button button-secondary button-compact" type="submit">Decline</button>
-                            </form>
-                          </>
-                        )}
-                        {["waiting", "offered"].includes(entry.status) && (
-                          <form action={leaveScheduleDateWaitlist.bind(null, entry.id)}>
-                            <button className="text-button danger-text" type="submit">Leave</button>
-                          </form>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </details>
-      )}
-
       {profile.role === "owner" && ownerWaitlistEntries.length > 0 && (
         <section className="panel schedule-owner-waitlist-panel">
           <div className="panel-header">
-            <div>
-              <span className="eyebrow">Owner queue</span>
-              <h2>Schedule date waitlist</h2>
-              <p>Offer an open slot on the school’s requested date.</p>
-            </div>
+            <div><p className="eyebrow">Owner queue</p><h2>Timeslot waitlists</h2><p>Each queue belongs to one exact timeslot. The next school receives a 15-minute exclusive offer.</p></div>
             <span className="badge">{ownerWaitlistEntries.length}</span>
           </div>
           <div className="panel-body schedule-owner-waitlist-list">
-            {ownerWaitlistEntries.map((entry) => {
-              const application = applicationLookup.get(entry.application_id);
-              const eligibleSlots = slots.filter(
-                (slot) =>
-                  slot.cycle_id === entry.cycle_id &&
-                  slot.status === "open" &&
-                  easternDateKey(slot.starts_at) === entry.requested_date &&
-                  !bookingMap.has(slot.id) &&
-                  new Date(slot.starts_at).getTime() > serverTime,
-              );
-
+            {slots.filter((slot) => slotWaitlistCount(slot) > 0).map((slot) => {
+              const queue = ownerWaitlistEntries.filter((entry) => entry.slot_id === slot.id).sort((a, b) => a.queue_rank - b.queue_rank);
+              const activeOffer = queue.find((entry) => entry.status === "offered" && entry.offer_expires_at && new Date(entry.offer_expires_at).getTime() > serverTime);
               return (
-                <article className="schedule-owner-waitlist-row" key={entry.id}>
-                  <div>
-                    <strong>{application?.school_name ?? "School"}</strong>
-                    <span>{application?.production_title || formatWaitlistDate(entry.requested_date)}</span>
-                    <small>{formatWaitlistDate(entry.requested_date)} · {entry.time_preference}</small>
+                <article className="schedule-owner-slot-queue" key={slot.id}>
+                  <div className="schedule-owner-slot-queue-heading">
+                    <div><strong>{formatSlotDate(slot.starts_at)}</strong><span>{formatSlotTime(slot.starts_at, slot.ends_at)} ET · {slot.title}</span></div>
+                    <div className="button-row"><span className="badge">{queue.length} waiting</span><form action={ownerOfferNextSlotWaitlist.bind(null, slot.id)}><button className="button button-secondary button-compact" type="submit" disabled={Boolean(activeOffer) || slotIsBooked(slot)}>{activeOffer ? "Offer active" : slotIsBooked(slot) ? "Currently booked" : "Offer next school"}</button></form></div>
                   </div>
-                  <span className={`badge schedule-waitlist-status schedule-waitlist-status-${entry.status}`}>{entry.status}</span>
-                  <form action={ownerOfferWaitlistSlot.bind(null, entry.id)} className="schedule-waitlist-offer-form">
-                    <select className="select" defaultValue={entry.offered_slot_id ?? ""} name="slot_id" required>
-                      <option value="">Choose open slot</option>
-                      {eligibleSlots.map((slot) => (
-                        <option key={slot.id} value={slot.id}>
-                          {formatSlotTime(slot.starts_at, slot.ends_at)} ET · {slot.title}
-                        </option>
-                      ))}
-                    </select>
-                    <select className="select" defaultValue="24" name="expires_hours">
-                      <option value="12">12-hour offer</option>
-                      <option value="24">24-hour offer</option>
-                      <option value="48">48-hour offer</option>
-                      <option value="72">72-hour offer</option>
-                    </select>
-                    <button className="button button-secondary button-compact" disabled={eligibleSlots.length === 0} type="submit">
-                      {entry.status === "offered" ? "Update offer" : "Offer slot"}
-                    </button>
-                  </form>
+                  <ol className="timeslot-waitlist-queue">{queue.map((entry) => { const application = applicationLookup.get(entry.application_id); return <li key={entry.id}><span className="queue-position">{entry.queue_rank}</span><div><strong>{application?.school_name ?? "School"}</strong><small>{application?.production_title ?? "Production"}{entry.applicant_notes ? ` · ${entry.applicant_notes}` : ""}</small></div><span className={`badge schedule-waitlist-status-${entry.status}`}>{entry.status}{entry.offer_expires_at && entry.status === "offered" ? ` until ${new Date(entry.offer_expires_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</span></li>; })}</ol>
                 </article>
               );
             })}

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
+import { normalizePhoneE164 } from "@/lib/phone";
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -26,13 +27,26 @@ export async function updateUserAccess(userId: string, formData: FormData) {
   const owner = await requireProfile(["owner"]);
   const role = String(formData.get("role") ?? "applicant") as AppRole;
   const active = formData.get("active") === "on";
+  const phoneInput = String(formData.get("phone_e164") ?? "").trim();
+  const phone = phoneInput ? normalizePhoneE164(phoneInput) : null;
+  const mfaRequired = formData.get("mfa_required") === "on";
+  if (phoneInput && !phone) throw new Error("Enter a valid mobile number.");
 
   if (owner.id === userId && (role !== "owner" || !active)) {
     throw new Error("Owners cannot remove or deactivate their own owner access.");
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("profiles").update({ role, active }).eq("id", userId);
+  const { data: existing } = await supabase.from("profiles").select("phone_e164").eq("id", userId).single();
+  const phoneChanged = (existing?.phone_e164 ?? null) !== phone;
+  const { error } = await supabase.from("profiles").update({
+    role,
+    active,
+    phone_e164: phone,
+    phone_verified_at: phoneChanged ? null : undefined,
+    phone_required_at: phoneChanged && phone ? new Date().toISOString() : undefined,
+    mfa_required: role === "owner" || role === "advisory_member" ? true : mfaRequired,
+  }).eq("id", userId);
   if (error) throw new Error(error.message);
   revalidateUsers();
 }

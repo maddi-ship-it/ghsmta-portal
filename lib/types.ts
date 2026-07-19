@@ -51,6 +51,19 @@ export type Profile = {
   id: string;
   email: string | null;
   full_name: string | null;
+  preferred_name?: string | null;
+  phone_e164?: string | null;
+  phone_verified_at?: string | null;
+  phone_required_at?: string | null;
+  pronouns?: string | null;
+  organization?: string | null;
+  notification_preferences?: {
+    email?: boolean;
+    sms?: boolean;
+    in_app?: boolean;
+  } | null;
+  mfa_required?: boolean;
+  mfa_grace_until?: string | null;
   role: AppRole;
   active: boolean;
   force_password_reset?: boolean;

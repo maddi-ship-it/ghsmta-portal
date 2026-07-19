@@ -32,7 +32,7 @@ export default async function UsersPage({
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id,email,full_name,role,active,force_password_reset,password_reset_requested_at");
+    .select("id,email,full_name,preferred_name,phone_e164,phone_verified_at,role,active,mfa_required,mfa_grace_until,force_password_reset,password_reset_requested_at");
 
   if (error) throw new Error(error.message);
 
@@ -88,20 +88,23 @@ export default async function UsersPage({
         <button className="button button-dark button-compact" type="submit">Apply to selected</button>
       </form>
 
-      <section className="panel"><div className="table-wrap"><table className="data-table user-admin-table"><thead><tr><th><span className="sr-only">Select</span></th><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Password</th><th>Change access</th></tr></thead><tbody>
+      <section className="panel"><div className="table-wrap"><table className="data-table user-admin-table"><thead><tr><th><span className="sr-only">Select</span></th><th>User</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th><th>Password</th><th>Change access</th></tr></thead><tbody>
         {profiles.map((profile) => (
           <tr key={profile.id}>
             <td><input aria-label={`Select ${profile.full_name ?? profile.email}`} form="bulk-users-form" name="user_ids" type="checkbox" value={profile.id} /></td>
             <td><strong>{profile.full_name ?? "Unnamed user"}</strong></td>
             <td>{profile.email}</td>
+            <td><span>{profile.phone_e164 ?? "Not entered"}</span><small>{profile.phone_verified_at ? "Verified" : "Unverified"}</small></td>
             <td><span className="badge">{roleLabel(profile.role)}</span></td>
             <td><span className={`badge ${profile.active ? "badge-complete" : "badge-warning"}`}>{profile.active ? "Active" : "Inactive"}</span></td>
             <td>{profile.force_password_reset ? <span className="badge badge-warning">Reset required</span> : "Current"}</td>
             <td>
               <div className="user-row-actions">
                 <form action={updateUserAccess.bind(null, profile.id)} className="user-inline-access-form">
+                  <input className="input input-compact" name="phone_e164" defaultValue={profile.phone_e164 ?? ""} placeholder="+14045551234" aria-label="Mobile number" />
                   <select className="select" defaultValue={profile.role} name="role">{roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}</select>
                   <label className="inline-check"><input defaultChecked={profile.active} name="active" type="checkbox" /> Active</label>
+                  <label className="inline-check"><input defaultChecked={profile.mfa_required} name="mfa_required" type="checkbox" /> Require MFA</label>
                   <button className="button button-secondary button-compact" type="submit">Save</button>
                 </form>
                 <form action={forcePasswordReset.bind(null, profile.id)}><button className="text-button" type="submit">Force reset</button></form>
@@ -109,7 +112,7 @@ export default async function UsersPage({
             </td>
           </tr>
         ))}
-        {profiles.length === 0 && <tr><td colSpan={7}>No users match these filters.</td></tr>}
+        {profiles.length === 0 && <tr><td colSpan={8}>No users match these filters.</td></tr>}
       </tbody></table></div></section>
     </>
   );

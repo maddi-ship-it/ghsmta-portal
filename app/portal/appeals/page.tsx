@@ -67,10 +67,9 @@ export default async function AppealsPage() {
       <div className="page-heading">
         <div>
           <span className="eyebrow">Formal review</span>
-          <h1>Appeals</h1>
+          <h1>Category Eligibility Appeals</h1>
           <p>
-            Submit supporting information, track review status, and preserve the
-            final resolution with a complete audit trail.
+            Submit and review appeals concerning award-category eligibility only. Scores, rankings, and adjudicator narratives are outside this workflow.
           </p>
         </div>
       </div>

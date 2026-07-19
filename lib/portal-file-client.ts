@@ -17,6 +17,7 @@ export async function uploadPortalFiles({
   documentType,
   documentCategory = "other",
   reviewerVisible = true,
+  metadata = {},
 }: {
   files: File[];
   contextType: PortalFileContext;
@@ -29,6 +30,16 @@ export async function uploadPortalFiles({
   documentType: string;
   documentCategory?: string;
   reviewerVisible?: boolean;
+  metadata?: {
+    displayName?: string | null;
+    personName?: string | null;
+    awardCategory?: string | null;
+    roleOrCharacter?: string | null;
+    designerName?: string | null;
+    phoneticSpelling?: string | null;
+    fileNotes?: string | null;
+    productionName?: string | null;
+  };
 }) {
   const supabase = createClient();
   const uploaded: Array<{ id: string; generatedName: string }> = [];
@@ -71,6 +82,14 @@ export async function uploadPortalFiles({
         uploaded_by: userId,
         document_category: documentCategory,
         reviewer_visible: reviewerVisible,
+        display_name: metadata.displayName ?? null,
+        person_name: metadata.personName ?? null,
+        award_category: metadata.awardCategory ?? null,
+        role_or_character: metadata.roleOrCharacter ?? null,
+        designer_name: metadata.designerName ?? null,
+        phonetic_spelling: metadata.phoneticSpelling ?? null,
+        file_notes: metadata.fileNotes ?? null,
+        production_name: metadata.productionName ?? null,
       })
       .select("id")
       .single();

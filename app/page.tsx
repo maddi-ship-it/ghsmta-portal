@@ -1,111 +1,59 @@
 import Link from "next/link";
 
-const features = [
-  {
-    icon: "01",
-    title: "One application home",
-    copy: "Schools can save progress, return throughout the cycle, and see exactly what remains before submission.",
-  },
-  {
-    icon: "02",
-    title: "Assignment-based review",
-    copy: "Adjudicators only receive the productions assigned to them, with permissions enforced at the database level.",
-  },
-  {
-    icon: "03",
-    title: "Year-over-year continuity",
-    copy: "Cycles, applications, assignments, and audit history stay organized without losing prior-season records.",
-  },
+const portalPaths = [
+  { number: "01", title: "Schools", copy: "Applications, scheduling, school files, appeals, and direct communication with GHSMTA." },
+  { number: "02", title: "Adjudicators", copy: "Assigned productions, collaborative observations, scoring, and category decisions." },
+  { number: "03", title: "Advisory & Owners", copy: "Live oversight, eligibility review, program setup, reporting, and preserved archives." },
 ];
 
 export default function LandingPage() {
   return (
-    <main className="safe-shell">
-      <header className="public-header">
-        <div className="container public-nav">
-          <Link href="/" className="brand" aria-label="GHSMTA home">
-            <span className="brand-mark">G</span>
-            <span className="brand-copy">
-              GHSMTA
-              <small>Awards Portal</small>
-            </span>
+    <main className="regal-landing safe-shell">
+      <header className="regal-public-header">
+        <div className="container regal-public-nav">
+          <Link href="/" className="regal-brand" aria-label="GHSMTA home">
+            <span className="regal-brand-mark">G</span>
+            <span><strong>GHSMTA</strong><small>Awards Portal</small></span>
           </Link>
           <nav className="nav-actions" aria-label="Primary navigation">
-            <Link className="button button-secondary" href="/login">Sign-In</Link>
-            <Link className="button button-primary" href="/signup">Sign-Up</Link>
+            <Link className="button button-ghost-gold" href="/login">Sign in</Link>
+            <Link className="button button-gold" href="/signup">Start an application</Link>
           </nav>
         </div>
       </header>
 
-      <section className="hero">
-        <div className="container hero-grid">
-          <div>
+      <section className="regal-hero">
+        <div className="regal-curtain regal-curtain-left" />
+        <div className="regal-curtain regal-curtain-right" />
+        <div className="regal-spotlight" />
+        <div className="container regal-hero-grid">
+          <div className="regal-hero-copy">
             <p className="eyebrow">Georgia High School Musical Theatre Awards</p>
-            <h1>Celebrating the next generation of theatre artists.</h1>
-            <p className="hero-lede">
-              A secure home for school applications, adjudication assignments,
-              and awards-cycle administration—designed for every screen.
-            </p>
-            <div className="hero-actions">
-              <Link className="button button-primary" href="/signup">Begin your application</Link>
-              <Link className="button button-secondary" href="/login">Continue or sign in</Link>
-            </div>
+            <h1>Excellence takes the stage.</h1>
+            <p className="regal-hero-lede">The secure 2026–2027 home for school applications, adjudication visits, award materials, and GHSMTA program administration.</p>
+            <div className="hero-actions"><Link className="button button-gold" href="/signup">Begin your school application</Link><Link className="button button-ghost-gold" href="/login">Continue to the portal</Link></div>
+            <div className="regal-signin-note"><span>Secure access</span><span>Email + password</span><span>Magic Link</span><span>Phone code</span><span>MFA</span></div>
           </div>
 
-          <aside className="hero-card" aria-label="Application process">
-            <div className="hero-card-top">
-              <div>
-                <div className="hero-card-label">Awards cycle</div>
-                <strong>Application pathway</strong>
-              </div>
-              <span className="status-dot" />
-            </div>
-            <div className="timeline">
-              <div className="timeline-item">
-                <span className="timeline-number">1</span>
-                <div><strong>Create your school profile</strong><span>Use one account to manage the production application.</span></div>
-              </div>
-              <div className="timeline-item">
-                <span className="timeline-number">2</span>
-                <div><strong>Complete the application</strong><span>Save progress and return before the cycle deadline.</span></div>
-              </div>
-              <div className="timeline-item">
-                <span className="timeline-number">3</span>
-                <div><strong>Submit for review</strong><span>Track status and receive program communications in one place.</span></div>
-              </div>
-            </div>
+          <aside className="regal-season-card">
+            <div className="regal-season-seal">2026<br /><span>–</span><br />2027</div>
+            <p className="eyebrow">Current awards cycle</p>
+            <h2>One portal.<br />Every part of the journey.</h2>
+            <div className="regal-season-rule" />
+            <p>Built for schools, adjudicators, Advisory Committee members, and program Owners—with role-based access throughout.</p>
           </aside>
         </div>
       </section>
 
-      <section className="section">
+      <section className="regal-path-section">
         <div className="container">
-          <div className="section-heading">
-            <p className="eyebrow">Built around the awards process</p>
-            <h2>Clear access for every participant.</h2>
-            <p>
-              Applicants, adjudicators, advisory members, and program owners each
-              see the tools and records appropriate to their role.
-            </p>
-          </div>
-          <div className="feature-grid">
-            {features.map((feature) => (
-              <article className="feature-card" key={feature.title}>
-                <span className="feature-icon">{feature.icon}</span>
-                <h3>{feature.title}</h3>
-                <p>{feature.copy}</p>
-              </article>
-            ))}
-          </div>
+          <div className="regal-section-heading"><p className="eyebrow">Designed for the full awards process</p><h2>A clear path for every participant.</h2></div>
+          <div className="regal-path-grid">{portalPaths.map((path) => <article className="regal-path-card" key={path.title}><span>{path.number}</span><h3>{path.title}</h3><p>{path.copy}</p></article>)}</div>
         </div>
       </section>
 
-      <footer className="public-footer">
-        <div className="container public-footer-inner">
-          <strong>Georgia High School Musical Theatre Awards</strong>
-          <span>Secure application and adjudication portal</span>
-        </div>
-      </footer>
+      <section className="regal-callout"><div className="container regal-callout-inner"><div><p className="eyebrow">Ready for the season?</p><h2>Step into the GHSMTA Awards Portal.</h2></div><div className="button-row"><Link className="button button-gold" href="/signup">Create school account</Link><Link className="button button-ghost-gold" href="/login">Sign in securely</Link></div></div></section>
+      <footer className="regal-footer"><div className="container"><strong>Georgia High School Musical Theatre Awards</strong><span>Secure applications · Live scheduling · Collaborative adjudication</span></div></footer>
     </main>
   );
 }

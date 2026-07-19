@@ -563,11 +563,19 @@ export default async function AdjudicationApplicationPage({
               (comment) => comment.scorecard_id === ownScorecard?.id,
             )}
             categoryProposals={(proposalResult.data ?? []) as Array<{
+              id: string;
               category_id: string;
               is_eligible: boolean;
               range_min: number | null;
               range_max: number | null;
               status: string;
+              advisory_note: string | null;
+            }>}
+            categoryApprovals={(approvalResult.data ?? []) as Array<{
+              proposal_id: string;
+              adjudicator_user_id: string;
+              response: string;
+              comment: string | null;
             }>}
             ownScores={scores.filter(
               (score) => score.scorecard_id === ownScorecard?.id,

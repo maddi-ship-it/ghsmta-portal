@@ -8,6 +8,7 @@ import {
   type CSSProperties,
 } from "react";
 
+import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow-actions";
 import { CategoryScoringControls } from "@/components/category-scoring-controls";
 import { RichTextField } from "@/components/rich-text-field";
 import { createClient } from "@/lib/supabase/client";
@@ -48,11 +49,20 @@ type CategoryDecision = {
 };
 
 type CategoryProposal = {
+  id: string;
   category_id: string;
   is_eligible: boolean;
   range_min: number | null;
   range_max: number | null;
   status: string;
+  advisory_note: string | null;
+};
+
+type CategoryApproval = {
+  proposal_id: string;
+  adjudicator_user_id: string;
+  response: string;
+  comment: string | null;
 };
 
 function RichTextPreview({
@@ -182,6 +192,8 @@ function CategoryScoreSection({
   categoryComment,
   categorySubjectName,
   officialProposal,
+  ownApproval,
+  applicationId,
   panelMembers,
   observationMap,
   ownScoreMap,
@@ -196,6 +208,8 @@ function CategoryScoreSection({
   categoryComment: AdjudicationCategoryComment | undefined;
   categorySubjectName: string;
   officialProposal?: CategoryProposal;
+  ownApproval?: CategoryApproval;
+  applicationId: string;
   panelMembers: PanelMember[];
   observationMap: Map<string, string | null>;
   ownScoreMap: Map<string, AdjudicationScore>;
@@ -503,6 +517,40 @@ function CategoryScoreSection({
             </small>
           </div>
         </details>
+
+        <section className="inline-category-decision">
+          <div className="inline-category-decision-copy">
+            <p className="eyebrow">Advisory decision</p>
+            {officialProposal ? (
+              <>
+                <h3>{officialProposal.is_eligible ? "Eligible" : "Not eligible"}</h3>
+                <p>
+                  {officialProposal.is_eligible && officialProposal.range_min != null && officialProposal.range_max != null
+                    ? `Approved range: ${Number(officialProposal.range_min).toFixed(2)}–${Number(officialProposal.range_max).toFixed(2)}`
+                    : "No score range applies."}
+                </p>
+                {officialProposal.advisory_note && <small>{officialProposal.advisory_note}</small>}
+              </>
+            ) : (
+              <><h3>Awaiting Advisory Committee decision</h3><p>Approval controls will appear after eligibility and range are proposed.</p></>
+            )}
+          </div>
+
+          {officialProposal && !["overridden"].includes(officialProposal.status) && (
+            <form action={respondCategoryProposal.bind(null, applicationId, officialProposal.id)} className="inline-category-approval-form">
+              <div className="field">
+                <label htmlFor={`proposal_comment_${category.id}`}>Dispute comment</label>
+                <input className="input" id={`proposal_comment_${category.id}`} name="comment" defaultValue={ownApproval?.comment ?? ""} placeholder="Required only when disputing" />
+              </div>
+              <div className="button-row">
+                <button className="button button-danger button-compact" name="response" type="submit" value="disputed">Dispute</button>
+                <button className="button button-gold button-compact" name="response" type="submit" value="approved">Approve decision</button>
+                {ownApproval && <span className={`badge ${ownApproval.response === "approved" ? "badge-complete" : "badge-warning"}`}>{ownApproval.response === "approved" ? "You approved" : "You disputed"}</span>}
+              </div>
+            </form>
+          )}
+          {officialProposal?.status === "overridden" && <span className="badge badge-complete">Owner override applied</span>}
+        </section>
       </div>
 
       {reviewOpen && !readOnly && (
@@ -612,6 +660,7 @@ export function CollaborativeAdjudicatorScorecard({
   ownScores,
   ownComments,
   categoryProposals,
+  categoryApprovals,
   initialPanelRows,
   scoreOptions,
   readOnly,
@@ -625,6 +674,7 @@ export function CollaborativeAdjudicatorScorecard({
   ownScores: AdjudicationScore[];
   ownComments: AdjudicationCategoryComment[];
   categoryProposals: CategoryProposal[];
+  categoryApprovals: CategoryApproval[];
   initialPanelRows: PanelObservationRow[];
   scoreOptions: ScoreOption[];
   readOnly: boolean;
@@ -701,6 +751,11 @@ export function CollaborativeAdjudicatorScorecard({
     [categoryProposals],
   );
 
+  const approvalMap = useMemo(
+    () => new Map(categoryApprovals.filter((approval) => approval.adjudicator_user_id === currentUserId).map((approval) => [approval.proposal_id, approval])),
+    [categoryApprovals, currentUserId],
+  );
+
   const commentColumnsStyle = {
     "--panel-comment-count": Math.max(panelMembers.length, 1),
   } as CSSProperties;
@@ -742,6 +797,8 @@ export function CollaborativeAdjudicatorScorecard({
             categorySubjectDefaults[category.category_key] ?? ""
           }
           officialProposal={proposalMap.get(category.id)}
+          ownApproval={proposalMap.get(category.id) ? approvalMap.get(proposalMap.get(category.id)!.id) : undefined}
+          applicationId={applicationId}
           commentColumnsStyle={commentColumnsStyle}
           currentUserId={currentUserId}
           key={category.id}

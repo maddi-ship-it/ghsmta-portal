@@ -27,7 +27,7 @@ export default async function SchoolFilesPage() {
     const { data: fileData, error: fileError } = await supabase
       .from("portal_files")
       .select(
-        "id,application_id,original_name,generated_name,storage_path,mime_type,file_size,uploaded_by,document_category,reviewer_visible,created_at",
+        "id,application_id,original_name,generated_name,storage_path,mime_type,file_size,uploaded_by,document_category,reviewer_visible,created_at,display_name,person_name,award_category,role_or_character,designer_name,phonetic_spelling,file_notes,production_name",
       )
       .eq("context_type", "application")
       .in("application_id", applicationIds)
@@ -48,8 +48,7 @@ export default async function SchoolFilesPage() {
           <span className="eyebrow">Documents</span>
           <h1>School files</h1>
           <p>
-            Private production, venue, audition, and supporting files shared
-            with the school team, assigned reviewers, and GHSMTA Owners.
+            Upload playbills, logos, scenic materials, name pronunciations, headshots, and résumés for the school team and assigned GHSMTA reviewers.
           </p>
         </div>
       </div>

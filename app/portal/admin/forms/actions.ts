@@ -351,3 +351,22 @@ export async function duplicateFormVersion(
   if (error) throw new Error(error.message);
   redirect(`/portal/admin/forms/${String(data)}`);
 }
+
+export async function editPublishedFormVersion(sourceFormVersionId: string) {
+  await requireProfile(["owner"]);
+  const supabase = await createClient();
+  const { data: source, error: sourceError } = await supabase
+    .from("application_form_versions")
+    .select("cycle_id,name,status")
+    .eq("id", sourceFormVersionId)
+    .single();
+  if (sourceError || !source) throw new Error(sourceError?.message ?? "Published form not found.");
+  if (source.status !== "published") redirect(`/portal/admin/forms/${sourceFormVersionId}`);
+  const { data, error } = await supabase.rpc("duplicate_form_version", {
+    p_source_form_version_id: sourceFormVersionId,
+    p_target_cycle_id: source.cycle_id,
+    p_name: `${source.name} — Updated draft`,
+  });
+  if (error) throw new Error(error.message);
+  redirect(`/portal/admin/forms/${String(data)}`);
+}

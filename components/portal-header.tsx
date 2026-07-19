@@ -57,8 +57,14 @@ function navItems(
     },
     {
       href: "/portal/appeals",
-      label: "Appeals",
+      label: "Eligibility appeals",
+      shortLabel: "Appeals",
       icon: "⚖",
+    },
+    {
+      href: "/portal/account",
+      label: "Account",
+      icon: "♙",
     },
   ];
 
@@ -209,10 +215,10 @@ export async function PortalHeader({
                 .toUpperCase()}
             </span>
 
-            <span className="user-meta">
-              <strong>{profile.full_name ?? profile.email}</strong>
+            <Link href="/portal/account" className="user-meta user-meta-link">
+              <strong>{profile.preferred_name ?? profile.full_name ?? profile.email}</strong>
               <span>{roleLabel(profile.role)}</span>
-            </span>
+            </Link>
 
             <form action={signOut}>
               <button

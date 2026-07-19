@@ -17,6 +17,7 @@ import {
   createStage,
   deleteQuestion,
   duplicateFormVersion,
+  editPublishedFormVersion,
   publishFormVersion,
   updateQuestion,
   updateSection,
@@ -197,7 +198,11 @@ export default async function FormBuilderPage({
         </div>
         <div className="heading-actions">
           <span className={`badge badge-form-${version.status}`}>{version.status}</span>
-          {version.status !== "published" && (
+          {version.status === "published" ? (
+            <form action={editPublishedFormVersion.bind(null, version.id)}>
+              <button className="button button-gold" type="submit">Edit published form</button>
+            </form>
+          ) : (
             <form action={publishFormVersion.bind(null, version.id)}>
               <button className="button button-dark" type="submit">Publish this version</button>
             </form>
@@ -207,7 +212,7 @@ export default async function FormBuilderPage({
 
       {!isDraft && (
         <div className="notice form-builder-notice">
-          This version is {version.status}. Duplicate it before changing the historical structure.
+          This version is {version.status}. “Edit published form” creates a safe draft version, so existing applications remain attached to the historical form they completed.
         </div>
       )}
 
