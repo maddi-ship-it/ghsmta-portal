@@ -84,7 +84,9 @@ select
 from public.applications application
 where application.applicant_user_id is not null
   and coalesce(application.is_archived, false) = false
-on conflict (application_id, channel_type) do update set
+on conflict (application_id, channel_type)
+where application_id is not null
+do update set
   name = excluded.name,
   description = excluded.description,
   active = true,
@@ -112,7 +114,9 @@ begin
       new.id,
       true
     )
-    on conflict (application_id, channel_type) do update set
+    on conflict (application_id, channel_type)
+where application_id is not null
+do update set
       name = excluded.name,
       description = excluded.description,
       active = true,
@@ -131,7 +135,9 @@ begin
       new.id,
       true
     )
-    on conflict (application_id, channel_type) do update set
+    on conflict (application_id, channel_type)
+where application_id is not null
+do update set
       name = excluded.name,
       description = excluded.description,
       active = true,
