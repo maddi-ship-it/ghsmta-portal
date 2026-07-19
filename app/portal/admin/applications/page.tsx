@@ -82,9 +82,7 @@ export default async function ApplicationsPage({
   const cycles = (cycleData ?? []) as AwardCycle[];
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const existingCycleIds = new Set(
-    applications
-      .filter((application) => application.applicant_user_id === profile.id)
-      .map((application) => application.cycle_id),
+    applications.map((application) => application.cycle_id),
   );
   const openPrograms = cycles.filter((cycle) => {
     if (!cycle.is_active || cycle.status !== "open") return false;

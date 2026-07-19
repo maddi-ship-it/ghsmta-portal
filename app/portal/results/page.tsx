@@ -10,13 +10,12 @@ import type {
 } from "@/lib/types";
 
 export default async function ReleasedResultsPage() {
-  const profile = await requireProfile(["applicant"]);
+  await requireProfile(["applicant"]);
   const supabase = await createClient();
 
   const { data: applicationData, error: applicationError } = await supabase
     .from("applications")
     .select("*")
-    .eq("applicant_user_id", profile.id)
     .order("updated_at", { ascending: false });
   if (applicationError) throw new Error(applicationError.message);
   const applications = (applicationData ?? []) as Application[];

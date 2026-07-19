@@ -237,7 +237,6 @@ export default async function SchedulePage({
           .select(
             "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_payload,cloned_from_application_id,created_at,updated_at",
           )
-          .eq("applicant_user_id", profile.id)
           .eq("is_archived", false)
           .order("updated_at", { ascending: false }),
         supabase.rpc("get_schedule_slot_availability"),

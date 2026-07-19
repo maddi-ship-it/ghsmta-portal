@@ -3958,3 +3958,192 @@ body.modal-open {
   .consensus-main-actions .button { flex: 1; }
   .advisory-queue-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.school-team-stack {
+  display: grid;
+  gap: 22px;
+}
+
+.school-team-panel {
+  overflow: hidden;
+}
+
+.school-team-heading {
+  align-items: flex-start;
+}
+
+.school-team-heading h2 {
+  margin: 4px 0 4px;
+}
+
+.school-team-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.school-team-body {
+  display: grid;
+  gap: 24px;
+}
+
+.school-team-member-list {
+  display: grid;
+  gap: 12px;
+}
+
+.school-team-member {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.school-team-member-avatar {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: #001699;
+  font-weight: 900;
+}
+
+.school-team-member-copy {
+  min-width: 0;
+}
+
+.school-team-member-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.school-team-member-title span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #001699;
+  background: rgba(0, 22, 153, .08);
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+.school-team-member-copy p,
+.school-team-member-copy small {
+  display: block;
+  margin: 3px 0 0;
+  color: var(--muted);
+}
+
+.school-team-member-copy small {
+  font-size: .72rem;
+}
+
+.school-team-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.school-team-member-actions form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.school-team-edit-toggle {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.school-team-invite-form {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid rgba(0, 22, 153, .16);
+  border-radius: 16px;
+  background: rgba(0, 22, 153, .04);
+}
+
+.school-team-invite-form h3 {
+  margin: 4px 0 6px;
+}
+
+.school-team-invite-form p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.school-team-invite-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.school-team-invite-form > .button {
+  width: fit-content;
+}
+
+.school-team-removed {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.school-team-removed summary {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.school-team-removed div {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.school-team-removed p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.danger-button {
+  color: #8f1d1d !important;
+  border-color: rgba(143, 29, 29, .22) !important;
+}
+
+@media (max-width: 900px) {
+  .school-team-member {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .school-team-member-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-top: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .school-team-invite-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .school-team-member-actions,
+  .school-team-member-actions form {
+    display: grid;
+    width: 100%;
+  }
+
+  .school-team-member-actions .button {
+    width: 100%;
+  }
+}

@@ -52,6 +52,17 @@ export default async function ApplicationDetailPage({
   if (!data) notFound();
   const application = data as Application;
 
+  let applicantCanEdit = false;
+  if (profile.role === "applicant") {
+    const { data: canEditData, error: canEditError } = await supabase.rpc(
+      "can_edit_application",
+      { p_application_id: id },
+    );
+
+    if (canEditError) throw new Error(canEditError.message);
+    applicantCanEdit = Boolean(canEditData);
+  }
+
   const [versionResult, stagesResult, progressResult, sectionsResult, questionsResult, answersResult, cyclesResult] =
     application.form_version_id
       ? await Promise.all([
@@ -133,7 +144,7 @@ export default async function ApplicationDetailPage({
     !application.is_archived &&
     (profile.role === "owner" ||
       (profile.role === "applicant" &&
-        application.applicant_user_id === profile.id &&
+        applicantCanEdit &&
         application.status === "draft" &&
         selectedStage?.id === application.current_stage_id));
 

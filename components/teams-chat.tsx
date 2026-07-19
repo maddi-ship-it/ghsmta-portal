@@ -15,6 +15,7 @@ import {
 } from "react";
 
 import {
+  broadcastToActiveSchoolDms,
   createChatMessage,
   createChatPost,
   createChatReply,
@@ -613,6 +614,13 @@ export function TeamsChat({
   const [members, setMembers] = useState(initialMembers);
   const [channelSearch, setChannelSearch] = useState("");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [showArchived, setShowArchived] = useState(() =>
+    initialChannels.some(
+      (channel) =>
+        channel.channel_id === selectedChannelId && channel.application_archived,
+    ),
+  );
+  const [showBroadcastComposer, setShowBroadcastComposer] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const feedEndRef = useRef<HTMLDivElement>(null);
@@ -622,14 +630,36 @@ export function TeamsChat({
   );
   const isThreaded = activeChannel?.channel_type === "applicant_community";
 
+  const archivedChannelCount = useMemo(
+    () => channels.filter((channel) => channel.application_archived).length,
+    [channels],
+  );
+
+  const activeSchoolDmCount = useMemo(
+    () =>
+      channels.filter(
+        (channel) =>
+          channel.channel_type === "school_dm" &&
+          !channel.application_archived,
+      ).length,
+    [channels],
+  );
+
   const totalUnread = useMemo(
-    () => channels.reduce((sum, channel) => sum + channel.unread_count, 0),
+    () =>
+      channels
+        .filter((channel) => !channel.application_archived)
+        .reduce((sum, channel) => sum + channel.unread_count, 0),
     [channels],
   );
 
   const groups = useMemo<ChannelGroup[]>(() => {
     const normalizedSearch = channelSearch.trim().toLowerCase();
     const filtered = channels.filter((channel) => {
+      if (!showArchived && channel.application_archived) {
+        return false;
+      }
+
       if (showUnreadOnly && channel.unread_count === 0) {
         return false;
       }
@@ -690,7 +720,7 @@ export function TeamsChat({
           );
         }),
       }));
-  }, [channelSearch, channels, showUnreadOnly]);
+  }, [channelSearch, channels, showArchived, showUnreadOnly]);
 
   const messages = useMemo<FlatMessage[]>(() => {
     return threads
@@ -863,6 +893,31 @@ export function TeamsChat({
     runFormAction(event.currentTarget, createChatMessage, "Message sent.");
   };
 
+  const submitBroadcast = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setStatus(null);
+
+    startTransition(async () => {
+      const result = await broadcastToActiveSchoolDms(formData);
+
+      if (!result.ok) {
+        setStatus(result.error ?? "The broadcast could not be sent.");
+        return;
+      }
+
+      form.reset();
+      setShowBroadcastComposer(false);
+      setStatus(
+        `Message sent to ${result.count ?? 0} active school ${
+          result.count === 1 ? "DM" : "DMs"
+        }.`,
+      );
+      await reloadChannels();
+    });
+  };
+
   const moderate = (postId: string, operation: "pin" | "lock") => {
     const formData = new FormData();
     formData.set("post_id", postId);
@@ -922,18 +977,44 @@ export function TeamsChat({
             type="search"
             value={channelSearch}
           />
-          <button
-            aria-pressed={showUnreadOnly}
-            className={
-              showUnreadOnly
-                ? `${styles.unreadFilter} ${styles.unreadFilterActive}`
-                : styles.unreadFilter
-            }
-            onClick={() => setShowUnreadOnly((current) => !current)}
-            type="button"
-          >
-            Unread only
-          </button>
+          <div className={styles.filterButtons}>
+            <button
+              aria-pressed={showUnreadOnly}
+              className={
+                showUnreadOnly
+                  ? `${styles.unreadFilter} ${styles.unreadFilterActive}`
+                  : styles.unreadFilter
+              }
+              onClick={() => setShowUnreadOnly((current) => !current)}
+              type="button"
+            >
+              Unread only
+            </button>
+            {archivedChannelCount > 0 && (
+              <button
+                aria-pressed={showArchived}
+                className={
+                  showArchived
+                    ? `${styles.unreadFilter} ${styles.unreadFilterActive}`
+                    : styles.unreadFilter
+                }
+                onClick={() => setShowArchived((current) => !current)}
+                type="button"
+              >
+                {showArchived ? "Hide archived" : `Show archived (${archivedChannelCount})`}
+              </button>
+            )}
+          </div>
+          {profile.role === "owner" && (
+            <button
+              className={styles.broadcastButton}
+              disabled={activeSchoolDmCount === 0}
+              onClick={() => setShowBroadcastComposer(true)}
+              type="button"
+            >
+              Message all active school DMs
+            </button>
+          )}
         </div>
 
         <ChannelNavigation
@@ -1293,6 +1374,76 @@ export function TeamsChat({
           </div>
         )}
       </section>
+
+      {showBroadcastComposer && profile.role === "owner" && (
+        <div
+          aria-labelledby="broadcast-title"
+          aria-modal="true"
+          className={styles.modalBackdrop}
+          role="dialog"
+        >
+          <form className={styles.broadcastModal} onSubmit={submitBroadcast}>
+            <div className={styles.broadcastModalHeader}>
+              <div>
+                <span className="eyebrow">Owner broadcast</span>
+                <h2 id="broadcast-title">Message every active school DM</h2>
+                <p>
+                  This creates the same message in {activeSchoolDmCount} active
+                  school {activeSchoolDmCount === 1 ? "DM" : "DMs"}. Archived
+                  applications are excluded.
+                </p>
+              </div>
+              <button
+                aria-label="Close broadcast composer"
+                className={styles.modalClose}
+                onClick={() => setShowBroadcastComposer(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="field">
+              <label htmlFor="broadcast-body">Message</label>
+              <textarea
+                autoFocus
+                className="textarea"
+                id="broadcast-body"
+                maxLength={5000}
+                name="body"
+                placeholder="Write the update schools should receive"
+                required
+                rows={7}
+              />
+            </div>
+
+            <label className={styles.broadcastConfirm}>
+              <input name="confirm" required type="checkbox" />
+              <span>
+                I understand this sends a separate message to every active
+                School Owner DM.
+              </span>
+            </label>
+
+            <div className={styles.broadcastActions}>
+              <button
+                className="button button-secondary"
+                onClick={() => setShowBroadcastComposer(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="button button-dark"
+                disabled={isPending}
+                type="submit"
+              >
+                {isPending ? "Sending…" : `Send to ${activeSchoolDmCount} DMs`}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

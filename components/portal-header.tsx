@@ -65,6 +65,12 @@ function navItems(
         icon: "▤",
       },
       {
+        href: "/portal/school-team",
+        label: "School team",
+        shortLabel: "Team",
+        icon: "♟",
+      },
+      {
         href: "/portal/results",
         label: "Released results",
         shortLabel: "Results",

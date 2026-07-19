@@ -52,11 +52,22 @@ async function getEditableApplication(applicationId: string) {
 
   if (error || !application) throw new Error("Application not found.");
 
+  let applicantCanEdit = false;
+  if (profile.role === "applicant") {
+    const { data: canEditData, error: canEditError } = await supabase.rpc(
+      "can_edit_application",
+      { p_application_id: applicationId },
+    );
+
+    if (canEditError) throw new Error(canEditError.message);
+    applicantCanEdit = Boolean(canEditData);
+  }
+
   const canEdit =
     !application.is_archived &&
     (profile.role === "owner" ||
       (profile.role === "applicant" &&
-        application.applicant_user_id === profile.id &&
+        applicantCanEdit &&
         application.status === "draft"));
 
   if (!canEdit) throw new Error("This application is read-only.");

@@ -12,7 +12,6 @@ export default async function AppealsPage() {
         ? supabase
             .from("applications")
             .select("id,school_name,production_title,cycle_id")
-            .eq("applicant_user_id", profile.id)
             .eq("is_archived", false)
             .order("updated_at", { ascending: false })
         : supabase

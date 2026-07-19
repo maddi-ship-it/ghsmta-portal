@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 type ChatActionResult = {
   ok: boolean;
   error?: string;
+  count?: number;
 };
 
 type ChannelMode = {
@@ -257,4 +258,38 @@ export async function moderateChatPost(
 
   revalidatePath("/portal/chat");
   return { ok: true };
+}
+
+export async function broadcastToActiveSchoolDms(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  await requireProfile(["owner"]);
+
+  const body = formText(formData, "body");
+
+  if (!body) {
+    return { ok: false, error: "Enter a message before sending." };
+  }
+
+  if (body.length > 5000) {
+    return {
+      ok: false,
+      error: "The broadcast message is longer than the allowed limit.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "broadcast_to_active_school_dms",
+    { p_body: body },
+  );
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+
+  return { ok: true, count: Number(data ?? 0) };
 }
