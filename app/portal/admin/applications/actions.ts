@@ -56,3 +56,38 @@ export async function duplicateApplication(
   revalidatePath("/portal/admin/applications");
   redirect(`/portal/applications/${String(data)}`);
 }
+
+export async function setApplicationArchiveState(formData: FormData) {
+  await requireProfile(["owner"]);
+
+  const singleArchiveId = String(formData.get("single_archive_id") ?? "").trim();
+  const singleRestoreId = String(formData.get("single_restore_id") ?? "").trim();
+  const bulkAction = String(formData.get("bulk_archive_action") ?? "").trim();
+  const selected = [...new Set(formData.getAll("application_ids").map(String).filter(Boolean))];
+
+  const applicationIds = singleArchiveId
+    ? [singleArchiveId]
+    : singleRestoreId
+      ? [singleRestoreId]
+      : selected;
+  const archived = singleArchiveId ? true : singleRestoreId ? false : bulkAction === "archive";
+
+  if (applicationIds.length === 0) throw new Error("Select at least one application.");
+  if (!singleArchiveId && !singleRestoreId && !["archive", "restore"].includes(bulkAction)) {
+    throw new Error("Choose Archive or Restore.");
+  }
+
+  const reason = String(formData.get("archive_reason") ?? "").trim();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_application_archive_state", {
+    p_application_ids: applicationIds,
+    p_archived: archived,
+    p_reason: reason || null,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/portal/admin/applications");
+  revalidatePath("/portal/adjudication");
+  revalidatePath("/portal/chat");
+  redirect(`/portal/admin/applications?${archived ? "archived" : "restored"}=${Number(data ?? applicationIds.length)}`);
+}

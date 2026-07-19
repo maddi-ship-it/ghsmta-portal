@@ -687,3 +687,47 @@ export async function removeScheduleStaff(
   revalidateSchedule();
   scheduleRedirect("success", "Staff member removed. Owners will see the change in their daily review.");
 }
+
+export async function updateOwnScheduleSchoolDetails(slotId: string, formData: FormData) {
+  await requireProfile(["applicant"]);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_own_schedule_school_details", {
+    p_slot_id: slotId,
+    p_venue_name: text(formData, "venue_name"),
+    p_venue_address: text(formData, "venue_address"),
+    p_arrival_entrance: text(formData, "arrival_entrance"),
+    p_parking_instructions: text(formData, "parking_instructions"),
+    p_accessibility_notes: text(formData, "accessibility_notes"),
+    p_wifi_network: text(formData, "wifi_network"),
+    p_wifi_password: text(formData, "wifi_password"),
+    p_day_of_contact_name: text(formData, "day_of_contact_name"),
+    p_day_of_contact_phone: text(formData, "day_of_contact_phone"),
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect("success", "School location, parking, and Wi-Fi details saved.");
+}
+
+export async function ownerUpdateScheduleSchoolDetails(slotId: string, formData: FormData) {
+  await requireProfile(["owner"]);
+  const supabase = await createClient();
+  const editDeadline = optionalLocalDateTimeToIso(text(formData, "edit_deadline"));
+  const { error } = await supabase.from("schedule_slot_school_details").upsert({
+    slot_id: slotId,
+    venue_name: text(formData, "venue_name") || null,
+    venue_address: text(formData, "venue_address") || null,
+    arrival_entrance: text(formData, "arrival_entrance") || null,
+    parking_instructions: text(formData, "parking_instructions") || null,
+    accessibility_notes: text(formData, "accessibility_notes") || null,
+    wifi_network: text(formData, "wifi_network") || null,
+    wifi_password: text(formData, "wifi_password") || null,
+    day_of_contact_name: text(formData, "day_of_contact_name") || null,
+    day_of_contact_phone: text(formData, "day_of_contact_phone") || null,
+    edit_deadline: editDeadline,
+  }, { onConflict: "slot_id" });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect("success", "School visit details updated.");
+}

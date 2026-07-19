@@ -14,6 +14,8 @@ import {
   ownerAssignSchool,
   removeScheduleSchoolBooking,
   removeScheduleStaff,
+  updateOwnScheduleSchoolDetails,
+  ownerUpdateScheduleSchoolDetails,
   updateScheduleSlot,
 } from "./actions";
 
@@ -33,6 +35,22 @@ type ScheduleSlot = {
   series_id: string | null;
   series_sequence: number | null;
   created_at: string;
+  updated_at: string;
+};
+
+
+type ScheduleSlotSchoolDetails = {
+  slot_id: string;
+  venue_name: string | null;
+  venue_address: string | null;
+  arrival_entrance: string | null;
+  parking_instructions: string | null;
+  accessibility_notes: string | null;
+  wifi_network: string | null;
+  wifi_password: string | null;
+  day_of_contact_name: string | null;
+  day_of_contact_phone: string | null;
+  edit_deadline: string | null;
   updated_at: string;
 };
 
@@ -191,6 +209,15 @@ export default async function SchedulePage({
   ]);
 
   const slots = (slotData ?? []) as ScheduleSlot[];
+  const { data: schoolDetailsData, error: schoolDetailsError } = slots.length
+    ? await supabase
+        .from("schedule_slot_school_details")
+        .select("slot_id,venue_name,venue_address,arrival_entrance,parking_instructions,accessibility_notes,wifi_network,wifi_password,day_of_contact_name,day_of_contact_phone,edit_deadline,updated_at")
+        .in("slot_id", slots.map((slot) => slot.id))
+    : { data: [], error: null };
+  if (schoolDetailsError) throw new Error(schoolDetailsError.message);
+  const schoolDetails = (schoolDetailsData ?? []) as ScheduleSlotSchoolDetails[];
+  const schoolDetailsMap = new Map(schoolDetails.map((details) => [details.slot_id, details]));
   const cycles = (cycleData ?? []) as AwardCycle[];
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const serverTime = new Date(String(serverTimeData)).getTime();
@@ -299,6 +326,7 @@ export default async function SchedulePage({
         (application) => application.id === applicantBooking.my_application_id,
       )
     : null;
+  const bookedSchoolDetails = bookedSlot ? schoolDetailsMap.get(bookedSlot.id) ?? null : null;
 
   const ownerBulkSlots =
     profile.role === "owner"
@@ -503,6 +531,16 @@ export default async function SchedulePage({
             <div className="info-banner">
               Your school cannot remove or change this reservation. Contact GHSMTA staff if a change is required.
             </div>
+            <form action={updateOwnScheduleSchoolDetails.bind(null, bookedSlot.id)} className="school-visit-details-form form-stack">
+              <div className="school-visit-details-heading"><div><span className="eyebrow">School editable</span><h3>Location, parking &amp; Wi-Fi</h3></div>{bookedSchoolDetails?.edit_deadline && <span className="badge">Edit by {formatAccessDateTime(bookedSchoolDetails.edit_deadline)}</span>}</div>
+              <div className="two-column-grid"><div className="field"><label>Venue name</label><input className="input" defaultValue={bookedSchoolDetails?.venue_name ?? ""} name="venue_name" /></div><div className="field"><label>Venue address</label><input className="input" defaultValue={bookedSchoolDetails?.venue_address ?? ""} name="venue_address" /></div></div>
+              <div className="field"><label>Arrival entrance</label><input className="input" defaultValue={bookedSchoolDetails?.arrival_entrance ?? ""} name="arrival_entrance" /></div>
+              <div className="field"><label>Parking instructions</label><textarea className="textarea compact-textarea" defaultValue={bookedSchoolDetails?.parking_instructions ?? ""} name="parking_instructions" /></div>
+              <div className="field"><label>Accessibility notes</label><textarea className="textarea compact-textarea" defaultValue={bookedSchoolDetails?.accessibility_notes ?? ""} name="accessibility_notes" /></div>
+              <div className="two-column-grid"><div className="field"><label>Wi-Fi network</label><input className="input" defaultValue={bookedSchoolDetails?.wifi_network ?? ""} name="wifi_network" /></div><div className="field"><label>Wi-Fi password</label><input className="input" defaultValue={bookedSchoolDetails?.wifi_password ?? ""} name="wifi_password" /></div></div>
+              <div className="two-column-grid"><div className="field"><label>Day-of contact</label><input className="input" defaultValue={bookedSchoolDetails?.day_of_contact_name ?? ""} name="day_of_contact_name" /></div><div className="field"><label>Day-of phone</label><input className="input" defaultValue={bookedSchoolDetails?.day_of_contact_phone ?? ""} name="day_of_contact_phone" /></div></div>
+              <button className="button button-dark" type="submit">Save school visit details</button>
+            </form>
           </div>
         </section>
       ) : (
@@ -525,6 +563,7 @@ export default async function SchedulePage({
               const cycle = cycleMap.get(slot.cycle_id);
               const slotAvailability = availabilityMap.get(slot.id);
               const booking = bookingMap.get(slot.id);
+              const visitDetails = schoolDetailsMap.get(slot.id) ?? null;
               const participants = staffBySlot.get(slot.id) ?? [];
               const currentEnrollment = participants.find(
                 (participant) => participant.user_id === profile.id,
@@ -660,6 +699,20 @@ export default async function SchedulePage({
                             <span>No school has selected this slot.</span>
                           )}
                         </div>
+
+                        {booking && visitDetails && (
+                          <div className="schedule-visit-detail-card">
+                            <span className="eyebrow">School visit details</span>
+                            <div className="schedule-visit-detail-grid">
+                              <span><strong>Venue</strong>{visitDetails.venue_name || slot.location || "To be announced"}</span>
+                              <span><strong>Address</strong>{visitDetails.venue_address || "Not entered"}</span>
+                              <span><strong>Entrance</strong>{visitDetails.arrival_entrance || "Not entered"}</span>
+                              <span><strong>Parking</strong>{visitDetails.parking_instructions || "Not entered"}</span>
+                              <span><strong>Wi-Fi</strong>{visitDetails.wifi_network ? `${visitDetails.wifi_network}${visitDetails.wifi_password ? ` · ${visitDetails.wifi_password}` : ""}` : "Not entered"}</span>
+                              <span><strong>Day-of contact</strong>{visitDetails.day_of_contact_name ? `${visitDetails.day_of_contact_name}${visitDetails.day_of_contact_phone ? ` · ${visitDetails.day_of_contact_phone}` : ""}` : "Not entered"}</span>
+                            </div>
+                          </div>
+                        )}
 
                         <div className="schedule-participants">
                           <div className="schedule-section-heading">
@@ -835,6 +888,20 @@ export default async function SchedulePage({
                                 <button className="button button-dark button-compact" type="submit">
                                   Save slot
                                 </button>
+                              </form>
+                            </details>
+
+                            <details>
+                              <summary>Edit school visit details</summary>
+                              <form action={ownerUpdateScheduleSchoolDetails.bind(null, slot.id)} className="form-stack compact-form">
+                                <div className="two-column-grid"><div className="field"><label>Venue name</label><input className="input" defaultValue={visitDetails?.venue_name ?? ""} name="venue_name" /></div><div className="field"><label>Venue address</label><input className="input" defaultValue={visitDetails?.venue_address ?? ""} name="venue_address" /></div></div>
+                                <div className="field"><label>Arrival entrance</label><input className="input" defaultValue={visitDetails?.arrival_entrance ?? ""} name="arrival_entrance" /></div>
+                                <div className="field"><label>Parking instructions</label><textarea className="textarea compact-textarea" defaultValue={visitDetails?.parking_instructions ?? ""} name="parking_instructions" /></div>
+                                <div className="field"><label>Accessibility notes</label><textarea className="textarea compact-textarea" defaultValue={visitDetails?.accessibility_notes ?? ""} name="accessibility_notes" /></div>
+                                <div className="two-column-grid"><div className="field"><label>Wi-Fi network</label><input className="input" defaultValue={visitDetails?.wifi_network ?? ""} name="wifi_network" /></div><div className="field"><label>Wi-Fi password</label><input className="input" defaultValue={visitDetails?.wifi_password ?? ""} name="wifi_password" /></div></div>
+                                <div className="two-column-grid"><div className="field"><label>Day-of contact</label><input className="input" defaultValue={visitDetails?.day_of_contact_name ?? ""} name="day_of_contact_name" /></div><div className="field"><label>Day-of phone</label><input className="input" defaultValue={visitDetails?.day_of_contact_phone ?? ""} name="day_of_contact_phone" /></div></div>
+                                <div className="field"><label>School edit deadline</label><input className="input" defaultValue={visitDetails?.edit_deadline ? localInputValue(visitDetails.edit_deadline) : ""} name="edit_deadline" type="datetime-local" /></div>
+                                <button className="button button-dark button-compact" type="submit">Save visit details</button>
                               </form>
                             </details>
 

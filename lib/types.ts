@@ -53,6 +53,8 @@ export type Profile = {
   full_name: string | null;
   role: AppRole;
   active: boolean;
+  force_password_reset?: boolean;
+  password_reset_requested_at?: string | null;
 };
 
 export type AwardCycle = {
@@ -90,6 +92,9 @@ export type Application = {
   source_record_id: string | null;
   source_stage: string | null;
   is_archived: boolean;
+  archived_at?: string | null;
+  archived_by?: string | null;
+  archive_reason?: string | null;
   archived_payload: Record<string, unknown>;
   cloned_from_application_id: string | null;
   created_at: string;

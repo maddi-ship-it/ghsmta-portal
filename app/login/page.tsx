@@ -37,6 +37,7 @@ export default async function LoginPage({
               <input className="input" id="password" name="password" type="password" autoComplete="current-password" required />
             </div>
             <button className="button button-dark" type="submit">Sign in</button>
+            <Link className="text-button auth-forgot-link" href="/forgot-password">Forgot your password?</Link>
           </form>
           <p className="auth-links">Applying for the first time? <Link href="/signup">Create an applicant account</Link></p>
         </div>

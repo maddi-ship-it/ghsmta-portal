@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -146,7 +148,7 @@ export default async function ScoringAdminPage({
         </div>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Program</th><th>Rubric</th><th>Status</th><th>Categories</th><th>Criteria</th></tr></thead>
+            <thead><tr><th>Program</th><th>Rubric</th><th>Status</th><th>Categories</th><th>Criteria</th><th /></tr></thead>
             <tbody>
               {rubrics.map((rubric) => {
                 const cycle = cycleMap.get(rubric.cycle_id);
@@ -159,10 +161,11 @@ export default async function ScoringAdminPage({
                     <td><span className={`badge badge-form-${rubric.status}`}>{rubric.status}</span></td>
                     <td>{rubricCategories.length}</td>
                     <td>{criteria.filter((criterion) => categoryIds.has(criterion.category_id)).length}</td>
+                    <td><Link href={`/portal/admin/scoring/rubrics/${rubric.id}`}>{rubric.status === "draft" ? "Edit rubric" : "Open rubric"}</Link></td>
                   </tr>
                 );
               })}
-              {rubrics.length === 0 && <tr><td colSpan={5}>No scoring rubric is installed yet. Run the included 2025–2026 rubric seed script.</td></tr>}
+              {rubrics.length === 0 && <tr><td colSpan={6}>No scoring rubric is installed yet. Run the included 2025–2026 rubric seed script.</td></tr>}
             </tbody>
           </table>
         </div>

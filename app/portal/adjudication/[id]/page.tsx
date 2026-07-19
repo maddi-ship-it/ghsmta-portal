@@ -68,6 +68,18 @@ type ScheduleSlotReference = {
   status: string;
 };
 
+type ScheduleSchoolDetailReference = {
+  venue_name: string | null;
+  venue_address: string | null;
+  arrival_entrance: string | null;
+  parking_instructions: string | null;
+  accessibility_notes: string | null;
+  wifi_network: string | null;
+  wifi_password: string | null;
+  day_of_contact_name: string | null;
+  day_of_contact_phone: string | null;
+};
+
 const EASTERN_TIME_ZONE = "America/New_York";
 
 function formatReferenceDate(value: string) {
@@ -267,6 +279,7 @@ export default async function AdjudicationApplicationPage({
       .find((booking) => booking.application_id === id) ?? null;
 
   let scheduleSlot: ScheduleSlotReference | null = null;
+  let scheduleSchoolDetails: ScheduleSchoolDetailReference | null = null;
   if (scheduleBooking) {
     const { data: scheduleSlotData, error: scheduleSlotError } =
       await supabase
@@ -279,6 +292,14 @@ export default async function AdjudicationApplicationPage({
 
     if (scheduleSlotError) throw new Error(scheduleSlotError.message);
     scheduleSlot = scheduleSlotData as ScheduleSlotReference | null;
+
+    const { data: detailData, error: detailError } = await supabase
+      .from("schedule_slot_school_details")
+      .select("venue_name,venue_address,arrival_entrance,parking_instructions,accessibility_notes,wifi_network,wifi_password,day_of_contact_name,day_of_contact_phone")
+      .eq("slot_id", scheduleBooking.slot_id)
+      .maybeSingle();
+    if (detailError) throw new Error(detailError.message);
+    scheduleSchoolDetails = detailData as ScheduleSchoolDetailReference | null;
   }
 
   const scheduledStaff =
@@ -319,7 +340,15 @@ export default async function AdjudicationApplicationPage({
                   scheduleSlot.ends_at,
                 ),
               },
-              { label: "Location", value: scheduleSlot.location ?? "" },
+              { label: "Location", value: scheduleSchoolDetails?.venue_name ?? scheduleSlot.location ?? "" },
+              { label: "Address", value: scheduleSchoolDetails?.venue_address ?? "" },
+              { label: "Arrival entrance", value: scheduleSchoolDetails?.arrival_entrance ?? "" },
+              { label: "Parking", value: scheduleSchoolDetails?.parking_instructions ?? "" },
+              { label: "Accessibility", value: scheduleSchoolDetails?.accessibility_notes ?? "" },
+              { label: "Wi-Fi network", value: scheduleSchoolDetails?.wifi_network ?? "" },
+              { label: "Wi-Fi password", value: scheduleSchoolDetails?.wifi_password ?? "" },
+              { label: "Day-of contact", value: scheduleSchoolDetails?.day_of_contact_name ?? "" },
+              { label: "Day-of phone", value: scheduleSchoolDetails?.day_of_contact_phone ?? "" },
               { label: "Status", value: scheduleSlot.status },
               {
                 label: "School instructions",
@@ -461,7 +490,6 @@ export default async function AdjudicationApplicationPage({
         }>}
         categories={categories}
         currentUserId={profile.id}
-        isScoringParticipant={isScoringParticipant}
         proposals={(proposalResult.data ?? []) as Array<{
           id: string;
           application_id: string;

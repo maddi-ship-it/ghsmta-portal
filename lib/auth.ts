@@ -10,7 +10,7 @@ export async function requireProfile(allowedRoles?: AppRole[]): Promise<Profile>
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id,email,full_name,role,active")
+    .select("id,email,full_name,role,active,force_password_reset,password_reset_requested_at")
     .eq("id", user.id)
     .single();
 

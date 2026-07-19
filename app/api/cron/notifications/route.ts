@@ -1,3 +1,4 @@
+import { sendSmtpEmail } from "@/lib/email/smtp";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -37,24 +38,7 @@ function formatSlotTime(start: string, end: string) {
   return `${formatter.format(new Date(start))}–${formatter.format(new Date(end))} ET`;
 }
 
-async function sendEmail({ to, subject, html }: { to: string[]; subject: string; html: string }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.NOTIFICATION_FROM_EMAIL;
-  if (!apiKey || !from || to.length === 0) {
-    return { ok: false, detail: "Email provider not configured." };
-  }
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to, subject, html }),
-  });
-  if (!response.ok) return { ok: false, detail: await response.text() };
-  const data = (await response.json()) as { id?: string };
-  return { ok: true, detail: data.id ?? "sent" };
-}
+const sendEmail = sendSmtpEmail;
 
 function localParts(date: Date, timeZone: string) {
   return Object.fromEntries(

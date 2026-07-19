@@ -5,7 +5,7 @@ import { statusLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { Application, AwardCycle } from "@/lib/types";
 
-import { startApplication } from "./actions";
+import { setApplicationArchiveState, startApplication } from "./actions";
 
 type ApplicationSort =
   | "updated"
@@ -27,6 +27,8 @@ type ApplicationSearchParams = {
   source?: string;
   sort?: ApplicationSort;
   direction?: SortDirection;
+  archived?: string;
+  restored?: string;
 };
 
 function textCompare(left: string | null | undefined, right: string | null | undefined) {
@@ -65,7 +67,7 @@ export default async function ApplicationsPage({
     supabase
       .from("applications")
       .select(
-        "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_payload,cloned_from_application_id,created_at,updated_at",
+        "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_at,archived_by,archive_reason,archived_payload,cloned_from_application_id,created_at,updated_at",
       ),
     supabase
       .from("award_cycles")
@@ -163,6 +165,8 @@ export default async function ApplicationsPage({
           {params.message ?? "The application could not be started."}
         </div>
       )}
+      {params.archived && <div className="notice page-message">Archived {params.archived} application record{params.archived === "1" ? "" : "s"}.</div>}
+      {params.restored && <div className="notice page-message">Restored {params.restored} application record{params.restored === "1" ? "" : "s"}.</div>}
 
       {profile.role === "applicant" && openPrograms.length > 0 && (
         <section className="panel start-application-panel">
@@ -320,10 +324,20 @@ export default async function ApplicationsPage({
             </p>
           </div>
         ) : (
-          <div className="table-wrap">
+          <form action={setApplicationArchiveState} className="application-archive-form">
+            {profile.role === "owner" && (
+              <div className="application-archive-toolbar">
+                <div><strong>Application archive</strong><small>Select one or more records. Archiving preserves forms, files, chat history, scheduling, and scoring.</small></div>
+                <input className="input" name="archive_reason" placeholder="Optional archive reason" />
+                <button className="button button-secondary button-compact" name="bulk_archive_action" type="submit" value="restore">Restore selected</button>
+                <button className="button button-dark button-compact" name="bulk_archive_action" type="submit" value="archive">Archive selected</button>
+              </div>
+            )}
+            <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
+                  {profile.role === "owner" && <th><span className="sr-only">Select</span></th>}
                   <th>Program</th>
                   <th>School / applicant</th>
                   <th>Production</th>
@@ -338,6 +352,7 @@ export default async function ApplicationsPage({
                   const cycle = cycleMap.get(application.cycle_id);
                   return (
                     <tr key={application.id}>
+                      {profile.role === "owner" && <td><input aria-label={`Select ${application.school_name}`} name="application_ids" type="checkbox" value={application.id} /></td>}
                       <td>
                         <strong>{cycle?.name ?? "Unknown program"}</strong>
                         <small>{cycle?.season_year}</small>
@@ -369,14 +384,22 @@ export default async function ApplicationsPage({
                         </small>
                       </td>
                       <td>
-                        <Link href={`/portal/applications/${application.id}`}>Open</Link>
+                        <div className="application-row-actions">
+                          <Link href={`/portal/applications/${application.id}`}>Open</Link>
+                          {profile.role === "owner" && (
+                            application.is_archived
+                              ? <button className="text-button" name="single_restore_id" type="submit" value={application.id}>Restore</button>
+                              : <button className="text-button danger-text" name="single_archive_id" type="submit" value={application.id}>Archive</button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </form>
         )}
       </section>
     </>

@@ -72,6 +72,46 @@ export default async function AdjudicationDashboard() {
 
   const submittedCards = scorecards.filter((card) => card.status === "submitted" || card.status === "locked").length;
 
+  let advisoryQueue: Array<{
+    application: Application;
+    unresolved: number;
+    disputed: number;
+    submitted: number;
+    assigned: number;
+    reviewStatus: string;
+  }> = [];
+
+  if (profile.role === "advisory_member" && applicationIds.length > 0) {
+    const [{ data: proposals }, { data: reviews }] = await Promise.all([
+      supabase
+        .from("adjudication_category_proposals")
+        .select("application_id,status")
+        .in("application_id", applicationIds),
+      supabase
+        .from("adjudication_reviews")
+        .select("application_id,status")
+        .in("application_id", applicationIds),
+    ]);
+    const reviewMap = new Map((reviews ?? []).map((review) => [review.application_id, review.status]));
+    advisoryQueue = applications.map((application) => {
+      const applicationProposals = (proposals ?? []).filter((proposal) => proposal.application_id === application.id);
+      const applicationAssignments = assignments.filter((assignment) => assignment.application_id === application.id);
+      const applicationCards = scorecards.filter((card) => card.application_id === application.id);
+      return {
+        application,
+        unresolved: Math.max(15 - applicationProposals.filter((proposal) => ["approved", "overridden"].includes(proposal.status)).length, 0),
+        disputed: applicationProposals.filter((proposal) => proposal.status === "disputed").length,
+        submitted: applicationCards.filter((card) => ["submitted", "locked"].includes(card.status)).length,
+        assigned: applicationAssignments.length,
+        reviewStatus: reviewMap.get(application.id) ?? "draft",
+      };
+    }).sort((left, right) => {
+      const leftUrgency = left.disputed * 100 + left.unresolved * 10 + Math.max(left.assigned - left.submitted, 0);
+      const rightUrgency = right.disputed * 100 + right.unresolved * 10 + Math.max(right.assigned - right.submitted, 0);
+      return rightUrgency - leftUrgency || left.application.school_name.localeCompare(right.application.school_name);
+    });
+  }
+
   return (
     <>
       <div className="page-heading">
@@ -89,8 +129,28 @@ export default async function AdjudicationDashboard() {
         <article className="metric-card"><span className="metric-label">Pending</span><strong className="metric-value">{Math.max(assignments.length - submittedCards, 0)}</strong></article>
       </section>
 
+
+      {profile.role === "advisory_member" && (
+        <>
+          <section className="advisory-dashboard-metrics metric-grid" aria-label="Advisory Committee queue">
+            <article className="metric-card"><span className="metric-label">Schools in review</span><strong className="metric-value">{advisoryQueue.length}</strong></article>
+            <article className="metric-card"><span className="metric-label">Disputed decisions</span><strong className="metric-value">{advisoryQueue.reduce((total, row) => total + row.disputed, 0)}</strong></article>
+            <article className="metric-card"><span className="metric-label">Unresolved categories</span><strong className="metric-value">{advisoryQueue.reduce((total, row) => total + row.unresolved, 0)}</strong></article>
+            <article className="metric-card"><span className="metric-label">Missing scorecards</span><strong className="metric-value">{advisoryQueue.reduce((total, row) => total + Math.max(row.assigned - row.submitted, 0), 0)}</strong></article>
+          </section>
+          <section className="panel advisory-review-queue">
+            <div className="panel-header"><div><h2>Advisory Committee review queue</h2><p>Schools are sorted by disputes, unresolved eligibility/ranges, and missing scorecards.</p></div></div>
+            <div className="advisory-queue-grid">
+              {advisoryQueue.map((row) => {
+                const cycle = cycleMap.get(row.application.cycle_id);
+                return <Link className="advisory-queue-card" href={`/portal/adjudication/${row.application.id}`} key={row.application.id}><div><span className="eyebrow">{cycle ? `${cycle.season_year} · ${cycle.name}` : "Adjudication"}</span><h3>{row.application.school_name}</h3><p>{row.application.production_title ?? "Untitled production"}</p></div><div className="advisory-queue-status-grid"><span><strong>{row.unresolved}</strong> unresolved</span><span className={row.disputed ? "is-alert" : ""}><strong>{row.disputed}</strong> disputed</span><span><strong>{row.submitted}/{row.assigned}</strong> scorecards</span><span><strong>{row.reviewStatus.replaceAll("_", " ")}</strong></span></div></Link>;
+              })}
+            </div>
+          </section>
+        </>
+      )}
       <section className="panel">
-        <div className="panel-header"><h2>{profile.role === "adjudicator" ? "Assigned productions" : "Productions under review"}</h2></div>
+        <div className="panel-header"><h2>{profile.role === "adjudicator" ? "Assigned productions" : profile.role === "advisory_member" ? "All productions" : "Productions under review"}</h2></div>
         <div className="adjudication-card-list">
           {profile.role === "adjudicator" ? (
             relevantRows.map((row) => {
