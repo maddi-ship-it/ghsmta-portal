@@ -2846,3 +2846,16 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   }
 }
 /* GHSMTA category averages, collapse controls, and range review — END */
+
+/* GHSMTA application-sourced category names — START */
+.category-subject-field {
+  max-width: 960px;
+}
+
+.category-subject-input[readonly] {
+  color: var(--navy-900);
+  background: var(--surface-soft, #f6f7fa);
+  font-weight: 800;
+  cursor: default;
+}
+/* GHSMTA application-sourced category names — END */

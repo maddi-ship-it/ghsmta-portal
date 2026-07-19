@@ -172,6 +172,7 @@ function CategoryScoreSection({
   categoryIndex,
   categoryCriteria,
   categoryComment,
+  categorySubjectName,
   panelMembers,
   observationMap,
   ownScoreMap,
@@ -184,6 +185,7 @@ function CategoryScoreSection({
   categoryIndex: number;
   categoryCriteria: ScoringCriterion[];
   categoryComment: AdjudicationCategoryComment | undefined;
+  categorySubjectName: string;
   panelMembers: PanelMember[];
   observationMap: Map<string, string | null>;
   ownScoreMap: Map<string, AdjudicationScore>;
@@ -333,7 +335,6 @@ function CategoryScoreSection({
             categoryId={category.id}
             defaultEligible={initialEligible}
             defaultRangeStart={categoryComment?.score_range_min}
-            defaultReason={categoryComment?.not_applicable_reason}
             disabled={readOnly}
             onStateChange={setDecision}
             scoreValues={scoreOptions.map((option) => option.value)}
@@ -343,17 +344,23 @@ function CategoryScoreSection({
 
       <div className="panel-body" hidden={!expanded}>
         {category.subject_label && (
-          <div className="field">
+          <div className="field category-subject-field">
             <label htmlFor={`subject_name_${category.id}`}>
               {category.subject_label}
             </label>
             <input
-              className="input"
-              defaultValue={categoryComment?.subject_name ?? ""}
-              disabled={readOnly}
+              className="input category-subject-input"
               id={`subject_name_${category.id}`}
               name={`subject_name_${category.id}`}
+              readOnly
+              value={
+                categoryComment?.subject_name ??
+                categorySubjectName
+              }
             />
+            <small className="field-help">
+              Pulled automatically from the school application.
+            </small>
           </div>
         )}
 
@@ -584,6 +591,7 @@ export function CollaborativeAdjudicatorScorecard({
   currentUserId,
   currentUserName,
   categories,
+  categorySubjectDefaults,
   criteria,
   ownScores,
   ownComments,
@@ -595,6 +603,7 @@ export function CollaborativeAdjudicatorScorecard({
   currentUserId: string;
   currentUserName: string;
   categories: ScoringCategory[];
+  categorySubjectDefaults: Record<string, string>;
   criteria: ScoringCriterion[];
   ownScores: AdjudicationScore[];
   ownComments: AdjudicationCategoryComment[];
@@ -706,6 +715,9 @@ export function CollaborativeAdjudicatorScorecard({
             (criterion) => criterion.category_id === category.id,
           )}
           categoryIndex={categoryIndex}
+          categorySubjectName={
+            categorySubjectDefaults[category.category_key] ?? ""
+          }
           commentColumnsStyle={commentColumnsStyle}
           currentUserId={currentUserId}
           key={category.id}

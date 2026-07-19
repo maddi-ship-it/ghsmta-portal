@@ -5,6 +5,7 @@ import {
   formatScore,
   quarterScoreOptions,
 } from "@/lib/adjudication";
+import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
@@ -19,6 +20,8 @@ import type {
   AdjudicationScorecard,
   AdjudicatorAssignment,
   Application,
+  ApplicationAnswer,
+  ApplicationQuestion,
   AwardCycle,
   Profile,
   ScoringCategory,
@@ -62,6 +65,39 @@ export default async function AdjudicationApplicationPage({
     .single();
   if (applicationError || !applicationData) notFound();
   const application = applicationData as Application;
+
+  const [applicationQuestionsResult, applicationAnswersResult] =
+    application.form_version_id
+      ? await Promise.all([
+          supabase
+            .from("application_questions")
+            .select(
+              "id,form_version_id,section_id,question_key,label,description,question_type,required,options,settings,visibility_rule,sort_order,active,source_column_index,source_label,imported,created_at,updated_at",
+            )
+            .eq("form_version_id", application.form_version_id),
+          supabase
+            .from("application_answers")
+            .select("id,application_id,question_id,value,updated_at")
+            .eq("application_id", id),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+
+  if (applicationQuestionsResult.error) {
+    throw new Error(applicationQuestionsResult.error.message);
+  }
+
+  if (applicationAnswersResult.error) {
+    throw new Error(applicationAnswersResult.error.message);
+  }
+
+  const categorySubjectDefaults = resolveScoringCategorySubjects({
+    application,
+    questions: (applicationQuestionsResult.data ?? []) as ApplicationQuestion[],
+    answers: (applicationAnswersResult.data ?? []) as ApplicationAnswer[],
+  });
 
   const { data: cycleData } = await supabase.from("award_cycles").select("*").eq("id", application.cycle_id).single();
   const cycle = cycleData as AwardCycle | null;
@@ -217,13 +253,14 @@ export default async function AdjudicationApplicationPage({
           <section className="panel score-guide-panel">
             <div className="panel-header"><div><h2>Scoring guide</h2><p>Use the 1–10 scale in 0.25-point increments. Scores remain private to you, advisory members, and owners.</p></div></div>
             <div className="score-scale-grid">
-              {scale.map((level) => <div key={level.id}><strong>{formatScore(level.score)}</strong><span>{level.label}</span></div>)}
+              {scale.map((level) => <div key={level.id}><strong>{formatScore(level.score)}</strong><span>{level.label}</span><small>{level.description}</small></div>)}
             </div>
           </section>
 
           <CollaborativeAdjudicatorScorecard
             applicationId={id}
             categories={categories}
+            categorySubjectDefaults={categorySubjectDefaults}
             criteria={criteria}
             currentUserId={profile.id}
             currentUserName={profile.full_name ?? profile.email ?? "Adjudicator"}

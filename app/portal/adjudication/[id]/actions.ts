@@ -9,6 +9,7 @@ import {
   extractOpenAIText,
   isQuarterPointScore,
 } from "@/lib/adjudication";
+import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { requireProfile } from "@/lib/auth";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +19,8 @@ import type {
   AdjudicationScorecard,
   AiPromptTemplate,
   Application,
+  ApplicationAnswer,
+  ApplicationQuestion,
   ScoringCategory,
   ScoringCriterion,
 } from "@/lib/types";
@@ -97,6 +100,55 @@ async function persistAdjudicatorScorecard(
   if (criterionError) throw new Error(criterionError.message);
   const criteria = (criterionData ?? []) as ScoringCriterion[];
 
+  const { data: applicationSourceData, error: applicationSourceError } =
+    await supabase
+      .from("applications")
+      .select("form_version_id,form_data,archived_payload")
+      .eq("id", applicationId)
+      .single();
+
+  if (applicationSourceError || !applicationSourceData) {
+    throw new Error(
+      applicationSourceError?.message ?? "Application source data not found.",
+    );
+  }
+
+  const [applicationQuestionsResult, applicationAnswersResult] =
+    applicationSourceData.form_version_id
+      ? await Promise.all([
+          supabase
+            .from("application_questions")
+            .select(
+              "id,form_version_id,section_id,question_key,label,description,question_type,required,options,settings,visibility_rule,sort_order,active,source_column_index,source_label,imported,created_at,updated_at",
+            )
+            .eq("form_version_id", applicationSourceData.form_version_id),
+          supabase
+            .from("application_answers")
+            .select("id,application_id,question_id,value,updated_at")
+            .eq("application_id", applicationId),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+
+  if (applicationQuestionsResult.error) {
+    throw new Error(applicationQuestionsResult.error.message);
+  }
+
+  if (applicationAnswersResult.error) {
+    throw new Error(applicationAnswersResult.error.message);
+  }
+
+  const categorySubjectDefaults = resolveScoringCategorySubjects({
+    application: {
+      form_data: applicationSourceData.form_data ?? {},
+      archived_payload: applicationSourceData.archived_payload ?? {},
+    },
+    questions: (applicationQuestionsResult.data ?? []) as ApplicationQuestion[],
+    answers: (applicationAnswersResult.data ?? []) as ApplicationAnswer[],
+  });
+
   const scoreRows: Array<Record<string, unknown>> = [];
   const commentRows: Array<Record<string, unknown>> = [];
   const missing: string[] = [];
@@ -111,10 +163,6 @@ async function persistAdjudicatorScorecard(
           category.allow_not_applicable &&
           formData.get(`not_applicable_${category.id}`) === "on"
         );
-
-    const ineligibilityReason =
-      formText(formData, `ineligibility_reason_${category.id}`) ||
-      formText(formData, `not_applicable_reason_${category.id}`);
 
     const rawRangeStart = formText(
       formData,
@@ -145,10 +193,6 @@ async function persistAdjudicatorScorecard(
       );
     }
 
-    if (submit && !isEligible && !ineligibilityReason) {
-      missing.push(`${category.title}: explain why it is not eligible`);
-    }
-
     if (submit && isEligible && !validRange) {
       missing.push(`${category.title}: select a 2-point scoring range`);
     }
@@ -166,13 +210,13 @@ async function persistAdjudicatorScorecard(
       scorecard_id: scorecard.id,
       category_id: category.id,
       subject_name: isEligible
-        ? formText(formData, `subject_name_${category.id}`) || null
+        ? formText(formData, `subject_name_${category.id}`) ||
+          categorySubjectDefaults[category.category_key] ||
+          null
         : null,
       is_applicable: isEligible,
       is_eligible: isEligible,
-      not_applicable_reason: isEligible
-        ? null
-        : ineligibilityReason || null,
+      not_applicable_reason: null,
       score_range_min: isEligible && validRange ? rangeMinimum : null,
       score_range_max: isEligible && validRange ? rangeMaximum : null,
       private_notes: formText(formData, `private_notes_${category.id}`) || null,

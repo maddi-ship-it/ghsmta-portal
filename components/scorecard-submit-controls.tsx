@@ -35,12 +35,6 @@ function evaluateCompletion(
         );
 
     if (!eligible) {
-      if (
-        !formText(formData, `ineligibility_reason_${category.id}`) &&
-        !formText(formData, `not_applicable_reason_${category.id}`)
-      ) {
-        missingCount += 1;
-      }
       continue;
     }
 

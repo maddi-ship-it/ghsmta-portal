@@ -20,7 +20,6 @@ export function CategoryScoringControls({
   categoryId,
   defaultEligible,
   defaultRangeStart,
-  defaultReason,
   scoreValues,
   disabled = false,
   onStateChange,
@@ -28,7 +27,6 @@ export function CategoryScoringControls({
   categoryId: string;
   defaultEligible: boolean;
   defaultRangeStart: number | null | undefined;
-  defaultReason: string | null | undefined;
   scoreValues: number[];
   disabled?: boolean;
   onStateChange?: (decision: CategoryDecision) => void;
@@ -116,18 +114,6 @@ export function CategoryScoringControls({
         </select>
       </label>
 
-      {!eligible && (
-        <label className="category-ineligibility-reason">
-          <span>Reason not eligible</span>
-          <input
-            className="input"
-            defaultValue={defaultReason ?? ""}
-            disabled={disabled}
-            name={`ineligibility_reason_${categoryId}`}
-            placeholder="Brief reason"
-          />
-        </label>
-      )}
     </div>
   );
 }
