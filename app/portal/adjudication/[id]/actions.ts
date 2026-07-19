@@ -44,7 +44,7 @@ async function persistAdjudicatorScorecard(
   submit: boolean,
   formData: FormData,
 ): Promise<PersistScorecardResult> {
-  const adjudicator = await requireProfile(["adjudicator"]);
+  const adjudicator = await requireProfile(["adjudicator", "advisory_member"]);
   const supabase = await createClient();
 
   const { data: scorecardId, error: scorecardError } = await supabase.rpc(
@@ -87,6 +87,17 @@ async function persistAdjudicatorScorecard(
     .order("sort_order");
   if (categoryError) throw new Error(categoryError.message);
   const categories = (categoryData ?? []) as ScoringCategory[];
+
+  const { data: proposalData, error: proposalError } = await supabase
+    .from("adjudication_category_proposals")
+    .select("category_id,is_eligible,range_min,range_max,status")
+    .eq("application_id", applicationId);
+
+  if (proposalError) throw new Error(proposalError.message);
+
+  const officialProposalMap = new Map(
+    (proposalData ?? []).map((proposal) => [proposal.category_id, proposal]),
+  );
 
   const categoryIds = categories.map((category) => category.id);
   const { data: criterionData, error: criterionError } = categoryIds.length
@@ -154,28 +165,34 @@ async function persistAdjudicatorScorecard(
   const missing: string[] = [];
 
   for (const category of categories) {
+    const officialProposal = officialProposalMap.get(category.id);
     const usesEligibilityControl =
       formData.get(`eligibility_control_${category.id}`) === "1";
 
-    const isEligible = usesEligibilityControl
-      ? formData.get(`eligible_${category.id}`) === "on"
-      : !(
-          category.allow_not_applicable &&
-          formData.get(`not_applicable_${category.id}`) === "on"
-        );
+    const isEligible = officialProposal
+      ? Boolean(officialProposal.is_eligible)
+      : usesEligibilityControl
+        ? formData.get(`eligible_${category.id}`) === "on"
+        : !(
+            category.allow_not_applicable &&
+            formData.get(`not_applicable_${category.id}`) === "on"
+          );
 
-    const rawRangeStart = formText(
-      formData,
-      `score_range_start_${category.id}`,
-    );
+    const rawRangeStart = officialProposal?.range_min != null
+      ? String(officialProposal.range_min)
+      : formText(formData, `score_range_start_${category.id}`);
 
-    const rangeMinimum = rawRangeStart
-      ? Number(rawRangeStart)
-      : null;
+    const rangeMinimum = officialProposal?.range_min != null
+      ? Number(officialProposal.range_min)
+      : rawRangeStart
+        ? Number(rawRangeStart)
+        : null;
 
-    const rangeMaximum = rangeMinimum == null
-      ? null
-      : Number((rangeMinimum + 2).toFixed(2));
+    const rangeMaximum = officialProposal?.range_max != null
+      ? Number(officialProposal.range_max)
+      : rangeMinimum == null
+        ? null
+        : Number((rangeMinimum + 2).toFixed(2));
 
     const validRange =
       rangeMinimum != null &&
@@ -191,6 +208,13 @@ async function persistAdjudicatorScorecard(
       throw new Error(
         `The ${category.title} range must span exactly two points within the scoring scale.`,
       );
+    }
+
+    if (
+      submit &&
+      (!officialProposal || !["approved", "overridden"].includes(String(officialProposal.status)))
+    ) {
+      missing.push(`${category.title}: eligibility and range approval`);
     }
 
     if (submit && isEligible && !validRange) {

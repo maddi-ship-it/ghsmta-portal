@@ -3464,3 +3464,272 @@ body.modal-open {
     display: grid;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Workflow, appeals, notifications, and portal utility additions
+   -------------------------------------------------------------------------- */
+
+.portal-utilities {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-utility-link {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--navy-900);
+  background: white;
+  font: inherit;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.portal-utility-link:hover,
+.portal-utility-link:focus-visible {
+  border-color: var(--navy-700);
+  box-shadow: 0 6px 18px rgba(7,20,47,.12);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(6, 15, 35, .62);
+  backdrop-filter: blur(6px);
+}
+
+.modal-card {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 22px;
+  background: white;
+  box-shadow: 0 28px 80px rgba(6,15,35,.28);
+}
+
+.modal-header,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h2 { margin: 3px 0 0; }
+.modal-actions { justify-content: flex-end; flex-wrap: wrap; }
+.modal-close {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+
+.appeal-workspace,
+.workflow-admin-grid {
+  display: grid;
+  gap: 22px;
+}
+
+.appeal-list,
+.workflow-feedback-list,
+.workflow-rule-list,
+.owner-activity-list,
+.notification-list {
+  display: grid;
+}
+
+.appeal-card + .appeal-card,
+.workflow-feedback-card + .workflow-feedback-card,
+.workflow-rule-card + .workflow-rule-card,
+.owner-activity-list article + article,
+.notification-row + .notification-row {
+  border-top: 1px solid var(--line);
+}
+
+.appeal-card-summary {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 22px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.appeal-card-summary > span:first-child,
+.appeal-card-summary strong,
+.appeal-card-summary small {
+  display: block;
+}
+
+.appeal-card-summary small { margin-top: 4px; color: var(--muted); }
+.appeal-card-body { padding: 0 22px 22px; }
+.appeal-explanation,
+.appeal-resolution-view {
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.appeal-file-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+.appeal-file-list > strong { width: 100%; }
+.appeal-review-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+.notification-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 14px;
+  width: 100%;
+  padding: 18px 22px;
+  border: 0;
+  color: inherit;
+  background: white;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.notification-row.is-unread { background: #f2f5ff; }
+.notification-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: transparent;
+}
+.notification-row.is-unread .notification-dot { background: var(--navy-700); }
+.notification-copy strong,
+.notification-copy p,
+.notification-copy small { display: block; }
+.notification-copy p { margin: 4px 0; }
+.notification-copy small { color: var(--muted); }
+
+.workflow-admin-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.workflow-notification-builder,
+.workflow-feedback-panel { grid-column: 1 / -1; }
+.workflow-rule-card,
+.workflow-feedback-card,
+.owner-activity-list article {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px;
+}
+.workflow-rule-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.workflow-rule-card p,
+.workflow-feedback-card p,
+.owner-activity-list p { margin: 4px 0; }
+.workflow-rule-card small,
+.workflow-feedback-card small,
+.owner-activity-list small { color: var(--muted); }
+.workflow-feedback-card {
+  grid-template-columns: minmax(260px, 1.4fr) minmax(150px, .5fr) minmax(220px, 1fr) auto;
+  align-items: end;
+}
+.compact-check-card { min-height: 0; padding: 12px; }
+.input-compact { min-height: 32px; padding: 6px 8px; font-size: .8rem; }
+.schedule-remove-participant-form { display: flex; align-items: center; gap: 8px; }
+.schedule-remove-participant-form .input { width: 150px; }
+
+.adjudication-consensus-bar {
+  position: sticky;
+  z-index: 25;
+  top: calc(70px + env(safe-area-inset-top));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 28px rgba(7,20,47,.1);
+  backdrop-filter: blur(14px);
+}
+.consensus-summary { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.consensus-category-buttons { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: thin; }
+.consensus-category-button {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: inherit;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+.consensus-category-button span { font-weight: 800; }
+.consensus-category-button small { color: var(--muted); }
+.consensus-category-button.is-approved { border-color: #83b89b; background: #effaf3; }
+.consensus-category-button.is-disputed { border-color: #dc7d7d; background: #fff0f0; }
+.consensus-modal { width: min(680px, 100%); }
+.consensus-alert {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.consensus-alert strong,
+.consensus-alert span { display: block; }
+.consensus-alert p { margin: 6px 0; }
+.consensus-alert-disputed { border-color: #d44; background: #fff1f1; }
+.consensus-alert-approved,
+.consensus-alert-overridden { border-color: #63a37d; background: #effaf3; }
+.consensus-response-form { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.consensus-response-status { display: flex; justify-content: space-between; gap: 12px; }
+.consensus-review-checklist { margin-bottom: 20px; padding: 16px; border-radius: 14px; background: var(--surface-soft); }
+.badge-warning { color: #8b4d00; background: #fff3d8; }
+.badge-complete { color: #145d32; background: #e7f8ed; }
+
+@media (max-width: 1000px) {
+  .workflow-admin-grid { grid-template-columns: 1fr; }
+  .workflow-notification-builder,
+  .workflow-feedback-panel { grid-column: auto; }
+  .workflow-feedback-card { grid-template-columns: 1fr; }
+  .adjudication-consensus-bar { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .portal-utilities { margin-left: auto; }
+  .modal-backdrop { align-items: end; padding: 0; }
+  .modal-card { width: 100%; max-height: 92vh; border-radius: 22px 22px 0 0; }
+  .appeal-card-summary { align-items: flex-start; padding: 15px; }
+  .appeal-card-body { padding: 0 15px 18px; }
+  .adjudication-consensus-bar { top: calc(62px + env(safe-area-inset-top)); border-radius: 12px; }
+  .consensus-summary { flex-wrap: wrap; white-space: normal; }
+  .schedule-remove-participant-form { align-items: flex-end; flex-direction: column; }
+  .schedule-remove-participant-form .input { width: 100%; }
+}

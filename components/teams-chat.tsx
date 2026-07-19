@@ -25,6 +25,7 @@ import type { AppRole, Profile } from "@/lib/types";
 
 type ChannelType =
   | "school"
+  | "school_dm"
   | "applicant_community"
   | "general"
   | "networking"
@@ -92,7 +93,9 @@ type ChannelGroup = {
 function channelGroupLabel(type: ChannelType) {
   switch (type) {
     case "school":
-      return "School channels";
+      return "School staff channels";
+    case "school_dm":
+      return "School owner DMs";
     case "applicant_community":
       return "Community";
     case "general":
@@ -107,6 +110,8 @@ function channelIcon(type: ChannelType) {
   switch (type) {
     case "school":
       return "S";
+    case "school_dm":
+      return "D";
     case "applicant_community":
       return "A";
     case "general":

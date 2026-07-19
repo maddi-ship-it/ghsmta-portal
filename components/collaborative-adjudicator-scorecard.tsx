@@ -47,6 +47,14 @@ type CategoryDecision = {
   rangeStart: number | null;
 };
 
+type CategoryProposal = {
+  category_id: string;
+  is_eligible: boolean;
+  range_min: number | null;
+  range_max: number | null;
+  status: string;
+};
+
 function RichTextPreview({
   value,
 }: {
@@ -173,6 +181,7 @@ function CategoryScoreSection({
   categoryCriteria,
   categoryComment,
   categorySubjectName,
+  officialProposal,
   panelMembers,
   observationMap,
   ownScoreMap,
@@ -186,6 +195,7 @@ function CategoryScoreSection({
   categoryCriteria: ScoringCriterion[];
   categoryComment: AdjudicationCategoryComment | undefined;
   categorySubjectName: string;
+  officialProposal?: CategoryProposal;
   panelMembers: PanelMember[];
   observationMap: Map<string, string | null>;
   ownScoreMap: Map<string, AdjudicationScore>;
@@ -195,6 +205,7 @@ function CategoryScoreSection({
   commentColumnsStyle: CSSProperties;
 }) {
   const initialEligible =
+    officialProposal?.is_eligible ??
     categoryComment?.is_eligible ??
     categoryComment?.is_applicable ??
     true;
@@ -205,9 +216,11 @@ function CategoryScoreSection({
   const [decision, setDecision] = useState<CategoryDecision>({
     eligible: initialEligible,
     rangeStart:
-      categoryComment?.score_range_min == null
-        ? null
-        : Number(categoryComment.score_range_min),
+      officialProposal?.range_min != null
+        ? Number(officialProposal.range_min)
+        : categoryComment?.score_range_min == null
+          ? null
+          : Number(categoryComment.score_range_min),
   });
   const [scoreValues, setScoreValues] = useState<Record<string, string>>(
     () =>
@@ -334,8 +347,11 @@ function CategoryScoreSection({
           <CategoryScoringControls
             categoryId={category.id}
             defaultEligible={initialEligible}
-            defaultRangeStart={categoryComment?.score_range_min}
+            defaultRangeStart={
+              officialProposal?.range_min ?? categoryComment?.score_range_min
+            }
             disabled={readOnly}
+            locked={Boolean(officialProposal)}
             onStateChange={setDecision}
             scoreValues={scoreOptions.map((option) => option.value)}
           />
@@ -595,6 +611,7 @@ export function CollaborativeAdjudicatorScorecard({
   criteria,
   ownScores,
   ownComments,
+  categoryProposals,
   initialPanelRows,
   scoreOptions,
   readOnly,
@@ -607,6 +624,7 @@ export function CollaborativeAdjudicatorScorecard({
   criteria: ScoringCriterion[];
   ownScores: AdjudicationScore[];
   ownComments: AdjudicationCategoryComment[];
+  categoryProposals: CategoryProposal[];
   initialPanelRows: PanelObservationRow[];
   scoreOptions: ScoreOption[];
   readOnly: boolean;
@@ -678,6 +696,11 @@ export function CollaborativeAdjudicatorScorecard({
     [ownComments],
   );
 
+  const proposalMap = useMemo(
+    () => new Map(categoryProposals.map((proposal) => [proposal.category_id, proposal])),
+    [categoryProposals],
+  );
+
   const commentColumnsStyle = {
     "--panel-comment-count": Math.max(panelMembers.length, 1),
   } as CSSProperties;
@@ -718,6 +741,7 @@ export function CollaborativeAdjudicatorScorecard({
           categorySubjectName={
             categorySubjectDefaults[category.category_key] ?? ""
           }
+          officialProposal={proposalMap.get(category.id)}
           commentColumnsStyle={commentColumnsStyle}
           currentUserId={currentUserId}
           key={category.id}

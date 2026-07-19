@@ -13,6 +13,7 @@ type ChatActionResult = {
 type ChannelMode = {
   channel_type:
     | "school"
+    | "school_dm"
     | "applicant_community"
     | "general"
     | "networking"
@@ -78,7 +79,7 @@ export async function createChatPost(
   if (channel.channel_type !== "applicant_community") {
     return {
       ok: false,
-      error: "Only Applicant Community uses threaded conversations.",
+      error: "Only Community Chat uses threaded conversations.",
     };
   }
 

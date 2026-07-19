@@ -22,6 +22,7 @@ export function CategoryScoringControls({
   defaultRangeStart,
   scoreValues,
   disabled = false,
+  locked = false,
   onStateChange,
 }: {
   categoryId: string;
@@ -29,6 +30,7 @@ export function CategoryScoringControls({
   defaultRangeStart: number | null | undefined;
   scoreValues: number[];
   disabled?: boolean;
+  locked?: boolean;
   onStateChange?: (decision: CategoryDecision) => void;
 }) {
   const [eligible, setEligible] = useState(defaultEligible);
@@ -69,10 +71,21 @@ export function CategoryScoringControls({
         value="1"
       />
 
+      {locked && eligible && (
+        <input name={`eligible_${categoryId}`} type="hidden" value="on" />
+      )}
+      {locked && eligible && rangeStart != null && (
+        <input
+          name={`score_range_start_${categoryId}`}
+          type="hidden"
+          value={formatRangeValue(rangeStart)}
+        />
+      )}
+
       <label className="category-eligibility-control">
         <input
           checked={eligible}
-          disabled={disabled}
+          disabled={disabled || locked}
           name={`eligible_${categoryId}`}
           onChange={(event) => {
             const nextEligible = event.target.checked;
@@ -83,7 +96,7 @@ export function CategoryScoringControls({
         />
         <span>
           <strong>Eligible</strong>
-          <small>Include this category in scoring</small>
+          <small>{locked ? "Set by Advisory Committee" : "Include this category in scoring"}</small>
         </span>
       </label>
 
@@ -91,7 +104,7 @@ export function CategoryScoringControls({
         <span>2-point range</span>
         <select
           className="select"
-          disabled={disabled || !eligible}
+          disabled={disabled || locked || !eligible}
           name={`score_range_start_${categoryId}`}
           onChange={(event) => {
             const nextRangeStart = event.target.value
@@ -114,6 +127,11 @@ export function CategoryScoringControls({
         </select>
       </label>
 
+      {locked && (
+        <small className="field-help category-decision-lock-note">
+          Eligibility and range are controlled by the approved panel decision.
+        </small>
+      )}
     </div>
   );
 }

@@ -624,21 +624,23 @@ export async function ownerAssignSchool(slotId: string, formData: FormData) {
 }
 
 export async function ownerAddStaff(slotId: string, formData: FormData) {
-  await requireProfile(["owner"]);
+  await requireProfile(["advisory_member", "owner"]);
 
   const userId = text(formData, "user_id");
   if (!userId) scheduleRedirect("error", "Choose an adjudicator or advisory member.");
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("owner_add_schedule_staff", {
+  const { error } = await supabase.rpc("manage_schedule_staff", {
     p_slot_id: slotId,
     p_user_id: userId,
+    p_action: "add",
+    p_reason: text(formData, "reason") || null,
   });
 
   if (error) scheduleRedirect("error", error.message);
 
   revalidateSchedule();
-  scheduleRedirect("success", "Staff member added to the slot.");
+  scheduleRedirect("success", "Staff member added to the slot. Owners will see the change in their daily review.");
 }
 
 export async function removeScheduleSchoolBooking(bookingId: string) {
@@ -656,17 +658,32 @@ export async function removeScheduleSchoolBooking(bookingId: string) {
   scheduleRedirect("success", "School removed from the slot.");
 }
 
-export async function removeScheduleStaff(enrollmentId: string) {
-  await requireProfile(["owner"]);
+export async function removeScheduleStaff(
+  enrollmentId: string,
+  formData: FormData,
+) {
+  await requireProfile(["advisory_member", "owner"]);
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: enrollment, error: readError } = await supabase
     .from("schedule_slot_staff")
-    .delete()
-    .eq("id", enrollmentId);
+    .select("slot_id,user_id")
+    .eq("id", enrollmentId)
+    .single();
+
+  if (readError || !enrollment) {
+    scheduleRedirect("error", readError?.message ?? "Schedule participant not found.");
+  }
+
+  const { error } = await supabase.rpc("manage_schedule_staff", {
+    p_slot_id: enrollment.slot_id,
+    p_user_id: enrollment.user_id,
+    p_action: "remove",
+    p_reason: text(formData, "reason") || null,
+  });
 
   if (error) scheduleRedirect("error", error.message);
 
   revalidateSchedule();
-  scheduleRedirect("success", "Staff member removed from the slot.");
+  scheduleRedirect("success", "Staff member removed. Owners will see the change in their daily review.");
 }

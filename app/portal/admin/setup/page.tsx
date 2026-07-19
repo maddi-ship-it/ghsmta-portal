@@ -3,9 +3,10 @@ import Link from "next/link";
 import CyclesPage from "@/app/portal/admin/cycles/page";
 import FormsPage from "@/app/portal/admin/forms/page";
 import ScoringAdminPage from "@/app/portal/admin/scoring/page";
+import WorkflowsAdminPage from "@/app/portal/admin/workflows/page";
 import { requireProfile } from "@/lib/auth";
 
-type AdminSetupTab = "programs" | "forms" | "scoring";
+type AdminSetupTab = "programs" | "forms" | "scoring" | "workflows";
 
 type AdminSetupSearchParams = {
   tab?: string;
@@ -32,6 +33,11 @@ const tabs: Array<{
     key: "scoring",
     label: "Scoring setup",
     description: "Manage assignments, rubrics, and the AI narrative prompt.",
+  },
+  {
+    key: "workflows",
+    label: "Workflows & notifications",
+    description: "Configure reminders, daily review emails, appeals, and support requests.",
   },
 ];
 
@@ -88,6 +94,7 @@ export default async function AdminSetupPage({
             })}
           />
         )}
+        {activeTab === "workflows" && <WorkflowsAdminPage />}
       </div>
     </>
   );

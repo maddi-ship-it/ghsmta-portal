@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { signOut } from "@/app/portal/actions";
 import { roleLabel } from "@/lib/format";
+import { PortalUtilities } from "@/components/portal-utilities";
 import type { Profile } from "@/lib/types";
 
 type NavItem = {
@@ -17,6 +18,7 @@ function navItems(profile: Profile): NavItem[] {
     { href: "/portal/schedule", label: "Scheduling", shortLabel: "Schedule", icon: "◷" },
     { href: "/portal/chat", label: "Chat", icon: "✉" },
     { href: "/portal/reference-documents", label: "Reference documents", shortLabel: "Documents", icon: "▱" },
+    { href: "/portal/appeals", label: "Appeals", icon: "⚖" },
   ];
 
   if (profile.role === "applicant") {
@@ -60,6 +62,8 @@ export function PortalHeader({ profile }: { profile: Profile }) {
           <nav className="portal-nav" aria-label="Portal navigation">
             {items.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
           </nav>
+
+          <PortalUtilities profile={profile} />
 
           <div className="user-chip">
             <span className="user-avatar">{(profile.full_name ?? profile.email ?? "U").slice(0, 1).toUpperCase()}</span>

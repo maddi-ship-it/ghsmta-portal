@@ -13,6 +13,7 @@ import {
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
+import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { requireProfile } from "@/lib/auth";
@@ -178,6 +179,26 @@ export default async function AdjudicationApplicationPage({
   if (rubricError) throw new Error(rubricError.message);
   const rubric = rubricData as ScoringRubric | null;
 
+  const ownParticipantResult =
+    profile.role === "owner"
+      ? { data: null, error: null }
+      : await supabase
+          .from("adjudicator_assignments")
+          .select("id,can_score,can_comment,removed_at")
+          .eq("application_id", id)
+          .eq("adjudicator_user_id", profile.id)
+          .is("removed_at", null)
+          .maybeSingle();
+
+  if (ownParticipantResult.error) {
+    throw new Error(ownParticipantResult.error.message);
+  }
+
+  const isScoringParticipant =
+    profile.role === "adjudicator" ||
+    (profile.role === "advisory_member" &&
+      Boolean(ownParticipantResult.data?.can_score));
+
   if (!rubric) {
     return (
       <>
@@ -199,16 +220,16 @@ export default async function AdjudicationApplicationPage({
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
-    profile.role === "adjudicator"
+    isScoringParticipant
       ? supabase.from("adjudicator_assignments").select("*").eq("application_id", id).eq("adjudicator_user_id", profile.id)
       : supabase.from("adjudicator_assignments").select("*").eq("application_id", id).order("assigned_at"),
-    profile.role === "adjudicator"
+    isScoringParticipant
       ? supabase.from("adjudication_scorecards").select("*").eq("application_id", id).eq("adjudicator_user_id", profile.id)
       : supabase.from("adjudication_scorecards").select("*").eq("application_id", id).order("created_at"),
-    profile.role === "adjudicator"
+    isScoringParticipant
       ? Promise.resolve({ data: [], error: null })
       : supabase.from("adjudication_panel_feedback").select("*").eq("application_id", id),
-    profile.role === "adjudicator"
+    isScoringParticipant
       ? Promise.resolve({ data: null, error: null })
       : supabase.from("adjudication_releases").select("*").eq("application_id", id).maybeSingle(),
     supabase.rpc("get_schedule_bookings_for_staff"),
@@ -337,7 +358,7 @@ export default async function AdjudicationApplicationPage({
     adjudicationReferencePanel,
   ];
 
-  if (profile.role === "adjudicator" && assignments.length === 0) notFound();
+  if (isScoringParticipant && assignments.length === 0) notFound();
 
   const categoryIds = categories.map((category) => category.id);
   const scorecardIds = scorecards.map((card) => card.id);
@@ -357,8 +378,36 @@ export default async function AdjudicationApplicationPage({
   const scores = (scoresResult.data ?? []) as AdjudicationScore[];
   const comments = (commentsResult.data ?? []) as AdjudicationCategoryComment[];
 
+  const [proposalResult, reviewResult] = await Promise.all([
+    supabase
+      .from("adjudication_category_proposals")
+      .select("*")
+      .eq("application_id", id),
+    supabase
+      .from("adjudication_reviews")
+      .select("status,owner_note")
+      .eq("application_id", id)
+      .maybeSingle(),
+  ]);
+
+  if (proposalResult.error) throw new Error(proposalResult.error.message);
+  if (reviewResult.error) throw new Error(reviewResult.error.message);
+
+  const proposalIds = (proposalResult.data ?? []).map(
+    (proposal) => proposal.id,
+  );
+
+  const approvalResult = proposalIds.length
+    ? await supabase
+        .from("adjudication_category_approvals")
+        .select("*")
+        .in("proposal_id", proposalIds)
+    : { data: [], error: null };
+
+  if (approvalResult.error) throw new Error(approvalResult.error.message);
+
   const sharedObservationResult =
-    profile.role === "adjudicator"
+    isScoringParticipant
       ? await supabase.rpc("get_shared_adjudication_observations", {
           p_application_id: id,
         })
@@ -369,14 +418,14 @@ export default async function AdjudicationApplicationPage({
   }
 
   let adjudicatorProfiles: Profile[] = [];
-  if (profile.role !== "adjudicator") {
+  if (!isScoringParticipant) {
     const profileIds = [...new Set(assignments.map((assignment) => assignment.adjudicator_user_id))];
     if (profileIds.length > 0) {
       const { data } = await supabase.from("profiles").select("id,email,full_name,role,active").in("id", profileIds);
       adjudicatorProfiles = (data ?? []) as Profile[];
     }
   }
-  const ownScorecard = profile.role === "adjudicator" ? scorecards[0] ?? null : null;
+  const ownScorecard = isScoringParticipant ? scorecards[0] ?? null : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
 
   return (
@@ -388,7 +437,7 @@ export default async function AdjudicationApplicationPage({
           <p>{application.production_title ?? "Untitled production"}</p>
         </div>
         <div className="heading-actions">
-          {profile.role === "adjudicator" && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
+          {isScoringParticipant && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
           <Link className="button button-secondary" href="/portal/adjudication">Back to adjudication</Link>
         </div>
       </div>
@@ -400,6 +449,34 @@ export default async function AdjudicationApplicationPage({
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field, score, and criterion comment before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
 
       <ApplicationReferenceBar panels={referencePanels} />
+
+      <AdjudicationConsensusBar
+        applicationId={id}
+        approvals={(approvalResult.data ?? []) as Array<{
+          id: string;
+          proposal_id: string;
+          adjudicator_user_id: string;
+          response: string;
+          comment: string | null;
+        }>}
+        categories={categories}
+        currentUserId={profile.id}
+        isScoringParticipant={isScoringParticipant}
+        proposals={(proposalResult.data ?? []) as Array<{
+          id: string;
+          application_id: string;
+          category_id: string;
+          proposed_by: string;
+          is_eligible: boolean;
+          range_min: number | null;
+          range_max: number | null;
+          status: string;
+          advisory_note: string | null;
+          owner_override_note: string | null;
+        }>}
+        review={reviewResult.data as { status: string; owner_note: string | null } | null}
+        role={profile.role}
+      />
 
       <div className="adjudication-score-layout">
         <aside className="score-category-sidebar">
@@ -426,7 +503,7 @@ export default async function AdjudicationApplicationPage({
         </aside>
 
         <div className="adjudication-score-content">
-      {profile.role === "adjudicator" ? (
+      {isScoringParticipant ? (
         <form className="scorecard-form">
           <AdjudicatorAutosave
             applicationId={id}
@@ -457,6 +534,13 @@ export default async function AdjudicationApplicationPage({
             ownComments={comments.filter(
               (comment) => comment.scorecard_id === ownScorecard?.id,
             )}
+            categoryProposals={(proposalResult.data ?? []) as Array<{
+              category_id: string;
+              is_eligible: boolean;
+              range_min: number | null;
+              range_max: number | null;
+              status: string;
+            }>}
             ownScores={scores.filter(
               (score) => score.scorecard_id === ownScorecard?.id,
             )}

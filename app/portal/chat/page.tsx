@@ -66,8 +66,7 @@ export default async function ChatPage({
           <span className="eyebrow">Communication</span>
           <h1>GHSMTA Chat</h1>
           <p>
-            Applicant Community uses threaded discussions. School and staff
-            channels use a live message feed.
+            Community Chat uses threaded discussions for applicants and owners. School DMs and staff channels use a live message feed.
           </p>
         </div>
       </div>

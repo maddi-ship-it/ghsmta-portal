@@ -227,26 +227,27 @@ export default async function SchedulePage({
     staffBookings = (bookingData ?? []) as StaffBooking[];
     staffDirectory = (directoryData ?? []) as StaffEnrollment[];
 
+    if (profile.role === "owner" || profile.role === "advisory_member") {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id,email,full_name,role,active")
+        .in("role", ["adjudicator", "advisory_member"])
+        .eq("active", true)
+        .order("full_name");
+
+      ownerStaff = (profileData ?? []) as Profile[];
+    }
+
     if (profile.role === "owner") {
-      const [{ data: applicationData }, { data: profileData }] =
-        await Promise.all([
-          supabase
-            .from("applications")
-            .select(
-              "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_payload,cloned_from_application_id,created_at,updated_at",
-            )
-            .eq("is_archived", false)
-            .order("school_name"),
-          supabase
-            .from("profiles")
-            .select("id,email,full_name,role,active")
-            .in("role", ["adjudicator", "advisory_member"])
-            .eq("active", true)
-            .order("full_name"),
-        ]);
+      const { data: applicationData } = await supabase
+        .from("applications")
+        .select(
+          "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_payload,cloned_from_application_id,created_at,updated_at",
+        )
+        .eq("is_archived", false)
+        .order("school_name");
 
       ownerApplications = (applicationData ?? []) as Application[];
-      ownerStaff = (profileData ?? []) as Profile[];
     }
   }
 
@@ -682,8 +683,11 @@ export default async function SchedulePage({
                                     <strong>{personName(participant)}</strong>
                                     <small>{staffRoleLabel(participant.role)}</small>
                                   </span>
-                                  {profile.role === "owner" && (
-                                    <form action={removeScheduleStaff.bind(null, participant.enrollment_id)}>
+                                  {(profile.role === "owner" || profile.role === "advisory_member") && (
+                                    <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
+                                      {profile.role === "advisory_member" && (
+                                        <input className="input input-compact" name="reason" placeholder="Removal reason" required />
+                                      )}
                                       <button className="text-button danger-text" type="submit">
                                         Remove
                                       </button>
@@ -717,6 +721,31 @@ export default async function SchedulePage({
                                 </button>
                               </form>
                             )}
+                          </div>
+                        )}
+
+                        {profile.role === "advisory_member" && (
+                          <div className="schedule-owner-controls schedule-advisory-controls">
+                            <div className="schedule-owner-action">
+                              <h4>Manage review team</h4>
+                              <p className="muted-copy">Changes are included in the Owner daily review email.</p>
+                              <form action={ownerAddStaff.bind(null, slot.id)} className="form-stack compact-form">
+                                <div className="field">
+                                  <label htmlFor={`advisory_staff_${slot.id}`}>Portal user</label>
+                                  <select className="select" id={`advisory_staff_${slot.id}`} name="user_id" required>
+                                    <option value="">Choose person</option>
+                                    {ownerStaff
+                                      .filter((person) => !participants.some((participant) => participant.user_id === person.id))
+                                      .map((person) => (
+                                        <option key={person.id} value={person.id}>
+                                          {person.full_name ?? person.email} — {roleLabel(person.role)}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </div>
+                                <button className="button button-secondary button-compact" type="submit">Add reviewer</button>
+                              </form>
+                            </div>
                           </div>
                         )}
 

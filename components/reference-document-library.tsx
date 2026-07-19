@@ -127,7 +127,11 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
   }, [supabase]);
 
   useEffect(() => {
-    void loadDocuments();
+    const timer = window.setTimeout(() => {
+      void loadDocuments();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadDocuments]);
 
   const visibleDocuments = documents.filter((document) => {
