@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ApplicantScheduleBoard } from "@/components/applicant-schedule-board";
 import { ScheduleOwnerTools } from "@/components/schedule-owner-tools";
 import { requireProfile } from "@/lib/auth";
 import { roleLabel } from "@/lib/format";
@@ -559,6 +560,50 @@ export default async function SchedulePage({
     ["waiting", "offered"].includes(entry.status),
   );
 
+  const applicantScheduleSlots = profile.role === "applicant"
+    ? displaySlots.map((slot) => {
+        const cycle = cycleMap.get(slot.cycle_id);
+        const slotAvailability = availabilityMap.get(slot.id);
+        const slotApplications = applicantApplications.filter(
+          (application) => application.cycle_id === slot.cycle_id,
+        );
+        const isPast = new Date(slot.starts_at).getTime() <= serverTime;
+        const schoolAccessOpen =
+          Boolean(slot.school_booking_opens_at) &&
+          new Date(slot.school_booking_opens_at!).getTime() <= serverTime &&
+          (!slot.school_booking_closes_at ||
+            new Date(slot.school_booking_closes_at).getTime() > serverTime);
+
+        return {
+          id: slot.id,
+          title: slot.title,
+          dateLabel: formatSlotDate(slot.starts_at),
+          timeLabel: formatSlotTime(slot.starts_at, slot.ends_at),
+          locationLabel:
+            slot.location || schoolDetailsMap.get(slot.id)?.venue_name || "TBA",
+          cycleLabel: cycle
+            ? `${cycle.season_year} · ${cycle.name}`
+            : "Program",
+          waitlistCount: slotWaitlistCount(slot),
+          applications: slotApplications.map((application) => ({
+            id: application.id,
+            label: `${application.school_name}${
+              application.production_title
+                ? ` — ${application.production_title}`
+                : ""
+            }`,
+          })),
+          isPast,
+          canSchoolBook:
+            slot.status === "open" &&
+            schoolAccessOpen &&
+            !isPast &&
+            !slotAvailability?.is_booked &&
+            slotApplications.length > 0,
+        };
+      })
+    : [];
+
   return (
     <>
       <div className="page-heading schedule-page-heading">
@@ -755,15 +800,18 @@ export default async function SchedulePage({
       </section>
 
       {profile.role === "applicant" && !bookedSlot && (
-        <section className="panel schedule-waitlist-panel">
-          <div className="panel-header">
+        <details
+          className="panel schedule-waitlist-panel schedule-waitlist-disclosure"
+          open={applicantWaitlistEntries.some((entry) => entry.status === "offered")}
+        >
+          <summary className="panel-header">
             <div>
               <span className="eyebrow">Date waitlist</span>
               <h2>Join a preferred date</h2>
               <p>Join a date waitlist when the available times do not work or are already full.</p>
             </div>
             <span className="badge">{applicantWaitlistEntries.filter((entry) => ["waiting", "offered"].includes(entry.status)).length}</span>
-          </div>
+          </summary>
           <div className="panel-body schedule-waitlist-body">
             <form action={joinScheduleDateWaitlist} className="schedule-waitlist-form">
               <div className="field">
@@ -847,7 +895,7 @@ export default async function SchedulePage({
               </div>
             )}
           </div>
-        </section>
+        </details>
       )}
 
       {profile.role === "owner" && ownerWaitlistEntries.length > 0 && (
@@ -941,17 +989,23 @@ export default async function SchedulePage({
             </form>
           </div>
         </section>
+      ) : (profile.role as AppRole) === "applicant" ? (
+        <ApplicantScheduleBoard
+          initialAvailability={availability}
+          slots={applicantScheduleSlots}
+          view={selectedView}
+        />
       ) : (
         <section className={`schedule-slot-grid schedule-slot-grid-${selectedView}`}>
           {displaySlots.length === 0 ? (
             <div className="panel empty-state schedule-empty-state">
               <h3>
-                {profile.role === "applicant"
+                {(profile.role as AppRole) === "applicant"
                   ? "No schedule slots are currently open."
                   : "No schedule slots are configured."}
               </h3>
               <p>
-                {profile.role === "applicant"
+                {(profile.role as AppRole) === "applicant"
                   ? "GHSMTA will make slots available when school selection opens."
                   : "Slots will appear here when an owner creates them."}
               </p>
@@ -967,7 +1021,7 @@ export default async function SchedulePage({
                 (participant) => participant.user_id === profile.id,
               );
               const slotApplications =
-                profile.role === "applicant"
+                (profile.role as AppRole) === "applicant"
                   ? applicantApplications.filter(
                       (application) => application.cycle_id === slot.cycle_id,
                     )
@@ -998,7 +1052,7 @@ export default async function SchedulePage({
                 !slotAvailability?.is_booked &&
                 slotApplications.length > 0;
 
-              if (profile.role === "applicant" && slot.status === "draft") {
+              if ((profile.role as AppRole) === "applicant" && slot.status === "draft") {
                 return null;
               }
 
@@ -1075,7 +1129,7 @@ export default async function SchedulePage({
                       <p className="schedule-school-instructions">{slot.school_instructions}</p>
                     )}
 
-                    {profile.role === "applicant" ? (
+                    {(profile.role as AppRole) === "applicant" ? (
                       <div className="schedule-school-action">
                         {slotAvailability?.is_booked ? (
                           <button className="button button-secondary" disabled type="button">
