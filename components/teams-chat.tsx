@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Fragment,
   type FormEvent,
   type KeyboardEvent,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -20,10 +20,11 @@ import {
   createChatReply,
   moderateChatPost,
 } from "@/app/portal/chat/actions";
+import styles from "@/components/chat-workspace.module.css";
 import { createClient } from "@/lib/supabase/client";
 import type { AppRole, Profile } from "@/lib/types";
 
-type ChannelType =
+export type ChannelType =
   | "school"
   | "school_dm"
   | "applicant_community"
@@ -39,8 +40,15 @@ export type ChatChannel = {
   application_id: string | null;
   school_name: string | null;
   production_title: string | null;
+  application_archived: boolean;
   last_activity_at: string;
   unread_count: number;
+  latest_message_preview: string | null;
+  latest_author_name: string | null;
+  channel_group: string;
+  channel_group_label: string;
+  channel_group_order: number;
+  visibility_label: string;
 };
 
 export type ChatMember = {
@@ -86,42 +94,40 @@ type FlatMessage = {
 };
 
 type ChannelGroup = {
+  key: string;
   label: string;
+  order: number;
   channels: ChatChannel[];
+  unreadCount: number;
 };
 
-function channelGroupLabel(type: ChannelType) {
-  switch (type) {
-    case "school":
-      return "School staff channels";
-    case "school_dm":
-      return "School owner DMs";
-    case "applicant_community":
-      return "Community";
-    case "general":
-    case "networking":
-      return "Staff channels";
-    case "advisory_committee":
-      return "Committee";
-  }
-}
+type ChatAction = (
+  formData: FormData,
+) => Promise<{ ok: boolean; error?: string }>;
 
-function channelIcon(type: ChannelType) {
-  switch (type) {
-    case "school":
-      return "S";
-    case "school_dm":
-      return "D";
-    case "applicant_community":
-      return "A";
-    case "general":
-      return "G";
-    case "networking":
-      return "N";
-    case "advisory_committee":
-      return "C";
-  }
-}
+const GROUP_FALLBACKS: Record<
+  ChannelType,
+  { key: string; label: string; order: number }
+> = {
+  applicant_community: { key: "community", label: "Community", order: 10 },
+  general: { key: "staff", label: "Staff channels", order: 20 },
+  networking: { key: "staff", label: "Staff channels", order: 20 },
+  advisory_committee: {
+    key: "committee",
+    label: "Advisory Committee",
+    order: 30,
+  },
+  school_dm: {
+    key: "direct_messages",
+    label: "School DMs",
+    order: 40,
+  },
+  school: {
+    key: "school_staff",
+    label: "School staff channels",
+    order: 50,
+  },
+};
 
 function roleName(role: AppRole) {
   switch (role) {
@@ -136,17 +142,21 @@ function roleName(role: AppRole) {
   }
 }
 
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  const today = new Date();
-  const sameDay = date.toDateString() === today.toDateString();
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: sameDay ? undefined : "short",
-    day: sameDay ? undefined : "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
+function channelIcon(type: ChannelType) {
+  switch (type) {
+    case "school":
+      return "ST";
+    case "school_dm":
+      return "DM";
+    case "applicant_community":
+      return "CO";
+    case "general":
+      return "GE";
+    case "networking":
+      return "NW";
+    case "advisory_committee":
+      return "AC";
+  }
 }
 
 function initials(name: string) {
@@ -160,6 +170,88 @@ function initials(name: string) {
 
 function escapeRegularExpression(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatChannelActivity(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+
+  if (sameDay) {
+    return formatTime(value);
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function formatFullTimestamp(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatDay(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return "Today";
+  }
+
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
+function normalizeChannel(row: Partial<ChatChannel> & Pick<ChatChannel, "channel_id" | "channel_type" | "channel_name">): ChatChannel {
+  const fallback = GROUP_FALLBACKS[row.channel_type];
+  const archived = Boolean(row.application_archived);
+
+  return {
+    channel_id: row.channel_id,
+    channel_type: row.channel_type,
+    channel_name: row.channel_name,
+    channel_description: row.channel_description ?? null,
+    application_id: row.application_id ?? null,
+    school_name: row.school_name ?? null,
+    production_title: row.production_title ?? null,
+    application_archived: archived,
+    last_activity_at: row.last_activity_at ?? new Date(0).toISOString(),
+    unread_count: Number(row.unread_count ?? 0),
+    latest_message_preview: row.latest_message_preview ?? null,
+    latest_author_name: row.latest_author_name ?? null,
+    channel_group: archived
+      ? "archived"
+      : (row.channel_group ?? fallback.key),
+    channel_group_label: archived
+      ? "Archived conversations"
+      : (row.channel_group_label ?? fallback.label),
+    channel_group_order: archived
+      ? 60
+      : Number(row.channel_group_order ?? fallback.order),
+    visibility_label: row.visibility_label ?? "Private channel",
+  };
 }
 
 function MentionedMessage({
@@ -205,8 +297,8 @@ function MentionedMessage({
           <span
             className={
               member.user_id === currentUserId
-                ? "chat-mention chat-mention-self"
-                : "chat-mention"
+                ? `${styles.mention} ${styles.mentionSelf}`
+                : styles.mention
             }
             key={`${member.user_id}-${index}`}
           >
@@ -224,16 +316,16 @@ function MentionTextarea({
   members,
   placeholder,
   rows,
-  required = true,
-  className = "textarea",
+  className,
+  submitOnEnter = false,
 }: {
   id: string;
   name: string;
   members: ChatMember[];
   placeholder: string;
   rows: number;
-  required?: boolean;
   className?: string;
+  submitOnEnter?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState("");
@@ -312,72 +404,89 @@ function MentionTextarea({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (suggestions.length === 0) {
-      return;
+    if (suggestions.length > 0) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActiveIndex((current) => (current + 1) % suggestions.length);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActiveIndex(
+          (current) => (current - 1 + suggestions.length) % suggestions.length,
+        );
+        return;
+      }
+
+      if (event.key === "Enter" && query !== null) {
+        event.preventDefault();
+        const selected = suggestions[activeIndex];
+
+        if (selected) {
+          selectMention(selected);
+        }
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setQuery(null);
+        setMentionStart(null);
+        return;
+      }
     }
 
-    if (event.key === "ArrowDown") {
+    if (
+      submitOnEnter &&
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
       event.preventDefault();
-      setActiveIndex((current) => (current + 1) % suggestions.length);
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveIndex(
-        (current) => (current - 1 + suggestions.length) % suggestions.length,
-      );
-    } else if (event.key === "Enter" && query !== null) {
-      event.preventDefault();
-      const selected = suggestions[activeIndex];
-
-      if (selected) {
-        selectMention(selected);
-      }
-    } else if (event.key === "Escape") {
-      setQuery(null);
-      setMentionStart(null);
+      textareaRef.current?.form?.requestSubmit();
     }
   };
 
   return (
-    <div className="mention-composer">
+    <div className={styles.mentionComposer}>
       <textarea
-        className={className}
+        className={`${className ?? "textarea"} ${styles.textarea}`}
         id={id}
         maxLength={5000}
         name={name}
         onChange={(event) => {
           const nextValue = event.target.value;
-          const cursor = event.target.selectionStart;
           setValue(nextValue);
-          detectMention(nextValue, cursor);
+          detectMention(nextValue, event.target.selectionStart);
         }}
-        onClick={(event) => {
-          detectMention(value, event.currentTarget.selectionStart);
-        }}
+        onClick={(event) =>
+          detectMention(value, event.currentTarget.selectionStart)
+        }
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         ref={textareaRef}
-        required={required}
+        required
         rows={rows}
         value={value}
       />
 
       {suggestions.length > 0 && (
-        <div className="mention-suggestions" role="listbox">
+        <div className={styles.mentionSuggestions} role="listbox">
           {suggestions.map((member, index) => (
             <button
               aria-selected={index === activeIndex}
               className={
                 index === activeIndex
-                  ? "mention-suggestion mention-suggestion-active"
-                  : "mention-suggestion"
+                  ? `${styles.mentionSuggestion} ${styles.mentionSuggestionActive}`
+                  : styles.mentionSuggestion
               }
               key={member.user_id}
-              onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectMention(member)}
+              onMouseDown={(event) => event.preventDefault()}
               role="option"
               type="button"
             >
-              <span className="user-avatar teams-avatar teams-avatar-small">
+              <span className={`${styles.avatar} ${styles.avatarSmall}`}>
                 {initials(member.display_name)}
               </span>
               <span>
@@ -389,28 +498,98 @@ function MentionTextarea({
         </div>
       )}
 
-      <small className="mention-help">Type @ to tag someone in this channel.</small>
+      <small className={styles.mentionHelp}>
+        Type @ to tag someone. Press Enter to send; Shift+Enter adds a line.
+      </small>
     </div>
   );
 }
 
-function MessageBody({
-  children,
-  members,
-  currentUserId,
+function ChannelNavigation({
+  groups,
+  selectedChannelId,
 }: {
-  children: string;
-  members: ChatMember[];
-  currentUserId: string;
+  groups: ChannelGroup[];
+  selectedChannelId: string | null;
 }) {
+  if (groups.length === 0) {
+    return (
+      <div className={styles.noChannelResults}>
+        No channels match your search.
+      </div>
+    );
+  }
+
   return (
-    <p className="teams-message-body">
-      <MentionedMessage
-        body={children}
-        currentUserId={currentUserId}
-        members={members}
-      />
-    </p>
+    <nav className={styles.channelList} aria-label="Chat channels">
+      {groups.map((group) => (
+        <section className={styles.channelGroup} key={group.key}>
+          <div className={styles.channelGroupHeading}>
+            <h3>{group.label}</h3>
+            {group.unreadCount > 0 && (
+              <span>{group.unreadCount > 99 ? "99+" : group.unreadCount}</span>
+            )}
+          </div>
+
+          <div className={styles.channelGroupItems}>
+            {group.channels.map((channel) => {
+              const active = channel.channel_id === selectedChannelId;
+              const context =
+                channel.production_title ??
+                channel.latest_message_preview ??
+                channel.channel_description;
+
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  className={
+                    active
+                      ? `${styles.channelLink} ${styles.channelLinkActive}`
+                      : styles.channelLink
+                  }
+                  href={`/portal/chat?channel=${channel.channel_id}`}
+                  key={channel.channel_id}
+                  scroll={false}
+                >
+                  <span
+                    className={`${styles.channelIcon} ${styles[`channelIcon_${channel.channel_type}`]}`}
+                    aria-hidden="true"
+                  >
+                    {channelIcon(channel.channel_type)}
+                  </span>
+
+                  <span className={styles.channelCopy}>
+                    <span className={styles.channelTitleRow}>
+                      <strong>{channel.channel_name}</strong>
+                      <time dateTime={channel.last_activity_at}>
+                        {formatChannelActivity(channel.last_activity_at)}
+                      </time>
+                    </span>
+                    {context && (
+                      <small>
+                        {channel.latest_author_name &&
+                        channel.latest_message_preview
+                          ? `${channel.latest_author_name}: `
+                          : ""}
+                        {context}
+                      </small>
+                    )}
+                  </span>
+
+                  {channel.unread_count > 0 && (
+                    <span className={styles.unreadBadge}>
+                      {channel.unread_count > 99
+                        ? "99+"
+                        : channel.unread_count}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </nav>
   );
 }
 
@@ -433,6 +612,7 @@ export function TeamsChat({
   const [threads, setThreads] = useState(initialThreads);
   const [members, setMembers] = useState(initialMembers);
   const [channelSearch, setChannelSearch] = useState("");
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const feedEndRef = useRef<HTMLDivElement>(null);
@@ -442,36 +622,75 @@ export function TeamsChat({
   );
   const isThreaded = activeChannel?.channel_type === "applicant_community";
 
+  const totalUnread = useMemo(
+    () => channels.reduce((sum, channel) => sum + channel.unread_count, 0),
+    [channels],
+  );
+
   const groups = useMemo<ChannelGroup[]>(() => {
+    const normalizedSearch = channelSearch.trim().toLowerCase();
     const filtered = channels.filter((channel) => {
+      if (showUnreadOnly && channel.unread_count === 0) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
       const haystack = [
         channel.channel_name,
         channel.school_name,
         channel.production_title,
+        channel.latest_message_preview,
+        channel.latest_author_name,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      return haystack.includes(channelSearch.trim().toLowerCase());
+      return haystack.includes(normalizedSearch);
     });
 
-    const labels = [
-      "Community",
-      "Staff channels",
-      "Committee",
-      "School channels",
-    ];
+    const grouped = new Map<string, ChannelGroup>();
 
-    return labels
-      .map((label) => ({
-        label,
-        channels: filtered.filter(
-          (channel) => channelGroupLabel(channel.channel_type) === label,
-        ),
-      }))
-      .filter((group) => group.channels.length > 0);
-  }, [channelSearch, channels]);
+    for (const channel of filtered) {
+      const existing = grouped.get(channel.channel_group);
+
+      if (existing) {
+        existing.channels.push(channel);
+        existing.unreadCount += channel.unread_count;
+      } else {
+        grouped.set(channel.channel_group, {
+          key: channel.channel_group,
+          label: channel.channel_group_label,
+          order: channel.channel_group_order,
+          channels: [channel],
+          unreadCount: channel.unread_count,
+        });
+      }
+    }
+
+    return [...grouped.values()]
+      .sort((left, right) => left.order - right.order)
+      .map((group) => ({
+        ...group,
+        channels: group.channels.sort((left, right) => {
+          if (left.unread_count > 0 && right.unread_count === 0) {
+            return -1;
+          }
+
+          if (right.unread_count > 0 && left.unread_count === 0) {
+            return 1;
+          }
+
+          return (
+            new Date(right.last_activity_at).getTime() -
+            new Date(left.last_activity_at).getTime()
+          );
+        }),
+      }));
+  }, [channelSearch, channels, showUnreadOnly]);
 
   const messages = useMemo<FlatMessage[]>(() => {
     return threads
@@ -502,6 +721,31 @@ export function TeamsChat({
       );
   }, [threads]);
 
+  const reloadChannels = useCallback(async () => {
+    const richResult = await supabase.rpc("get_my_chat_channels_v2");
+
+    if (!richResult.error) {
+      setChannels(
+        ((richResult.data ?? []) as Array<
+          Partial<ChatChannel> &
+            Pick<ChatChannel, "channel_id" | "channel_type" | "channel_name">
+        >).map(normalizeChannel),
+      );
+      return;
+    }
+
+    const legacyResult = await supabase.rpc("get_my_chat_channels");
+
+    if (!legacyResult.error) {
+      setChannels(
+        ((legacyResult.data ?? []) as Array<
+          Partial<ChatChannel> &
+            Pick<ChatChannel, "channel_id" | "channel_type" | "channel_name">
+        >).map(normalizeChannel),
+      );
+    }
+  }, [supabase]);
+
   const loadChannel = useCallback(async () => {
     if (!selectedChannelId) {
       return;
@@ -516,60 +760,65 @@ export function TeamsChat({
       }),
     ]);
 
-    if (!threadResult.error) {
-      setThreads((threadResult.data ?? []) as ChatThread[]);
+    if (threadResult.error) {
+      setStatus(threadResult.error.message);
+      return;
     }
 
-    if (!memberResult.error) {
-      setMembers((memberResult.data ?? []) as ChatMember[]);
+    if (memberResult.error) {
+      setStatus(memberResult.error.message);
+      return;
     }
+
+    setThreads((threadResult.data ?? []) as ChatThread[]);
+    setMembers((memberResult.data ?? []) as ChatMember[]);
 
     await supabase.rpc("mark_chat_channel_read", {
       p_channel_id: selectedChannelId,
     });
 
-    setChannels((current) =>
-      current.map((channel) =>
-        channel.channel_id === selectedChannelId
-          ? { ...channel, unread_count: 0 }
-          : channel,
-      ),
-    );
-  }, [selectedChannelId, supabase]);
+    await reloadChannels();
+  }, [reloadChannels, selectedChannelId, supabase]);
 
   useEffect(() => {
-    if (!selectedChannelId) {
-      return;
-    }
-
     const subscription = supabase
-      .channel(`chat:${selectedChannelId}`)
+      .channel(`chat-workspace:${profile.id}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chat_posts",
-          filter: `channel_id=eq.${selectedChannelId}`,
+        { event: "*", schema: "public", table: "chat_posts" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as
+            | { channel_id?: string }
+            | undefined;
+
+          if (row?.channel_id === selectedChannelId) {
+            void loadChannel();
+          } else {
+            void reloadChannels();
+          }
         },
-        () => void loadChannel(),
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chat_replies",
-          filter: `channel_id=eq.${selectedChannelId}`,
+        { event: "*", schema: "public", table: "chat_replies" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as
+            | { channel_id?: string }
+            | undefined;
+
+          if (row?.channel_id === selectedChannelId) {
+            void loadChannel();
+          } else {
+            void reloadChannels();
+          }
         },
-        () => void loadChannel(),
       )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(subscription);
     };
-  }, [loadChannel, selectedChannelId, supabase]);
+  }, [loadChannel, profile.id, reloadChannels, selectedChannelId, supabase]);
 
   useEffect(() => {
     if (!isThreaded) {
@@ -579,7 +828,7 @@ export function TeamsChat({
 
   const runFormAction = (
     form: HTMLFormElement,
-    action: (formData: FormData) => Promise<{ ok: boolean; error?: string }>,
+    action: ChatAction,
     successMessage: string,
   ) => {
     const formData = new FormData(form);
@@ -634,371 +883,415 @@ export function TeamsChat({
 
   if (!activeChannel) {
     return (
-      <section className="panel chat-empty-panel">
+      <section className={`panel ${styles.emptyPanel}`}>
         <div className="empty-state">
-          <h2>No chat channels are available yet.</h2>
+          <h2>No chat channels are available.</h2>
           <p>
-            School channels appear after an application is created and an
-            applicant or adjudicator is connected to it.
+            An Owner may need to run migration 018 to rebuild the school DMs
+            and panel channels.
           </p>
         </div>
       </section>
     );
   }
 
-  let channelContent: ReactNode;
-
-  if (isThreaded) {
-    channelContent = (
-      <>
-        <form className="teams-new-post" onSubmit={submitPost}>
-          <input
-            name="channel_id"
-            type="hidden"
-            value={activeChannel.channel_id}
-          />
-          <div className="teams-new-post-heading">
-            <span className="user-avatar teams-avatar">
-              {initials(profile.full_name ?? profile.email ?? "User")}
-            </span>
-            <div>
-              <strong>Start a new conversation</strong>
-              <p>Post a topic, then continue the discussion in its thread.</p>
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="chat-subject">Subject</label>
-            <input
-              className="input"
-              id="chat-subject"
-              maxLength={180}
-              name="subject"
-              placeholder="What is this conversation about?"
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="chat-body">Message</label>
-            <MentionTextarea
-              className="textarea teams-message-textarea"
-              id="chat-body"
-              members={members}
-              name="body"
-              placeholder="Write a message to Applicant Community"
-              rows={4}
-            />
-          </div>
-          <div className="teams-composer-footer">
-            <span>{status}</span>
-            <button
-              className="button button-dark"
-              disabled={isPending}
-              type="submit"
-            >
-              {isPending ? "Posting…" : "Post conversation"}
-            </button>
-          </div>
-        </form>
-
-        <div className="teams-thread-feed" aria-live="polite">
-          {threads.length === 0 ? (
-            <div className="empty-state teams-thread-empty">
-              <h2>No conversations yet.</h2>
-              <p>Start the first thread in Applicant Community.</p>
-            </div>
-          ) : (
-            threads.map((thread) => (
-              <article className="teams-thread-card" key={thread.post_id}>
-                <div className="teams-thread-root">
-                  <span className="user-avatar teams-avatar">
-                    {initials(thread.author_name)}
-                  </span>
-                  <div className="teams-thread-content">
-                    <div className="teams-message-meta">
-                      <strong>{thread.author_name}</strong>
-                      <span>{roleName(thread.author_role)}</span>
-                      <time dateTime={thread.created_at}>
-                        {formatTimestamp(thread.created_at)}
-                      </time>
-                    </div>
-                    <div className="teams-thread-subject-row">
-                      <h2>{thread.subject}</h2>
-                      <div className="teams-thread-badges">
-                        {thread.pinned && <span className="badge">Pinned</span>}
-                        {thread.locked && <span className="badge">Locked</span>}
-                      </div>
-                    </div>
-                    <MessageBody
-                      currentUserId={profile.id}
-                      members={members}
-                    >
-                      {thread.body}
-                    </MessageBody>
-
-                    {profile.role === "owner" && (
-                      <div className="teams-owner-controls">
-                        <button
-                          className="button button-secondary button-compact"
-                          disabled={isPending}
-                          onClick={() => moderate(thread.post_id, "pin")}
-                          type="button"
-                        >
-                          {thread.pinned ? "Unpin" : "Pin"}
-                        </button>
-                        <button
-                          className="button button-secondary button-compact"
-                          disabled={isPending}
-                          onClick={() => moderate(thread.post_id, "lock")}
-                          type="button"
-                        >
-                          {thread.locked ? "Unlock replies" : "Lock replies"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="teams-reply-thread">
-                  {thread.replies.map((reply) => (
-                    <div className="teams-reply" key={reply.id}>
-                      <span className="user-avatar teams-avatar teams-avatar-small">
-                        {initials(reply.author_name)}
-                      </span>
-                      <div>
-                        <div className="teams-message-meta">
-                          <strong>{reply.author_name}</strong>
-                          <span>{roleName(reply.author_role)}</span>
-                          <time dateTime={reply.created_at}>
-                            {formatTimestamp(reply.created_at)}
-                          </time>
-                        </div>
-                        <MessageBody
-                          currentUserId={profile.id}
-                          members={members}
-                        >
-                          {reply.body}
-                        </MessageBody>
-                      </div>
-                    </div>
-                  ))}
-
-                  {!thread.locked ? (
-                    <form className="teams-reply-form" onSubmit={submitReply}>
-                      <input
-                        name="channel_id"
-                        type="hidden"
-                        value={activeChannel.channel_id}
-                      />
-                      <input
-                        name="post_id"
-                        type="hidden"
-                        value={thread.post_id}
-                      />
-                      <label
-                        className="sr-only"
-                        htmlFor={`reply-${thread.post_id}`}
-                      >
-                        Reply to {thread.subject}
-                      </label>
-                      <MentionTextarea
-                        id={`reply-${thread.post_id}`}
-                        members={members}
-                        name="body"
-                        placeholder="Reply to this conversation"
-                        rows={2}
-                      />
-                      <button
-                        className="button button-secondary button-compact"
-                        disabled={isPending}
-                        type="submit"
-                      >
-                        Reply
-                      </button>
-                    </form>
-                  ) : (
-                    <p className="teams-thread-locked-note">
-                      Replies are closed for this conversation.
-                    </p>
-                  )}
-                </div>
-              </article>
-            ))
-          )}
-        </div>
-      </>
-    );
-  } else {
-    channelContent = (
-      <div className="teams-message-channel">
-        <div className="teams-message-feed" aria-live="polite">
-          {messages.length === 0 ? (
-            <div className="empty-state teams-message-empty">
-              <h2>No messages yet.</h2>
-              <p>Send the first message in this channel.</p>
-            </div>
-          ) : (
-            messages.map((message) => {
-              const ownMessage = message.author_id === profile.id;
-
-              return (
-                <article
-                  className={
-                    ownMessage
-                      ? "teams-chat-message teams-chat-message-own"
-                      : "teams-chat-message"
-                  }
-                  key={message.id}
-                >
-                  {!ownMessage && (
-                    <span className="user-avatar teams-avatar">
-                      {initials(message.author_name)}
-                    </span>
-                  )}
-                  <div className="teams-chat-message-column">
-                    {!ownMessage && (
-                      <div className="teams-message-meta">
-                        <strong>{message.author_name}</strong>
-                        <span>{roleName(message.author_role)}</span>
-                      </div>
-                    )}
-                    <div className="teams-chat-bubble">
-                      <MentionedMessage
-                        body={message.body}
-                        currentUserId={profile.id}
-                        members={members}
-                      />
-                    </div>
-                    <time dateTime={message.created_at}>
-                      {formatTimestamp(message.created_at)}
-                    </time>
-                  </div>
-                </article>
-              );
-            })
-          )}
-          <div ref={feedEndRef} />
-        </div>
-
-        <form className="teams-message-composer" onSubmit={submitMessage}>
-          <input
-            name="channel_id"
-            type="hidden"
-            value={activeChannel.channel_id}
-          />
-          <MentionTextarea
-            className="textarea teams-message-composer-textarea"
-            id="channel-message"
-            members={members}
-            name="body"
-            placeholder={`Message ${activeChannel.channel_name}`}
-            rows={2}
-          />
-          <div className="teams-message-composer-actions">
-            <span>{status}</span>
-            <button
-              className="button button-dark"
-              disabled={isPending}
-              type="submit"
-            >
-              {isPending ? "Sending…" : "Send"}
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  }
-
   return (
-    <div className="teams-chat-shell">
-      <aside className="teams-channel-rail">
-        <div className="teams-channel-rail-heading">
-          <span className="eyebrow">GHSMTA Teams</span>
-          <h2>Chat</h2>
-          <p>Community threads and channel messages</p>
+    <div className={styles.shell}>
+      <aside className={styles.rail}>
+        <div className={styles.railHeader}>
+          <div>
+            <span className="eyebrow">Messages</span>
+            <h2>Chat workspace</h2>
+          </div>
+          {totalUnread > 0 && (
+            <span className={styles.totalUnread}>
+              {totalUnread > 99 ? "99+" : totalUnread}
+            </span>
+          )}
         </div>
 
-        <div className="teams-channel-search field">
-          <label htmlFor="channel-search">Find a channel</label>
+        <div className={styles.filters}>
+          <label className="sr-only" htmlFor="channel-search">
+            Search channels
+          </label>
           <input
-            className="input"
+            className={`input ${styles.searchInput}`}
             id="channel-search"
             onChange={(event) => setChannelSearch(event.target.value)}
-            placeholder="School or channel name"
+            placeholder="Search schools or messages"
             type="search"
             value={channelSearch}
           />
+          <button
+            aria-pressed={showUnreadOnly}
+            className={
+              showUnreadOnly
+                ? `${styles.unreadFilter} ${styles.unreadFilterActive}`
+                : styles.unreadFilter
+            }
+            onClick={() => setShowUnreadOnly((current) => !current)}
+            type="button"
+          >
+            Unread only
+          </button>
         </div>
 
-        <nav className="teams-channel-list" aria-label="Chat channels">
-          {groups.map((group) => (
-            <section className="teams-channel-group" key={group.label}>
-              <h3>{group.label}</h3>
-              {group.channels.map((channel) => (
-                <Link
-                  className={
-                    channel.channel_id === selectedChannelId
-                      ? "teams-channel-link teams-channel-link-active"
-                      : "teams-channel-link"
-                  }
-                  href={`/portal/chat?channel=${channel.channel_id}`}
-                  key={channel.channel_id}
-                >
-                  <span className="teams-channel-icon" aria-hidden="true">
-                    {channelIcon(channel.channel_type)}
-                  </span>
-                  <span className="teams-channel-link-copy">
-                    <strong>{channel.channel_name}</strong>
-                    {channel.channel_type === "school" &&
-                      channel.production_title && (
-                        <small>{channel.production_title}</small>
-                      )}
-                  </span>
-                  {channel.unread_count > 0 && (
-                    <span className="teams-unread-badge">
-                      {channel.unread_count > 99 ? "99+" : channel.unread_count}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </section>
-          ))}
-        </nav>
+        <ChannelNavigation
+          groups={groups}
+          selectedChannelId={selectedChannelId}
+        />
       </aside>
 
-      <section className="teams-conversation-panel">
-        <header className="teams-channel-header">
-          <div>
-            <span className="eyebrow">
-              {isThreaded ? "Threaded community" : "Channel messages"}
+      <section className={styles.conversation}>
+        <header className={styles.channelHeader}>
+          <div className={styles.channelIdentity}>
+            <span
+              className={`${styles.headerIcon} ${styles[`channelIcon_${activeChannel.channel_type}`]}`}
+              aria-hidden="true"
+            >
+              {channelIcon(activeChannel.channel_type)}
             </span>
-            <h1>{activeChannel.channel_name}</h1>
-            <p>
-              {activeChannel.channel_description ??
-                (isThreaded
-                  ? "Start topics and continue the discussion in threads."
-                  : "A chronological message feed for this channel.")}
-            </p>
+            <div>
+              <div className={styles.channelEyebrowRow}>
+                <span className="eyebrow">
+                  {isThreaded ? "Threaded community" : "Live channel"}
+                </span>
+                {activeChannel.application_archived && (
+                  <span className={styles.archivedBadge}>Archived</span>
+                )}
+              </div>
+              <h1>{activeChannel.channel_name}</h1>
+              <p>
+                {activeChannel.production_title && (
+                  <strong>{activeChannel.production_title} · </strong>
+                )}
+                {activeChannel.channel_description}
+              </p>
+            </div>
           </div>
 
-          <label className="teams-mobile-channel-picker">
-            <span>Channel</span>
+          <div className={styles.headerMeta}>
+            <span className={styles.visibilityPill}>
+              {activeChannel.visibility_label}
+            </span>
+            <div className={styles.memberSummary}>
+              <div className={styles.memberAvatars} aria-hidden="true">
+                {members.slice(0, 4).map((member) => (
+                  <span className={styles.memberAvatar} key={member.user_id}>
+                    {initials(member.display_name)}
+                  </span>
+                ))}
+              </div>
+              <span>
+                {members.length} {members.length === 1 ? "member" : "members"}
+              </span>
+            </div>
+          </div>
+
+          <label className={styles.mobilePicker}>
+            <span>Conversation</span>
             <select
               className="select"
-              onChange={(event) => {
-                router.push(`/portal/chat?channel=${event.target.value}`);
-              }}
+              onChange={(event) =>
+                router.push(`/portal/chat?channel=${event.target.value}`)
+              }
               value={activeChannel.channel_id}
             >
-              {channels.map((channel) => (
-                <option value={channel.channel_id} key={channel.channel_id}>
-                  {channel.channel_name}
-                </option>
+              {groups.map((group) => (
+                <optgroup key={group.key} label={group.label}>
+                  {group.channels.map((channel) => (
+                    <option value={channel.channel_id} key={channel.channel_id}>
+                      {channel.channel_name}
+                      {channel.unread_count > 0
+                        ? ` (${channel.unread_count} unread)`
+                        : ""}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
         </header>
 
-        {channelContent}
+        {status && (
+          <div className={styles.statusBanner} role="status">
+            {status}
+          </div>
+        )}
+
+        {isThreaded ? (
+          <div className={styles.threadWorkspace}>
+            <form className={styles.newThread} onSubmit={submitPost}>
+              <div className={styles.newThreadHeading}>
+                <span className={styles.avatar}>
+                  {initials(profile.full_name ?? profile.email ?? "User")}
+                </span>
+                <div>
+                  <strong>Start a conversation</strong>
+                  <p>Post a topic, then continue it as a thread.</p>
+                </div>
+              </div>
+
+              <div className="field">
+                <label htmlFor="chat-subject">Subject</label>
+                <input
+                  className="input"
+                  id="chat-subject"
+                  maxLength={180}
+                  name="subject"
+                  placeholder="What is this conversation about?"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="chat-body">Message</label>
+                <MentionTextarea
+                  id="chat-body"
+                  members={members}
+                  name="body"
+                  placeholder="Write a message to Community Chat"
+                  rows={4}
+                />
+              </div>
+
+              <div className={styles.composerFooter}>
+                <span>Visible to school applicants and GHSMTA Owners.</span>
+                <button
+                  className="button button-dark"
+                  disabled={isPending}
+                  type="submit"
+                >
+                  {isPending ? "Posting…" : "Post conversation"}
+                </button>
+              </div>
+            </form>
+
+            <div className={styles.threadFeed} aria-live="polite">
+              {threads.length === 0 ? (
+                <div className={`empty-state ${styles.threadEmpty}`}>
+                  <h2>No conversations yet.</h2>
+                  <p>Start the first Community Chat topic.</p>
+                </div>
+              ) : (
+                threads.map((thread) => (
+                  <article className={styles.threadCard} key={thread.post_id}>
+                    <div className={styles.threadRoot}>
+                      <span className={styles.avatar}>
+                        {initials(thread.author_name)}
+                      </span>
+                      <div className={styles.threadContent}>
+                        <div className={styles.messageMeta}>
+                          <strong>{thread.author_name}</strong>
+                          <span>{roleName(thread.author_role)}</span>
+                          <time dateTime={thread.created_at}>
+                            {formatFullTimestamp(thread.created_at)}
+                          </time>
+                        </div>
+
+                        <div className={styles.threadTitleRow}>
+                          <h2>{thread.subject}</h2>
+                          <div className={styles.threadBadges}>
+                            {thread.pinned && <span>Pinned</span>}
+                            {thread.locked && <span>Locked</span>}
+                          </div>
+                        </div>
+
+                        <p className={styles.messageBody}>
+                          <MentionedMessage
+                            body={thread.body}
+                            currentUserId={profile.id}
+                            members={members}
+                          />
+                        </p>
+
+                        {profile.role === "owner" && (
+                          <div className={styles.ownerControls}>
+                            <button
+                              className="button button-secondary button-compact"
+                              disabled={isPending}
+                              onClick={() => moderate(thread.post_id, "pin")}
+                              type="button"
+                            >
+                              {thread.pinned ? "Unpin" : "Pin"}
+                            </button>
+                            <button
+                              className="button button-secondary button-compact"
+                              disabled={isPending}
+                              onClick={() => moderate(thread.post_id, "lock")}
+                              type="button"
+                            >
+                              {thread.locked ? "Unlock replies" : "Lock replies"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={styles.replyThread}>
+                      {thread.replies.map((reply) => (
+                        <div className={styles.reply} key={reply.id}>
+                          <span
+                            className={`${styles.avatar} ${styles.avatarSmall}`}
+                          >
+                            {initials(reply.author_name)}
+                          </span>
+                          <div>
+                            <div className={styles.messageMeta}>
+                              <strong>{reply.author_name}</strong>
+                              <span>{roleName(reply.author_role)}</span>
+                              <time dateTime={reply.created_at}>
+                                {formatFullTimestamp(reply.created_at)}
+                              </time>
+                            </div>
+                            <p className={styles.messageBody}>
+                              <MentionedMessage
+                                body={reply.body}
+                                currentUserId={profile.id}
+                                members={members}
+                              />
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+
+                      {!thread.locked ? (
+                        <form
+                          className={styles.replyForm}
+                          onSubmit={submitReply}
+                        >
+                          <input
+                            name="channel_id"
+                            type="hidden"
+                            value={activeChannel.channel_id}
+                          />
+                          <input
+                            name="post_id"
+                            type="hidden"
+                            value={thread.post_id}
+                          />
+                          <label
+                            className="sr-only"
+                            htmlFor={`reply-${thread.post_id}`}
+                          >
+                            Reply to {thread.subject}
+                          </label>
+                          <MentionTextarea
+                            id={`reply-${thread.post_id}`}
+                            members={members}
+                            name="body"
+                            placeholder="Reply to this conversation"
+                            rows={2}
+                            submitOnEnter
+                          />
+                          <button
+                            className="button button-secondary button-compact"
+                            disabled={isPending}
+                            type="submit"
+                          >
+                            Reply
+                          </button>
+                        </form>
+                      ) : (
+                        <p className={styles.lockedNote}>
+                          Replies are closed for this conversation.
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className={styles.messageWorkspace}>
+            <div className={styles.messageFeed} aria-live="polite">
+              {messages.length === 0 ? (
+                <div className={`empty-state ${styles.messageEmpty}`}>
+                  <h2>No messages yet.</h2>
+                  <p>Send the first message in this conversation.</p>
+                </div>
+              ) : (
+                messages.map((message, index) => {
+                  const ownMessage = message.author_id === profile.id;
+                  const previous = messages[index - 1];
+                  const showDay =
+                    !previous ||
+                    new Date(previous.created_at).toDateString() !==
+                      new Date(message.created_at).toDateString();
+
+                  return (
+                    <Fragment key={message.id}>
+                      {showDay && (
+                        <div className={styles.dayDivider}>
+                          <span>{formatDay(message.created_at)}</span>
+                        </div>
+                      )}
+                      <article
+                        className={
+                          ownMessage
+                            ? `${styles.chatMessage} ${styles.chatMessageOwn}`
+                            : styles.chatMessage
+                        }
+                      >
+                        {!ownMessage && (
+                          <span className={styles.avatar}>
+                            {initials(message.author_name)}
+                          </span>
+                        )}
+                        <div className={styles.chatMessageColumn}>
+                          {!ownMessage && (
+                            <div className={styles.messageMeta}>
+                              <strong>{message.author_name}</strong>
+                              <span>{roleName(message.author_role)}</span>
+                            </div>
+                          )}
+                          <div className={styles.chatBubble}>
+                            <MentionedMessage
+                              body={message.body}
+                              currentUserId={profile.id}
+                              members={members}
+                            />
+                          </div>
+                          <time dateTime={message.created_at}>
+                            {formatTime(message.created_at)}
+                          </time>
+                        </div>
+                      </article>
+                    </Fragment>
+                  );
+                })
+              )}
+              <div ref={feedEndRef} />
+            </div>
+
+            <form className={styles.messageComposer} onSubmit={submitMessage}>
+              <input
+                name="channel_id"
+                type="hidden"
+                value={activeChannel.channel_id}
+              />
+              <MentionTextarea
+                id="channel-message"
+                members={members}
+                name="body"
+                placeholder={`Message ${activeChannel.channel_name}`}
+                rows={2}
+                submitOnEnter
+              />
+              <div className={styles.composerFooter}>
+                <span>{activeChannel.visibility_label}</span>
+                <button
+                  className="button button-dark"
+                  disabled={isPending}
+                  type="submit"
+                >
+                  {isPending ? "Sending…" : "Send"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </section>
     </div>
   );

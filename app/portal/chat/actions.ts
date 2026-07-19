@@ -130,7 +130,7 @@ export async function createChatReply(
   if (channel.channel_type !== "applicant_community") {
     return {
       ok: false,
-      error: "Replies are only available in Applicant Community.",
+      error: "Replies are only available in Community Chat.",
     };
   }
 
@@ -180,7 +180,7 @@ export async function createChatMessage(
   if (channel.channel_type === "applicant_community") {
     return {
       ok: false,
-      error: "Start a threaded conversation in Applicant Community instead.",
+      error: "Start a threaded conversation in Community Chat instead.",
     };
   }
 
