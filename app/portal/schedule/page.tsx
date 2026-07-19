@@ -276,27 +276,31 @@ export default async function SchedulePage({
   const scheduleSearch = (params.q ?? "").trim();
   const supabase = await createClient();
 
-  const [
-    { data: slotData, error: slotError },
-    { data: cycleData },
-    { data: serverTimeData },
-  ] = await Promise.all([
-    supabase
-      .from("schedule_slots")
-      .select(
-        "id,cycle_id,title,starts_at,ends_at,location,school_instructions,status,school_booking_opens_at,school_booking_closes_at,series_id,series_sequence,created_at,updated_at",
-      )
-      .order("starts_at", { ascending: true }),
+  const [{ data: cycleData }, { data: serverTimeData }] = await Promise.all([
     supabase
       .from("award_cycles")
       .select(
         "id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at",
       )
+      .eq("is_active", true)
+      .neq("status", "archived")
       .order("season_year", { ascending: false })
       .order("name"),
     supabase.rpc("get_schedule_server_time"),
   ]);
 
+  const cycles = (cycleData ?? []) as AwardCycle[];
+  const activeCycleIds = cycles.map((cycle) => cycle.id);
+  const slotResult = activeCycleIds.length
+    ? await supabase
+        .from("schedule_slots")
+        .select(
+          "id,cycle_id,title,starts_at,ends_at,location,school_instructions,status,school_booking_opens_at,school_booking_closes_at,series_id,series_sequence,created_at,updated_at",
+        )
+        .in("cycle_id", activeCycleIds)
+        .order("starts_at", { ascending: true })
+    : { data: [], error: null };
+  const { data: slotData, error: slotError } = slotResult;
   const slots = (slotData ?? []) as ScheduleSlot[];
   const { data: schoolDetailsData, error: schoolDetailsError } = slots.length
     ? await supabase
@@ -307,7 +311,6 @@ export default async function SchedulePage({
   if (schoolDetailsError) throw new Error(schoolDetailsError.message);
   const schoolDetails = (schoolDetailsData ?? []) as ScheduleSlotSchoolDetails[];
   const schoolDetailsMap = new Map(schoolDetails.map((details) => [details.slot_id, details]));
-  const cycles = (cycleData ?? []) as AwardCycle[];
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const serverTime = new Date(String(serverTimeData)).getTime();
 
@@ -339,8 +342,13 @@ export default async function SchedulePage({
       supabase.rpc("get_schedule_staff_directory"),
     ]);
 
-    staffBookings = (bookingData ?? []) as StaffBooking[];
-    staffDirectory = (directoryData ?? []) as StaffEnrollment[];
+    const activeSlotIds = new Set(slots.map((slot) => slot.id));
+    staffBookings = ((bookingData ?? []) as StaffBooking[]).filter(
+      (booking) => activeSlotIds.has(booking.slot_id),
+    );
+    staffDirectory = ((directoryData ?? []) as StaffEnrollment[]).filter(
+      (enrollment) => activeSlotIds.has(enrollment.slot_id),
+    );
 
     if (profile.role === "owner" || profile.role === "advisory_member") {
       const { data: profileData } = await supabase
@@ -366,14 +374,18 @@ export default async function SchedulePage({
     }
   }
 
-  const { data: waitlistData, error: waitlistError } = await supabase
-    .from("schedule_date_waitlist")
-    .select(
-      "id,cycle_id,application_id,requested_date,time_preference,status,offered_slot_id,offer_expires_at,applicant_notes,owner_notes,created_at,updated_at",
-    )
-    .in("status", ["waiting", "offered", "accepted"])
-    .order("requested_date", { ascending: true })
-    .order("created_at", { ascending: true });
+  const waitlistResult = activeCycleIds.length
+    ? await supabase
+        .from("schedule_date_waitlist")
+        .select(
+          "id,cycle_id,application_id,requested_date,time_preference,status,offered_slot_id,offer_expires_at,applicant_notes,owner_notes,created_at,updated_at",
+        )
+        .in("cycle_id", activeCycleIds)
+        .in("status", ["waiting", "offered", "accepted"])
+        .order("requested_date", { ascending: true })
+        .order("created_at", { ascending: true })
+    : { data: [], error: null };
+  const { data: waitlistData, error: waitlistError } = waitlistResult;
 
   if (waitlistError) {
     throw new Error(`Schedule waitlist could not be loaded: ${waitlistError.message}`);
@@ -613,10 +625,15 @@ export default async function SchedulePage({
             {profile.role === "applicant"
               ? "Choose one available GHSMTA schedule slot for your school."
               : profile.role === "owner"
-                ? "Build schedule slots, manage school reservations, and coordinate adjudicators and advisory members."
-                : "Join the schedule slots you can attend and see the other participating reviewers."}
+                ? "Build active schedule slots, manage school reservations, and coordinate adjudicators and advisory members."
+                : "Join the active schedule slots you can attend and see the other participating reviewers."}
           </p>
         </div>
+        {profile.role === "owner" && (
+          <Link className="button button-secondary" href="/portal/admin/archive#schedule-archive">
+            View archived schedule
+          </Link>
+        )}
       </div>
 
       {params.success && <div className="success-banner">{params.success}</div>}

@@ -14,6 +14,7 @@ export default async function FormsPage() {
     supabase
       .from("award_cycles")
       .select("id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at")
+      .neq("status", "archived")
       .order("season_year", { ascending: false }),
     supabase
       .from("application_form_versions")
@@ -22,7 +23,10 @@ export default async function FormsPage() {
   ]);
 
   const awardCycles = (cycles ?? []) as AwardCycle[];
-  const formVersions = (versions ?? []) as ApplicationFormVersion[];
+  const activeCycleIds = new Set(awardCycles.map((cycle) => cycle.id));
+  const formVersions = ((versions ?? []) as ApplicationFormVersion[]).filter(
+    (version) => activeCycleIds.has(version.cycle_id) && version.status !== "archived",
+  );
   const cycleMap = new Map(awardCycles.map((cycle) => [cycle.id, cycle]));
 
   return (

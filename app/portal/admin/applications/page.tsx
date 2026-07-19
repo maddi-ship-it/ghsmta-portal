@@ -24,7 +24,6 @@ type ApplicationSearchParams = {
   cycle?: string;
   program?: string;
   status?: string;
-  source?: string;
   sort?: ApplicationSort;
   direction?: SortDirection;
   archived?: string;
@@ -68,18 +67,23 @@ export default async function ApplicationsPage({
       .from("applications")
       .select(
         "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_at,archived_by,archive_reason,archived_payload,cloned_from_application_id,created_at,updated_at",
-      ),
+      )
+      .eq("is_archived", false),
     supabase
       .from("award_cycles")
       .select(
         "id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at",
       )
+      .neq("status", "archived")
       .order("season_year", { ascending: false })
       .order("name"),
   ]);
 
-  const applications = (data ?? []) as Application[];
   const cycles = (cycleData ?? []) as AwardCycle[];
+  const activeCycleIds = new Set(cycles.map((cycle) => cycle.id));
+  const applications = ((data ?? []) as Application[]).filter(
+    (application) => activeCycleIds.has(application.cycle_id),
+  );
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const existingCycleIds = new Set(
     applications.map((application) => application.cycle_id),
@@ -93,7 +97,6 @@ export default async function ApplicationsPage({
   const selectedCycle = params.cycle ?? "";
   const selectedProgram = params.program ?? "";
   const selectedStatus = params.status ?? "";
-  const selectedSource = params.source ?? "";
   const sort = params.sort ?? "updated";
   const direction = params.direction ?? "desc";
 
@@ -103,8 +106,6 @@ export default async function ApplicationsPage({
     if (selectedCycle && application.cycle_id !== selectedCycle) return false;
     if (selectedProgram && cycle?.program_type !== selectedProgram) return false;
     if (selectedStatus && application.status !== selectedStatus) return false;
-    if (selectedSource === "archive" && !application.is_archived) return false;
-    if (selectedSource === "portal" && application.is_archived) return false;
     return true;
   });
 
@@ -142,7 +143,7 @@ export default async function ApplicationsPage({
   const programTypes = [...new Set(cycles.map((cycle) => cycle.program_type))].sort();
   const statusOptions = [...new Set(applications.map((application) => application.status))].sort();
   const hasFilters = Boolean(
-    search || selectedCycle || selectedProgram || selectedStatus || selectedSource,
+    search || selectedCycle || selectedProgram || selectedStatus,
   );
 
   return (
@@ -153,9 +154,14 @@ export default async function ApplicationsPage({
           <p>
             {profile.role === "applicant"
               ? "Start and manage each program application available to you."
-              : "Search, filter, sort, and review applications visible under your access level."}
+              : "Search, filter, sort, and review active applications visible under your access level."}
           </p>
         </div>
+        {profile.role === "owner" && (
+          <Link className="button button-secondary" href="/portal/admin/archive">
+            View archive
+          </Link>
+        )}
       </div>
 
       {params.error && (
@@ -273,14 +279,6 @@ export default async function ApplicationsPage({
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="source">Source</label>
-                <select className="select" defaultValue={selectedSource} id="source" name="source">
-                  <option value="">All sources</option>
-                  <option value="portal">Portal</option>
-                  <option value="archive">Archive</option>
-                </select>
-              </div>
-              <div className="field">
                 <label htmlFor="sort">Sort by</label>
                 <select className="select" defaultValue={sort} id="sort" name="sort">
                   <option value="updated">Last updated</option>
@@ -325,9 +323,8 @@ export default async function ApplicationsPage({
           <form action={setApplicationArchiveState} className="application-archive-form">
             {profile.role === "owner" && (
               <div className="application-archive-toolbar">
-                <div><strong>Application archive</strong><small>Select one or more records. Archiving preserves forms, files, chat history, scheduling, and scoring.</small></div>
+                <div><strong>Archive applications</strong><small>Select active records to move them out of every main workspace. Historical data remains available under View archive.</small></div>
                 <input className="input" name="archive_reason" placeholder="Optional archive reason" />
-                <button className="button button-secondary button-compact" name="bulk_archive_action" type="submit" value="restore">Restore selected</button>
                 <button className="button button-dark button-compact" name="bulk_archive_action" type="submit" value="archive">Archive selected</button>
               </div>
             )}
@@ -368,7 +365,7 @@ export default async function ApplicationsPage({
                         </span>
                       </td>
                       <td>
-                        {application.is_archived ? <span className="badge">Archive</span> : "Portal"}
+                        {application.source_system ? "Imported" : "Portal"}
                       </td>
                       <td>
                         <span className="table-date">
@@ -385,9 +382,7 @@ export default async function ApplicationsPage({
                         <div className="application-row-actions">
                           <Link href={`/portal/applications/${application.id}`}>Open</Link>
                           {profile.role === "owner" && (
-                            application.is_archived
-                              ? <button className="text-button" name="single_restore_id" type="submit" value={application.id}>Restore</button>
-                              : <button className="text-button danger-text" name="single_archive_id" type="submit" value={application.id}>Archive</button>
+                            <button className="text-button danger-text" name="single_archive_id" type="submit" value={application.id}>Archive</button>
                           )}
                         </div>
                       </td>

@@ -47,7 +47,7 @@ export default async function ScoringAdminPage({
     criteriaResult,
     promptsResult,
   ] = await Promise.all([
-    supabase.from("award_cycles").select("*").order("season_year", { ascending: false }).order("name"),
+    supabase.from("award_cycles").select("*").neq("status", "archived").order("season_year", { ascending: false }).order("name"),
     supabase.from("applications").select("*").eq("is_archived", false).order("school_name"),
     supabase.from("profiles").select("id,email,full_name,role,active").eq("role", "adjudicator").eq("active", true).order("full_name"),
     supabase.from("adjudicator_assignments").select("*").order("assigned_at", { ascending: false }),
@@ -58,10 +58,18 @@ export default async function ScoringAdminPage({
   ]);
 
   const cycles = (cyclesResult.data ?? []) as AwardCycle[];
-  const applications = (applicationsResult.data ?? []) as Application[];
+  const activeCycleIds = new Set(cycles.map((cycle) => cycle.id));
+  const applications = ((applicationsResult.data ?? []) as Application[]).filter(
+    (application) => activeCycleIds.has(application.cycle_id),
+  );
+  const activeApplicationIds = new Set(applications.map((application) => application.id));
   const adjudicators = (adjudicatorsResult.data ?? []) as Profile[];
-  const assignments = (assignmentsResult.data ?? []) as AdjudicatorAssignment[];
-  const rubrics = (rubricsResult.data ?? []) as ScoringRubric[];
+  const assignments = ((assignmentsResult.data ?? []) as AdjudicatorAssignment[]).filter(
+    (assignment) => activeApplicationIds.has(assignment.application_id),
+  );
+  const rubrics = ((rubricsResult.data ?? []) as ScoringRubric[]).filter(
+    (rubric) => activeCycleIds.has(rubric.cycle_id) && rubric.status !== "archived",
+  );
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
   const criteria = (criteriaResult.data ?? []) as ScoringCriterion[];
   const prompts = (promptsResult.data ?? []) as AiPromptTemplate[];

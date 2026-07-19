@@ -123,6 +123,12 @@ function navItems(
         label: "Users",
         icon: "♙",
       },
+      {
+        href: "/portal/admin/archive",
+        label: "View archive",
+        shortLabel: "Archive",
+        icon: "▥",
+      },
     );
   }
 

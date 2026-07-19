@@ -16,6 +16,7 @@ export default async function ReleasedResultsPage() {
   const { data: applicationData, error: applicationError } = await supabase
     .from("applications")
     .select("*")
+    .eq("is_archived", false)
     .order("updated_at", { ascending: false });
   if (applicationError) throw new Error(applicationError.message);
   const applications = (applicationData ?? []) as Application[];

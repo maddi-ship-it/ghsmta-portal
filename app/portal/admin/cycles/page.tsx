@@ -30,6 +30,7 @@ export default async function CyclesPage() {
     .select(
       "id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at",
     )
+    .neq("status", "archived")
     .order("season_year", { ascending: false })
     .order("name");
 
@@ -45,6 +46,11 @@ export default async function CyclesPage() {
             open at the same time.
           </p>
         </div>
+        {profile.role === "owner" && (
+          <a className="button button-secondary" href="/portal/admin/archive">
+            View archive
+          </a>
+        )}
       </div>
 
       <div className="split-grid">

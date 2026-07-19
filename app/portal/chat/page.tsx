@@ -90,7 +90,7 @@ function normalizeChannels(rows: RawChannel[]): ChatChannel[] {
 export default async function ChatPage({
   searchParams,
 }: {
-  searchParams: Promise<{ channel?: string }>;
+  searchParams: Promise<{ channel?: string; archive?: string }>;
 }) {
   const profile = await requireProfile();
   const supabase = await createClient();
@@ -112,11 +112,22 @@ export default async function ChatPage({
     throw new Error(`Chat channels could not be loaded: ${channelError.message}`);
   }
 
-  let channels = normalizeChannels(channelRows ?? []);
-  const requestedChannel = channels.find(
+  const normalizedChannels = normalizeChannels(channelRows ?? []);
+  const requestedChannel = normalizedChannels.find(
     (channel) => channel.channel_id === params.channel,
   );
-  const selectedChannel = requestedChannel ?? channels[0] ?? null;
+  const archiveMode =
+    profile.role === "owner" &&
+    (params.archive === "1" || Boolean(requestedChannel?.application_archived));
+  let channels = normalizedChannels.filter((channel) =>
+    archiveMode
+      ? channel.application_archived
+      : !channel.application_archived,
+  );
+  const visibleRequestedChannel = channels.find(
+    (channel) => channel.channel_id === params.channel,
+  );
+  const selectedChannel = visibleRequestedChannel ?? channels[0] ?? null;
 
   let threads: ChatThread[] = [];
   let members: ChatMember[] = [];

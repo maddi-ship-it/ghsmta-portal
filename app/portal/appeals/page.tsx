@@ -36,12 +36,31 @@ export default async function AppealsPage() {
       supabase
         .from("award_cycles")
         .select("id,name,season_year")
+        .eq("is_active", true)
+        .neq("status", "archived")
         .order("season_year", { ascending: false }),
     ]);
 
   for (const result of [applicationsResult, appealsResult, categoriesResult, filesResult, cyclesResult]) {
     if (result.error) throw new Error(result.error.message);
   }
+
+  const activeCycleIds = new Set(
+    (cyclesResult.data ?? []).map((cycle) => cycle.id),
+  );
+  const applications = (applicationsResult.data ?? []).filter((application) =>
+    activeCycleIds.has(application.cycle_id),
+  );
+  const activeApplicationIds = new Set(
+    applications.map((application) => application.id),
+  );
+  const appeals = (appealsResult.data ?? []).filter((appeal) =>
+    activeApplicationIds.has(appeal.application_id),
+  );
+  const activeAppealIds = new Set(appeals.map((appeal) => appeal.id));
+  const files = (filesResult.data ?? []).filter((file) =>
+    activeAppealIds.has(file.context_id),
+  );
 
   return (
     <>
@@ -57,11 +76,11 @@ export default async function AppealsPage() {
       </div>
 
       <AppealWorkspace
-        appeals={appealsResult.data ?? []}
-        applications={applicationsResult.data ?? []}
+        appeals={appeals}
+        applications={applications}
         categories={categoriesResult.data ?? []}
         cycles={cyclesResult.data ?? []}
-        files={filesResult.data ?? []}
+        files={files}
         profile={profile}
       />
     </>

@@ -4765,3 +4765,25 @@ body.modal-open {
 .schedule-waitlist-disclosure[open] > summary::after {
   content: "Hide waitlist";
 }
+
+/* Owner archive workspace */
+.archive-jump-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+
+.archive-jump-nav a {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  padding: 9px 14px;
+}
+
+.archive-jump-nav a:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}

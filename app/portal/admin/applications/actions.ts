@@ -86,8 +86,15 @@ export async function setApplicationArchiveState(formData: FormData) {
   });
 
   if (error) throw new Error(error.message);
+  revalidatePath("/portal");
   revalidatePath("/portal/admin/applications");
+  revalidatePath("/portal/admin/archive");
   revalidatePath("/portal/adjudication");
+  revalidatePath("/portal/schedule");
   revalidatePath("/portal/chat");
-  redirect(`/portal/admin/applications?${archived ? "archived" : "restored"}=${Number(data ?? applicationIds.length)}`);
+  const returnTo = String(formData.get("return_to") ?? "").trim();
+  const targetPath = returnTo === "archive"
+    ? "/portal/admin/archive"
+    : "/portal/admin/applications";
+  redirect(`${targetPath}?${archived ? "archived" : "restored"}=${Number(data ?? applicationIds.length)}`);
 }

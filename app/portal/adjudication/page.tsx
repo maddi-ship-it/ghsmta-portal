@@ -13,8 +13,13 @@ export default async function AdjudicationDashboard() {
   const profile = await requireProfile(["adjudicator", "advisory_member", "owner"]);
   const supabase = await createClient();
 
-  const cyclesResult = await supabase.from("award_cycles").select("*");
+  const cyclesResult = await supabase
+    .from("award_cycles")
+    .select("*")
+    .eq("is_active", true)
+    .neq("status", "archived");
   const cycles = (cyclesResult.data ?? []) as AwardCycle[];
+  const activeCycleIds = cycles.map((cycle) => cycle.id);
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
 
   let applications: Application[] = [];
@@ -27,23 +32,35 @@ export default async function AdjudicationDashboard() {
       .eq("adjudicator_user_id", profile.id)
       .order("assigned_at", { ascending: false });
     if (assignmentError) throw new Error(assignmentError.message);
-    assignments = (assignmentData ?? []) as AdjudicatorAssignment[];
+    const candidateAssignments = (assignmentData ?? []) as AdjudicatorAssignment[];
 
-    const applicationIds = assignments.map((assignment) => assignment.application_id);
-    if (applicationIds.length > 0) {
+    const applicationIds = candidateAssignments.map(
+      (assignment) => assignment.application_id,
+    );
+    if (applicationIds.length > 0 && activeCycleIds.length > 0) {
       const { data, error } = await supabase
         .from("applications")
         .select("*")
         .in("id", applicationIds)
+        .in("cycle_id", activeCycleIds)
+        .eq("is_archived", false)
         .order("school_name");
       if (error) throw new Error(error.message);
       applications = (data ?? []) as Application[];
     }
-  } else {
+
+    const activeApplicationIds = new Set(
+      applications.map((application) => application.id),
+    );
+    assignments = candidateAssignments.filter((assignment) =>
+      activeApplicationIds.has(assignment.application_id),
+    );
+  } else if (activeCycleIds.length > 0) {
     const [{ data: applicationData, error: applicationError }, { data: assignmentData, error: assignmentError }] = await Promise.all([
       supabase
         .from("applications")
         .select("*")
+        .in("cycle_id", activeCycleIds)
         .eq("is_archived", false)
         .in("status", ["submitted", "under_review", "complete"])
         .order("school_name"),
@@ -52,7 +69,12 @@ export default async function AdjudicationDashboard() {
     if (applicationError) throw new Error(applicationError.message);
     if (assignmentError) throw new Error(assignmentError.message);
     applications = (applicationData ?? []) as Application[];
-    assignments = (assignmentData ?? []) as AdjudicatorAssignment[];
+    const activeApplicationIds = new Set(
+      applications.map((application) => application.id),
+    );
+    assignments = ((assignmentData ?? []) as AdjudicatorAssignment[]).filter(
+      (assignment) => activeApplicationIds.has(assignment.application_id),
+    );
   }
 
   const applicationIds = applications.map((application) => application.id);
@@ -119,7 +141,12 @@ export default async function AdjudicationDashboard() {
           <h1>{profile.role === "adjudicator" ? "My adjudication assignments" : "Adjudication review"}</h1>
           <p>{profile.role === "adjudicator" ? "Score assigned productions and complete all four comment quadrants before submitting." : "Review panel scorecards, synthesize comments, and prepare owner-controlled school releases."}</p>
         </div>
-        {profile.role === "owner" && <Link className="button button-dark" href="/portal/admin/scoring">Scoring setup</Link>}
+        {profile.role === "owner" && (
+          <div className="heading-actions">
+            <Link className="button button-secondary" href="/portal/admin/archive#assignment-archive">View archive</Link>
+            <Link className="button button-dark" href="/portal/admin/scoring">Scoring setup</Link>
+          </div>
+        )}
       </div>
 
       <section className="metric-grid" aria-label="Adjudication overview">

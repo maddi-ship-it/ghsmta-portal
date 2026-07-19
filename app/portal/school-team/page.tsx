@@ -79,7 +79,11 @@ export default async function SchoolTeamPage({
     throw new Error(error.message);
   }
 
-  const applications = groupByApplication((data ?? []) as TeamWorkspaceRow[]);
+  const applications = groupByApplication(
+    ((data ?? []) as TeamWorkspaceRow[]).filter(
+      (row) => !row.application_archived,
+    ),
+  );
 
   return (
     <>

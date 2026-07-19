@@ -9,9 +9,12 @@ export default async function PortalDashboard() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("applications")
-    .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,form_data,owner_notes,created_at,updated_at")
+    .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,form_data,owner_notes,created_at,updated_at,award_cycles!inner(is_active,status)")
+    .eq("is_archived", false)
+    .eq("award_cycles.is_active", true)
+    .neq("award_cycles.status", "archived")
     .order("updated_at", { ascending: false });
-  const applications = (data ?? []) as Application[];
+  const applications = (data ?? []) as unknown as Application[];
 
   const counts = {
     total: applications.length,
