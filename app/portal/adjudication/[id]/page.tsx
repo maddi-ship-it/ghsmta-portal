@@ -6,7 +6,12 @@ import {
   quarterScoreOptions,
 } from "@/lib/adjudication";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
+import {
+  buildApplicationReferencePanels,
+  type ApplicationReferencePanel,
+} from "@/lib/application-reference-panels";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
+import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
@@ -34,6 +39,55 @@ import {
   releaseAdjudicationResults,
   saveAdjudicatorScorecard,
 } from "./actions";
+
+
+type ScheduleBookingReference = {
+  slot_id: string;
+  application_id: string;
+  school_name: string;
+  production_title: string | null;
+  booked_at: string;
+};
+
+type ScheduleStaffReference = {
+  slot_id: string;
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
+};
+
+type ScheduleSlotReference = {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  location: string | null;
+  school_instructions: string | null;
+  status: string;
+};
+
+const EASTERN_TIME_ZONE = "America/New_York";
+
+function formatReferenceDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatReferenceTime(start: string, end: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return `${formatter.format(new Date(start))}–${formatter.format(new Date(end))} ET`;
+}
 
 function scorecardStatusLabel(status: string) {
   return status.replaceAll("_", " ");
@@ -93,10 +147,21 @@ export default async function AdjudicationApplicationPage({
     throw new Error(applicationAnswersResult.error.message);
   }
 
+  const applicationQuestions =
+    (applicationQuestionsResult.data ?? []) as ApplicationQuestion[];
+  const applicationAnswers =
+    (applicationAnswersResult.data ?? []) as ApplicationAnswer[];
+
   const categorySubjectDefaults = resolveScoringCategorySubjects({
     application,
-    questions: (applicationQuestionsResult.data ?? []) as ApplicationQuestion[],
-    answers: (applicationAnswersResult.data ?? []) as ApplicationAnswer[],
+    questions: applicationQuestions,
+    answers: applicationAnswers,
+  });
+
+  const applicationReferencePanels = buildApplicationReferencePanels({
+    application,
+    questions: applicationQuestions,
+    answers: applicationAnswers,
   });
 
   const { data: cycleData } = await supabase.from("award_cycles").select("*").eq("id", application.cycle_id).single();
@@ -122,7 +187,16 @@ export default async function AdjudicationApplicationPage({
     );
   }
 
-  const [categoriesResult, scaleResult, assignmentsResult, scorecardsResult, feedbackResult, releaseResult] = await Promise.all([
+  const [
+    categoriesResult,
+    scaleResult,
+    assignmentsResult,
+    scorecardsResult,
+    feedbackResult,
+    releaseResult,
+    scheduleBookingsResult,
+    scheduleStaffResult,
+  ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
     profile.role === "adjudicator"
@@ -137,6 +211,8 @@ export default async function AdjudicationApplicationPage({
     profile.role === "adjudicator"
       ? Promise.resolve({ data: null, error: null })
       : supabase.from("adjudication_releases").select("*").eq("application_id", id).maybeSingle(),
+    supabase.rpc("get_schedule_bookings_for_staff"),
+    supabase.rpc("get_schedule_staff_directory"),
   ]);
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
@@ -156,6 +232,110 @@ export default async function AdjudicationApplicationPage({
   const scorecards = (scorecardsResult.data ?? []) as AdjudicationScorecard[];
   const feedback = (feedbackResult.data ?? []) as AdjudicationPanelFeedback[];
   const release = releaseResult.data as AdjudicationRelease | null;
+
+  if (scheduleBookingsResult.error) {
+    throw new Error(scheduleBookingsResult.error.message);
+  }
+
+  if (scheduleStaffResult.error) {
+    throw new Error(scheduleStaffResult.error.message);
+  }
+
+  const scheduleBooking =
+    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[])
+      .find((booking) => booking.application_id === id) ?? null;
+
+  let scheduleSlot: ScheduleSlotReference | null = null;
+  if (scheduleBooking) {
+    const { data: scheduleSlotData, error: scheduleSlotError } =
+      await supabase
+        .from("schedule_slots")
+        .select(
+          "id,title,starts_at,ends_at,location,school_instructions,status",
+        )
+        .eq("id", scheduleBooking.slot_id)
+        .maybeSingle();
+
+    if (scheduleSlotError) throw new Error(scheduleSlotError.message);
+    scheduleSlot = scheduleSlotData as ScheduleSlotReference | null;
+  }
+
+  const scheduledStaff =
+    ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
+      .filter((staff) => staff.slot_id === scheduleBooking?.slot_id);
+
+  const adjudicationReferencePanel: ApplicationReferencePanel = {
+    key: "adjudication-calendar",
+    title: "Adjudication Calendar",
+    shortTitle: "Adjudication Details",
+    description:
+      "The school’s confirmed adjudication schedule and assigned panel.",
+    groups: [
+      {
+        title: "School and production",
+        items: [
+          { label: "School", value: application.school_name },
+          {
+            label: "Production",
+            value: application.production_title ?? "",
+          },
+          { label: "Application status", value: application.status },
+        ],
+      },
+      {
+        title: "Schedule",
+        items: scheduleSlot
+          ? [
+              { label: "Schedule", value: scheduleSlot.title },
+              {
+                label: "Date",
+                value: formatReferenceDate(scheduleSlot.starts_at),
+              },
+              {
+                label: "Time",
+                value: formatReferenceTime(
+                  scheduleSlot.starts_at,
+                  scheduleSlot.ends_at,
+                ),
+              },
+              { label: "Location", value: scheduleSlot.location ?? "" },
+              { label: "Status", value: scheduleSlot.status },
+              {
+                label: "School instructions",
+                value: scheduleSlot.school_instructions ?? "",
+              },
+            ]
+          : [
+              {
+                label: "Schedule",
+                value: "No adjudication slot has been confirmed.",
+              },
+            ],
+      },
+      {
+        title: "Assigned panel",
+        items: scheduledStaff.length
+          ? scheduledStaff.map((staff) => ({
+              label:
+                staff.role === "advisory_member"
+                  ? "Advisory Committee"
+                  : "Adjudicator",
+              value: staff.full_name ?? staff.email ?? "Portal user",
+            }))
+          : [
+              {
+                label: "Panel",
+                value: "No schedule panel members are currently listed.",
+              },
+            ],
+      },
+    ],
+  };
+
+  const referencePanels = [
+    ...applicationReferencePanels,
+    adjudicationReferencePanel,
+  ];
 
   if (profile.role === "adjudicator" && assignments.length === 0) notFound();
 
@@ -218,6 +398,8 @@ export default async function AdjudicationApplicationPage({
       {query.generated && <div className="notice page-message">The AI narrative draft was generated. Review and edit it before approval.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field, score, and criterion comment before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
+
+      <ApplicationReferenceBar panels={referencePanels} />
 
       <div className="adjudication-score-layout">
         <aside className="score-category-sidebar">
