@@ -20,11 +20,11 @@ type UnreadCounts = {
   chat_channel_count: number;
 };
 
-function navItems(
+function buildNavigation(
   profile: Profile,
   chatMessageCount: number,
-): NavItem[] {
-  const items: NavItem[] = [
+) {
+  const primary: NavItem[] = [
     {
       href: "/portal",
       label: "Dashboard",
@@ -43,6 +43,9 @@ function navItems(
       icon: "✉",
       badgeCount: chatMessageCount,
     },
+  ];
+
+  const resources: NavItem[] = [
     {
       href: "/portal/files",
       label: "School files",
@@ -61,21 +64,19 @@ function navItems(
       shortLabel: "Appeals",
       icon: "⚖",
     },
-    {
-      href: "/portal/account",
-      label: "Account",
-      icon: "♙",
-    },
   ];
 
+  const management: NavItem[] = [];
+
   if (profile.role === "applicant") {
-    items.push(
-      {
-        href: "/portal/admin/applications",
-        label: "My application",
-        shortLabel: "Application",
-        icon: "▤",
-      },
+    primary.push({
+      href: "/portal/admin/applications",
+      label: "My application",
+      shortLabel: "Application",
+      icon: "▤",
+    });
+
+    resources.push(
       {
         href: "/portal/school-team",
         label: "School team",
@@ -89,27 +90,26 @@ function navItems(
         icon: "★",
       },
     );
-
-    return items;
+  } else {
+    primary.push(
+      {
+        href: "/portal/admin/applications",
+        label: "Applications",
+        icon: "▤",
+      },
+      {
+        href: "/portal/adjudication",
+        label:
+          profile.role === "adjudicator"
+            ? "Assignments"
+            : "Adjudication",
+        icon: "✓",
+      },
+    );
   }
 
-  items.push({
-    href: "/portal/admin/applications",
-    label: "Applications",
-    icon: "▤",
-  });
-
-  items.push({
-    href: "/portal/adjudication",
-    label:
-      profile.role === "adjudicator"
-        ? "Assignments"
-        : "Adjudication",
-    icon: "✓",
-  });
-
   if (profile.role === "advisory_member") {
-    items.push({
+    management.push({
       href: "/portal/admin/cycles",
       label: "Programs",
       icon: "◫",
@@ -117,7 +117,7 @@ function navItems(
   }
 
   if (profile.role === "owner") {
-    items.push(
+    management.push(
       {
         href: "/portal/admin/setup",
         label: "Program setup",
@@ -138,7 +138,21 @@ function navItems(
     );
   }
 
-  return items;
+  return {
+    primary,
+    resources,
+    management,
+    mobile: [
+      ...primary,
+      ...resources,
+      ...management,
+      {
+        href: "/portal/account",
+        label: "Account",
+        icon: "♙",
+      },
+    ],
+  };
 }
 
 function renderBadge(count: number | undefined) {
@@ -150,6 +164,48 @@ function renderBadge(count: number | undefined) {
     <span className="portal-nav-badge" aria-label={`${count} unread`}>
       {count > 99 ? "99+" : count}
     </span>
+  );
+}
+
+function DesktopLink({ item }: { item: NavItem }) {
+  return (
+    <Link href={item.href} className="portal-desktop-link">
+      <span>{item.label}</span>
+      {renderBadge(item.badgeCount)}
+    </Link>
+  );
+}
+
+function DesktopMenu({
+  label,
+  items,
+}: {
+  label: string;
+  items: NavItem[];
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <details className="portal-nav-menu">
+      <summary>
+        {label}
+        <span aria-hidden="true">⌄</span>
+      </summary>
+
+      <div className="portal-nav-menu-popover">
+        {items.map((item) => (
+          <Link href={item.href} key={item.href}>
+            <span className="portal-nav-menu-icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span>{item.label}</span>
+            {renderBadge(item.badgeCount)}
+          </Link>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -177,14 +233,18 @@ export async function PortalHeader({
     countRow?.chat_channel_count ?? 0,
   );
 
-  const items = navItems(profile, chatMessageCount);
-  const mobileItems = items;
+  const navigation = buildNavigation(profile, chatMessageCount);
+  const displayName =
+    profile.preferred_name ??
+    profile.full_name ??
+    profile.email ??
+    "Account";
 
   return (
     <>
       <header className="portal-header">
-        <div className="container portal-header-inner">
-          <Link href="/portal" className="brand">
+        <div className="portal-header-inner">
+          <Link href="/portal" className="brand portal-brand">
             <span className="brand-mark">G</span>
             <span className="brand-copy">
               GHSMTA
@@ -193,41 +253,53 @@ export async function PortalHeader({
           </Link>
 
           <nav className="portal-nav" aria-label="Portal navigation">
-            {items.map((item) => (
-              <Link href={item.href} key={item.href}>
-                <span>{item.label}</span>
-                {renderBadge(item.badgeCount)}
-              </Link>
+            {navigation.primary.map((item) => (
+              <DesktopLink item={item} key={item.href} />
             ))}
+
+            <DesktopMenu
+              label={profile.role === "applicant" ? "School" : "Resources"}
+              items={navigation.resources}
+            />
+
+            <DesktopMenu label="Admin" items={navigation.management} />
           </nav>
 
-          <PortalUtilities
-            profile={profile}
-            initialNotificationCount={notificationCount}
-            initialChatMessageCount={chatMessageCount}
-            initialChatChannelCount={chatChannelCount}
-          />
+          <div className="portal-header-actions">
+            <PortalUtilities
+              profile={profile}
+              initialNotificationCount={notificationCount}
+              initialChatMessageCount={chatMessageCount}
+              initialChatChannelCount={chatChannelCount}
+            />
 
-          <div className="user-chip">
-            <span className="user-avatar">
-              {(profile.full_name ?? profile.email ?? "U")
-                .slice(0, 1)
-                .toUpperCase()}
-            </span>
+            <details className="portal-account-menu">
+              <summary aria-label="Open account menu">
+                <span className="user-avatar">
+                  {displayName.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="portal-account-summary-copy">
+                  <strong>{displayName}</strong>
+                  <small>{roleLabel(profile.role)}</small>
+                </span>
+                <span className="portal-account-chevron" aria-hidden="true">
+                  ⌄
+                </span>
+              </summary>
 
-            <Link href="/portal/account" className="user-meta user-meta-link">
-              <strong>{profile.preferred_name ?? profile.full_name ?? profile.email}</strong>
-              <span>{roleLabel(profile.role)}</span>
-            </Link>
+              <div className="portal-account-popover">
+                <div className="portal-account-popover-heading">
+                  <strong>{displayName}</strong>
+                  <span>{profile.email}</span>
+                </div>
 
-            <form action={signOut}>
-              <button
-                className="button button-secondary button-compact"
-                type="submit"
-              >
-                Sign out
-              </button>
-            </form>
+                <Link href="/portal/account">Account settings</Link>
+
+                <form action={signOut}>
+                  <button type="submit">Sign out</button>
+                </form>
+              </div>
+            </details>
           </div>
         </div>
       </header>
@@ -236,7 +308,7 @@ export async function PortalHeader({
         className="mobile-portal-nav"
         aria-label="Mobile portal navigation"
       >
-        {mobileItems.map((item) => (
+        {navigation.mobile.map((item) => (
           <Link href={item.href} key={item.href}>
             <span className="mobile-nav-icon" aria-hidden="true">
               {item.icon}
