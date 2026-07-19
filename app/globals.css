@@ -3733,3 +3733,110 @@ body.modal-open {
   .schedule-remove-participant-form { align-items: flex-end; flex-direction: column; }
   .schedule-remove-participant-form .input { width: 100%; }
 }
+
+/* --------------------------------------------------------------------------
+   Chat access repair and unread badges
+   -------------------------------------------------------------------------- */
+
+.portal-nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.portal-nav-badge,
+.portal-utility-badge,
+.notification-count-badge {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: white;
+  background: #d92d20;
+  font-size: .68rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.portal-utility-link-with-badge {
+  position: relative;
+}
+
+.portal-utility-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border: 2px solid var(--navy-950);
+  font-size: .62rem;
+}
+
+.mobile-nav-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.mobile-nav-icon .portal-nav-badge {
+  position: absolute;
+  top: -9px;
+  left: calc(100% - 3px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid var(--navy-950);
+  font-size: .58rem;
+}
+
+.notification-page-stack {
+  display: grid;
+  gap: 22px;
+}
+
+.chat-unread-row {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.chat-unread-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  color: white;
+  background: var(--navy-800);
+  font-size: .9rem;
+}
+
+.notification-count-badge {
+  min-width: 26px;
+  height: 26px;
+  font-size: .72rem;
+}
+
+.compact-empty-state {
+  padding: 28px 22px;
+}
+
+.compact-empty-state h3 {
+  font-size: 1rem;
+}
+
+@media (max-width: 600px) {
+  .chat-unread-row {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 15px 16px;
+  }
+
+  .chat-unread-icon {
+    width: 28px;
+    height: 28px;
+  }
+}
