@@ -2515,3 +2515,334 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   }
 }
 /* GHSMTA compact category scoring controls — END */
+
+/* GHSMTA category averages, collapse controls, and range review — START */
+.scoring-category-header {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+}
+
+.category-collapse-toggle {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-collapse-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-top: 2px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--navy-800);
+  background: white;
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.category-collapse-toggle:hover .category-collapse-icon,
+.category-collapse-toggle:focus-visible .category-collapse-icon {
+  border-color: var(--navy-600);
+  background: #eef1ff;
+}
+
+.category-collapse-toggle:focus-visible {
+  outline: 3px solid rgba(0, 22, 153, .16);
+  outline-offset: 5px;
+  border-radius: 8px;
+}
+
+.category-collapse-toggle .scoring-category-heading-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.category-collapse-title {
+  color: var(--navy-950, #08152f);
+  font-family: Georgia, serif;
+  font-size: clamp(1.25rem, 1.6vw, 1.75rem);
+  line-height: 1.15;
+}
+
+.category-collapse-toggle .scoring-category-heading-copy small {
+  max-width: 780px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.scoring-category-header-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.category-average-summary {
+  display: grid;
+  min-width: 172px;
+  gap: 2px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  text-align: center;
+}
+
+.category-average-summary > span {
+  color: var(--muted);
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.category-average-summary > strong {
+  color: var(--navy-900);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.category-average-summary > small {
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.category-average-summary-error {
+  border: 3px solid #d92d20;
+  background: #fff1f0;
+  box-shadow: 0 0 0 5px rgba(217, 45, 32, .09);
+}
+
+.category-average-summary-error > span,
+.category-average-summary-error > strong,
+.category-average-summary-error > small {
+  color: #b42318;
+  font-weight: 950;
+}
+
+.category-average-summary-error > strong {
+  font-size: 2.15rem;
+}
+
+.category-average-summary-error > small {
+  font-size: .74rem;
+  letter-spacing: .02em;
+}
+
+.category-average-review-button {
+  margin-top: 5px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  color: white;
+  background: #b42318;
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.score-category-panel-collapsed > .panel-header {
+  padding-bottom: 16px;
+  border-bottom-width: 1px;
+}
+
+.score-category-panel-range-error > .panel-header {
+  border-bottom-color: #d92d20;
+}
+
+.score-category-panel .panel-body[hidden] {
+  display: none;
+}
+
+.score-range-modal-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 15, 36, .66);
+  backdrop-filter: blur(5px);
+}
+
+.score-range-modal {
+  width: min(760px, 100%);
+  max-height: min(82vh, 820px);
+  overflow: auto;
+  border: 1px solid #f5b7b1;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 30px 80px rgba(5, 15, 36, .3);
+}
+
+.score-range-modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.score-range-modal-heading h2 {
+  margin: 4px 0 6px;
+  color: #b42318;
+  font-family: Georgia, serif;
+}
+
+.score-range-modal-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.score-range-modal-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: white;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.score-range-modal-average {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin: 18px 24px 0;
+  padding: 16px;
+  border: 3px solid #d92d20;
+  border-radius: 14px;
+  color: #b42318;
+  background: #fff1f0;
+  text-align: center;
+}
+
+.score-range-modal-average span,
+.score-range-modal-average small {
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.score-range-modal-average strong {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.score-range-modal-list {
+  display: grid;
+  gap: 10px;
+  padding: 18px 24px;
+}
+
+.score-range-modal-list label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 220px);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fafbfc;
+}
+
+.score-range-modal-list label > span {
+  font-size: .86rem;
+  font-weight: 850;
+}
+
+.score-range-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px 22px;
+  border-top: 1px solid var(--line);
+}
+
+.score-range-modal-actions > strong {
+  max-width: 440px;
+  color: #b42318;
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+.score-range-modal-actions .score-range-modal-resolved {
+  color: #067647;
+}
+
+@media (max-width: 1420px) {
+  .scoring-category-header {
+    grid-template-columns: 1fr;
+  }
+
+  .scoring-category-header-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    padding-left: 42px;
+  }
+}
+
+@media (max-width: 760px) {
+  .scoring-category-header-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding-left: 0;
+  }
+
+  .category-average-summary,
+  .category-scoring-controls {
+    width: 100%;
+  }
+
+  .score-range-modal-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .score-range-modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .score-range-modal-list label {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .score-range-modal-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .score-range-modal-actions .button {
+    width: 100%;
+  }
+}
+/* GHSMTA category averages, collapse controls, and range review — END */

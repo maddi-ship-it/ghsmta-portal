@@ -178,7 +178,12 @@ async function persistAdjudicatorScorecard(
       private_notes: formText(formData, `private_notes_${category.id}`) || null,
     });
 
-    for (const criterion of criteria.filter((item) => item.category_id === category.id)) {
+    const categoryCriteria = criteria.filter(
+      (item) => item.category_id === category.id,
+    );
+    const categoryNumericScores: number[] = [];
+
+    for (const criterion of categoryCriteria) {
       const rawScore = formText(formData, `score_${criterion.id}`);
       const observation = sanitizeRichTextHtml(
         formText(formData, `observation_${criterion.id}`),
@@ -192,6 +197,10 @@ async function persistAdjudicatorScorecard(
         throw new Error(
           `Scores must be entered between ${scoreMinimum} and ${scoreMaximum} in 0.25-point increments.`,
         );
+      }
+
+      if (isEligible && validScore && numericScore != null) {
+        categoryNumericScores.push(numericScore);
       }
 
       if (submit && isEligible && !validScore) {
@@ -212,6 +221,29 @@ async function persistAdjudicatorScorecard(
         score: isEligible && validScore ? numericScore : null,
         observation: isEligible ? observation || null : null,
       });
+    }
+
+    if (
+      submit &&
+      isEligible &&
+      validRange &&
+      rangeMinimum != null &&
+      rangeMaximum != null &&
+      categoryCriteria.length > 0 &&
+      categoryNumericScores.length === categoryCriteria.length
+    ) {
+      const categoryAverage =
+        categoryNumericScores.reduce((sum, score) => sum + score, 0) /
+        categoryNumericScores.length;
+
+      if (
+        categoryAverage < rangeMinimum - 0.0001 ||
+        categoryAverage > rangeMaximum + 0.0001
+      ) {
+        missing.push(
+          `${category.title}: category average must be within ${rangeMinimum.toFixed(2)}–${rangeMaximum.toFixed(2)}`,
+        );
+      }
     }
   }
 

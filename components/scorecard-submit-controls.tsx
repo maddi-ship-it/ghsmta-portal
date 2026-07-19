@@ -55,11 +55,21 @@ function evaluateCompletion(
       missingCount += 1;
     }
 
-    for (const criterion of criteria.filter(
+    const categoryScores: number[] = [];
+    const categoryCriteria = criteria.filter(
       (item) => item.category_id === category.id,
-    )) {
-      if (!formText(formData, `score_${criterion.id}`)) {
+    );
+
+    for (const criterion of categoryCriteria) {
+      const rawScore = formText(formData, `score_${criterion.id}`);
+
+      if (!rawScore) {
         missingCount += 1;
+      } else {
+        const numericScore = Number(rawScore);
+        if (Number.isFinite(numericScore)) {
+          categoryScores.push(numericScore);
+        }
       }
 
       if (
@@ -71,6 +81,26 @@ function evaluateCompletion(
       }
     }
 
+    const rawRangeStart = formText(
+      formData,
+      `score_range_start_${category.id}`,
+    );
+    const rangeStart = rawRangeStart ? Number(rawRangeStart) : null;
+
+    if (
+      rangeStart != null &&
+      categoryScores.length === categoryCriteria.length &&
+      categoryCriteria.length > 0
+    ) {
+      const average =
+        categoryScores.reduce((sum, score) => sum + score, 0) /
+        categoryScores.length;
+      const rangeEnd = rangeStart + 2;
+
+      if (average < rangeStart - 0.0001 || average > rangeEnd + 0.0001) {
+        missingCount += 1;
+      }
+    }
   }
 
   return {
