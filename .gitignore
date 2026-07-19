@@ -18,3 +18,4 @@ out/
 
 # macOS
 .DS_Store
+.ghsmta-patch-backups/
