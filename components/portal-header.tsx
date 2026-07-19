@@ -16,6 +16,7 @@ function navItems(profile: Profile): NavItem[] {
     { href: "/portal", label: "Dashboard", shortLabel: "Home", icon: "⌂" },
     { href: "/portal/schedule", label: "Scheduling", shortLabel: "Schedule", icon: "◷" },
     { href: "/portal/chat", label: "Chat", icon: "✉" },
+    { href: "/portal/reference-documents", label: "Reference documents", shortLabel: "Documents", icon: "▱" },
   ];
 
   if (profile.role === "applicant") {
@@ -29,14 +30,13 @@ function navItems(profile: Profile): NavItem[] {
   items.push({ href: "/portal/admin/applications", label: "Applications", icon: "▤" });
   items.push({ href: "/portal/adjudication", label: profile.role === "adjudicator" ? "Assignments" : "Adjudication", icon: "✓" });
 
-  if (profile.role === "advisory_member" || profile.role === "owner") {
-    items.push({ href: "/portal/admin/cycles", label: "Cycles", icon: "◫" });
+  if (profile.role === "advisory_member") {
+    items.push({ href: "/portal/admin/cycles", label: "Programs", icon: "◫" });
   }
 
   if (profile.role === "owner") {
     items.push(
-      { href: "/portal/admin/scoring", label: "Scoring setup", shortLabel: "Scoring", icon: "⚙" },
-      { href: "/portal/admin/forms", label: "Form Builder", shortLabel: "Forms", icon: "✎" },
+      { href: "/portal/admin/setup", label: "Program setup", shortLabel: "Setup", icon: "⚙" },
       { href: "/portal/admin/users", label: "Users", icon: "♙" },
     );
   }

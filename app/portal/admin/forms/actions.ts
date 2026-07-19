@@ -76,6 +76,7 @@ export async function publishFormVersion(formVersionId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/portal/admin/forms");
+  revalidatePath("/portal/admin/setup");
   revalidatePath(`/portal/admin/forms/${formVersionId}`);
 }
 

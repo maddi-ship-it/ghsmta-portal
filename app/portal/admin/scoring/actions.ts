@@ -40,8 +40,9 @@ export async function assignAdjudicator(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/portal/admin/scoring");
+  revalidatePath("/portal/admin/setup");
   revalidatePath("/portal/adjudication");
-  redirect("/portal/admin/scoring?assigned=1");
+  redirect("/portal/admin/setup?tab=scoring&assigned=1");
 }
 
 export async function removeAdjudicatorAssignment(assignmentId: string) {
@@ -50,6 +51,7 @@ export async function removeAdjudicatorAssignment(assignmentId: string) {
   const { error } = await supabase.from("adjudicator_assignments").delete().eq("id", assignmentId);
   if (error) throw new Error(error.message);
   revalidatePath("/portal/admin/scoring");
+  revalidatePath("/portal/admin/setup");
   revalidatePath("/portal/adjudication");
 }
 
@@ -105,5 +107,6 @@ export async function saveAiPrompt(formData: FormData) {
   }
 
   revalidatePath("/portal/admin/scoring");
-  redirect("/portal/admin/scoring?prompt_saved=1");
+  revalidatePath("/portal/admin/setup");
+  redirect("/portal/admin/setup?tab=scoring&prompt_saved=1");
 }

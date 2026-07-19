@@ -1,5 +1,6 @@
-import { ScheduleBulkAccessForm } from "@/components/schedule-bulk-access-form";
-import { ScheduleRecurringSlotsForm } from "@/components/schedule-recurring-slots-form";
+import Link from "next/link";
+
+import { ScheduleOwnerTools } from "@/components/schedule-owner-tools";
 import { requireProfile } from "@/lib/auth";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -63,9 +64,12 @@ type StaffEnrollment = {
   joined_at: string;
 };
 
+type ScheduleSort = "date_asc" | "date_desc" | "school_asc" | "school_desc";
+
 type ScheduleSearchParams = {
   success?: string;
   error?: string;
+  sort?: ScheduleSort;
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -157,6 +161,12 @@ export default async function SchedulePage({
 }) {
   const profile = await requireProfile();
   const params = await searchParams;
+  const selectedSort: ScheduleSort =
+    params.sort === "date_desc" ||
+    params.sort === "school_asc" ||
+    params.sort === "school_desc"
+      ? params.sort
+      : "date_asc";
   const supabase = await createClient();
 
   const [
@@ -253,6 +263,31 @@ export default async function SchedulePage({
     existing.push(enrollment);
     staffBySlot.set(enrollment.slot_id, existing);
   }
+
+  const displaySlots = [...slots].sort((left, right) => {
+    if (profile.role === "owner" && selectedSort.startsWith("school")) {
+      const leftSchool = bookingMap.get(left.id)?.school_name ?? null;
+      const rightSchool = bookingMap.get(right.id)?.school_name ?? null;
+
+      if (leftSchool && !rightSchool) return -1;
+      if (!leftSchool && rightSchool) return 1;
+
+      const schoolResult = (leftSchool ?? "").localeCompare(
+        rightSchool ?? "",
+        undefined,
+        { numeric: true, sensitivity: "base" },
+      );
+
+      if (schoolResult !== 0) {
+        return selectedSort === "school_desc" ? -schoolResult : schoolResult;
+      }
+    }
+
+    const dateResult =
+      new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime();
+
+    return selectedSort === "date_desc" ? -dateResult : dateResult;
+  });
 
   const applicantBooking = availability.find((item) => item.is_mine);
   const bookedSlot = applicantBooking
@@ -377,7 +412,7 @@ export default async function SchedulePage({
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="school_booking_opens_at">Releases for Selection</label>
+                <label htmlFor="school_booking_opens_at">Scheduled school opening</label>
                 <input
                   className="input"
                   id="school_booking_opens_at"
@@ -412,16 +447,36 @@ export default async function SchedulePage({
       )}
 
       {profile.role === "owner" && (
-        <div className="schedule-owner-tools-grid">
-          <ScheduleRecurringSlotsForm
+        <>
+          <ScheduleOwnerTools
             cycles={cycles.map((cycle) => ({
               id: cycle.id,
               name: cycle.name,
               season_year: cycle.season_year,
             }))}
+            slots={ownerBulkSlots}
           />
-          <ScheduleBulkAccessForm slots={ownerBulkSlots} />
-        </div>
+
+          <section className="schedule-sort-bar">
+            <div>
+              <span className="eyebrow">Schedule order</span>
+              <strong>Sort owner schedule</strong>
+            </div>
+            <form method="get" className="schedule-sort-form">
+              <label className="sr-only" htmlFor="schedule_sort">Sort schedule</label>
+              <select className="select" defaultValue={selectedSort} id="schedule_sort" name="sort">
+                <option value="date_asc">Date — earliest first</option>
+                <option value="date_desc">Date — latest first</option>
+                <option value="school_asc">School — A to Z</option>
+                <option value="school_desc">School — Z to A</option>
+              </select>
+              <button className="button button-secondary button-compact" type="submit">Apply sort</button>
+              {selectedSort !== "date_asc" && (
+                <Link className="text-button" href="/portal/schedule">Reset</Link>
+              )}
+            </form>
+          </section>
+        </>
       )}
 
       {profile.role === "applicant" && bookedSlot && bookedApplication ? (
@@ -451,7 +506,7 @@ export default async function SchedulePage({
         </section>
       ) : (
         <section className="schedule-slot-grid">
-          {slots.length === 0 ? (
+          {displaySlots.length === 0 ? (
             <div className="panel empty-state schedule-empty-state">
               <h3>
                 {profile.role === "applicant"
@@ -465,7 +520,7 @@ export default async function SchedulePage({
               </p>
             </div>
           ) : (
-            slots.map((slot) => {
+            displaySlots.map((slot) => {
               const cycle = cycleMap.get(slot.cycle_id);
               const slotAvailability = availabilityMap.get(slot.id);
               const booking = bookingMap.get(slot.id);

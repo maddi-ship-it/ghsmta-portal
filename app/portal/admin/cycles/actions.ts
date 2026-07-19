@@ -49,6 +49,7 @@ export async function createCycle(formData: FormData) {
 
   if (error) throw new Error(error.message);
   revalidatePath("/portal/admin/cycles");
+  revalidatePath("/portal/admin/setup");
   revalidatePath("/portal/admin/forms");
   revalidatePath("/portal/admin/applications");
 }
@@ -61,6 +62,7 @@ export async function activateCycle(id: string) {
   });
   if (error) throw new Error(error.message);
   revalidatePath("/portal/admin/cycles");
+  revalidatePath("/portal/admin/setup");
   revalidatePath("/portal/admin/applications");
 }
 
@@ -72,6 +74,7 @@ export async function deactivateCycle(id: string) {
   });
   if (error) throw new Error(error.message);
   revalidatePath("/portal/admin/cycles");
+  revalidatePath("/portal/admin/setup");
   revalidatePath("/portal/admin/applications");
 }
 
@@ -98,6 +101,7 @@ export async function duplicateCycle(sourceCycleId: string, formData: FormData) 
 
   if (error) throw new Error(error.message);
   revalidatePath("/portal/admin/cycles");
+  revalidatePath("/portal/admin/setup");
   revalidatePath("/portal/admin/forms");
-  redirect(`/portal/admin/forms?cycle=${String(data)}`);
+  redirect(`/portal/admin/setup?tab=forms&cycle=${String(data)}`);
 }
