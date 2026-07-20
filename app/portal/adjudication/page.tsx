@@ -78,6 +78,22 @@ export default async function AdjudicationDashboard() {
   }
 
   const applicationIds = applications.map((application) => application.id);
+
+  const advisoryReviewAccessResult =
+    profile.role === "advisory_member"
+      ? await supabase.rpc("get_advisory_review_application_ids")
+      : { data: [], error: null };
+
+  if (advisoryReviewAccessResult.error) {
+    throw new Error(advisoryReviewAccessResult.error.message);
+  }
+
+  const advisoryReviewApplicationIds = new Set(
+    (advisoryReviewAccessResult.data ?? []).map(
+      (row: { application_id: string }) => row.application_id,
+    ),
+  );
+
   const { data: scorecardData, error: scorecardError } = applicationIds.length
     ? await supabase.from("adjudication_scorecards").select("*").in("application_id", applicationIds)
     : { data: [], error: null };
@@ -115,7 +131,11 @@ export default async function AdjudicationDashboard() {
         .in("application_id", applicationIds),
     ]);
     const reviewMap = new Map((reviews ?? []).map((review) => [review.application_id, review.status]));
-    advisoryQueue = applications.map((application) => {
+    advisoryQueue = applications
+      .filter((application) =>
+        advisoryReviewApplicationIds.has(application.id),
+      )
+      .map((application) => {
       const applicationProposals = (proposals ?? []).filter((proposal) => proposal.application_id === application.id);
       const applicationAssignments = assignments.filter((assignment) => assignment.application_id === application.id);
       const applicationCards = scorecards.filter((card) => card.application_id === application.id);
@@ -177,7 +197,7 @@ export default async function AdjudicationDashboard() {
         </>
       )}
       <section className="panel">
-        <div className="panel-header"><h2>{profile.role === "adjudicator" ? "Assigned productions" : profile.role === "advisory_member" ? "All productions" : "Productions under review"}</h2></div>
+        <div className="panel-header"><div><h2>{profile.role === "adjudicator" ? "Assigned productions" : profile.role === "advisory_member" ? "All active applications" : "Productions under review"}</h2>{profile.role === "advisory_member" && <p>Every active application is available to read. Review tools activate only for schools whose timeslot you selected or were assigned.</p>}</div></div>
         <div className="adjudication-card-list">
           {profile.role === "adjudicator" ? (
             relevantRows.map((row) => {
@@ -213,6 +233,19 @@ export default async function AdjudicationDashboard() {
                     <p>{row.application.production_title ?? "Untitled production"}</p>
                   </div>
                   <div className="adjudication-card-meta">
+                    {profile.role === "advisory_member" && (
+                      <span
+                        className={`badge ${
+                          advisoryReviewApplicationIds.has(row.application.id)
+                            ? "badge-submitted"
+                            : "badge-draft"
+                        }`}
+                      >
+                        {advisoryReviewApplicationIds.has(row.application.id)
+                          ? "Review enabled"
+                          : "Application access"}
+                      </span>
+                    )}
                     <strong>{complete} / {row.assignments.length}</strong>
                     <small>scorecards submitted</small>
                   </div>

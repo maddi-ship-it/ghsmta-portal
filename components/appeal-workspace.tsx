@@ -10,7 +10,12 @@ import type { Profile } from "@/lib/types";
 
 type Appeal = { id: string; application_id: string; category_id: string | null; explanation: string; status: string; advisory_notes: string | null; owner_notes: string | null; resolution: string | null; submitted_at: string; resolved_at: string | null; current_eligibility: boolean | null; requested_eligibility: boolean; school_contact_name: string | null; school_contact_email: string | null; school_contact_phone: string | null };
 type ApplicationOption = { id: string; school_name: string; production_title: string | null; cycle_id: string };
-type CategoryOption = { id: string; title: string; rubric_id: string };
+type CategoryOption = {
+  id: string;
+  title: string;
+  rubric_id: string;
+  cycle_id: string;
+};
 type CycleOption = { id: string; name: string; season_year: string };
 type PortalFile = { id: string; context_id: string; original_name: string; generated_name: string; storage_path: string; mime_type: string | null; file_size: number | null; created_at: string };
 function statusLabel(value: string) { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
@@ -23,9 +28,20 @@ export function AppealWorkspace({ profile, applications, appeals, categories, cy
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openAppeal, setOpenAppeal] = useState<string | null>(appeals[0]?.id ?? null);
+  const [selectedApplicationId, setSelectedApplicationId] = useState(
+    applications[0]?.id ?? "",
+  );
   const applicationMap = new Map(applications.map((application) => [application.id, application]));
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
-  const categoryMap = new Map(categories.map((category) => [category.id, category.title]));
+  const categoryMap = new Map(
+    categories.map((category) => [category.id, category.title]),
+  );
+  const selectedApplication = applicationMap.get(selectedApplicationId);
+  const availableCategories = selectedApplication
+    ? categories.filter(
+        (category) => category.cycle_id === selectedApplication.cycle_id,
+      )
+    : [];
 
   async function submitAppeal(form: HTMLFormElement) {
     setCreating(true); setMessage(null); setError(null);
@@ -59,8 +75,42 @@ export function AppealWorkspace({ profile, applications, appeals, categories, cy
           <div className="panel-body">
             <form className="form-stack" onSubmit={(event) => { event.preventDefault(); void submitAppeal(event.currentTarget); }}>
               <div className="form-grid two-column-form">
-                <div className="field"><label htmlFor="appeal_application">Application</label><select className="select" id="appeal_application" name="application_id" required><option value="">Select application</option>{applications.map((application) => <option key={application.id} value={application.id}>{application.school_name} — {application.production_title ?? "Untitled production"}</option>)}</select></div>
-                <div className="field"><label htmlFor="appeal_category">Category</label><select className="select" id="appeal_category" name="category_id" required><option value="">Choose category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></div>
+                <div className="field"><label htmlFor="appeal_application">Application</label><select
+                  className="select"
+                  id="appeal_application"
+                  name="application_id"
+                  onChange={(event) =>
+                    setSelectedApplicationId(event.currentTarget.value)
+                  }
+                  required
+                  value={selectedApplicationId}
+                >
+                  <option value="">Select application</option>
+                  {applications.map((application) => (
+                    <option key={application.id} value={application.id}>
+                      {application.school_name} —{" "}
+                      {application.production_title ?? "Untitled production"}
+                    </option>
+                  ))}
+                </select></div>
+                <div className="field"><label htmlFor="appeal_category">Category</label><select
+                  className="select"
+                  id="appeal_category"
+                  name="category_id"
+                  required
+                >
+                  <option value="">Choose category from scoring guide</option>
+                  {availableCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.title}
+                    </option>
+                  ))}
+                </select>
+                {selectedApplication && availableCategories.length === 0 && (
+                  <small className="field-warning">
+                    This application does not have a published scoring guide.
+                  </small>
+                )}</div>
               </div>
               <div className="field"><label htmlFor="current_eligibility">Current determination</label><select className="select" id="current_eligibility" name="current_eligibility" required><option value="false">Not eligible</option><option value="true">Eligible — correction or clarification requested</option></select></div>
               <div className="field"><label htmlFor="appeal_explanation">Why should this category be eligible?</label><textarea className="textarea" id="appeal_explanation" name="explanation" required rows={8} minLength={10} placeholder="Reference the production, application materials, and eligibility requirement that supports this appeal." /></div>

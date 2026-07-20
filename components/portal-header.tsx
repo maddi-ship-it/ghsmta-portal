@@ -131,6 +131,11 @@ function buildNavigation(
         icon: "♙",
       },
       {
+        href: "/portal/admin/reports",
+        label: "Reports",
+        icon: "▦",
+      },
+      {
         href: "/portal/admin/archive",
         label: "View archive",
         shortLabel: "Archive",

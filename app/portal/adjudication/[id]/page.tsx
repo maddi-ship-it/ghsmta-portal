@@ -16,6 +16,7 @@ import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-ad
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
+import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -210,6 +211,23 @@ export default async function AdjudicationApplicationPage({
     profile.role === "adjudicator" ||
     (profile.role === "advisory_member" &&
       Boolean(ownParticipantResult.data?.can_score));
+
+  const advisoryReviewAccessResult =
+    profile.role === "advisory_member"
+      ? await supabase.rpc("can_advisory_review_application", {
+          p_application_id: id,
+          p_user_id: profile.id,
+        })
+      : { data: profile.role === "owner", error: null };
+
+  if (advisoryReviewAccessResult.error) {
+    throw new Error(advisoryReviewAccessResult.error.message);
+  }
+
+  const canPanelReview =
+    profile.role === "owner" ||
+    (profile.role === "advisory_member" &&
+      Boolean(advisoryReviewAccessResult.data));
 
   if (!rubric) {
     return (
@@ -435,6 +453,43 @@ export default async function AdjudicationApplicationPage({
 
   if (approvalResult.error) throw new Error(approvalResult.error.message);
 
+  const specialtyResult =
+    canPanelReview &&
+    (profile.role === "advisory_member" || profile.role === "owner")
+      ? await supabase
+          .from("advisory_specialty_award_recommendations")
+          .select(
+            "id,application_id,advisory_user_id,award_type,recommendation_status,song_title,explanation,status,submitted_at,updated_at",
+          )
+          .eq("application_id", id)
+          .order("updated_at", { ascending: false })
+      : { data: [], error: null };
+
+  if (specialtyResult.error) {
+    throw new Error(specialtyResult.error.message);
+  }
+
+  let specialtyRows = specialtyResult.data ?? [];
+  if (profile.role === "owner" && specialtyRows.length > 0) {
+    const specialtyUserIds = [
+      ...new Set(specialtyRows.map((row) => row.advisory_user_id)),
+    ];
+    const { data: specialtyProfiles } = await supabase
+      .from("profiles")
+      .select("id,full_name,email")
+      .in("id", specialtyUserIds);
+    const specialtyProfileMap = new Map(
+      (specialtyProfiles ?? []).map((row) => [row.id, row]),
+    );
+    specialtyRows = specialtyRows.map((row) => ({
+      ...row,
+      advisory_member_name:
+        specialtyProfileMap.get(row.advisory_user_id)?.full_name ?? null,
+      advisory_member_email:
+        specialtyProfileMap.get(row.advisory_user_id)?.email ?? null,
+    }));
+  }
+
   const sharedObservationResult =
     isScoringParticipant
       ? await supabase.rpc("get_shared_adjudication_observations", {
@@ -479,6 +534,7 @@ export default async function AdjudicationApplicationPage({
 
       <ApplicationReferenceBar panels={referencePanels} />
 
+      {(isScoringParticipant || canPanelReview) && (
       <AdjudicationConsensusBar
         applicationId={id}
         approvals={(approvalResult.data ?? []) as Array<{
@@ -505,6 +561,7 @@ export default async function AdjudicationApplicationPage({
         review={reviewResult.data as { status: string; owner_note: string | null } | null}
         role={profile.role}
       />
+      )}
 
       <div className="adjudication-score-layout">
         <aside className="score-category-sidebar">
@@ -603,8 +660,39 @@ export default async function AdjudicationApplicationPage({
             </div>
           )}
         </form>
+      ) : profile.role === "advisory_member" && !canPanelReview ? (
+        <section className="panel advisory-read-only-panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">Application access</span>
+              <h2>Review controls are not active for this school</h2>
+              <p>
+                Advisory Committee members may read every active application.
+                Eligibility, ranges, panel comments, private visit details, and
+                specialty awards become available after you select this
+                timeslot or an Owner assigns you to its panel.
+              </p>
+            </div>
+          </div>
+          <div className="panel-body">
+            <Link className="button button-secondary" href="/portal/schedule">
+              Open scheduling
+            </Link>
+          </div>
+        </section>
       ) : (
         <>
+          <SpecialtyAwardWorkspace
+            applicationId={id}
+            currentUserId={profile.id}
+            recommendations={specialtyRows}
+            role={
+              profile.role === "owner"
+                ? "owner"
+                : "advisory_member"
+            }
+          />
+
           <OwnerLiveAdjudicationReview
             applicationId={id}
             isOwner={profile.role === "owner"}

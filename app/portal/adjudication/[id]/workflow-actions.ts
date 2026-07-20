@@ -156,3 +156,38 @@ export async function ownerUpdateAdjudicationReview(
   if (error) throw new Error(error.message);
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }
+
+export async function saveSpecialtyAwardRecommendations(
+  applicationId: string,
+  formData: FormData,
+) {
+  await requireProfile(["advisory_member"]);
+
+  const awardTypes = formData
+    .getAll("award_type")
+    .map(String)
+    .filter(Boolean);
+
+  const recommendations = awardTypes.map((awardType) => ({
+    award_type: awardType,
+    recommendation_status:
+      text(formData, `recommendation_status_${awardType}`) ||
+      "no_recommendation",
+    song_title: text(formData, `song_title_${awardType}`) || null,
+    explanation: text(formData, `explanation_${awardType}`) || null,
+  }));
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "save_specialty_award_recommendations",
+    {
+      p_application_id: applicationId,
+      p_recommendations: recommendations,
+      p_submit: formData.get("submit_recommendations") === "true",
+    },
+  );
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/portal/adjudication/${applicationId}`);
+  revalidatePath("/portal/admin/reports");
+}

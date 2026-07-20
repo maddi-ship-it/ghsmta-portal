@@ -6,8 +6,14 @@ export default async function AppealsPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
 
-  const [applicationsResult, appealsResult, categoriesResult, filesResult, cyclesResult] =
-    await Promise.all([
+  const [
+    applicationsResult,
+    appealsResult,
+    categoriesResult,
+    rubricsResult,
+    filesResult,
+    cyclesResult,
+  ] = await Promise.all([
       profile.role === "applicant"
         ? supabase
             .from("applications")
@@ -29,6 +35,11 @@ export default async function AppealsPage() {
         .eq("active", true)
         .order("sort_order"),
       supabase
+        .from("scoring_rubrics")
+        .select("id,cycle_id,status,version_number")
+        .eq("status", "published")
+        .order("version_number", { ascending: false }),
+      supabase
         .from("portal_files")
         .select("id,context_id,original_name,generated_name,storage_path,mime_type,file_size,created_at")
         .eq("context_type", "appeal")
@@ -41,7 +52,14 @@ export default async function AppealsPage() {
         .order("season_year", { ascending: false }),
     ]);
 
-  for (const result of [applicationsResult, appealsResult, categoriesResult, filesResult, cyclesResult]) {
+  for (const result of [
+    applicationsResult,
+    appealsResult,
+    categoriesResult,
+    rubricsResult,
+    filesResult,
+    cyclesResult,
+  ]) {
     if (result.error) throw new Error(result.error.message);
   }
 
@@ -62,6 +80,32 @@ export default async function AppealsPage() {
     activeAppealIds.has(file.context_id),
   );
 
+  const publishedRubricByCycle = new Map<string, string>();
+  for (const rubric of rubricsResult.data ?? []) {
+    if (!publishedRubricByCycle.has(rubric.cycle_id)) {
+      publishedRubricByCycle.set(rubric.cycle_id, rubric.id);
+    }
+  }
+
+  const rubricCycleMap = new Map(
+    [...publishedRubricByCycle.entries()].map(([cycleId, rubricId]) => [
+      rubricId,
+      cycleId,
+    ]),
+  );
+
+  const applicationCategories = (categoriesResult.data ?? [])
+    .map((category) => ({
+      ...category,
+      cycle_id: rubricCycleMap.get(category.rubric_id) ?? null,
+    }))
+    .filter(
+      (
+        category,
+      ): category is typeof category & { cycle_id: string } =>
+        Boolean(category.cycle_id),
+    );
+
   return (
     <>
       <div className="page-heading">
@@ -77,7 +121,7 @@ export default async function AppealsPage() {
       <AppealWorkspace
         appeals={appeals}
         applications={applications}
-        categories={categoriesResult.data ?? []}
+        categories={applicationCategories}
         cycles={cyclesResult.data ?? []}
         files={files}
         profile={profile}
