@@ -22,6 +22,10 @@ export type ApplicantWaitlistEntry = {
   queue_rank: number;
   offer_expires_at: string | null;
   applicant_notes: string | null;
+  alternate_date_1?: string | null;
+  alternate_date_2?: string | null;
+  alternate_date_3?: string | null;
+  applicant_reason?: string | null;
 };
 
 type ApplicantScheduleSlot = {
@@ -115,7 +119,13 @@ export function ApplicantScheduleBoard({ slots, initialAvailability, view }: { s
                       <form action={joinScheduleSlotWaitlist.bind(null, slot.id)} className="form-stack waitlist-join-form">
                         <h3>Join this timeslot waitlist</h3><p>If this reservation opens, schools are offered the slot in queue order for 15 minutes.</p>
                         {slot.applications.length === 1 ? <input name="application_id" type="hidden" value={slot.applications[0].id} /> : <div className="field"><label htmlFor={`waitlist_application_${slot.id}`}>Application</label><select className="select" id={`waitlist_application_${slot.id}`} name="application_id" required><option value="">Choose application</option>{slot.applications.map((application) => <option key={application.id} value={application.id}>{application.label}</option>)}</select></div>}
-                        <div className="field"><label htmlFor={`waitlist_notes_${slot.id}`}>Notes <span>Optional</span></label><input className="input" id={`waitlist_notes_${slot.id}`} name="notes" placeholder="Travel or timing considerations" /></div>
+                        <div className="waitlist-alternate-date-grid">
+                          <div className="field"><label htmlFor={`waitlist_alt1_${slot.id}`}>Alternate date 1 <span>Optional</span></label><input className="input" id={`waitlist_alt1_${slot.id}`} name="alternate_date_1" type="date" /></div>
+                          <div className="field"><label htmlFor={`waitlist_alt2_${slot.id}`}>Alternate date 2 <span>Optional</span></label><input className="input" id={`waitlist_alt2_${slot.id}`} name="alternate_date_2" type="date" /></div>
+                          <div className="field"><label htmlFor={`waitlist_alt3_${slot.id}`}>Alternate date 3 <span>Optional</span></label><input className="input" id={`waitlist_alt3_${slot.id}`} name="alternate_date_3" type="date" /></div>
+                        </div>
+                        <div className="field"><label htmlFor={`waitlist_reason_${slot.id}`}>Reason or scheduling context <span>Optional</span></label><textarea className="textarea compact-textarea" id={`waitlist_reason_${slot.id}`} name="reason" placeholder="Travel, performance schedule, or other timing context" /></div>
+                        <div className="field"><label htmlFor={`waitlist_notes_${slot.id}`}>Additional notes <span>Optional</span></label><input className="input" id={`waitlist_notes_${slot.id}`} name="notes" placeholder="Anything else the scheduling team should know" /></div>
                         <button className="button button-secondary" type="submit">Join waitlist for this slot</button>
                       </form>
                     ) : canBook ? (

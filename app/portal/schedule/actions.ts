@@ -7,11 +7,117 @@ import { redirect } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sendSmtpEmail } from "@/lib/email/smtp";
 
 const SCHEDULE_PATH = "/portal/schedule";
 const EASTERN_TIME_ZONE = "America/New_York";
 const MAX_BULK_SLOTS = 250;
 const MAX_RECURRENCE_DAYS = 730;
+
+type ScheduleTemplateKey = "timeslot_selected" | "timeslot_confirmed" | "waitlist_offer";
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderScheduleTemplate(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{{${key}}}`, value),
+    template,
+  );
+}
+
+async function deliverScheduleTemplate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string,
+  templateKey: ScheduleTemplateKey,
+  applicationId: string,
+  slotId: string,
+) {
+  const [{ data: template }, { data: application }, { data: slot }] = await Promise.all([
+    supabase.from("portal_message_templates").select("*").eq("template_key", templateKey).eq("active", true).maybeSingle(),
+    supabase.from("applications").select("id,school_name,production_title,applicant_user_id").eq("id", applicationId).single(),
+    supabase.from("schedule_slots").select("id,title,starts_at,ends_at,location,school_instructions").eq("id", slotId).single(),
+  ]);
+
+  if (!template || !application || !slot) return;
+
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(slot.starts_at));
+  const timeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const values = {
+    school_name: application.school_name,
+    production_title: application.production_title ?? "",
+    slot_date: date,
+    slot_time: `${timeFormatter.format(new Date(slot.starts_at))}–${timeFormatter.format(new Date(slot.ends_at))} ET`,
+    location: slot.location ?? "Location to be confirmed",
+    location_line: slot.location ? `Location: ${slot.location}.` : "",
+    school_instructions: slot.school_instructions ?? "",
+    offer_expires: "the deadline shown in Scheduling",
+  };
+  const subject = renderScheduleTemplate(template.subject_template, values);
+  const body = renderScheduleTemplate(template.body_template, values);
+
+  if (template.send_in_app && application.applicant_user_id) {
+    await supabase.from("user_notifications").insert({
+      user_id: application.applicant_user_id,
+      notification_type: templateKey,
+      title: subject,
+      body,
+      href: "/portal/schedule",
+      related_application_id: applicationId,
+    });
+  }
+
+  if (template.send_school_messaging) {
+    const { data: channel } = await supabase
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", applicationId)
+      .eq("channel_type", "school_dm")
+      .eq("active", true)
+      .maybeSingle();
+    if (channel) {
+      await supabase.from("chat_posts").insert({
+        channel_id: channel.id,
+        author_id: actorId,
+        subject: "Message",
+        body,
+      });
+    }
+  }
+
+  if (template.send_email && application.applicant_user_id) {
+    const { data: recipient } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", application.applicant_user_id)
+      .maybeSingle();
+    if (recipient?.email) {
+      await sendSmtpEmail({
+        to: [recipient.email],
+        subject,
+        text: body,
+        html: `<p>${escapeHtml(body).replaceAll("\n", "<br>")}</p>`,
+      });
+    }
+  }
+}
+
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -561,7 +667,6 @@ export async function updateScheduleSlot(slotId: string, formData: FormData) {
 }
 
 export async function bookOwnScheduleSlot(formData: FormData) {
-  await requireProfile(["applicant"]);
 
   const slotId = text(formData, "slot_id");
   const applicationId = text(formData, "application_id");
@@ -570,6 +675,7 @@ export async function bookOwnScheduleSlot(formData: FormData) {
     scheduleRedirect("error", "Choose an application and schedule slot.");
   }
 
+  const profile = await requireProfile(["applicant"]);
   const supabase = await createClient();
   const { error } = await supabase.rpc("book_schedule_slot", {
     p_slot_id: slotId,
@@ -578,10 +684,31 @@ export async function bookOwnScheduleSlot(formData: FormData) {
 
   if (error) scheduleRedirect("error", error.message);
 
+  const { error: pendingError } = await supabase
+    .from("schedule_school_bookings")
+    .update({
+      approval_status: "pending",
+      selected_at: new Date().toISOString(),
+      approved_at: null,
+      approved_by: null,
+    })
+    .eq("slot_id", slotId)
+    .eq("application_id", applicationId);
+
+  if (pendingError) scheduleRedirect("error", pendingError.message);
+
+  await deliverScheduleTemplate(
+    supabase,
+    profile.id,
+    "timeslot_selected",
+    applicationId,
+    slotId,
+  );
+
   revalidateSchedule();
   scheduleRedirect(
     "success",
-    "Your school is registered. Only an owner can change this reservation.",
+    "Your school selected this timeslot. It is pending final Owner approval.",
   );
 }
 
@@ -606,11 +733,11 @@ export async function joinScheduleSlot(formData: FormData) {
 }
 
 export async function ownerAssignSchool(slotId: string, formData: FormData) {
-  await requireProfile(["owner"]);
 
   const applicationId = text(formData, "application_id");
   if (!applicationId) scheduleRedirect("error", "Choose a school application.");
 
+  const owner = await requireProfile(["owner"]);
   const supabase = await createClient();
   const { error } = await supabase.rpc("owner_book_schedule_slot", {
     p_slot_id: slotId,
@@ -619,8 +746,26 @@ export async function ownerAssignSchool(slotId: string, formData: FormData) {
 
   if (error) scheduleRedirect("error", error.message);
 
+  await supabase
+    .from("schedule_school_bookings")
+    .update({
+      approval_status: "confirmed",
+      approved_at: new Date().toISOString(),
+      approved_by: owner.id,
+    })
+    .eq("slot_id", slotId)
+    .eq("application_id", applicationId);
+
+  await deliverScheduleTemplate(
+    supabase,
+    owner.id,
+    "timeslot_confirmed",
+    applicationId,
+    slotId,
+  );
+
   revalidateSchedule();
-  scheduleRedirect("success", "School assigned to the slot.");
+  scheduleRedirect("success", "School assigned and confirmation sent.");
 }
 
 export async function ownerAddStaff(slotId: string, formData: FormData) {
@@ -741,6 +886,10 @@ export async function joinScheduleSlotWaitlist(slotId: string, formData: FormDat
     p_application_id: applicationId,
     p_slot_id: slotId,
     p_notes: text(formData, "notes") || null,
+    p_alternate_date_1: text(formData, "alternate_date_1") || null,
+    p_alternate_date_2: text(formData, "alternate_date_2") || null,
+    p_alternate_date_3: text(formData, "alternate_date_3") || null,
+    p_reason: text(formData, "reason") || null,
   });
   if (error) scheduleRedirect("error", error.message);
   revalidateSchedule();
@@ -785,4 +934,65 @@ export async function declineScheduleSlotWaitlistOffer(waitlistId: string) {
   if (error) scheduleRedirect("error", error.message);
   revalidateSchedule();
   scheduleRedirect("success", "Timeslot offer declined. The next school has been notified.");
+}
+
+
+export async function ownerConfirmScheduleBooking(
+  bookingId: string,
+  formData: FormData,
+) {
+  const owner = await requireProfile(["owner"]);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "owner_confirm_schedule_booking",
+    {
+      p_booking_id: bookingId,
+      p_notes: text(formData, "approval_notes") || null,
+    },
+  );
+
+  if (error) scheduleRedirect("error", error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (row) {
+    await deliverScheduleTemplate(
+      supabase,
+      owner.id,
+      "timeslot_confirmed",
+      row.application_id,
+      row.slot_id,
+    );
+  }
+
+  revalidateSchedule();
+  scheduleRedirect(
+    "success",
+    "Timeslot approved and final confirmation sent.",
+  );
+}
+
+export async function ownerDeclineScheduleBooking(
+  bookingId: string,
+  formData: FormData,
+) {
+  await requireProfile(["owner"]);
+  const reason = text(formData, "approval_notes");
+  if (!reason) {
+    scheduleRedirect(
+      "error",
+      "Add a reason before declining the school selection.",
+    );
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("owner_decline_schedule_booking", {
+    p_booking_id: bookingId,
+    p_notes: reason,
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+  revalidateSchedule();
+  scheduleRedirect(
+    "success",
+    "School selection declined and the timeslot reopened.",
+  );
 }

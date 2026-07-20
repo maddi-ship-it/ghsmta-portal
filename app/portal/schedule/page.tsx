@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ApplicantScheduleBoard } from "@/components/applicant-schedule-board";
 import { ScheduleOwnerTools } from "@/components/schedule-owner-tools";
+import { OwnerScheduleMessages } from "@/components/owner-schedule-messages";
 import { requireProfile } from "@/lib/auth";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +15,8 @@ import {
   ownerAddStaff,
   ownerAssignSchool,
   ownerOfferNextSlotWaitlist,
+  ownerConfirmScheduleBooking,
+  ownerDeclineScheduleBooking,
   removeScheduleSchoolBooking,
   removeScheduleStaff,
   updateOwnScheduleSchoolDetails,
@@ -74,6 +77,16 @@ type StaffBooking = {
   booked_at: string;
 };
 
+type BookingApproval = {
+  id: string;
+  slot_id: string;
+  application_id: string;
+  approval_status: "pending" | "confirmed" | "declined";
+  selected_at: string;
+  approved_at: string | null;
+  approval_notes: string | null;
+};
+
 type StaffEnrollment = {
   enrollment_id: string;
   slot_id: string;
@@ -112,10 +125,16 @@ type ScheduleWaitlistEntry = {
   queue_rank: number;
   offer_expires_at: string | null;
   applicant_notes: string | null;
+  alternate_date_1: string | null;
+  alternate_date_2: string | null;
+  alternate_date_3: string | null;
+  applicant_reason: string | null;
   owner_notes: string | null;
   created_at: string;
   updated_at: string;
 };
+
+type OwnerScheduleSection = "overview" | "timeslots" | "staffing" | "waitlists" | "messages";
 
 type ScheduleSearchParams = {
   success?: string;
@@ -124,6 +143,7 @@ type ScheduleSearchParams = {
   view?: ScheduleView;
   filter?: ScheduleFilter;
   q?: string;
+  section?: OwnerScheduleSection;
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -243,6 +263,10 @@ export default async function SchedulePage({
     ? (params.filter as ScheduleFilter)
     : "all";
   const scheduleSearch = (params.q ?? "").trim();
+  const ownerSections: OwnerScheduleSection[] = ["overview", "timeslots", "staffing", "waitlists", "messages"];
+  const ownerSection: OwnerScheduleSection = ownerSections.includes(params.section as OwnerScheduleSection)
+    ? (params.section as OwnerScheduleSection)
+    : "overview";
   const supabase = await createClient();
 
   const [{ data: cycleData }, { data: serverTimeData }] = await Promise.all([
@@ -289,6 +313,9 @@ export default async function SchedulePage({
   let staffDirectory: StaffEnrollment[] = [];
   let ownerApplications: Application[] = [];
   let ownerStaff: Profile[] = [];
+  let bookingApprovals: BookingApproval[] = [];
+  let messageTemplates: Array<{ template_key: string; name: string; subject_template: string; body_template: string; send_in_app: boolean; send_school_messaging: boolean; send_email: boolean; active: boolean }> = [];
+  let digestSettings: { enabled: boolean; recipient_email: string | null; delivery_hour: number; time_zone: string; last_sent_at: string | null } | null = null;
 
   if (profile.role === "applicant") {
     const [{ data: applicationData }, { data: availabilityData }] =
@@ -340,6 +367,18 @@ export default async function SchedulePage({
         .order("school_name");
 
       ownerApplications = (applicationData ?? []) as Application[];
+
+      const [approvalResult, templateResult, digestResult] = await Promise.all([
+        supabase.from("schedule_school_bookings").select("id,slot_id,application_id,approval_status,selected_at,approved_at,approval_notes"),
+        supabase.from("portal_message_templates").select("template_key,name,subject_template,body_template,send_in_app,send_school_messaging,send_email,active").order("name"),
+        supabase.from("owner_digest_settings").select("enabled,recipient_email,delivery_hour,time_zone,last_sent_at").eq("owner_user_id", profile.id).maybeSingle(),
+      ]);
+      if (approvalResult.error) throw new Error(approvalResult.error.message);
+      if (templateResult.error) throw new Error(templateResult.error.message);
+      if (digestResult.error) throw new Error(digestResult.error.message);
+      bookingApprovals = (approvalResult.data ?? []) as BookingApproval[];
+      messageTemplates = templateResult.data ?? [];
+      digestSettings = digestResult.data;
     }
   }
 
@@ -347,7 +386,7 @@ export default async function SchedulePage({
     ? await supabase
         .from("schedule_slot_waitlist")
         .select(
-          "id,slot_id,cycle_id,application_id,status,queue_rank,offer_expires_at,applicant_notes,owner_notes,created_at,updated_at",
+          "id,slot_id,cycle_id,application_id,status,queue_rank,offer_expires_at,applicant_notes,alternate_date_1,alternate_date_2,alternate_date_3,applicant_reason,owner_notes,created_at,updated_at",
         )
         .in("cycle_id", activeCycleIds)
         .in("status", ["waiting", "offered", "accepted"])
@@ -566,7 +605,7 @@ export default async function SchedulePage({
     : [];
 
   return (
-    <>
+    <div className={`schedule-page-shell ${profile.role === "owner" ? `schedule-owner-section-${ownerSection}` : ""}`}>
       <div className="page-heading schedule-page-heading">
         <div>
           <h1>Scheduling</h1>
@@ -595,6 +634,26 @@ export default async function SchedulePage({
       )}
 
       {profile.role === "owner" && (
+        <nav className="owner-schedule-section-nav" aria-label="Owner scheduling workspace">
+          {[
+            ["overview", "Overview"],
+            ["timeslots", "Timeslots"],
+            ["staffing", "Staffing"],
+            ["waitlists", "Waitlists"],
+            ["messages", "Messages & notifications"],
+          ].map(([key, label]) => (
+            <Link className={ownerSection === key ? "active" : ""} href={{ pathname: "/portal/schedule", query: { section: key } }} key={key}>
+              {label}
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {profile.role === "owner" && ownerSection === "messages" && (
+        <OwnerScheduleMessages templates={messageTemplates} digest={digestSettings} />
+      )}
+
+      {profile.role === "owner" && ownerSection === "timeslots" && (
         <section className="panel schedule-create-panel">
           <div className="panel-header">
             <div>
@@ -694,7 +753,7 @@ export default async function SchedulePage({
         </section>
       )}
 
-      {profile.role === "owner" && (
+      {profile.role === "owner" && ownerSection === "timeslots" && (
         <ScheduleOwnerTools
           cycles={cycles.map((cycle) => ({
             id: cycle.id,
@@ -705,6 +764,7 @@ export default async function SchedulePage({
         />
       )}
 
+      {(profile.role !== "owner" || ["overview", "timeslots", "staffing"].includes(ownerSection)) && (
       <section className="schedule-workspace-toolbar">
         <div className="schedule-view-toggle" aria-label="Schedule view">
           <Link
@@ -764,8 +824,9 @@ export default async function SchedulePage({
           )}
         </form>
       </section>
+      )}
 
-      {profile.role === "owner" && ownerWaitlistEntries.length > 0 && (
+      {profile.role === "owner" && ownerSection === "waitlists" && ownerWaitlistEntries.length > 0 && (
         <section className="panel schedule-owner-waitlist-panel">
           <div className="panel-header">
             <div><p className="eyebrow">Owner queue</p><h2>Timeslot waitlists</h2><p>Each queue belongs to one exact timeslot. The next school receives a 15-minute exclusive offer.</p></div>
@@ -781,7 +842,7 @@ export default async function SchedulePage({
                     <div><strong>{formatSlotDate(slot.starts_at)}</strong><span>{formatSlotTime(slot.starts_at, slot.ends_at)} ET · {slot.title}</span></div>
                     <div className="button-row"><span className="badge">{queue.length} waiting</span><form action={ownerOfferNextSlotWaitlist.bind(null, slot.id)}><button className="button button-secondary button-compact" type="submit" disabled={Boolean(activeOffer) || slotIsBooked(slot)}>{activeOffer ? "Offer active" : slotIsBooked(slot) ? "Currently booked" : "Offer next school"}</button></form></div>
                   </div>
-                  <ol className="timeslot-waitlist-queue">{queue.map((entry) => { const application = applicationLookup.get(entry.application_id); return <li key={entry.id}><span className="queue-position">{entry.queue_rank}</span><div><strong>{application?.school_name ?? "School"}</strong><small>{application?.production_title ?? "Production"}{entry.applicant_notes ? ` · ${entry.applicant_notes}` : ""}</small></div><span className={`badge schedule-waitlist-status-${entry.status}`}>{entry.status}{entry.offer_expires_at && entry.status === "offered" ? ` until ${new Date(entry.offer_expires_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</span></li>; })}</ol>
+                  <ol className="timeslot-waitlist-queue">{queue.map((entry) => { const application = applicationLookup.get(entry.application_id); return <li key={entry.id}><span className="queue-position">{entry.queue_rank}</span><div><strong>{application?.school_name ?? "School"}</strong><small>{application?.production_title ?? "Production"}{entry.applicant_notes ? ` · ${entry.applicant_notes}` : ""}</small>{(entry.alternate_date_1 || entry.alternate_date_2 || entry.alternate_date_3) && <small>Alternates: {[entry.alternate_date_1, entry.alternate_date_2, entry.alternate_date_3].filter(Boolean).join(", ")}</small>}{entry.applicant_reason && <small>Reason: {entry.applicant_reason}</small>}</div><span className={`badge schedule-waitlist-status-${entry.status}`}>{entry.status}{entry.offer_expires_at && entry.status === "offered" ? ` until ${new Date(entry.offer_expires_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</span></li>; })}</ol>
                 </article>
               );
             })}
@@ -789,7 +850,7 @@ export default async function SchedulePage({
         </section>
       )}
 
-      {profile.role === "applicant" && bookedSlot && bookedApplication ? (
+      {(profile.role !== "owner" || ["overview", "timeslots", "staffing"].includes(ownerSection)) && (profile.role === "applicant" && bookedSlot && bookedApplication ? (
         <section className="panel schedule-locked-booking">
           <div className="panel-header">
             <div>
@@ -1235,6 +1296,20 @@ export default async function SchedulePage({
                             <div className="schedule-owner-action-grid">
                               <div className="schedule-owner-action">
                                 <h4>School reservation</h4>
+                                {booking && (() => {
+                                  const approval = bookingApprovals.find((item) => item.id === booking.booking_id);
+                                  if (!approval || approval.approval_status !== "pending") return null;
+                                  return (
+                                    <div className="pending-booking-approval">
+                                      <span className="badge">Pending Owner approval</span>
+                                      <form action={ownerConfirmScheduleBooking.bind(null, booking.booking_id)} className="form-stack compact-form">
+                                        <div className="field"><label>Optional confirmation note</label><input className="input" name="approval_notes" /></div>
+                                        <button className="button button-gold button-compact" type="submit">Approve and send final message</button>
+                                      </form>
+                                      <details><summary>Decline selection</summary><form action={ownerDeclineScheduleBooking.bind(null, booking.booking_id)} className="form-stack compact-form"><div className="field"><label>Reason</label><textarea className="textarea compact-textarea" name="approval_notes" required /></div><button className="button button-danger button-compact" type="submit">Decline and reopen slot</button></form></details>
+                                    </div>
+                                  );
+                                })()}
                                 {booking ? (
                                   <form action={removeScheduleSchoolBooking.bind(null, booking.booking_id)}>
                                     <button className="button button-secondary button-compact" type="submit">
@@ -1306,7 +1381,7 @@ export default async function SchedulePage({
             })
           )}
         </section>
-      )}
-    </>
+      ))}
+    </div>
   );
 }
