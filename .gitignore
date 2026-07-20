@@ -19,3 +19,17 @@ out/
 # macOS
 .DS_Store
 .ghsmta-patch-backups/
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store

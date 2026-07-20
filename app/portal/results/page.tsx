@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-import { formatScore } from "@/lib/adjudication";
+import {
+  formatScore,
+  formatScoreAverage,
+} from "@/lib/adjudication";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -51,7 +54,7 @@ export default async function ReleasedResultsPage() {
           <section className="panel released-results-panel" key={application.id}>
             <div className="panel-header released-results-heading"><div><span className="eyebrow">{cycle ? `${cycle.season_year} · ${cycle.name}` : "Application"}</span><h2>{application.school_name}</h2><p>{application.production_title ?? "Untitled production"}</p></div><Link href={`/portal/applications/${application.id}`}>View application</Link></div>
 
-            {release.scores_released_at && <div className="panel-body"><h3>Released category averages</h3><p className="release-date">Released {new Date(release.scores_released_at).toLocaleDateString()}</p><div className="released-score-grid">{release.score_snapshot.map((item) => <article key={item.category_id}><span>{item.title}</span><strong>{formatScore(item.average_score)}</strong></article>)}</div></div>}
+            {release.scores_released_at && <div className="panel-body"><h3>Released category averages</h3><p className="release-date">Released {new Date(release.scores_released_at).toLocaleDateString()}</p><div className="released-score-grid">{release.score_snapshot.map((item) => <article key={item.category_id}><span>{item.title}</span><strong>{formatScoreAverage(item.average_score)}</strong></article>)}</div></div>}
 
             {release.feedback_released_at && <div className="panel-body released-feedback-section"><h3>Adjudication panel feedback</h3><p className="release-date">Released {new Date(release.feedback_released_at).toLocaleDateString()}</p><div className="released-feedback-list">{release.feedback_snapshot.map((item) => <article key={item.category_id}><h4>{item.title}</h4><p>{item.final_comment}</p></article>)}</div></div>}
 

@@ -1440,3 +1440,140 @@
   }
 }
 /* GHSMTA CHAT THREAD COLLISION FIX END */
+
+/* GHSMTA COMPLETE LIGHT MODE CHAT START */
+
+:global(html[data-theme="light"]) .shell {
+  color: #263247;
+  border-color: #d7dfe9;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(28, 43, 68, 0.12);
+}
+
+:global(html[data-theme="light"]) .rail {
+  border-color: #d7dfe9;
+  background: linear-gradient(180deg, #f4f7fb 0%, #edf2f8 100%);
+}
+
+:global(html[data-theme="light"]) .railHeader h2,
+:global(html[data-theme="light"]) .channelHeader h1,
+:global(html[data-theme="light"]) .channelTitleRow strong,
+:global(html[data-theme="light"]) .channelHeader p strong {
+  color: #142039;
+}
+
+:global(html[data-theme="light"]) .searchInput,
+:global(html[data-theme="light"]) .unreadFilter {
+  color: #172033;
+  border-color: #cbd5e2;
+  background: #ffffff;
+}
+
+:global(html[data-theme="light"]) .channelLink {
+  color: #263247;
+}
+
+:global(html[data-theme="light"]) .channelLink:hover,
+:global(html[data-theme="light"]) .channelLink:focus-visible {
+  border-color: #d3dce8;
+  background: #ffffff;
+}
+
+:global(html[data-theme="light"]) .channelLinkActive {
+  border-color: rgba(40, 87, 189, 0.24);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(28, 43, 68, 0.11);
+}
+
+:global(html[data-theme="light"]) .channelTitleRow time,
+:global(html[data-theme="light"]) .channelCopy small,
+:global(html[data-theme="light"]) .channelGroupHeading h3,
+:global(html[data-theme="light"]) .memberSummary,
+:global(html[data-theme="light"]) .channelHeader p {
+  color: #667388;
+}
+
+:global(html[data-theme="light"]) .noChannelResults {
+  color: #667388;
+  border-color: #ccd6e3;
+  background: #ffffff;
+}
+
+:global(html[data-theme="light"]) .conversation,
+:global(html[data-theme="light"]) .channelHeader {
+  color: #263247;
+  border-color: #d7dfe9;
+  background: #ffffff;
+}
+
+:global(html[data-theme="light"]) .channelHeader {
+  background: rgba(255, 255, 255, 0.97);
+}
+
+:global(html[data-theme="light"]) .visibilityPill {
+  color: #2857bd;
+  border-color: rgba(40, 87, 189, 0.2);
+  background: #edf3ff;
+}
+
+:global(html[data-theme="light"]) .messageList,
+:global(html[data-theme="light"]) .thread,
+:global(html[data-theme="light"]) .conversationBody {
+  color: #263247;
+  background: #f5f7fb;
+}
+
+:global(html[data-theme="light"]) .post,
+:global(html[data-theme="light"]) .message,
+:global(html[data-theme="light"]) .reply,
+:global(html[data-theme="light"]) .replyCard,
+:global(html[data-theme="light"]) .composer,
+:global(html[data-theme="light"]) .replyComposer,
+:global(html[data-theme="light"]) .threadPanel,
+:global(html[data-theme="light"]) .threadHeader {
+  color: #263247;
+  border-color: #d7dfe9;
+  background: #ffffff;
+}
+
+:global(html[data-theme="light"]) .composer textarea,
+:global(html[data-theme="light"]) .replyComposer textarea,
+:global(html[data-theme="light"]) .composer input,
+:global(html[data-theme="light"]) .replyComposer input {
+  color: #172033;
+  border-color: #cbd5e2;
+  background: #ffffff;
+}
+
+:global(html[data-theme="light"]) .composer textarea::placeholder,
+:global(html[data-theme="light"]) .replyComposer textarea::placeholder {
+  color: #8692a5;
+}
+
+:global(html[data-theme="light"]) .author,
+:global(html[data-theme="light"]) .messageAuthor,
+:global(html[data-theme="light"]) .replyAuthor {
+  color: #142039;
+}
+
+:global(html[data-theme="light"]) .messageBody,
+:global(html[data-theme="light"]) .replyBody,
+:global(html[data-theme="light"]) .postBody {
+  color: #263247;
+}
+
+:global(html[data-theme="light"]) .messageMeta,
+:global(html[data-theme="light"]) .replyMeta,
+:global(html[data-theme="light"]) .postMeta,
+:global(html[data-theme="light"]) .timestamp {
+  color: #6b778b;
+}
+
+:global(html[data-theme="light"]) .deletedMessage,
+:global(html[data-theme="light"]) .lockedNotice {
+  color: #6b778b;
+  border-color: #d6dee8;
+  background: #eef2f7;
+}
+
+/* GHSMTA COMPLETE LIGHT MODE CHAT END */

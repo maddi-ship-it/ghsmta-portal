@@ -12,6 +12,7 @@ import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow
 import { CategoryScoringControls } from "@/components/category-scoring-controls";
 import { RichTextField } from "@/components/rich-text-field";
 import { createClient } from "@/lib/supabase/client";
+import { roundScoreAverage } from "@/lib/adjudication";
 import {
   richTextHasContent,
   sanitizeRichTextHtml,
@@ -119,7 +120,8 @@ function panelMembersFromRows(
 }
 
 function formatAverage(value: number | null) {
-  return value == null ? "—" : value.toFixed(2);
+  const rounded = roundScoreAverage(value);
+  return rounded == null ? "—" : rounded.toFixed(5);
 }
 
 function CategoryAverageSummary({
@@ -278,8 +280,10 @@ function CategoryScoreSection({
   const average =
     numericScores.length === 0
       ? null
-      : numericScores.reduce((sum, score) => sum + score, 0) /
-        numericScores.length;
+      : roundScoreAverage(
+          numericScores.reduce((sum, score) => sum + score, 0) /
+            numericScores.length,
+        );
 
   const rangeEnd =
     decision.rangeStart == null

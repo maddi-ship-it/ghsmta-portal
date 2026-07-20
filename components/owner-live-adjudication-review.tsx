@@ -7,7 +7,11 @@ import {
   reopenAdjudicatorScorecard,
   savePanelFeedback,
 } from "@/app/portal/adjudication/[id]/actions";
-import { formatScore } from "@/lib/adjudication";
+import {
+  formatScore,
+  formatScoreAverage,
+  roundScoreAverage,
+} from "@/lib/adjudication";
 import { createClient } from "@/lib/supabase/client";
 import { richTextHasContent, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/rich-text";
 import type {
@@ -132,7 +136,9 @@ function categoryAverage(
     .map((score) => Number(score.score));
 
   if (values.length === 0) return null;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return roundScoreAverage(
+    values.reduce((sum, value) => sum + value, 0) / values.length,
+  );
 }
 
 function LivePanelFeedbackEditor({
@@ -527,7 +533,7 @@ export function OwnerLiveAdjudicationReview({
               </div>
               <div className="category-average">
                 <span>{isOwner ? "Live panel average" : "Panel average"}</span>
-                <strong>{formatScore(average)}</strong>
+                <strong>{formatScoreAverage(average)}</strong>
               </div>
             </div>
 
@@ -560,7 +566,10 @@ export function OwnerLiveAdjudicationReview({
                       .filter((value): value is number => typeof value === "number")
                       .map(Number);
                     const criterionAverage = numeric.length
-                      ? numeric.reduce((sum, value) => sum + value, 0) / numeric.length
+                      ? roundScoreAverage(
+                          numeric.reduce((sum, value) => sum + value, 0) /
+                            numeric.length,
+                        )
                       : null;
 
                     return (
@@ -580,7 +589,7 @@ export function OwnerLiveAdjudicationReview({
                           </td>
                         ))}
                         <td>
-                          <strong>{formatScore(criterionAverage)}</strong>
+                          <strong>{formatScoreAverage(criterionAverage)}</strong>
                         </td>
                       </tr>
                     );

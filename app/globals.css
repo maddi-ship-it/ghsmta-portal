@@ -8408,3 +8408,455 @@ html[data-theme="light"] .report-digest-details strong {
 }
 
 /* GHSMTA PDF REPORTS + HTML DIGEST END */
+
+/* GHSMTA COMPLETE LIGHT MODE + 5DP AUDIT START */
+
+.portal-shell .category-average,
+.portal-shell .category-average-summary,
+.portal-shell .score-range-modal-average {
+  min-width: 164px;
+}
+
+.portal-shell .category-average strong,
+.portal-shell .category-average-summary > strong,
+.portal-shell .score-range-modal-average strong {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --paper: #ffffff;
+  --cream: #f5f7fb;
+  --ink: #172033;
+  --muted: #657187;
+  --line: #d8e0eb;
+  --success: #147547;
+  --danger: #b4232d;
+}
+
+html[data-theme="light"] body,
+html[data-theme="light"] .safe-shell,
+html[data-theme="light"] .portal-shell {
+  color: #263247;
+  background: #edf1f7;
+}
+
+html[data-theme="light"] .portal-shell {
+  --portal-bg-deep: #e4eaf3;
+  --portal-bg: #edf1f7;
+  --portal-surface: #ffffff;
+  --portal-surface-2: #f7f9fc;
+  --portal-surface-3: #eef3f9;
+  --portal-surface-hover: #e7edf6;
+  --portal-line: rgba(28, 45, 73, 0.16);
+  --portal-line-strong: rgba(139, 101, 18, 0.34);
+  --portal-ivory: #152033;
+  --portal-text: #2a3548;
+  --portal-muted: #647187;
+  --portal-gold: #a17616;
+  --portal-gold-bright: #7e5b0c;
+  --portal-blue: #2857bd;
+  --portal-blue-deep: #173987;
+  --portal-success: #147547;
+  --portal-warning: #975800;
+  --portal-danger: #b4232d;
+  --portal-shadow: 0 15px 42px rgba(28, 43, 68, 0.11);
+}
+
+html[data-theme="light"] .portal-main {
+  color: var(--portal-text);
+  background:
+    radial-gradient(circle at 15% 2%, rgba(40, 87, 189, 0.08), transparent 31rem),
+    radial-gradient(circle at 88% 13%, rgba(161, 118, 22, 0.07), transparent 26rem),
+    #edf1f7;
+}
+
+html[data-theme="light"] .portal-header {
+  color: #ffffff;
+  background: rgba(7, 17, 38, 0.98);
+}
+
+html[data-theme="light"] .portal-header :where(a, button, summary, strong, span, small) {
+  color: inherit;
+}
+
+html[data-theme="light"] .portal-header :where(.portal-nav-dropdown, .portal-account-dropdown) {
+  color: #182235;
+  border-color: #d5deea;
+  background: #ffffff;
+  box-shadow: 0 22px 60px rgba(24, 34, 53, 0.22);
+}
+
+html[data-theme="light"] .portal-header :where(.portal-nav-dropdown, .portal-account-dropdown) :where(a, button, strong, span, small) {
+  color: #263247;
+}
+
+html[data-theme="light"] .mobile-portal-nav {
+  color: #ffffff;
+  background: rgba(7, 17, 38, 0.98);
+}
+
+html[data-theme="light"] .portal-main :where(h1, h2, h3, h4, h5) {
+  color: #142039;
+}
+
+html[data-theme="light"] .portal-main :where(p, li, dd, .field-help, .panel-comment-empty, .release-date) {
+  color: #5f6c81;
+}
+
+html[data-theme="light"] .portal-main :where(label, dt, .metric-label, .section-order) {
+  color: #46536a;
+}
+
+html[data-theme="light"] .portal-main .eyebrow {
+  color: #76550c;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel,
+  .metric-card,
+  .settings-section,
+  .detail-item,
+  .application-section,
+  .application-question,
+  .application-content-block,
+  .application-filter-panel,
+  .archive-source-panel,
+  .builder-section,
+  .builder-stage,
+  .check-card,
+  .compact-check-card,
+  .cycle-card,
+  .feedback-request-card,
+  .form-duplicate-panel,
+  .notification-center,
+  .notification-row,
+  .owner-controls-panel,
+  .panelist-card,
+  .question-admin-card,
+  .question-editor,
+  .raw-comment-card,
+  .reference-document-card,
+  .reference-library-panel,
+  .reference-upload-panel,
+  .release-panel,
+  .released-results-panel,
+  .rubric-category-editor,
+  .rubric-criterion-row,
+  .schedule-create-panel,
+  .schedule-owner-waitlist-panel,
+  .schedule-school-card,
+  .schedule-slot-card,
+  .schedule-tool-panel,
+  .schedule-visit-detail-card,
+  .school-file-row,
+  .school-files-main,
+  .school-files-sidebar,
+  .school-team-panel,
+  .school-team-member,
+  .score-category-panel,
+  .score-guide-panel,
+  .scoring-admin-section,
+  .specialty-award-card,
+  .specialty-owner-group,
+  .specialty-summary-card,
+  .stage-heading-panel,
+  .start-application-panel,
+  .user-admin-filter-panel,
+  .workflow-feedback-card,
+  .workflow-feedback-panel,
+  .workflow-notification-builder,
+  .workflow-rule-card
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: #ffffff !important;
+  box-shadow: var(--portal-shadow);
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel-body,
+  .application-answer,
+  .builder-question-card,
+  .criterion-copy,
+  .criterion-score-cell,
+  .inline-category-decision,
+  .live-score-observation,
+  .panel-criterion-comment,
+  .panel-feedback-editor,
+  .panel-review-category,
+  .private-category-notes,
+  .raw-comment-grid,
+  .reference-audience-option,
+  .released-feedback-section,
+  .reply-composer,
+  .reply-thread,
+  .schedule-booking-summary,
+  .schedule-owner-controls,
+  .schedule-owner-action,
+  .schedule-school-action,
+  .schedule-advisory-controls,
+  .schedule-locked-booking,
+  .school-file-upload-panel,
+  .specialty-action-bar
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: #f7f9fc;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel-header,
+  .application-section-header,
+  .application-action-bar,
+  .application-archive-toolbar,
+  .application-reference-bar,
+  .owner-application-tools,
+  .schedule-live-strip,
+  .schedule-owner-tool-bar,
+  .schedule-workspace-toolbar,
+  .schedule-workspace-filters,
+  .scorecard-action-bar,
+  .scoring-category-header,
+  .user-bulk-toolbar,
+  .workflow-builder-header
+) {
+  color: #1d2a42 !important;
+  border-color: var(--portal-line) !important;
+  background: rgba(249, 251, 254, 0.97) !important;
+  box-shadow: 0 10px 28px rgba(28, 43, 68, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+html[data-theme="light"] .portal-main :where(.panel-header, .scoring-category-header) :where(h2, h3, strong) {
+  color: #142039 !important;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .input,
+  .select,
+  .textarea,
+  .file-input,
+  .input-static,
+  .input-compact,
+  .compact-textarea,
+  .rich-text-editor,
+  .rich-text-toolbar,
+  .rich-text-surface
+),
+html[data-theme="light"] .portal-main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+html[data-theme="light"] .portal-main select,
+html[data-theme="light"] .portal-main textarea,
+html[data-theme="light"] .portal-main [contenteditable="true"] {
+  color: #172033 !important;
+  border-color: #cbd5e2 !important;
+  background: #ffffff !important;
+}
+
+html[data-theme="light"] .portal-main :where(input, textarea, [contenteditable="true"])::placeholder {
+  color: #8692a5 !important;
+}
+
+html[data-theme="light"] .portal-main :where(.input, .select, .textarea, .rich-text-surface, [contenteditable="true"]):focus {
+  border-color: #2857bd !important;
+  box-shadow: 0 0 0 3px rgba(40, 87, 189, 0.14) !important;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .button-secondary,
+  .button-secondary-light,
+  .button-compact,
+  .text-button,
+  .category-collapse-toggle,
+  .category-average-review-button
+) {
+  color: #263247 !important;
+  border-color: #cbd5e2 !important;
+  background: #f5f7fb !important;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .button-secondary,
+  .button-secondary-light,
+  .button-compact,
+  .text-button,
+  .category-collapse-toggle,
+  .category-average-review-button
+):hover {
+  color: #6e500c !important;
+  border-color: rgba(139, 101, 18, 0.38) !important;
+  background: #fff7e4 !important;
+}
+
+html[data-theme="light"] .portal-main .button-dark {
+  color: #ffffff !important;
+  background: #142039 !important;
+}
+
+html[data-theme="light"] .portal-main :where(.table-wrap, .criterion-score-table, .consensus-matrix-table-wrap, .report-table-wrap) {
+  color: #263247;
+  border-color: var(--portal-line);
+  background: #ffffff;
+}
+
+html[data-theme="light"] .portal-main :where(.data-table th, .user-admin-table th, .criterion-score-table th, .consensus-matrix-table th) {
+  color: #6f510e !important;
+  border-color: #dbe2ec !important;
+  background: #eef2f7 !important;
+}
+
+html[data-theme="light"] .portal-main :where(.data-table td, .user-admin-table td, .criterion-score-table td, .consensus-matrix-table td) {
+  color: #263247 !important;
+  border-color: #e1e6ee !important;
+  background: transparent;
+}
+
+html[data-theme="light"] .portal-main :where(.data-table tbody tr:nth-child(even), .user-admin-table tbody tr:nth-child(even), .criterion-score-table tbody tr:nth-child(even)) {
+  background: #f8fafc;
+}
+
+html[data-theme="light"] .portal-main :where(.data-table tbody tr:hover, .user-admin-table tbody tr:hover, .criterion-score-table tbody tr:hover) {
+  background: #edf3fb;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .collaborative-criterion-table,
+  .collaborative-criterion-table-header,
+  .collaborative-criterion-row,
+  .panel-comment-column-headings,
+  .personal-score-heading,
+  .score-range-modal-list label
+) {
+  color: #263247;
+  border-color: var(--portal-line);
+  background: #ffffff;
+}
+
+html[data-theme="light"] .portal-main .collaborative-criterion-row:nth-child(odd) {
+  background: #f8fafc;
+}
+
+html[data-theme="light"] .portal-main :where(.category-average-summary, .score-range-modal-average, .category-decision-response-card) {
+  color: #263247;
+  border-color: var(--portal-line);
+  background: #f5f7fb;
+}
+
+html[data-theme="light"] .portal-main :where(.category-average-summary, .score-range-modal-average) strong {
+  color: #142039 !important;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-approved {
+  color: #147547 !important;
+  border-color: rgba(20, 117, 71, 0.32) !important;
+  background: #eaf8f0 !important;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-pending {
+  color: #975800 !important;
+  border-color: rgba(151, 88, 0, 0.32) !important;
+  background: #fff5dd !important;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-disputed {
+  color: #b4232d !important;
+  border-color: rgba(180, 35, 45, 0.31) !important;
+  background: #ffeff1 !important;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-awaiting {
+  color: #2857bd !important;
+  border-color: rgba(40, 87, 189, 0.28) !important;
+  background: #edf3ff !important;
+}
+
+html[data-theme="light"] .portal-main :where(.notice, .notice-banner, .info-banner, .page-message, .form-builder-notice) {
+  color: #204889 !important;
+  border-color: rgba(40, 87, 189, 0.22) !important;
+  background: #edf4ff !important;
+}
+
+html[data-theme="light"] .portal-main :where(.success-banner, .badge-complete, .badge-submitted) {
+  color: #12663d !important;
+  border-color: rgba(20, 117, 71, 0.22) !important;
+  background: #eaf8f0 !important;
+}
+
+html[data-theme="light"] .portal-main :where(.form-error, .error-banner) {
+  color: #9f1f28 !important;
+  border-color: rgba(180, 35, 45, 0.22) !important;
+  background: #fff0f1 !important;
+}
+
+html[data-theme="light"] .portal-main :where(.badge-warning, .badge-under_review) {
+  color: #8c5300 !important;
+  background: #fff5dd !important;
+}
+
+html[data-theme="light"] :where(
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .feedback-modal,
+  .regal-dialog-card,
+  .schedule-tool-modal,
+  .score-range-modal
+) {
+  color: #263247 !important;
+  border-color: rgba(139, 101, 18, 0.32) !important;
+  background: #ffffff !important;
+  box-shadow: 0 28px 86px rgba(28, 43, 68, 0.24) !important;
+}
+
+html[data-theme="light"] :where(
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .feedback-modal,
+  .regal-dialog-card,
+  .schedule-tool-modal,
+  .score-range-modal
+) :where(h2, h3, strong) {
+  color: #142039;
+}
+
+html[data-theme="light"] :where(
+  .application-reference-modal-backdrop,
+  .consensus-matrix-modal-backdrop,
+  .feedback-modal-backdrop,
+  .regal-dialog-backdrop,
+  .schedule-tool-modal-backdrop,
+  .score-range-modal-backdrop
+) {
+  background: rgba(26, 38, 58, 0.54);
+}
+
+html[data-theme="light"] .theme-setting-toggle {
+  color: #263247;
+  border-color: #d2dbe7;
+  background: #f7f9fc;
+}
+
+html[data-theme="light"] .theme-setting-copy strong {
+  color: #142039;
+}
+
+html[data-theme="light"] .theme-setting-copy small {
+  color: #647187;
+}
+
+html[data-theme="light"] .theme-setting-icon {
+  color: #7e5b0c;
+  border-color: rgba(139, 101, 18, 0.3);
+  background: #fff7e4;
+}
+
+@media (max-width: 620px) {
+  .portal-shell .category-average,
+  .portal-shell .category-average-summary,
+  .portal-shell .score-range-modal-average {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* GHSMTA COMPLETE LIGHT MODE + 5DP AUDIT END */

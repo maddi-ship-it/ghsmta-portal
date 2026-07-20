@@ -8,10 +8,36 @@ import type {
 
 import { richTextToPlainText } from "@/lib/rich-text";
 
-export function average(values: Array<number | null | undefined>) {
-  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+export const SCORE_AVERAGE_DECIMALS = 5;
+
+export function roundScoreAverage(
+  value: number | null | undefined,
+) {
+  if (value == null || !Number.isFinite(value)) return null;
+  const factor = 10 ** SCORE_AVERAGE_DECIMALS;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+export function formatScoreAverage(
+  value: number | null | undefined,
+) {
+  const rounded = roundScoreAverage(value);
+  return rounded == null
+    ? "—"
+    : rounded.toFixed(SCORE_AVERAGE_DECIMALS);
+}
+export function average(
+  values: Array<number | null | undefined>,
+) {
+  const numeric = values.filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value),
+  );
   if (numeric.length === 0) return null;
-  return numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+  return roundScoreAverage(
+    numeric.reduce((sum, value) => sum + value, 0) / numeric.length,
+  );
 }
 
 export function categoryAverage(
