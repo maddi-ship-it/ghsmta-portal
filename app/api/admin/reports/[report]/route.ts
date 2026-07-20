@@ -1,33 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { requireProfile } from "@/lib/auth";
+import {
+  buildOwnerReportPdf,
+  type OwnerReportName,
+} from "@/lib/reports/owner-report-pdf";
 import { createClient } from "@/lib/supabase/server";
 
-type ReportName =
-  | "missing-comments"
-  | "missing-scores"
-  | "specialty-awards";
-
-function csvCell(value: unknown) {
-  const text = value == null ? "" : String(value);
-  return `"${text.replaceAll('"', '""')}"`;
-}
-
-function toCsv(rows: Record<string, unknown>[]) {
-  if (rows.length === 0) {
-    return "No records\n";
-  }
-
-  const headers = Object.keys(rows[0]);
-  const lines = [
-    headers.map(csvCell).join(","),
-    ...rows.map((row) =>
-      headers.map((header) => csvCell(row[header])).join(","),
-    ),
-  ];
-
-  return `\uFEFF${lines.join("\n")}\n`;
-}
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
@@ -37,20 +18,20 @@ export async function GET(
 ) {
   await requireProfile(["owner"]);
   const { report } = await context.params;
+  const selected = report as OwnerReportName;
 
-  const selected = report as ReportName;
   const config = {
     "missing-comments": {
       view: "owner_report_missing_comments",
-      filename: "ghsmta-comments-missing.csv",
+      filename: "ghsmta-comments-missing.pdf",
     },
     "missing-scores": {
       view: "owner_report_missing_scores",
-      filename: "ghsmta-scores-missing.csv",
+      filename: "ghsmta-scores-missing.pdf",
     },
     "specialty-awards": {
       view: "owner_report_specialty_awards",
-      filename: "ghsmta-specialty-award-recommendations.csv",
+      filename: "ghsmta-specialty-award-recommendations.pdf",
     },
   }[selected];
 
@@ -62,10 +43,22 @@ export async function GET(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from(config.view)
-    .select("*")
-    .limit(10000);
+  let query = supabase.from(config.view).select("*").limit(10000);
+
+  if (selected === "specialty-awards") {
+    query = query
+      .order("school_name")
+      .order("award_type")
+      .order("advisory_member_name");
+  } else {
+    query = query
+      .order("school_name")
+      .order("adjudicator_name")
+      .order("category_title")
+      .order("criterion_title");
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json(
@@ -74,14 +67,17 @@ export async function GET(
     );
   }
 
-  return new Response(
-    toCsv((data ?? []) as Record<string, unknown>[]),
-    {
-      headers: {
-        "Content-Disposition": `attachment; filename="${config.filename}"`,
-        "Content-Type": "text/csv; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    },
+  const pdfBytes = await buildOwnerReportPdf(
+    selected,
+    (data ?? []) as Record<string, unknown>[],
   );
+
+  return new NextResponse(Buffer.from(pdfBytes), {
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Disposition": `attachment; filename="${config.filename}"`,
+      "Content-Length": String(pdfBytes.byteLength),
+      "Content-Type": "application/pdf",
+    },
+  });
 }

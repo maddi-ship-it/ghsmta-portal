@@ -8319,3 +8319,92 @@ html[data-theme="light"] .theme-setting-icon {
 }
 
 /* GHSMTA DECISION STATUS + LIGHT MODE END */
+
+/* GHSMTA PDF REPORTS + HTML DIGEST START */
+
+.report-digest-panel {
+  margin-bottom: 20px;
+  overflow: hidden;
+  border-color: rgba(213, 177, 79, 0.28);
+}
+
+.report-digest-panel .panel-header {
+  align-items: center;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(0, 22, 153, 0.26),
+      rgba(13, 24, 45, 0.94)
+    );
+}
+
+.report-digest-panel .panel-header form {
+  flex: none;
+}
+
+.report-digest-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report-digest-details > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.report-digest-details span {
+  color: var(--portal-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.report-digest-details strong {
+  overflow-wrap: anywhere;
+  color: var(--portal-ivory);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+html[data-theme="light"] .report-digest-panel .panel-header {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(0, 22, 153, 0.09),
+      rgba(247, 249, 252, 0.98)
+    );
+}
+
+html[data-theme="light"] .report-digest-details > div {
+  background: #f7f9fc;
+}
+
+html[data-theme="light"] .report-digest-details strong {
+  color: #152033;
+}
+
+@media (max-width: 980px) {
+  .report-digest-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .report-digest-panel .panel-header form,
+  .report-digest-panel .panel-header form .button {
+    width: 100%;
+  }
+
+  .report-digest-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* GHSMTA PDF REPORTS + HTML DIGEST END */

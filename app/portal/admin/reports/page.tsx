@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+import { sendOwnerDigestFromReports } from "./actions";
+
 type ReportName =
   | "missing-comments"
   | "missing-scores"
@@ -44,9 +46,13 @@ function reportHref(report: ReportName) {
 export default async function OwnerReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ report?: string }>;
+  searchParams: Promise<{
+    report?: string;
+    success?: string;
+    error?: string;
+  }>;
 }) {
-  await requireProfile(["owner"]);
+  const owner = await requireProfile(["owner"]);
   const query = await searchParams;
   const selected: ReportName =
     query.report === "missing-scores" ||
@@ -55,7 +61,13 @@ export default async function OwnerReportsPage({
       : "missing-comments";
 
   const supabase = await createClient();
-  const [commentsResult, scoresResult, specialtyResult] = await Promise.all([
+  const [
+    commentsResult,
+    scoresResult,
+    specialtyResult,
+    digestResult,
+    activityResult,
+  ] = await Promise.all([
     supabase
       .from("owner_report_missing_comments")
       .select("*")
@@ -77,9 +89,29 @@ export default async function OwnerReportsPage({
       .order("award_type")
       .order("advisory_member_name")
       .limit(2500),
+    supabase
+      .from("owner_digest_settings")
+      .select(
+        "enabled,recipient_email,delivery_hour,time_zone,last_sent_at",
+      )
+      .eq("owner_user_id", owner.id)
+      .maybeSingle(),
+    supabase
+      .from("owner_activity_log")
+      .select("id", { count: "exact", head: true })
+      .gte(
+        "created_at",
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      ),
   ]);
 
-  for (const result of [commentsResult, scoresResult, specialtyResult]) {
+  for (const result of [
+    commentsResult,
+    scoresResult,
+    specialtyResult,
+    digestResult,
+    activityResult,
+  ]) {
     if (result.error) throw new Error(result.error.message);
   }
 
@@ -99,6 +131,68 @@ export default async function OwnerReportsPage({
           </p>
         </div>
       </div>
+
+      {query.success && (
+        <div className="notice-banner success-banner page-message">
+          {query.success}
+        </div>
+      )}
+      {query.error && (
+        <div className="form-error page-message">{query.error}</div>
+      )}
+
+      <section className="panel report-digest-panel">
+        <div className="panel-header">
+          <div>
+            <span className="eyebrow">Email delivery</span>
+            <h2>Owner daily digest</h2>
+            <p>
+              Send a branded HTML snapshot of current portal activity,
+              incomplete scoring, scheduling approvals, and waitlists.
+            </p>
+          </div>
+
+          <form action={sendOwnerDigestFromReports}>
+            <input name="report" type="hidden" value={selected} />
+            <button className="button button-gold" type="submit">
+              Send daily digest now
+            </button>
+          </form>
+        </div>
+
+        <div className="panel-body report-digest-details">
+          <div>
+            <span>Recipient</span>
+            <strong>
+              {digestResult.data?.recipient_email ||
+                owner.email ||
+                "No recipient configured"}
+            </strong>
+          </div>
+          <div>
+            <span>Activity included</span>
+            <strong>{activityResult.count ?? 0} items from 24 hours</strong>
+          </div>
+          <div>
+            <span>Scheduled delivery</span>
+            <strong>
+              {digestResult.data?.enabled
+                ? `${digestResult.data.delivery_hour}:00 · ${digestResult.data.time_zone}`
+                : "Scheduled delivery disabled"}
+            </strong>
+          </div>
+          <div>
+            <span>Last sent</span>
+            <strong>
+              {digestResult.data?.last_sent_at
+                ? new Date(
+                    digestResult.data.last_sent_at,
+                  ).toLocaleString("en-US")
+                : "Not sent yet"}
+            </strong>
+          </div>
+        </div>
+      </section>
 
       <section className="metric-grid report-metric-grid">
         <article className="metric-card">
@@ -172,12 +266,13 @@ function MissingWorkReport({
             criterion requiring completion.
           </p>
         </div>
-        <a
+        <Link
           className="button button-secondary"
           href={`/api/admin/reports/${report}`}
+          prefetch={false}
         >
-          Download CSV
-        </a>
+          Download PDF
+        </Link>
       </div>
 
       <div className="table-wrap report-table-wrap">
@@ -252,7 +347,7 @@ function SpecialtyReport({ rows }: { rows: SpecialtyRow[] }) {
           href="/api/admin/reports/specialty-awards"
           prefetch={false}
         >
-          Download CSV
+          Download PDF
         </Link>
       </div>
 
