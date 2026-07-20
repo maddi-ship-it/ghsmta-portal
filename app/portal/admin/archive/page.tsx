@@ -371,7 +371,7 @@ export default async function OwnerArchivePage() {
                       <td>
                         <div className="application-row-actions">
                           <Link href={`/portal/applications/${application.id}`}>Open record</Link>
-                          {ownerDm && <Link href={`/portal/chat?archive=1&channel=${ownerDm.id}`}>Owner DM</Link>}
+                          {ownerDm && <Link href={`/portal/chat?archive=1&channel=${ownerDm.id}`}>School Messaging</Link>}
                           {staffChannel && <Link href={`/portal/chat?archive=1&channel=${staffChannel.id}`}>Staff chat</Link>}
                         </div>
                       </td>

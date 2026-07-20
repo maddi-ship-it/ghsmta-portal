@@ -34,11 +34,11 @@ function fallbackChannelGroup(
     case "advisory_committee":
       return { key: "committee", label: "Advisory Committee", order: 30 };
     case "school_dm":
-      return { key: "direct_messages", label: "School DMs", order: 40 };
+      return { key: "direct_messages", label: "School Messaging", order: 40 };
     case "school":
       return {
         key: "school_staff",
-        label: "School staff channels",
+        label: "Panel Channels",
         order: 50,
       };
   }
@@ -96,7 +96,7 @@ export default async function ChatPage({
   const supabase = await createClient();
   const params = await searchParams;
 
-  const richChannelResult = await supabase.rpc("get_my_chat_channels_v2");
+  const richChannelResult = await supabase.rpc("get_my_chat_channels_v3");
   let channelRows = richChannelResult.data as RawChannel[] | null;
   let channelError = richChannelResult.error;
 
@@ -173,7 +173,7 @@ export default async function ChatPage({
           <span className="eyebrow">Communication</span>
           <h1>GHSMTA Chat</h1>
           <p>
-            Community discussions, private school DMs, and assigned panel
+            Community discussions, private School Messaging, and assigned panel
             channels in one workspace.
           </p>
         </div>

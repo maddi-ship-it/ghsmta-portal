@@ -93,7 +93,7 @@ export default async function SchoolTeamPage({
           <h1>School team</h1>
           <p>
             Invite additional school contacts to share the application, private
-            Owner DM, scheduling details, appeals, and released results.
+            School Messaging, scheduling details, appeals, and released results.
           </p>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default async function SchoolTeamPage({
                         <h3>Invite another school contact</h3>
                         <p>
                           They receive their own login and join this application&apos;s
-                          private Owner DM. You can make them an editor or view-only.
+                          private School Messaging. You can make them an editor or view-only.
                         </p>
                       </div>
 

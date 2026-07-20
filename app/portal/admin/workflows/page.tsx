@@ -40,7 +40,7 @@ export default async function WorkflowsAdminPage() {
   return (
     <div className="workflow-admin-grid">
       <section className="panel workflow-notification-builder">
-        <div className="panel-header"><div><h2>Scheduled slot notifications</h2><p>Send automatic reminders to the school DM, school staff channel, in-app inbox, or email.</p></div></div>
+        <div className="panel-header"><div><h2>Scheduled slot notifications</h2><p>Send automatic reminders to the School Messaging, school staff channel, in-app inbox, or email.</p></div></div>
         <div className="panel-body">
           <form action={saveScheduleNotificationRule} className="form-stack">
             <div className="form-grid two-column-form">
@@ -48,7 +48,7 @@ export default async function WorkflowsAdminPage() {
               <div className="field"><label htmlFor="rule_cycle">Program</label><select className="select" id="rule_cycle" name="cycle_id"><option value="">All programs</option>{(cyclesResult.data ?? []).map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.season_year} — {cycle.name}</option>)}</select></div>
               <div className="field"><label htmlFor="rule_offset">Minutes before slot</label><input className="input" id="rule_offset" min="0" name="offset_minutes" required type="number" defaultValue="4320" /><small>4320 = 3 days; 1440 = 1 day; 120 = 2 hours.</small></div>
               <div className="field"><label htmlFor="rule_audience">Audience</label><select className="select" id="rule_audience" name="audience"><option value="school">School applicant</option><option value="school_staff">Assigned adjudicators and Advisory Committee</option></select></div>
-              <div className="field"><label htmlFor="rule_destination">Destination</label><select className="select" id="rule_destination" name="destination"><option value="school_dm">School DM</option><option value="school_channel">School staff channel</option><option value="in_app">In-app notification</option><option value="email">Email</option></select></div>
+              <div className="field"><label htmlFor="rule_destination">Destination</label><select className="select" id="rule_destination" name="destination"><option value="school_dm">School Messaging</option><option value="school_channel">Panel Channel</option><option value="in_app">In-app notification</option><option value="email">Email</option></select></div>
               <label className="check-card compact-check-card"><input defaultChecked name="active" type="checkbox" /><span><strong>Active</strong><small>Process this rule hourly.</small></span></label>
             </div>
             <div className="field"><label htmlFor="rule_title">Notification title</label><input className="input" id="rule_title" name="title_template" required defaultValue="Upcoming adjudication — {{school_name}}" /></div>

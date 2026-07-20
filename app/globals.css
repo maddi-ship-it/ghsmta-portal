@@ -7247,3 +7247,502 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   }
 }
 
+/* GHSMTA PHASE 3 RESPONSIVE START */
+/* ==========================================================================
+   GHSMTA Phase 3 — global polish and responsive system
+   ========================================================================== */
+
+.regal-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 5, 12, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.regal-dialog-card {
+  width: min(100%, 520px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  padding: 26px;
+  border: 1px solid rgba(213, 177, 79, 0.3);
+  border-radius: 22px;
+  color: var(--portal-text, #e9edf5);
+  background:
+    linear-gradient(145deg, rgba(20, 31, 54, 0.99), rgba(8, 14, 27, 0.99));
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.56);
+}
+
+.regal-dialog-mark {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  place-items: center;
+  border: 1px solid rgba(213, 177, 79, 0.4);
+  border-radius: 50%;
+  color: var(--portal-gold-bright, #f2d889);
+  background: rgba(213, 177, 79, 0.08);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.regal-dialog-copy h2 {
+  margin: 4px 0 8px;
+  color: var(--portal-ivory, #f7f2e8);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.65rem;
+}
+
+.regal-dialog-copy p {
+  margin: 0;
+  color: var(--portal-muted, #9da9bd);
+  line-height: 1.55;
+}
+
+.regal-dialog-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.button-danger {
+  color: #fff7f7;
+  border-color: rgba(231, 97, 107, 0.45);
+  background: linear-gradient(135deg, #9e2f3c, #741f2b);
+}
+
+.button-danger:hover {
+  background: linear-gradient(135deg, #b53b49, #872634);
+}
+
+.admin-collapsible-section {
+  overflow: clip;
+  margin-bottom: 16px;
+}
+
+.admin-collapsible-section > summary {
+  list-style: none;
+}
+
+.admin-collapsible-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-collapsible-summary {
+  min-height: 94px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 20px 22px;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.admin-collapsible-summary:hover,
+.admin-collapsible-section[open] > .admin-collapsible-summary {
+  background: rgba(213, 177, 79, 0.055);
+}
+
+.admin-collapsible-summary h2 {
+  margin: 3px 0 4px;
+  color: var(--portal-ivory, #f7f2e8);
+}
+
+.admin-collapsible-summary p {
+  margin: 0;
+  color: var(--portal-muted, #9da9bd);
+}
+
+.admin-collapsible-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--portal-gold-bright, #f2d889);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-collapsible-toggle::after {
+  content: "⌄";
+  transition: transform 160ms ease;
+}
+
+.admin-collapsible-section[open] .admin-collapsible-toggle::after {
+  transform: rotate(180deg);
+}
+
+.admin-collapsible-section[open] .admin-collapsible-toggle {
+  font-size: 0;
+}
+
+.admin-collapsible-section[open] .admin-collapsible-toggle::before {
+  content: "Close";
+  font-size: 0.78rem;
+}
+
+/* Touch and keyboard targets */
+.portal-shell :is(
+  button,
+  .button,
+  .portal-desktop-link,
+  .admin-workspace-tabs a,
+  .mobile-portal-nav a,
+  input,
+  select
+) {
+  min-height: 44px;
+}
+
+.portal-shell :is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(242, 216, 137, 0.58);
+  outline-offset: 3px;
+}
+
+/* Prevent legacy panels and grids from breaking the viewport. */
+.portal-shell :is(
+  .panel,
+  .panel-body,
+  .table-wrap,
+  .form-grid,
+  .schedule-layout,
+  .schedule-grid,
+  .school-files-layout,
+  .adjudication-score-layout,
+  .collaborative-workspace,
+  .chat-workspace,
+  .owner-schedule-workspace
+) {
+  min-width: 0;
+}
+
+.portal-shell .table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.portal-shell .data-table {
+  width: 100%;
+}
+
+.portal-shell .modal-card,
+.portal-shell [role="dialog"] > section {
+  max-height: min(88dvh, 920px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.portal-shell textarea {
+  resize: vertical;
+}
+
+/* Tablet landscape and smaller laptops */
+@media (max-width: 1180px) {
+  .portal-shell .container {
+    width: min(100% - 32px, 1480px);
+  }
+
+  .portal-main {
+    padding-top: 34px;
+  }
+
+  .page-heading {
+    gap: 20px;
+  }
+
+  .page-heading .heading-actions,
+  .panel-header .heading-actions {
+    flex-wrap: wrap;
+  }
+
+  .school-files-layout,
+  .adjudication-score-layout,
+  .owner-schedule-workspace,
+  .schedule-admin-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scoring-sidebar,
+  .school-files-sidebar,
+  .schedule-sidebar {
+    position: static;
+    max-height: none;
+  }
+
+  .collaborative-category-grid,
+  .criterion-collaboration-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Tablets */
+@media (max-width: 900px) {
+  .portal-main {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .page-heading,
+  .panel-header,
+  .specialty-action-bar,
+  .schedule-toolbar,
+  .admin-toolbar,
+  .bulk-action-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-heading .heading-actions,
+  .panel-header .heading-actions,
+  .schedule-toolbar .heading-actions {
+    width: 100%;
+  }
+
+  .page-heading .heading-actions > *,
+  .panel-header .heading-actions > *,
+  .schedule-toolbar .heading-actions > * {
+    flex: 1 1 180px;
+  }
+
+  .metric-grid,
+  .report-metric-grid,
+  .schedule-summary-grid,
+  .specialty-awards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid,
+  .two-column-form,
+  .three-column-form,
+  .assignment-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .field-span-2,
+  .field-span-3 {
+    grid-column: auto;
+  }
+
+  .admin-workspace-tabs,
+  .schedule-workspace-tabs,
+  .tab-bar {
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+
+  .admin-workspace-tabs > *,
+  .schedule-workspace-tabs > *,
+  .tab-bar > * {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+
+  .application-reference-bar,
+  .scoring-reference-bar {
+    position: sticky;
+    top: 64px;
+    overflow-x: auto;
+  }
+
+  .scoring-category-sidebar {
+    position: static;
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+
+  .scoring-category-sidebar > * {
+    flex: 0 0 min(230px, 75vw);
+  }
+}
+
+/* Phones */
+@media (max-width: 640px) {
+  .portal-shell .container,
+  .security-grace-banner .container {
+    width: min(100% - 22px, 1480px);
+  }
+
+  .portal-main {
+    padding-top: 24px;
+  }
+
+  .portal-main .page-heading {
+    margin-bottom: 22px;
+  }
+
+  .portal-main .page-heading h1 {
+    font-size: clamp(2.15rem, 12vw, 3rem);
+    overflow-wrap: anywhere;
+  }
+
+  .portal-main .page-heading p {
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .metric-grid,
+  .report-metric-grid,
+  .schedule-summary-grid,
+  .specialty-awards-grid,
+  .specialty-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .portal-main .metric-card {
+    min-height: 104px;
+  }
+
+  .panel-header,
+  .panel-body,
+  .admin-collapsible-summary {
+    padding-inline: 16px;
+  }
+
+  .admin-collapsible-summary {
+    min-height: 82px;
+    align-items: flex-start;
+  }
+
+  .admin-collapsible-summary h2 {
+    font-size: 1.15rem;
+  }
+
+  .regal-dialog-backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .regal-dialog-card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    border-radius: 22px 22px 16px 16px;
+  }
+
+  .regal-dialog-mark {
+    width: 42px;
+    height: 42px;
+  }
+
+  .regal-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .regal-dialog-actions .button {
+    width: 100%;
+  }
+
+  .portal-shell .data-table {
+    min-width: 760px;
+  }
+
+  .portal-shell .table-wrap::after {
+    content: "Swipe horizontally to view all columns";
+    position: sticky;
+    left: 12px;
+    display: inline-block;
+    margin: 8px 12px 12px;
+    color: var(--portal-muted, #9da9bd);
+    font-size: 0.72rem;
+  }
+
+  .button,
+  button {
+    max-width: 100%;
+  }
+
+  .heading-actions,
+  .school-file-actions,
+  .schedule-row-actions,
+  .chat-composer-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .heading-actions .button,
+  .school-file-actions .button,
+  .schedule-row-actions .button {
+    flex: 1 1 140px;
+  }
+
+  .mobile-portal-nav {
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: env(safe-area-inset-bottom);
+    scroll-snap-type: x mandatory;
+  }
+
+  .mobile-portal-nav a {
+    flex: 0 0 76px;
+    scroll-snap-align: center;
+  }
+
+  .chat-workspace,
+  .teams-chat-shell {
+    min-height: calc(100dvh - 156px);
+    max-height: none;
+  }
+
+  .chat-composer textarea {
+    min-height: 88px;
+  }
+
+  .school-file-row,
+  .schedule-list-row,
+  .feedback-request-card {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .school-file-icon {
+    display: none;
+  }
+
+  .schedule-list-row > *,
+  .school-file-row > * {
+    min-width: 0;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 390px) {
+  .portal-shell .container {
+    width: min(100% - 16px, 1480px);
+  }
+
+  .brand-copy small,
+  .portal-account-chevron {
+    display: none;
+  }
+
+  .portal-header-inner {
+    width: calc(100% - 14px);
+  }
+
+  .portal-main .page-heading h1 {
+    font-size: 2.08rem;
+  }
+
+  .mobile-portal-nav a {
+    flex-basis: 70px;
+  }
+}
+/* GHSMTA PHASE 3 RESPONSIVE END */

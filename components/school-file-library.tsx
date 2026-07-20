@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { archiveSchoolFile } from "@/app/portal/files/actions";
+import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import { uploadPortalFiles } from "@/lib/portal-file-client";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
@@ -33,6 +34,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const application = applications.find((item) => item.application_id === applicationId);
   const selectedType = FILE_TYPES.find(([key]) => key === fileType) ?? FILE_TYPES[0];
   const personFields = ["name_pronunciation", "headshot", "resume"].includes(fileType);
@@ -83,10 +85,26 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
-  function remove(fileId: string) {
-    if (!window.confirm("Remove this file from the active school library?")) return;
-    const data = new FormData(); data.set("file_id", fileId);
-    startTransition(async () => { try { await archiveSchoolFile(data); router.refresh(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not remove file."); } });
+  function confirmRemoval() {
+    if (!pendingRemovalId) return;
+
+    const data = new FormData();
+    data.set("file_id", pendingRemovalId);
+
+    startTransition(async () => {
+      try {
+        await archiveSchoolFile(data);
+        setPendingRemovalId(null);
+        setMessage("File removed from the active school library.");
+        router.refresh();
+      } catch (caught) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Could not remove file.",
+        );
+      }
+    });
   }
 
   if (applications.length === 0) return <section className="panel empty-state"><h2>No school files are available.</h2></section>;
@@ -108,8 +126,19 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
         </form>}
         {error && <div className="form-error">{error}</div>}{message && <div className="notice-banner success-banner">{message}</div>}
         <div className="school-files-toolbar"><div><strong>Active files</strong><small>Up to 50 MB each</small></div><input className="input" type="search" placeholder="Search by file, person, or category" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-        <div className="school-file-list">{visibleFiles.map((file) => <article className="school-file-row" key={file.id}><span className="school-file-icon">▱</span><div className="school-file-copy"><strong>{file.display_name || file.person_name || file.original_name}</strong><span>{labelFor(file.document_category)}{file.award_category ? ` · ${file.award_category}` : ""}{file.person_name ? ` · ${file.person_name}` : ""}</span><small>{formatBytes(file.file_size)} · {file.reviewer_visible ? "Assigned reviewers can access" : "School + Owners only"}</small></div><div className="school-file-actions"><button className="button button-secondary button-compact" type="button" onClick={() => void openFile(file)}>Open</button>{(profile.role === "owner" || application?.can_upload) && <button className="text-button danger-text" type="button" onClick={() => remove(file.id)}>Remove</button>}</div></article>)}</div>
+        <div className="school-file-list">{visibleFiles.map((file) => <article className="school-file-row" key={file.id}><span className="school-file-icon">▱</span><div className="school-file-copy"><strong>{file.display_name || file.person_name || file.original_name}</strong><span>{labelFor(file.document_category)}{file.award_category ? ` · ${file.award_category}` : ""}{file.person_name ? ` · ${file.person_name}` : ""}</span><small>{formatBytes(file.file_size)} · {file.reviewer_visible ? "Assigned reviewers can access" : "School + Owners only"}</small></div><div className="school-file-actions"><button className="button button-secondary button-compact" type="button" onClick={() => void openFile(file)}>Open</button>{(profile.role === "owner" || application?.can_upload) && <button className="text-button danger-text" type="button" onClick={() => setPendingRemovalId(file.id)}>Remove</button>}</div></article>)}</div>
       </div></section>
+
+      <RegalConfirmDialog
+        confirmLabel="Remove file"
+        description="The file will be removed from the active school library but retained in the portal archive and audit history."
+        destructive
+        onCancel={() => setPendingRemovalId(null)}
+        onConfirm={confirmRemoval}
+        open={Boolean(pendingRemovalId)}
+        pending={pending}
+        title="Remove this file?"
+      />
     </div>
   );
 }

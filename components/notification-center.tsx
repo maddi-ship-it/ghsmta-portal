@@ -44,11 +44,11 @@ function formatDate(value: string) {
 
 function chatChannelLabel(channel: ChatChannelRow) {
   if (channel.channel_type === "school") {
-    return "School Staff";
+    return "Panel Channel";
   }
 
   if (channel.channel_type === "school_dm") {
-    return "School Owner DM";
+    return "School Messaging";
   }
 
   return channel.channel_name;

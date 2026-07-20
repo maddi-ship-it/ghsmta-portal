@@ -207,8 +207,8 @@ export async function inviteSchoolTeamMember(formData: FormData) {
     notification_type: "school_team_invite",
     title: `You've been added to ${application.school_name}`,
     body: canEditApplication
-      ? "You can view and edit the school's application, schedule details, appeals, results, and Owner DM."
-      : "You can view the school's application, schedule, appeals, results, and Owner DM.",
+      ? "You can view and edit the school's application, schedule details, appeals, results, and School Messaging."
+      : "You can view the school's application, schedule, appeals, results, and School Messaging.",
     href: TEAM_PATH,
     related_application_id: applicationId,
   });
@@ -224,7 +224,7 @@ export async function inviteSchoolTeamMember(formData: FormData) {
     to: [email],
     subject: `You've been added to the ${application.school_name} GHSMTA account`,
     text: `${profile.full_name ?? profile.email ?? "The primary school contact"} added you to ${application.school_name}${application.production_title ? ` — ${application.production_title}` : ""} in the GHSMTA Portal. You can ${accessDescription}. Open this secure link: ${linkData.properties.action_link}`,
-    html: `<h2>You've been added to a GHSMTA school account</h2><p>Hello ${safeName},</p><p>${escapeHtml(profile.full_name ?? profile.email ?? "The primary school contact")} added you to <strong>${safeSchool}</strong>${safeProduction ? ` for <strong>${safeProduction}</strong>` : ""}.</p><p>You can ${accessDescription}, use the private School Owner DM, update permitted schedule information, submit appeals, and view released results.</p><p><a href="${linkData.properties.action_link}">Open the GHSMTA Portal</a></p><p>This secure link is intended only for ${escapeHtml(email)}.</p>`,
+    html: `<h2>You've been added to a GHSMTA school account</h2><p>Hello ${safeName},</p><p>${escapeHtml(profile.full_name ?? profile.email ?? "The primary school contact")} added you to <strong>${safeSchool}</strong>${safeProduction ? ` for <strong>${safeProduction}</strong>` : ""}.</p><p>You can ${accessDescription}, use the private School Messaging, update permitted schedule information, submit appeals, and view released results.</p><p><a href="${linkData.properties.action_link}">Open the GHSMTA Portal</a></p><p>This secure link is intended only for ${escapeHtml(email)}.</p>`,
   });
 
   if (!emailResult.ok) {

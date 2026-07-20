@@ -130,12 +130,12 @@ const GROUP_FALLBACKS: Record<
   },
   school_dm: {
     key: "direct_messages",
-    label: "School DMs",
+    label: "School Messaging",
     order: 40,
   },
   school: {
     key: "school_staff",
-    label: "School staff channels",
+    label: "Panel Channels",
     order: 50,
   },
 };
@@ -768,7 +768,7 @@ export function TeamsChat({
   }, [threads]);
 
   const reloadChannels = useCallback(async () => {
-    const richResult = await supabase.rpc("get_my_chat_channels_v2");
+    const richResult = await supabase.rpc("get_my_chat_channels_v3");
 
     if (!richResult.error) {
       setChannels(
@@ -998,7 +998,7 @@ export function TeamsChat({
         <div className="empty-state">
           <h2>No chat channels are available.</h2>
           <p>
-            An Owner may need to run migration 018 to rebuild the school DMs
+            An Owner may need to run migration 018 to rebuild the School Messaging
             and panel channels.
           </p>
         </div>
@@ -1068,7 +1068,7 @@ export function TeamsChat({
               onClick={() => setShowBroadcastComposer(true)}
               type="button"
             >
-              Message all active school DMs
+              Message all active School Messaging
             </button>
           )}
         </div>
@@ -1508,7 +1508,7 @@ export function TeamsChat({
             <div className={styles.broadcastModalHeader}>
               <div>
                 <span className="eyebrow">Owner broadcast</span>
-                <h2 id="broadcast-title">Message every active school DM</h2>
+                <h2 id="broadcast-title">Message every active School Messaging</h2>
                 <p>
                   This creates the same message in {activeSchoolDmCount} active
                   school {activeSchoolDmCount === 1 ? "DM" : "DMs"}. Archived
@@ -1543,7 +1543,7 @@ export function TeamsChat({
               <input name="confirm" required type="checkbox" />
               <span>
                 I understand this sends a separate message to every active
-                School Owner DM.
+                School Messaging.
               </span>
             </label>
 

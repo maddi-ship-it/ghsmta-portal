@@ -57,6 +57,19 @@ export default async function ScoringAdminPage({
     supabase.from("ai_prompt_templates").select("*").eq("template_key", "panel_category_comment").order("cycle_id", { ascending: true }).order("version_number", { ascending: false }),
   ]);
 
+  for (const result of [
+    cyclesResult,
+    applicationsResult,
+    adjudicatorsResult,
+    assignmentsResult,
+    rubricsResult,
+    categoriesResult,
+    criteriaResult,
+    promptsResult,
+  ]) {
+    if (result.error) throw new Error(result.error.message);
+  }
+
   const cycles = (cyclesResult.data ?? []) as AwardCycle[];
   const activeCycleIds = new Set(cycles.map((cycle) => cycle.id));
   const applications = ((applicationsResult.data ?? []) as Application[]).filter(
@@ -91,10 +104,15 @@ export default async function ScoringAdminPage({
       {query.assigned && <div className="notice page-message">Adjudicator assignment saved.</div>}
       {query.prompt_saved && <div className="notice page-message">AI narrative prompt saved.</div>}
 
-      <section className="panel scoring-admin-section">
-        <div className="panel-header">
-          <div><h2>Assign adjudicators</h2><p>Assignments determine which applications an adjudicator can open and score.</p></div>
-        </div>
+      <details className="panel scoring-admin-section admin-collapsible-section">
+        <summary className="admin-collapsible-summary">
+          <div>
+            <span className="eyebrow">Panel management</span>
+            <h2>Assign adjudicators</h2>
+            <p>{assignments.length} active assignments · {adjudicators.length} available adjudicators</p>
+          </div>
+          <span className="admin-collapsible-toggle">Open</span>
+        </summary>
         <div className="panel-body">
           <form action={assignAdjudicator} className="form-grid assignment-form">
             <div className="field">
@@ -148,12 +166,17 @@ export default async function ScoringAdminPage({
             </tbody>
           </table>
         </div>
-      </section>
+      </details>
 
-      <section className="panel scoring-admin-section">
-        <div className="panel-header">
-          <div><h2>Scoring rubrics</h2><p>Each program can have its own published rubric. Duplicating a cycle now also duplicates its rubric as a draft.</p></div>
-        </div>
+      <details className="panel scoring-admin-section admin-collapsible-section">
+        <summary className="admin-collapsible-summary">
+          <div>
+            <span className="eyebrow">Scoring guides</span>
+            <h2>Scoring rubrics</h2>
+            <p>{rubrics.length} active rubrics · {categories.length} categories · {criteria.length} criteria</p>
+          </div>
+          <span className="admin-collapsible-toggle">Open</span>
+        </summary>
         <div className="table-wrap">
           <table className="data-table">
             <thead><tr><th>Program</th><th>Rubric</th><th>Status</th><th>Categories</th><th>Criteria</th><th /></tr></thead>
@@ -177,12 +200,17 @@ export default async function ScoringAdminPage({
             </tbody>
           </table>
         </div>
-      </section>
+      </details>
 
-      <section className="panel scoring-admin-section">
-        <div className="panel-header">
-          <div><h2>ChatGPT narrative prompt</h2><p>This prompt is used only on the server. The model receives the category rubric and adjudicator observations, not private applicant profile data.</p></div>
-        </div>
+      <details className="panel scoring-admin-section admin-collapsible-section">
+        <summary className="admin-collapsible-summary">
+          <div>
+            <span className="eyebrow">Narrative generation</span>
+            <h2>ChatGPT narrative prompt</h2>
+            <p>{latestGlobalPrompt ? `Active model: ${latestGlobalPrompt.model}` : "Global prompt not configured"}</p>
+          </div>
+          <span className="admin-collapsible-toggle">Open</span>
+        </summary>
         <div className="panel-body">
           <form action={saveAiPrompt} className="form-stack">
             <input name="prompt_id" type="hidden" value={latestGlobalPrompt?.id ?? ""} />
@@ -213,7 +241,7 @@ export default async function ScoringAdminPage({
             <button className="button button-dark" type="submit">Save AI prompt</button>
           </form>
         </div>
-      </section>
+      </details>
     </>
   );
 }
