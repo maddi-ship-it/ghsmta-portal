@@ -6441,3 +6441,234 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 .portal-account-menu[open] .portal-account-chevron {
   transform: rotate(180deg);
 }
+
+/* GHSMTA VISUAL COLLISION FIX START */
+/* The selectors below intentionally use a stronger portal scope. Several
+   legacy page styles have greater specificity than the general dark-theme
+   layer and were still painting individual controls white. */
+
+.portal-shell .portal-main .application-archive-toolbar,
+.portal-shell .portal-main .user-bulk-toolbar {
+  position: static;
+  top: auto;
+  z-index: auto;
+}
+
+.portal-shell .portal-main .application-archive-toolbar {
+  border: 1px solid var(--portal-line);
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(145deg, rgba(20, 31, 54, 0.98), rgba(10, 17, 31, 0.985));
+}
+
+.portal-shell .portal-main .adjudication-card,
+.portal-shell .portal-main .adjudication-card:hover,
+.portal-shell .portal-main .adjudication-card:focus-visible {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.5);
+}
+
+.portal-shell .portal-main .adjudication-card:hover,
+.portal-shell .portal-main .adjudication-card:focus-visible {
+  border-color: rgba(213, 177, 79, 0.32);
+  background: linear-gradient(135deg, rgba(28, 46, 80, 0.92), rgba(12, 21, 39, 0.96));
+}
+
+.portal-shell .portal-main .adjudication-card .eyebrow {
+  color: var(--portal-gold-bright);
+}
+
+.portal-shell .portal-main .adjudication-card h3 {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .adjudication-card p,
+.portal-shell .portal-main .adjudication-card-meta small {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .score-category-sidebar {
+  border-color: var(--portal-line-strong);
+  background: linear-gradient(180deg, rgba(17, 27, 47, 0.99), rgba(6, 12, 24, 0.99));
+}
+
+.portal-shell .portal-main .score-category-sidebar-heading {
+  border-color: var(--portal-line);
+}
+
+.portal-shell .portal-main .score-category-sidebar-heading .eyebrow {
+  color: var(--portal-gold-bright);
+}
+
+.portal-shell .portal-main .score-category-sidebar-heading h2 {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .score-category-sidebar-heading p {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .score-category-tabs a,
+.portal-shell .portal-main .score-category-tabs a strong {
+  color: #cbd5e6;
+}
+
+.portal-shell .portal-main .score-category-tabs a:hover,
+.portal-shell .portal-main .score-category-tabs a:focus-visible,
+.portal-shell .portal-main .score-category-tabs a:hover strong,
+.portal-shell .portal-main .score-category-tabs a:focus-visible strong {
+  color: var(--portal-ivory);
+  background: rgba(124, 158, 246, 0.08);
+}
+
+.portal-shell .portal-main .score-category-tabs a span {
+  color: #dbe6ff;
+  background: #18347d;
+}
+
+.portal-shell .portal-main .live-review-status,
+.portal-shell .portal-main .live-review-status-live,
+.portal-shell .portal-main .live-review-status-connecting,
+.portal-shell .portal-main .live-review-status-error {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: linear-gradient(135deg, rgba(16, 35, 45, 0.94), rgba(10, 25, 37, 0.96));
+}
+
+.portal-shell .portal-main .live-review-status strong {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .live-review-status small {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .panel-feedback-editor {
+  color: var(--portal-text);
+  border-color: var(--portal-line-strong);
+  background: linear-gradient(145deg, rgba(20, 31, 54, 0.98), rgba(8, 15, 28, 0.99));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+}
+
+.portal-shell .portal-main .panel-feedback-editor h3,
+.portal-shell .portal-main .panel-feedback-editor label,
+.portal-shell .portal-main .panel-feedback-editor strong {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .panel-feedback-editor p,
+.portal-shell .portal-main .panel-feedback-editor small {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .panel-feedback-editor .narrative-textarea {
+  color: var(--portal-ivory);
+  border-color: rgba(183, 196, 220, 0.25);
+  background: rgba(4, 8, 18, 0.78);
+}
+
+.portal-shell .portal-main .check-card,
+.portal-shell .portal-main .reference-audience-options label {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.portal-shell .portal-main .check-card:hover,
+.portal-shell .portal-main .reference-audience-options label:hover {
+  border-color: rgba(213, 177, 79, 0.34);
+  background: rgba(213, 177, 79, 0.07);
+}
+
+.portal-shell .portal-main .reference-audience-options label:has(input:checked) {
+  color: var(--portal-ivory);
+  border-color: rgba(213, 177, 79, 0.42);
+  background: rgba(213, 177, 79, 0.11);
+}
+
+.portal-shell .portal-main .school-file-application,
+.portal-shell .portal-main .school-file-application:hover,
+.portal-shell .portal-main .school-file-application.active {
+  color: var(--portal-text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.portal-shell .portal-main .school-file-application:hover {
+  border-color: rgba(124, 158, 246, 0.26);
+  background: rgba(124, 158, 246, 0.07);
+}
+
+.portal-shell .portal-main .school-file-application.active {
+  color: var(--portal-ivory);
+  border-color: rgba(213, 177, 79, 0.36);
+  background: linear-gradient(135deg, rgba(213, 177, 79, 0.12), rgba(124, 158, 246, 0.08));
+  box-shadow: inset 3px 0 0 var(--portal-gold);
+}
+
+.portal-shell .portal-main .school-file-application span,
+.portal-shell .portal-main .school-file-application small {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .school-file-application.active strong {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .school-file-upload-form {
+  color: var(--portal-text);
+  border-color: var(--portal-line-strong);
+  background: rgba(5, 10, 22, 0.48);
+}
+
+.portal-shell .portal-main input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(213, 177, 79, 0.32);
+  border-radius: 9px;
+  color: var(--portal-ivory);
+  background: rgba(213, 177, 79, 0.09);
+  cursor: pointer;
+}
+
+.portal-shell .portal-main input[type="file"]::file-selector-button:hover {
+  color: #080b13;
+  background: var(--portal-gold-bright);
+}
+
+.portal-shell .portal-main .collaborative-criterion-row:nth-child(odd),
+.portal-shell .portal-main .panel-criterion-comment .rich-text-shell,
+.portal-shell .portal-main .raw-comment-card,
+.portal-shell .portal-main .release-note,
+.portal-shell .portal-main .not-applicable-box {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.46);
+}
+
+.portal-shell .portal-main .category-average strong,
+.portal-shell .portal-main .released-score-grid strong {
+  color: var(--portal-gold-bright);
+}
+
+.portal-shell .portal-main .detail-item,
+.portal-shell .portal-main .metric-card {
+  min-width: 0;
+}
+
+.portal-shell .portal-main .detail-item > *,
+.portal-shell .portal-main .metric-card > * {
+  min-width: 0;
+}
+
+.portal-shell .portal-main .metric-card .metric-text,
+.portal-shell .portal-main .detail-item strong {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .portal-shell .portal-main .application-archive-toolbar {
+    border-radius: 14px;
+  }
+}
+/* GHSMTA VISUAL COLLISION FIX END */
