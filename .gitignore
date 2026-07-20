@@ -33,3 +33,17 @@ dist/
 
 # macOS
 .DS_Store
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
