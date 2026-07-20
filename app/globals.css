@@ -6423,3 +6423,21 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   }
 }
 /* GHSMTA REGAL ALL-LAYOUT SYSTEM END */
+
+/* Header interaction polish: bell icon and auto-closing menu indicators */
+.portal-utility-icon {
+  width: 19px;
+  height: 19px;
+  display: block;
+}
+
+.portal-menu-chevron,
+.portal-account-chevron {
+  display: inline-block;
+  transition: transform 150ms ease;
+}
+
+.portal-nav-menu[open] .portal-menu-chevron,
+.portal-account-menu[open] .portal-account-chevron {
+  transform: rotate(180deg);
+}

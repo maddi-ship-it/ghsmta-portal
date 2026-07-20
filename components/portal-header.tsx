@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { signOut } from "@/app/portal/actions";
+import { AutoClosingDetails } from "@/components/auto-closing-details";
 import { PortalUtilities } from "@/components/portal-utilities";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -188,12 +189,18 @@ function DesktopMenu({
   }
 
   return (
-    <details className="portal-nav-menu">
-      <summary>
-        {label}
-        <span aria-hidden="true">⌄</span>
-      </summary>
-
+    <AutoClosingDetails
+      className="portal-nav-menu"
+      summary={
+        <>
+          {label}
+          <span className="portal-menu-chevron" aria-hidden="true">
+            ⌄
+          </span>
+        </>
+      }
+      summaryAriaLabel={`Open ${label} menu`}
+    >
       <div className="portal-nav-menu-popover">
         {items.map((item) => (
           <Link href={item.href} key={item.href}>
@@ -205,7 +212,7 @@ function DesktopMenu({
           </Link>
         ))}
       </div>
-    </details>
+    </AutoClosingDetails>
   );
 }
 
@@ -273,20 +280,27 @@ export async function PortalHeader({
               initialChatChannelCount={chatChannelCount}
             />
 
-            <details className="portal-account-menu">
-              <summary aria-label="Open account menu">
-                <span className="user-avatar">
-                  {displayName.slice(0, 1).toUpperCase()}
-                </span>
-                <span className="portal-account-summary-copy">
-                  <strong>{displayName}</strong>
-                  <small>{roleLabel(profile.role)}</small>
-                </span>
-                <span className="portal-account-chevron" aria-hidden="true">
-                  ⌄
-                </span>
-              </summary>
-
+            <AutoClosingDetails
+              className="portal-account-menu"
+              summaryAriaLabel="Open account menu"
+              summary={
+                <>
+                  <span className="user-avatar">
+                    {displayName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="portal-account-summary-copy">
+                    <strong>{displayName}</strong>
+                    <small>{roleLabel(profile.role)}</small>
+                  </span>
+                  <span
+                    className="portal-account-chevron"
+                    aria-hidden="true"
+                  >
+                    ⌄
+                  </span>
+                </>
+              }
+            >
               <div className="portal-account-popover">
                 <div className="portal-account-popover-heading">
                   <strong>{displayName}</strong>
@@ -299,7 +313,7 @@ export async function PortalHeader({
                   <button type="submit">Sign out</button>
                 </form>
               </div>
-            </details>
+            </AutoClosingDetails>
           </div>
         </div>
       </header>
