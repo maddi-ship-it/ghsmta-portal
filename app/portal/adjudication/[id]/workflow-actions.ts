@@ -64,12 +64,15 @@ export async function saveAllCategoryProposals(
 export async function respondCategoryProposal(
   applicationId: string,
   proposalId: string,
+  responseValue: string,
+  commentFieldName: string,
   formData: FormData,
 ) {
   const profile = await requireProfile(["adjudicator", "advisory_member"]);
   const response =
-    text(formData, "response") === "disputed" ? "disputed" : "approved";
-  const comment = text(formData, "comment");
+    responseValue === "disputed" ? "disputed" : "approved";
+  const comment =
+    response === "disputed" ? text(formData, commentFieldName) : "";
 
   if (response === "disputed" && comment.length < 3) {
     throw new Error("Add a comment explaining the dispute.");

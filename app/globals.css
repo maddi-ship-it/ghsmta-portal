@@ -6672,3 +6672,197 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   }
 }
 /* GHSMTA VISUAL COLLISION FIX END */
+
+/* GHSMTA ADJUDICATOR DECISION + STICKY LAYER FIX START */
+/* Keep header dropdowns above the sticky application-data reference bar. */
+.portal-shell .portal-header {
+  z-index: 300;
+}
+
+.portal-shell .portal-header .portal-nav-menu-popover,
+.portal-shell .portal-header .portal-account-popover {
+  z-index: 340;
+}
+
+.portal-shell .application-reference-bar {
+  top: calc(72px + env(safe-area-inset-top));
+  z-index: 35;
+}
+
+/* Place approval controls directly with the locked eligibility/range controls. */
+.portal-shell .portal-main .category-decision-controls-stack {
+  display: grid;
+  min-width: 330px;
+  gap: 8px;
+}
+
+.portal-shell .portal-main .category-decision-controls-stack .category-scoring-controls {
+  width: 100%;
+  min-width: 0;
+}
+
+.portal-shell .portal-main .category-decision-response-card {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--portal-line);
+  border-radius: 10px;
+  color: var(--portal-text);
+  background: rgba(5, 10, 22, 0.62);
+}
+
+.portal-shell .portal-main .category-decision-response-card > span:first-child {
+  color: var(--portal-gold-bright);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.portal-shell .portal-main .category-decision-response-card > small {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .category-decision-response-status {
+  margin-left: auto;
+}
+
+.portal-shell .portal-main .category-decision-response-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.portal-shell .portal-main .category-decision-response-actions .button {
+  min-height: 31px;
+  padding: 5px 9px;
+  font-size: 0.68rem;
+}
+
+.portal-shell .portal-main .category-dispute-editor {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.5fr) minmax(320px, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(240, 91, 91, 0.38);
+  border-radius: 14px;
+  color: var(--portal-text);
+  background: linear-gradient(135deg, rgba(94, 25, 35, 0.2), rgba(8, 14, 27, 0.9));
+}
+
+.portal-shell .portal-main .category-dispute-editor > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.portal-shell .portal-main .category-dispute-editor strong {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .category-dispute-editor small {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .category-dispute-comment-field {
+  margin: 0;
+}
+
+.portal-shell .portal-main .category-dispute-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Remove the remaining light controls from the adjudicator header. */
+.portal-shell .portal-main .category-average-summary,
+.portal-shell .portal-main .category-eligibility-control {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.64);
+}
+
+.portal-shell .portal-main .category-average-summary > span,
+.portal-shell .portal-main .category-average-summary > small,
+.portal-shell .portal-main .category-eligibility-control small,
+.portal-shell .portal-main .category-decision-lock-note {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .category-average-summary > strong,
+.portal-shell .portal-main .category-eligibility-control strong {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .category-collapse-icon {
+  color: var(--portal-ivory);
+  border-color: var(--portal-line);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.portal-shell .portal-main .category-collapse-title {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .panel-comment-sync-status,
+.portal-shell .portal-main .autosave-status {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: linear-gradient(135deg, rgba(16, 35, 45, 0.94), rgba(9, 19, 34, 0.97));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+}
+
+.portal-shell .portal-main .panel-comment-sync-status strong {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-main .panel-comment-sync-status small {
+  color: var(--portal-muted);
+}
+
+@media (max-width: 1420px) {
+  .portal-shell .portal-main .category-decision-controls-stack {
+    width: min(100%, 430px);
+  }
+}
+
+@media (max-width: 900px) {
+  .portal-shell .application-reference-bar {
+    top: calc(62px + env(safe-area-inset-top));
+  }
+
+  .portal-shell .portal-main .category-decision-controls-stack {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .portal-shell .portal-main .category-dispute-editor {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .portal-shell .portal-main .category-dispute-editor-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .portal-shell .portal-main .category-decision-response-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .portal-shell .portal-main .category-decision-response-status {
+    margin-left: 0;
+  }
+
+  .portal-shell .portal-main .category-decision-response-actions .button,
+  .portal-shell .portal-main .category-dispute-editor-actions .button {
+    flex: 1 1 0;
+  }
+}
+/* GHSMTA ADJUDICATOR DECISION + STICKY LAYER FIX END */

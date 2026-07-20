@@ -226,6 +226,9 @@ function CategoryScoreSection({
 
   const [expanded, setExpanded] = useState(true);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [disputeOpen, setDisputeOpen] = useState(
+    ownApproval?.response === "disputed",
+  );
   const previousMismatchRef = useRef(false);
   const [decision, setDecision] = useState<CategoryDecision>({
     eligible: initialEligible,
@@ -358,21 +361,133 @@ function CategoryScoreSection({
             rangeMismatch={rangeMismatch}
           />
 
-          <CategoryScoringControls
-            categoryId={category.id}
-            defaultEligible={initialEligible}
-            defaultRangeStart={
-              officialProposal?.range_min ?? categoryComment?.score_range_min
-            }
-            disabled={readOnly}
-            locked={Boolean(officialProposal)}
-            onStateChange={setDecision}
-            scoreValues={scoreOptions.map((option) => option.value)}
-          />
+          <div className="category-decision-controls-stack">
+            <CategoryScoringControls
+              categoryId={category.id}
+              defaultEligible={initialEligible}
+              defaultRangeStart={
+                officialProposal?.range_min ?? categoryComment?.score_range_min
+              }
+              disabled={readOnly}
+              locked={Boolean(officialProposal)}
+              onStateChange={setDecision}
+              scoreValues={scoreOptions.map((option) => option.value)}
+            />
+
+            <div className="category-decision-response-card">
+              <span>Approve panel decision</span>
+
+              {!officialProposal ? (
+                <small>Awaiting Advisory Committee</small>
+              ) : officialProposal.status === "overridden" ? (
+                <span className="badge badge-complete">Owner override</span>
+              ) : (
+                <>
+                  <div className="category-decision-response-status">
+                    {ownApproval ? (
+                      <span
+                        className={`badge ${
+                          ownApproval.response === "approved"
+                            ? "badge-complete"
+                            : "badge-warning"
+                        }`}
+                      >
+                        {ownApproval.response === "approved"
+                          ? "You approved"
+                          : "You disputed"}
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning">Response needed</span>
+                    )}
+                  </div>
+
+                  <div className="category-decision-response-actions">
+                    <button
+                      className="button button-gold button-compact"
+                      formAction={respondCategoryProposal.bind(
+                        null,
+                        applicationId,
+                        officialProposal.id,
+                        "approved",
+                        `proposal_comment_${category.id}`,
+                      )}
+                      type="submit"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      aria-expanded={disputeOpen}
+                      className="button button-danger button-compact"
+                      onClick={() => setDisputeOpen((current) => !current)}
+                      type="button"
+                    >
+                      Dispute
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="panel-body" hidden={!expanded}>
+        {officialProposal &&
+          officialProposal.status !== "overridden" &&
+          disputeOpen && (
+            <section className="category-dispute-editor">
+              <div>
+                <p className="eyebrow">Dispute panel decision</p>
+                <strong>{officialProposal.is_eligible ? "Eligible" : "Not eligible"}</strong>
+                <small>
+                  {officialProposal.is_eligible &&
+                  officialProposal.range_min != null &&
+                  officialProposal.range_max != null
+                    ? `${Number(officialProposal.range_min).toFixed(2)}–${Number(officialProposal.range_max).toFixed(2)} range`
+                    : "No score range applies"}
+                </small>
+              </div>
+
+              <div className="field category-dispute-comment-field">
+                <label htmlFor={`proposal_comment_${category.id}`}>
+                  Why do you disagree?
+                </label>
+                <input
+                  className="input"
+                  defaultValue={ownApproval?.comment ?? ""}
+                  id={`proposal_comment_${category.id}`}
+                  minLength={3}
+                  name={`proposal_comment_${category.id}`}
+                  placeholder="Explain the eligibility or range concern"
+                  required
+                />
+              </div>
+
+              <div className="category-dispute-editor-actions">
+                <button
+                  className="button button-danger button-compact"
+                  formAction={respondCategoryProposal.bind(
+                    null,
+                    applicationId,
+                    officialProposal.id,
+                    "disputed",
+                    `proposal_comment_${category.id}`,
+                  )}
+                  formNoValidate
+                  type="submit"
+                >
+                  Submit dispute
+                </button>
+                <button
+                  className="button button-secondary button-compact"
+                  onClick={() => setDisputeOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </section>
+          )}
         {category.subject_label && (
           <div className="field category-subject-field">
             <label htmlFor={`subject_name_${category.id}`}>
@@ -518,39 +633,6 @@ function CategoryScoreSection({
           </div>
         </details>
 
-        <section className="inline-category-decision">
-          <div className="inline-category-decision-copy">
-            <p className="eyebrow">Advisory decision</p>
-            {officialProposal ? (
-              <>
-                <h3>{officialProposal.is_eligible ? "Eligible" : "Not eligible"}</h3>
-                <p>
-                  {officialProposal.is_eligible && officialProposal.range_min != null && officialProposal.range_max != null
-                    ? `Approved range: ${Number(officialProposal.range_min).toFixed(2)}–${Number(officialProposal.range_max).toFixed(2)}`
-                    : "No score range applies."}
-                </p>
-                {officialProposal.advisory_note && <small>{officialProposal.advisory_note}</small>}
-              </>
-            ) : (
-              <><h3>Awaiting Advisory Committee decision</h3><p>Approval controls will appear after eligibility and range are proposed.</p></>
-            )}
-          </div>
-
-          {officialProposal && !["overridden"].includes(officialProposal.status) && (
-            <form action={respondCategoryProposal.bind(null, applicationId, officialProposal.id)} className="inline-category-approval-form">
-              <div className="field">
-                <label htmlFor={`proposal_comment_${category.id}`}>Dispute comment</label>
-                <input className="input" id={`proposal_comment_${category.id}`} name="comment" defaultValue={ownApproval?.comment ?? ""} placeholder="Required only when disputing" />
-              </div>
-              <div className="button-row">
-                <button className="button button-danger button-compact" name="response" type="submit" value="disputed">Dispute</button>
-                <button className="button button-gold button-compact" name="response" type="submit" value="approved">Approve decision</button>
-                {ownApproval && <span className={`badge ${ownApproval.response === "approved" ? "badge-complete" : "badge-warning"}`}>{ownApproval.response === "approved" ? "You approved" : "You disputed"}</span>}
-              </div>
-            </form>
-          )}
-          {officialProposal?.status === "overridden" && <span className="badge badge-complete">Owner override applied</span>}
-        </section>
       </div>
 
       {reviewOpen && !readOnly && (
