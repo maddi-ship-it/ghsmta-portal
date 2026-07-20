@@ -5439,3 +5439,987 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   }
 }
 /* GHSMTA REGAL PORTAL CORRECTION END */
+
+/* GHSMTA REGAL ALL-LAYOUT SYSTEM START */
+/* ========================================================================== */
+/* GHSMTA REGAL ALL-LAYOUT SYSTEM                                             */
+/* ========================================================================== */
+
+.portal-shell {
+  --portal-bg-deep: #050814;
+  --portal-bg: #070b17;
+  --portal-surface: #0f1729;
+  --portal-surface-2: #141f36;
+  --portal-surface-3: #192743;
+  --portal-surface-hover: #1d2d4c;
+  --portal-line: rgba(183, 196, 220, 0.16);
+  --portal-line-strong: rgba(213, 177, 79, 0.32);
+  --portal-ivory: #f7f2e8;
+  --portal-text: #e7ecf5;
+  --portal-muted: #9ca9be;
+  --portal-gold: #d5b14f;
+  --portal-gold-bright: #f0d37e;
+  --portal-blue: #7c9ef6;
+  --portal-blue-deep: #19347d;
+  --portal-success: #81ddb0;
+  --portal-warning: #f0c56b;
+  --portal-danger: #ff9c9c;
+  --portal-shadow: 0 22px 64px rgba(0, 0, 0, 0.24);
+  --portal-radius: 20px;
+  --portal-radius-sm: 13px;
+}
+
+.portal-main {
+  background:
+    radial-gradient(circle at 17% 3%, rgba(38, 72, 153, 0.16), transparent 28rem),
+    radial-gradient(circle at 88% 20%, rgba(213, 177, 79, 0.055), transparent 24rem),
+    transparent;
+}
+
+.portal-main > .container {
+  display: grid;
+  gap: 24px;
+}
+
+.portal-main :where(h1, h2, h3, h4) {
+  color: var(--portal-ivory);
+}
+
+.portal-main :where(p, li, dd) {
+  color: var(--portal-text);
+}
+
+.portal-main :where(.muted-copy, .field-help, .privacy-note, .empty-note) {
+  color: var(--portal-muted);
+}
+
+.portal-main :where(a:not(.button):not(.button-primary):not(.button-secondary):not(.button-dark):not(.button-gold):not(.button-ghost-gold)) {
+  color: var(--portal-blue);
+}
+
+.portal-main :where(a:not(.button):not(.button-primary):not(.button-secondary):not(.button-dark):not(.button-gold):not(.button-ghost-gold)):hover {
+  color: var(--portal-gold-bright);
+}
+
+/* Shared page rhythm */
+.page-stack,
+.form-stack,
+.settings-workspace,
+.notification-page-stack,
+.school-team-stack,
+.advisory-review-queue,
+.appeal-list,
+.feedback-request-list,
+.owner-activity-list,
+.reference-document-grid,
+.rubric-category-editor-list,
+.adjudication-card-list {
+  display: grid;
+  gap: 18px;
+}
+
+.page-heading,
+.admin-setup-heading,
+.schedule-page-heading,
+.released-results-heading,
+.school-team-heading,
+.chat-page-heading {
+  position: relative;
+  margin-bottom: 6px;
+  padding-bottom: 18px;
+}
+
+.page-heading::after,
+.admin-setup-heading::after,
+.schedule-page-heading::after,
+.released-results-heading::after,
+.school-team-heading::after,
+.chat-page-heading::after {
+  position: absolute;
+  content: "";
+  left: 0;
+  bottom: 0;
+  width: 74px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--portal-gold), transparent);
+}
+
+.eyebrow,
+.metric-label,
+.reference-folder-tabs button,
+.stage-tabs button,
+.admin-setup-tabs a,
+.schedule-section-heading,
+.field-label-row,
+.panel-comment-column-headings {
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+/* Universal surfaces */
+.portal-main :where(
+  .panel,
+  .settings-section,
+  .adjudication-card,
+  .advisory-queue-card,
+  .appeal-card,
+  .application-section,
+  .application-filter-panel,
+  .archive-source-panel,
+  .builder-section,
+  .builder-stage,
+  .check-card,
+  .compact-check-card,
+  .cycle-card,
+  .feedback-request-card,
+  .form-duplicate-panel,
+  .notification-center,
+  .notification-row,
+  .owner-controls-panel,
+  .panelist-card,
+  .question-admin-card,
+  .question-editor,
+  .raw-comment-card,
+  .reference-document-card,
+  .reference-library-panel,
+  .reference-upload-panel,
+  .release-panel,
+  .released-results-panel,
+  .rubric-category-editor,
+  .rubric-criterion-row,
+  .schedule-create-panel,
+  .schedule-owner-waitlist-panel,
+  .schedule-school-card,
+  .schedule-slot-card,
+  .schedule-tool-panel,
+  .schedule-visit-detail-card,
+  .school-file-row,
+  .school-files-main,
+  .school-files-sidebar,
+  .school-team-panel,
+  .school-team-member,
+  .score-category-panel,
+  .score-guide-panel,
+  .scoring-admin-section,
+  .stage-heading-panel,
+  .start-application-panel,
+  .user-admin-filter-panel,
+  .workflow-feedback-card,
+  .workflow-feedback-panel,
+  .workflow-notification-builder,
+  .workflow-rule-card
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background:
+    linear-gradient(145deg, rgba(20, 31, 54, 0.98), rgba(10, 17, 31, 0.985));
+  box-shadow: var(--portal-shadow);
+}
+
+.portal-main :where(
+  .panel,
+  .settings-section,
+  .adjudication-card,
+  .advisory-queue-card,
+  .appeal-card,
+  .application-filter-panel,
+  .archive-source-panel,
+  .cycle-card,
+  .feedback-request-card,
+  .reference-document-card,
+  .reference-library-panel,
+  .reference-upload-panel,
+  .release-panel,
+  .released-results-panel,
+  .schedule-create-panel,
+  .schedule-owner-waitlist-panel,
+  .schedule-school-card,
+  .schedule-slot-card,
+  .schedule-tool-panel,
+  .schedule-visit-detail-card,
+  .school-files-main,
+  .school-files-sidebar,
+  .school-team-panel,
+  .score-guide-panel,
+  .scoring-admin-section,
+  .stage-heading-panel,
+  .start-application-panel,
+  .user-admin-filter-panel,
+  .workflow-feedback-panel,
+  .workflow-notification-builder
+) {
+  border-radius: var(--portal-radius);
+}
+
+.portal-main :where(
+  .panel-header,
+  .application-section-header,
+  .cycle-card-heading,
+  .reference-document-copy,
+  .schedule-slot-header,
+  .school-team-member-title,
+  .workflow-feedback-card,
+  .question-admin-heading,
+  .rubric-editor-overview
+) {
+  border-color: var(--portal-line);
+}
+
+.portal-main :where(.panel-header, .application-section-header, .schedule-slot-header) {
+  background: rgba(21, 33, 58, 0.62);
+}
+
+.portal-main :where(.panel-body, .appeal-card-body, .schedule-slot-body, .school-team-body) {
+  color: var(--portal-text);
+}
+
+.portal-main :where(.panel:hover, .adjudication-card:hover, .reference-document-card:hover, .schedule-slot-card:hover) {
+  border-color: rgba(213, 177, 79, 0.27);
+}
+
+/* Form controls */
+.portal-main :where(.input, .select, .textarea, .file-input, .input-static, .compact-textarea, .input-compact),
+.portal-main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.portal-main select,
+.portal-main textarea {
+  color: var(--portal-ivory);
+  border-color: rgba(183, 196, 220, 0.24);
+  background: rgba(4, 8, 18, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.portal-main :where(.input, .select, .textarea, .file-input, .input-static, .compact-textarea, .input-compact):hover,
+.portal-main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):hover,
+.portal-main select:hover,
+.portal-main textarea:hover {
+  border-color: rgba(124, 158, 246, 0.42);
+}
+
+.portal-main :where(.input, .select, .textarea, .file-input, .compact-textarea, .input-compact):focus,
+.portal-main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):focus,
+.portal-main select:focus,
+.portal-main textarea:focus {
+  outline: none;
+  border-color: var(--portal-gold);
+  box-shadow: 0 0 0 3px rgba(213, 177, 79, 0.13);
+}
+
+.portal-main :where(input, textarea)::placeholder {
+  color: #71809a;
+}
+
+.portal-main :where(.field > label, .field-label-row, .question-label-row, .reference-audience-field > legend) {
+  color: var(--portal-ivory);
+  font-weight: 760;
+}
+
+.portal-main :where(.checkbox-row, .choice-row, .inline-check, .inline-check-row, .acknowledgement-row, .certification-box) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(213, 177, 79, 0.045);
+}
+
+.portal-main input[type="checkbox"],
+.portal-main input[type="radio"] {
+  accent-color: var(--portal-gold);
+}
+
+.portal-main :where(.switch-control, .choice-inline, .reference-audience-options, .notification-choice-grid, .release-choice-grid) {
+  color: var(--portal-text);
+}
+
+/* Buttons and tabs */
+.portal-main :where(.button, button):focus-visible,
+.portal-header :where(a, button, summary):focus-visible,
+.mobile-portal-nav a:focus-visible {
+  outline: 2px solid var(--portal-gold-bright);
+  outline-offset: 3px;
+}
+
+.portal-main :where(.button-primary, .button-gold) {
+  color: #080b13;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, #f2d889, #d5b14f);
+  box-shadow: 0 12px 30px rgba(213, 177, 79, 0.16);
+}
+
+.portal-main :where(.button-primary, .button-gold):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.portal-main :where(.button-secondary, .button-secondary-light, .button-compact) {
+  color: var(--portal-text);
+  border-color: rgba(183, 196, 220, 0.22);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.portal-main :where(.button-secondary, .button-secondary-light, .button-compact):hover {
+  color: var(--portal-gold-bright);
+  border-color: rgba(213, 177, 79, 0.38);
+  background: rgba(213, 177, 79, 0.075);
+}
+
+.portal-main :where(.button-dark) {
+  color: var(--portal-ivory);
+  border-color: rgba(124, 158, 246, 0.34);
+  background: linear-gradient(135deg, #18347d, #101c47);
+}
+
+.portal-main :where(.button-danger, .danger-button) {
+  color: #ffd9d9;
+  border-color: rgba(255, 123, 123, 0.36);
+  background: rgba(138, 35, 49, 0.34);
+}
+
+.portal-main :where(.button-danger, .danger-button):hover {
+  background: rgba(169, 44, 60, 0.46);
+}
+
+.portal-main :where(
+  .admin-setup-tabs,
+  .stage-tabs,
+  .reference-folder-tabs,
+  .score-category-tabs,
+  .schedule-view-toggle,
+  .auth-method-tabs
+) {
+  padding: 5px;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  background: rgba(4, 8, 18, 0.58);
+}
+
+.portal-main :where(
+  .admin-setup-tabs a,
+  .stage-tab,
+  .reference-folder-tabs button,
+  .score-category-tabs button,
+  .schedule-view-toggle button,
+  .auth-method-tabs button
+) {
+  color: var(--portal-muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+.portal-main :where(
+  .admin-setup-tabs a:hover,
+  .stage-tab:hover,
+  .reference-folder-tabs button:hover,
+  .score-category-tabs button:hover,
+  .schedule-view-toggle button:hover,
+  .auth-method-tabs button:hover
+) {
+  color: var(--portal-ivory);
+  background: rgba(124, 158, 246, 0.1);
+}
+
+/* Tables */
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--portal-line);
+  border-radius: 17px;
+  background: rgba(6, 10, 21, 0.48);
+  scrollbar-color: rgba(213, 177, 79, 0.42) rgba(255, 255, 255, 0.04);
+}
+
+.data-table,
+.user-admin-table,
+.criterion-score-table,
+.collaborative-criterion-table,
+.consensus-matrix-table {
+  color: var(--portal-text);
+  background: transparent;
+}
+
+.data-table th,
+.user-admin-table th,
+.criterion-score-table th,
+.collaborative-criterion-table-header,
+.consensus-matrix-table th {
+  color: var(--portal-gold-bright);
+  border-color: var(--portal-line);
+  background: rgba(4, 8, 18, 0.7);
+}
+
+.data-table td,
+.user-admin-table td,
+.criterion-score-table td,
+.collaborative-criterion-row,
+.consensus-matrix-table td {
+  border-color: var(--portal-line);
+}
+
+.data-table tbody tr:nth-child(even),
+.user-admin-table tbody tr:nth-child(even) {
+  background: rgba(124, 158, 246, 0.025);
+}
+
+.data-table tbody tr:hover,
+.user-admin-table tbody tr:hover {
+  background: rgba(124, 158, 246, 0.075);
+}
+
+/* Notices, badges, status */
+.portal-main :where(.notice, .notice-banner, .info-banner, .page-message, .form-builder-notice) {
+  color: #dbe6ff;
+  border-color: rgba(124, 158, 246, 0.28);
+  background: rgba(55, 88, 171, 0.16);
+}
+
+.portal-main :where(.success-banner) {
+  color: #c8f4dd;
+  border-color: rgba(129, 221, 176, 0.3);
+  background: rgba(41, 129, 86, 0.19);
+}
+
+.portal-main :where(.form-error, .danger-text, .text-danger) {
+  color: var(--portal-danger);
+}
+
+.portal-main :where(.badge, .status-pill, .user-chip, .schedule-school-access-badge, .schedule-status) {
+  color: var(--portal-text);
+  border: 1px solid rgba(183, 196, 220, 0.2);
+  background: rgba(183, 196, 220, 0.1);
+}
+
+.portal-main :where(.badge-complete, .schedule-status-open) {
+  color: #c6f4dc;
+  border-color: rgba(129, 221, 176, 0.28);
+  background: rgba(41, 129, 86, 0.2);
+}
+
+.portal-main :where(.badge-warning, .schedule-status-waiting) {
+  color: #ffe5a4;
+  border-color: rgba(240, 197, 107, 0.28);
+  background: rgba(151, 105, 24, 0.22);
+}
+
+.portal-main :where(.badge-required) {
+  color: #ffd6d6;
+  border-color: rgba(255, 156, 156, 0.27);
+  background: rgba(133, 39, 52, 0.25);
+}
+
+/* Dashboard and metrics */
+.metric-grid,
+.application-metrics,
+.adjudication-review-metrics,
+.advisory-dashboard-metrics,
+.advisory-queue-status-grid,
+.released-score-grid,
+.detail-grid {
+  gap: 16px;
+}
+
+.metric-card,
+.detail-item,
+.consensus-summary > div,
+.owner-category-decision-summary > div {
+  border-color: var(--portal-line);
+  background: linear-gradient(145deg, rgba(21, 33, 58, 0.98), rgba(10, 17, 31, 0.985));
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.18);
+}
+
+.metric-text,
+.detail-item small,
+.release-date,
+.table-date,
+.user-meta,
+.adjudication-card-meta {
+  color: var(--portal-muted);
+}
+
+/* Applications and form builder */
+.application-action-bar,
+.application-archive-toolbar,
+.owner-application-tools,
+.user-bulk-toolbar,
+.schedule-owner-tool-bar,
+.scorecard-action-bar {
+  border-color: var(--portal-line);
+  background: rgba(12, 20, 36, 0.9);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+.application-question,
+.application-content-block,
+.question-admin-card,
+.rubric-criterion-row,
+.reference-document-card,
+.school-team-member,
+.workflow-rule-card,
+.adjudication-card {
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.48);
+}
+
+.application-reference-bar {
+  border-color: var(--portal-line-strong);
+  background: rgba(10, 17, 31, 0.96);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.application-reference-button {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.application-reference-button:hover {
+  color: var(--portal-gold-bright);
+  border-color: rgba(213, 177, 79, 0.32);
+  background: rgba(213, 177, 79, 0.075);
+}
+
+.application-reference-modal,
+.consensus-matrix-modal,
+.score-range-modal,
+.schedule-tool-modal,
+.feedback-modal {
+  color: var(--portal-text);
+  border-color: var(--portal-line-strong);
+  background: linear-gradient(145deg, #141f36, #0b1221);
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.55);
+}
+
+.application-reference-modal-backdrop,
+.modal-backdrop,
+.score-range-modal-backdrop,
+.schedule-tool-modal-backdrop {
+  background: rgba(1, 4, 11, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.builder-layout,
+.reference-library-layout,
+.school-files-layout,
+.adjudication-score-layout {
+  gap: 20px;
+}
+
+.builder-sidebar,
+.score-category-sidebar {
+  border-color: var(--portal-line);
+  background: linear-gradient(180deg, rgba(17, 27, 47, 0.98), rgba(8, 14, 27, 0.98));
+  box-shadow: var(--portal-shadow);
+}
+
+.builder-stage,
+.builder-section,
+.rubric-category-editor,
+.rubric-criterion-row,
+.question-editor {
+  border-color: var(--portal-line);
+}
+
+.builder-stage:hover,
+.rubric-criterion-row:hover,
+.question-editor:hover {
+  border-color: rgba(124, 158, 246, 0.34);
+}
+
+/* Adjudication and scoring */
+.scoring-category-header,
+.collaborative-criterion-table-header,
+.panel-comment-column-headings,
+.personal-score-heading {
+  color: var(--portal-ivory);
+  border-color: var(--portal-line);
+  background: rgba(16, 27, 49, 0.92);
+}
+
+.collaborative-criterion-row,
+.panel-review-category,
+.inline-category-decision,
+.private-category-notes,
+.live-score-observation,
+.raw-comment-card,
+.release-panel,
+.released-feedback-section {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.46);
+}
+
+.category-collapse-toggle,
+.score-category-tabs button {
+  color: var(--portal-text);
+}
+
+.category-collapse-toggle:hover {
+  background: rgba(124, 158, 246, 0.075);
+}
+
+.score-category-tabs button[aria-current="true"],
+.score-category-tabs button[data-active="true"] {
+  color: #080b13;
+  background: linear-gradient(135deg, #f2d889, #d5b14f);
+}
+
+.score-guide-panel,
+.consolidated-consensus-bar,
+.adjudication-consensus-bar {
+  border-color: var(--portal-line-strong);
+  background: linear-gradient(145deg, rgba(22, 35, 61, 0.98), rgba(10, 17, 31, 0.98));
+}
+
+.category-average,
+.score-range-modal-average {
+  color: var(--portal-gold-bright);
+}
+
+.rich-text-shell {
+  border-color: rgba(183, 196, 220, 0.24);
+  background: rgba(4, 8, 18, 0.72);
+}
+
+.rich-text-toolbar {
+  border-color: var(--portal-line);
+  background: rgba(18, 29, 50, 0.86);
+}
+
+.rich-text-toolbar-button {
+  color: var(--portal-text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.rich-text-toolbar-button:hover {
+  color: var(--portal-gold-bright);
+  background: rgba(213, 177, 79, 0.08);
+}
+
+.rich-text-editor,
+.rich-text-preview,
+.narrative-preview {
+  color: var(--portal-text);
+  background: transparent;
+}
+
+/* Scheduling */
+.schedule-workspace-toolbar,
+.schedule-workspace-filters,
+.schedule-owner-controls,
+.schedule-owner-action,
+.schedule-advisory-controls,
+.schedule-school-action,
+.schedule-locked-booking,
+.schedule-booking-summary,
+.schedule-live-strip {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(12, 20, 36, 0.9);
+}
+
+.schedule-slot-card {
+  overflow: hidden;
+}
+
+.schedule-slot-accent {
+  background: linear-gradient(180deg, var(--portal-gold), #84661c);
+}
+
+.schedule-slot-meta,
+.schedule-list-location,
+.schedule-list-metric,
+.schedule-school-instructions,
+.schedule-create-instructions,
+.schedule-recurring-instructions {
+  color: var(--portal-muted);
+}
+
+.schedule-list-summary,
+.schedule-applicant-list-summary,
+.schedule-bulk-slot,
+.schedule-owner-slot-queue,
+.waitlist-offer-card,
+.waitlist-status-card,
+.waitlist-join-form,
+.schedule-visit-detail-card {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.48);
+}
+
+.schedule-list-summary:hover,
+.schedule-bulk-slot:hover {
+  border-color: rgba(124, 158, 246, 0.34);
+  background: rgba(124, 158, 246, 0.055);
+}
+
+.schedule-live-dot-connected,
+.schedule-live-dot-live {
+  background: var(--portal-success);
+  box-shadow: 0 0 0 5px rgba(129, 221, 176, 0.12);
+}
+
+.schedule-availability-open {
+  color: var(--portal-success);
+}
+
+.schedule-availability-taken {
+  color: var(--portal-muted);
+}
+
+.queue-position {
+  color: #080b13;
+  background: var(--portal-gold);
+}
+
+/* Files, reference documents, school team */
+.school-files-sidebar,
+.builder-sidebar,
+.score-category-sidebar {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+}
+
+.school-file-application-list button,
+.reference-folder-tabs button {
+  color: var(--portal-text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.school-file-application-list button:hover,
+.reference-folder-tabs button:hover {
+  background: rgba(124, 158, 246, 0.08);
+}
+
+.school-file-icon,
+.reference-document-icon,
+.school-team-member-avatar {
+  color: var(--portal-gold-bright);
+  border-color: rgba(213, 177, 79, 0.24);
+  background: rgba(213, 177, 79, 0.08);
+}
+
+.school-file-row:hover,
+.reference-document-card:hover,
+.school-team-member:hover {
+  border-color: rgba(213, 177, 79, 0.28);
+  background: rgba(213, 177, 79, 0.035);
+}
+
+/* Notifications and feedback */
+.notification-row,
+.chat-unread-row,
+.workflow-feedback-card {
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.46);
+}
+
+.notification-row.is-unread,
+.chat-unread-row.is-unread {
+  border-color: rgba(124, 158, 246, 0.32);
+  background: rgba(61, 91, 177, 0.12);
+}
+
+.notification-dot,
+.chat-unread-icon,
+.notification-count-badge {
+  color: #080b13;
+  background: var(--portal-gold);
+}
+
+.feedback-modal .modal-card,
+.global-feedback-dialog .modal-card {
+  background: linear-gradient(145deg, #141f36, #0b1221);
+}
+
+.owner-response {
+  color: var(--portal-text);
+  border-color: var(--portal-gold);
+  background: rgba(213, 177, 79, 0.06);
+}
+
+/* Archive and admin */
+.archive-jump-nav a,
+.admin-setup-tabs a {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.archive-jump-nav a:hover,
+.admin-setup-tabs a:hover {
+  color: var(--portal-gold-bright);
+  border-color: rgba(213, 177, 79, 0.36);
+  background: rgba(213, 177, 79, 0.075);
+}
+
+.user-bulk-toolbar,
+.application-archive-toolbar,
+.owner-application-tools {
+  position: sticky;
+  z-index: 12;
+  top: 82px;
+}
+
+/* Auth and security pages */
+.auth-page,
+.auth-page-regal,
+.security-page,
+.safe-shell {
+  color: var(--portal-text);
+  background:
+    radial-gradient(circle at 50% 0, rgba(38, 72, 153, 0.22), transparent 32rem),
+    #070b17;
+}
+
+.auth-card,
+.auth-card-regal,
+.security-page-card,
+.single-panel-auth {
+  color: var(--portal-text);
+  border-color: rgba(213, 177, 79, 0.22);
+  background: linear-gradient(145deg, rgba(20, 31, 54, 0.99), rgba(10, 17, 31, 0.99));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+}
+
+.factor-row,
+.mfa-enrollment-card {
+  border-color: var(--portal-line);
+  background: rgba(5, 10, 22, 0.46);
+}
+
+/* Empty states */
+.empty-state,
+.compact-empty,
+.compact-empty-state,
+.schedule-empty-state {
+  color: var(--portal-muted);
+  border-color: rgba(183, 196, 220, 0.2);
+  background: rgba(5, 10, 22, 0.42);
+}
+
+/* Scrollbars */
+.portal-shell * {
+  scrollbar-color: rgba(213, 177, 79, 0.35) rgba(255, 255, 255, 0.035);
+}
+
+.portal-shell *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.portal-shell *::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.portal-shell *::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(213, 177, 79, 0.32);
+  background-clip: padding-box;
+}
+
+/* Responsive layout consistency */
+@media (max-width: 1180px) {
+  .builder-layout,
+  .reference-library-layout,
+  .school-files-layout,
+  .adjudication-score-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-sidebar,
+  .score-category-sidebar,
+  .school-files-sidebar {
+    position: static;
+  }
+
+  .user-bulk-toolbar,
+  .application-archive-toolbar,
+  .owner-application-tools {
+    top: 74px;
+  }
+}
+
+@media (max-width: 820px) {
+  .portal-main > .container {
+    gap: 18px;
+  }
+
+  .page-heading,
+  .admin-setup-heading,
+  .schedule-page-heading,
+  .released-results-heading,
+  .school-team-heading,
+  .chat-page-heading {
+    align-items: flex-start;
+  }
+
+  .application-action-bar,
+  .application-archive-toolbar,
+  .owner-application-tools,
+  .user-bulk-toolbar,
+  .schedule-owner-tool-bar,
+  .scorecard-action-bar {
+    position: static;
+  }
+
+  .two-column-grid,
+  .two-column-form,
+  .three-column-form,
+  .form-grid,
+  .inline-form-grid,
+  .school-team-invite-grid,
+  .rubric-editor-top-grid,
+  .rubric-category-settings-grid,
+  .rubric-category-create-grid,
+  .schedule-owner-action-grid,
+  .schedule-bulk-action-grid,
+  .schedule-visit-detail-grid,
+  .eligibility-appeal-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .field-span-2 {
+    grid-column: auto;
+  }
+
+  .table-wrap {
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 560px) {
+  .portal-main :where(.panel, .settings-section, .schedule-slot-card, .school-team-panel, .reference-library-panel) {
+    border-radius: 16px;
+  }
+
+  .metric-grid,
+  .application-metrics,
+  .adjudication-review-metrics,
+  .advisory-dashboard-metrics,
+  .released-score-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metric-card {
+    min-height: 105px;
+  }
+
+  .button-row,
+  .heading-actions,
+  .hero-actions,
+  .nav-actions,
+  .modal-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .button-row > *,
+  .heading-actions > *,
+  .modal-actions > * {
+    width: 100%;
+  }
+}
+/* GHSMTA REGAL ALL-LAYOUT SYSTEM END */
