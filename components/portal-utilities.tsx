@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { FEEDBACK_DIALOG_EVENT } from "@/components/global-feedback-dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 
@@ -137,6 +138,8 @@ export function PortalUtilities({
           </span>
         ) : null}
       </Link>
+
+      <ThemeToggle />
 
       <button
         className="portal-utility-link"

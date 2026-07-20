@@ -7746,3 +7746,576 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   }
 }
 /* GHSMTA PHASE 3 RESPONSIVE END */
+
+/* GHSMTA DECISION STATUS + LIGHT MODE START */
+
+/* Decision status formatting */
+.portal-shell .portal-main .category-decision-response-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 10px 12px;
+  overflow: hidden;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 12px;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.portal-shell .portal-main .category-decision-state-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 5px currentColor;
+}
+
+.portal-shell .portal-main .category-decision-response-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.portal-shell .portal-main .category-decision-response-copy > span {
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.portal-shell .portal-main .category-decision-response-copy strong {
+  color: var(--portal-ivory);
+  font-size: 0.9rem;
+}
+
+.portal-shell .portal-main .category-decision-response-copy small {
+  color: var(--portal-muted);
+  line-height: 1.35;
+}
+
+.portal-shell .portal-main .category-decision-response-approved {
+  color: #72dea5;
+  border-color: rgba(73, 190, 126, 0.46);
+  background:
+    linear-gradient(135deg, rgba(29, 111, 70, 0.26), rgba(7, 24, 19, 0.82));
+  box-shadow: inset 4px 0 0 #49be7e;
+}
+
+.portal-shell .portal-main .category-decision-response-pending {
+  color: #f0b34e;
+  border-color: rgba(240, 179, 78, 0.5);
+  background:
+    linear-gradient(135deg, rgba(151, 96, 18, 0.28), rgba(31, 20, 6, 0.84));
+  box-shadow: inset 4px 0 0 #f0a93d;
+}
+
+.portal-shell .portal-main .category-decision-response-disputed {
+  color: #ff7d86;
+  border-color: rgba(239, 78, 91, 0.52);
+  background:
+    linear-gradient(135deg, rgba(137, 32, 44, 0.3), rgba(34, 8, 13, 0.86));
+  box-shadow: inset 4px 0 0 #ef4e5b;
+}
+
+.portal-shell .portal-main .category-decision-response-awaiting {
+  color: var(--portal-blue);
+  border-color: rgba(124, 158, 246, 0.34);
+  background:
+    linear-gradient(135deg, rgba(45, 74, 145, 0.18), rgba(7, 15, 32, 0.82));
+  box-shadow: inset 4px 0 0 var(--portal-blue);
+}
+
+.portal-shell .portal-main .badge-decision-approved {
+  color: #c7f5dc;
+  border-color: rgba(73, 190, 126, 0.42);
+  background: rgba(38, 137, 82, 0.28);
+}
+
+.portal-shell .portal-main .badge-decision-pending {
+  color: #ffe2a6;
+  border-color: rgba(240, 179, 78, 0.42);
+  background: rgba(156, 98, 17, 0.3);
+}
+
+.portal-shell .portal-main .badge-decision-disputed {
+  color: #ffd1d4;
+  border-color: rgba(239, 78, 91, 0.42);
+  background: rgba(155, 38, 49, 0.32);
+}
+
+.portal-shell .portal-main .badge-decision-awaiting {
+  color: #dce6ff;
+  border-color: rgba(124, 158, 246, 0.36);
+  background: rgba(53, 85, 166, 0.24);
+}
+
+.portal-shell .portal-main
+  .score-category-panel-decision-approved
+  > .panel-header {
+  border-left: 4px solid #49be7e;
+}
+
+.portal-shell .portal-main
+  .score-category-panel-decision-pending
+  > .panel-header {
+  border-left: 4px solid #f0a93d;
+}
+
+.portal-shell .portal-main
+  .score-category-panel-decision-disputed
+  > .panel-header {
+  border-left: 4px solid #ef4e5b;
+}
+
+.portal-shell .portal-main
+  .score-category-panel-decision-awaiting
+  > .panel-header {
+  border-left: 4px solid var(--portal-blue);
+}
+
+/* Theme toggle */
+.theme-toggle-button {
+  color: var(--portal-gold-bright, #f2d889);
+}
+
+.theme-toggle-button:hover {
+  color: #fff;
+}
+
+.theme-setting-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 16px;
+  border: 1px solid var(--portal-line);
+  border-radius: 16px;
+  color: var(--portal-text);
+  background: rgba(255, 255, 255, 0.045);
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.theme-setting-toggle:hover {
+  transform: translateY(-1px);
+  border-color: var(--portal-line-strong);
+  background: rgba(213, 177, 79, 0.075);
+}
+
+.theme-setting-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 50%;
+  color: var(--portal-gold-bright);
+  background: rgba(213, 177, 79, 0.08);
+}
+
+.theme-setting-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.theme-setting-copy strong {
+  color: var(--portal-ivory);
+}
+
+.theme-setting-copy small {
+  color: var(--portal-muted);
+}
+
+.theme-setting-action {
+  color: var(--portal-gold-bright);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Light portal theme */
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+html[data-theme="light"] body {
+  color: #182235;
+  background: #edf1f7;
+}
+
+html[data-theme="light"] .portal-shell {
+  --portal-bg-deep: #e8edf5;
+  --portal-bg: #edf1f7;
+  --portal-surface: #ffffff;
+  --portal-surface-2: #f7f9fc;
+  --portal-surface-3: #eef3f9;
+  --portal-surface-hover: #e8eef7;
+  --portal-line: rgba(26, 42, 68, 0.15);
+  --portal-line-strong: rgba(145, 108, 22, 0.34);
+  --portal-ivory: #152033;
+  --portal-text: #2a3548;
+  --portal-muted: #68758a;
+  --portal-gold: #a77d19;
+  --portal-gold-bright: #85600e;
+  --portal-blue: #2756bd;
+  --portal-blue-deep: #183a8d;
+  --portal-success: #18784c;
+  --portal-warning: #9c5b00;
+  --portal-danger: #b4232d;
+  --portal-shadow: 0 16px 44px rgba(28, 43, 68, 0.1);
+  color: var(--portal-text);
+  background: #edf1f7;
+}
+
+html[data-theme="light"] .portal-main {
+  background:
+    radial-gradient(circle at 14% 2%, rgba(39, 86, 189, 0.08), transparent 26rem),
+    radial-gradient(circle at 88% 15%, rgba(167, 125, 25, 0.07), transparent 24rem),
+    #edf1f7;
+}
+
+html[data-theme="light"] .portal-main :where(h1, h2, h3, h4) {
+  color: #142039;
+}
+
+html[data-theme="light"] .portal-main :where(p, li, dd) {
+  color: #2a3548;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel,
+  .settings-section,
+  .adjudication-card,
+  .advisory-queue-card,
+  .appeal-card,
+  .application-section,
+  .application-filter-panel,
+  .archive-source-panel,
+  .builder-section,
+  .builder-stage,
+  .check-card,
+  .compact-check-card,
+  .cycle-card,
+  .feedback-request-card,
+  .form-duplicate-panel,
+  .notification-center,
+  .notification-row,
+  .owner-controls-panel,
+  .panelist-card,
+  .question-admin-card,
+  .question-editor,
+  .raw-comment-card,
+  .reference-document-card,
+  .reference-library-panel,
+  .reference-upload-panel,
+  .release-panel,
+  .released-results-panel,
+  .rubric-category-editor,
+  .rubric-criterion-row,
+  .schedule-create-panel,
+  .schedule-owner-waitlist-panel,
+  .schedule-school-card,
+  .schedule-slot-card,
+  .schedule-tool-panel,
+  .schedule-visit-detail-card,
+  .school-file-row,
+  .school-files-main,
+  .school-files-sidebar,
+  .school-team-panel,
+  .school-team-member,
+  .score-category-panel,
+  .score-guide-panel,
+  .scoring-admin-section,
+  .stage-heading-panel,
+  .start-application-panel,
+  .user-admin-filter-panel,
+  .workflow-feedback-card,
+  .workflow-feedback-panel,
+  .workflow-notification-builder,
+  .workflow-rule-card
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: #ffffff;
+  box-shadow: var(--portal-shadow);
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel-header,
+  .application-section-header,
+  .schedule-slot-header,
+  .scoring-category-header,
+  .collaborative-criterion-table-header,
+  .panel-comment-column-headings,
+  .personal-score-heading
+) {
+  color: #1a2740;
+  border-color: var(--portal-line);
+  background: #f4f7fb;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .input,
+  .select,
+  .textarea,
+  .file-input,
+  .input-static,
+  .compact-textarea,
+  .input-compact
+),
+html[data-theme="light"] .portal-main
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+html[data-theme="light"] .portal-main select,
+html[data-theme="light"] .portal-main textarea {
+  color: #182235;
+  border-color: rgba(31, 48, 76, 0.2);
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(20, 32, 51, 0.02);
+}
+
+html[data-theme="light"] .portal-main :where(input, textarea)::placeholder {
+  color: #8792a5;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .button-secondary,
+  .button-secondary-light,
+  .button-compact
+) {
+  color: #26344c;
+  border-color: rgba(31, 48, 76, 0.18);
+  background: #f5f7fb;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .button-secondary,
+  .button-secondary-light,
+  .button-compact
+):hover {
+  color: #6e500c;
+  border-color: rgba(145, 108, 22, 0.34);
+  background: #fff8e8;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .table-wrap,
+  .application-reference-bar,
+  .application-action-bar,
+  .application-archive-toolbar,
+  .owner-application-tools,
+  .user-bulk-toolbar,
+  .schedule-owner-tool-bar,
+  .scorecard-action-bar,
+  .schedule-workspace-toolbar,
+  .schedule-workspace-filters,
+  .schedule-owner-controls,
+  .schedule-owner-action,
+  .schedule-advisory-controls,
+  .schedule-school-action,
+  .schedule-locked-booking,
+  .schedule-booking-summary,
+  .schedule-live-strip
+) {
+  color: #26344c;
+  border-color: var(--portal-line);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 34px rgba(28, 43, 68, 0.08);
+}
+
+html[data-theme="light"] .portal-main :where(
+  .data-table th,
+  .user-admin-table th,
+  .criterion-score-table th,
+  .consensus-matrix-table th
+) {
+  color: #6e500c;
+  border-color: var(--portal-line);
+  background: #f1f4f9;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .data-table td,
+  .user-admin-table td,
+  .criterion-score-table td,
+  .collaborative-criterion-row,
+  .consensus-matrix-table td
+) {
+  color: #26344c;
+  border-color: var(--portal-line);
+}
+
+html[data-theme="light"] .portal-main
+  :where(.data-table tbody tr:nth-child(even), .user-admin-table tbody tr:nth-child(even)) {
+  background: rgba(39, 86, 189, 0.025);
+}
+
+html[data-theme="light"] .portal-main
+  :where(.data-table tbody tr:hover, .user-admin-table tbody tr:hover) {
+  background: rgba(39, 86, 189, 0.065);
+}
+
+html[data-theme="light"] .portal-main :where(
+  .builder-sidebar,
+  .score-category-sidebar,
+  .chat-sidebar,
+  .chat-thread-panel,
+  .chat-reply-panel,
+  .school-files-sidebar
+) {
+  color: #26344c;
+  border-color: var(--portal-line);
+  background: #ffffff;
+  box-shadow: var(--portal-shadow);
+}
+
+html[data-theme="light"] .portal-main :where(
+  .application-question,
+  .application-content-block,
+  .question-admin-card,
+  .rubric-criterion-row,
+  .reference-document-card,
+  .school-team-member,
+  .workflow-rule-card,
+  .adjudication-card,
+  .collaborative-criterion-row,
+  .panel-review-category,
+  .inline-category-decision,
+  .private-category-notes,
+  .live-score-observation,
+  .raw-comment-card,
+  .release-panel,
+  .released-feedback-section,
+  .chat-post,
+  .chat-reply-card,
+  .chat-composer,
+  .reply-thread,
+  .reply-composer
+) {
+  color: #26344c;
+  border-color: var(--portal-line);
+  background: #f8fafc;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .score-range-modal,
+  .schedule-tool-modal,
+  .feedback-modal,
+  .regal-dialog-card
+) {
+  color: #26344c;
+  border-color: var(--portal-line-strong);
+  background: #ffffff;
+  box-shadow: 0 28px 86px rgba(28, 43, 68, 0.22);
+}
+
+html[data-theme="light"] .portal-main :where(
+  .notice,
+  .notice-banner,
+  .info-banner,
+  .page-message,
+  .form-builder-notice
+) {
+  color: #204889;
+  border-color: rgba(39, 86, 189, 0.2);
+  background: #edf4ff;
+}
+
+html[data-theme="light"] .portal-main :where(.success-banner) {
+  color: #17653f;
+  border-color: rgba(24, 120, 76, 0.22);
+  background: #edf9f2;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-approved {
+  color: #18784c;
+  border-color: rgba(24, 120, 76, 0.3);
+  background: #edf9f2;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-pending {
+  color: #9c5b00;
+  border-color: rgba(156, 91, 0, 0.32);
+  background: #fff6df;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-disputed {
+  color: #b4232d;
+  border-color: rgba(180, 35, 45, 0.3);
+  background: #fff0f1;
+}
+
+html[data-theme="light"] .portal-main .category-decision-response-awaiting {
+  color: #2756bd;
+  border-color: rgba(39, 86, 189, 0.26);
+  background: #edf4ff;
+}
+
+html[data-theme="light"] .portal-main
+  .category-decision-response-copy strong {
+  color: #152033;
+}
+
+html[data-theme="light"] .theme-setting-toggle {
+  color: #26344c;
+  border-color: var(--portal-line);
+  background: #f7f9fc;
+}
+
+html[data-theme="light"] .theme-setting-copy strong {
+  color: #152033;
+}
+
+html[data-theme="light"] .theme-setting-icon {
+  color: #85600e;
+  border-color: rgba(145, 108, 22, 0.3);
+  background: #fff8e8;
+}
+
+@media (max-width: 900px) {
+  .portal-shell .portal-main .category-decision-response-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .portal-shell .portal-main .category-decision-response-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .portal-shell .portal-main .category-decision-response-actions .button {
+    flex: 1 1 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .portal-shell .portal-main .category-decision-response-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .portal-shell .portal-main .category-decision-response-status {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+
+  .theme-setting-toggle {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .theme-setting-action {
+    grid-column: 1 / -1;
+  }
+}
+
+/* GHSMTA DECISION STATUS + LIGHT MODE END */

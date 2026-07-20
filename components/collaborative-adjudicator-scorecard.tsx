@@ -319,12 +319,46 @@ function CategoryScoreSection({
     }));
   };
 
+  const decisionResponseState =
+    !officialProposal
+      ? "awaiting"
+      : officialProposal.status === "overridden"
+        ? "approved"
+        : ownApproval?.response === "approved"
+          ? "approved"
+          : ownApproval?.response === "disputed"
+            ? "disputed"
+            : "pending";
+
+  const decisionResponseLabel =
+    decisionResponseState === "approved"
+      ? officialProposal?.status === "overridden"
+        ? "Owner override"
+        : "Approved"
+      : decisionResponseState === "disputed"
+        ? "Disputed"
+        : decisionResponseState === "pending"
+          ? "Needs approval"
+          : "Awaiting panel decision";
+
+  const decisionResponseDetail =
+    decisionResponseState === "approved"
+      ? officialProposal?.status === "overridden"
+        ? "The Owner finalized this eligibility and range."
+        : "You approved the eligibility and 2-point range."
+      : decisionResponseState === "disputed"
+        ? "You disputed the eligibility or 2-point range."
+        : decisionResponseState === "pending"
+          ? "Review and approve or dispute this panel decision."
+          : "The Advisory Committee has not finalized this category.";
+
   return (
     <section
       className={[
         "panel score-category-panel",
         expanded ? "score-category-panel-expanded" : "score-category-panel-collapsed",
         rangeMismatch ? "score-category-panel-range-error" : "",
+        `score-category-panel-decision-${decisionResponseState}`,
       ]
         .filter(Boolean)
         .join(" ")}
@@ -374,33 +408,33 @@ function CategoryScoreSection({
               scoreValues={scoreOptions.map((option) => option.value)}
             />
 
-            <div className="category-decision-response-card">
-              <span>Approve panel decision</span>
+            <div
+              className={[
+                "category-decision-response-card",
+                `category-decision-response-${decisionResponseState}`,
+              ].join(" ")}
+            >
+              <span
+                aria-hidden="true"
+                className="category-decision-state-dot"
+              />
 
-              {!officialProposal ? (
-                <small>Awaiting Advisory Committee</small>
-              ) : officialProposal.status === "overridden" ? (
-                <span className="badge badge-complete">Owner override</span>
-              ) : (
-                <>
-                  <div className="category-decision-response-status">
-                    {ownApproval ? (
-                      <span
-                        className={`badge ${
-                          ownApproval.response === "approved"
-                            ? "badge-complete"
-                            : "badge-warning"
-                        }`}
-                      >
-                        {ownApproval.response === "approved"
-                          ? "You approved"
-                          : "You disputed"}
-                      </span>
-                    ) : (
-                      <span className="badge badge-warning">Response needed</span>
-                    )}
-                  </div>
+              <div className="category-decision-response-copy">
+                <span>Eligibility and 2-point range</span>
+                <strong>{decisionResponseLabel}</strong>
+                <small>{decisionResponseDetail}</small>
+              </div>
 
+              <div className="category-decision-response-status">
+                <span
+                  className={`badge badge-decision-${decisionResponseState}`}
+                >
+                  {decisionResponseLabel}
+                </span>
+              </div>
+
+              {officialProposal &&
+                officialProposal.status !== "overridden" && (
                   <div className="category-decision-response-actions">
                     <button
                       className="button button-gold button-compact"
@@ -411,6 +445,7 @@ function CategoryScoreSection({
                         "approved",
                         `proposal_comment_${category.id}`,
                       )}
+                      formNoValidate
                       type="submit"
                     >
                       Approve
@@ -418,14 +453,15 @@ function CategoryScoreSection({
                     <button
                       aria-expanded={disputeOpen}
                       className="button button-danger button-compact"
-                      onClick={() => setDisputeOpen((current) => !current)}
+                      onClick={() =>
+                        setDisputeOpen((current) => !current)
+                      }
                       type="button"
                     >
                       Dispute
                     </button>
                   </div>
-                </>
-              )}
+                )}
             </div>
           </div>
         </div>

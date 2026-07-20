@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { ThemeScript } from "@/components/theme-script";
 export const metadata: Metadata = {
   title: {
     default: "Georgia High School Musical Theatre Awards",
@@ -25,8 +26,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}<SpeedInsights /></body>
+    <html lang="en" suppressHydrationWarning>
+      <body><ThemeScript />{children}<SpeedInsights /></body>
     </html>
   );
 }

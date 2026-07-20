@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { updateAccountDetails, type AccountActionResult } from "@/app/portal/account/actions";
 import { MfaManager } from "@/components/mfa-manager";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 
@@ -79,6 +80,16 @@ export function AccountSettingsPanel({ profile }: { profile: Profile }) {
           <div className="field"><label htmlFor="confirm_account_password">Confirm password</label><input className="input" id="confirm_account_password" type="password" minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></div>
         </div>
         <button className="button button-secondary" type="button" onClick={updatePassword}>Update password</button>
+      </section>
+
+      <section className="settings-section">
+        <p className="eyebrow">Appearance</p>
+        <h2>Portal theme</h2>
+        <p>
+          Choose the appearance that is most comfortable on this browser.
+          Your selection is remembered on this device.
+        </p>
+        <ThemeToggle variant="setting" />
       </section>
 
       <MfaManager verifiedPhone={profile.phone_verified_at ? profile.phone_e164 : null} />
