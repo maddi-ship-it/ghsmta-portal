@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { PhoneVerificationPanel } from "@/components/phone-verification-panel";
 import { requireProfile } from "@/lib/auth";
+import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
 
 export default async function VerifyPhonePage() {
+  if (!PHONE_VERIFICATION_ENABLED) {
+    redirect("/portal");
+  }
+
   const profile = await requireProfile(undefined, { enforceSecurity: false });
 
   return (

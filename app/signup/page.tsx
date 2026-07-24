@@ -35,8 +35,9 @@ export default async function SignupPage({
           <p className="eyebrow">School applicants</p>
           <h2>Create account</h2>
           <p>
-            Use the primary school contact&apos;s information. A verified mobile
-            number is required for account recovery and secure sign-in.
+            Use the primary school contact&apos;s information. Mobile numbers
+            are collected for contact and account recovery. Text verification
+            is temporarily disabled.
           </p>
 
           {params.error && (
@@ -81,7 +82,10 @@ export default async function SignupPage({
                 placeholder="(404) 555-1234"
                 required
               />
-              <small>US numbers are stored securely as +1 followed by ten digits.</small>
+              <small>
+                US numbers are stored securely as +1 followed by ten digits.
+                No verification text will be sent while verification is disabled.
+              </small>
             </div>
 
             <div className="field">
@@ -104,6 +108,9 @@ export default async function SignupPage({
 
           <p className="auth-links">
             Already registered? <Link href="/login">Sign in</Link>
+          </p>
+          <p className="auth-links">
+            GHSMTA staff or adjudicator? <Link href="/staff-signup">Staff signup</Link>
           </p>
         </div>
       </section>

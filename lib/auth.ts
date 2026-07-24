@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
 import type { AppRole, Profile } from "@/lib/types";
 
 const PROFILE_COLUMNS = [
@@ -54,6 +55,7 @@ export async function requireProfile(
 
   if (options.enforceSecurity !== false) {
     if (
+      PHONE_VERIFICATION_ENABLED &&
       typedProfile.phone_required_at &&
       !typedProfile.phone_verified_at
     ) {

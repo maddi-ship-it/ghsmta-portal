@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { normalizePhoneE164 } from "@/lib/phone";
+import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signup(formData: FormData) {
@@ -30,16 +31,22 @@ export async function signup(formData: FormData) {
       data: {
         full_name: fullName,
         phone_e164: phone,
-        require_phone_verification: true,
+        require_phone_verification: PHONE_VERIFICATION_ENABLED,
       },
-      emailRedirectTo: `${origin}/auth/callback?next=/verify-phone`,
+      emailRedirectTo: `${origin}/auth/callback?next=${PHONE_VERIFICATION_ENABLED ? "/verify-phone" : "/portal"}`,
     },
   });
 
   if (error) redirect("/signup?error=exists");
-  if (data.session) redirect("/verify-phone");
+  if (data.session) {
+    redirect(
+      PHONE_VERIFICATION_ENABLED ? "/verify-phone" : "/portal",
+    );
+  }
 
   redirect(
-    "/login?message=Check your email to confirm your account, then sign in and verify your mobile number.",
+    PHONE_VERIFICATION_ENABLED
+      ? "/login?message=Check your email to confirm your account, then sign in and verify your mobile number."
+      : "/login?message=Check your email to confirm your account, then sign in.",
   );
 }
