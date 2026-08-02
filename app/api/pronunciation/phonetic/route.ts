@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
 const TRANSCRIPTION_ENDPOINT = "https://api.openai.com/v1/audio/transcriptions";
 const RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
+const DEFAULT_PHONETIC_MODEL = "gpt-4.1-mini";
+const PHONETIC_OUTPUT_TOKEN_LIMIT = 400;
 
 function cleanSingleLine(value: unknown) {
   return String(value ?? "")
@@ -32,6 +34,52 @@ function errorMessage(payload: unknown, fallback: string) {
   }
   if (candidate.message?.trim()) return candidate.message.trim();
   return fallback;
+}
+
+async function requestPhoneticSuggestion(
+  apiKey: string,
+  model: string,
+  prompt: string,
+) {
+  try {
+    const response = await fetch(RESPONSES_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        store: false,
+        input: prompt,
+        max_output_tokens: PHONETIC_OUTPUT_TOKEN_LIMIT,
+      }),
+      cache: "no-store",
+    });
+
+    const payload = await response.json().catch(() => null);
+    const phoneticSpelling = cleanSingleLine(
+      extractOpenAIText(payload),
+    ).slice(0, 160);
+
+    return {
+      error: response.ok
+        ? ""
+        : errorMessage(
+            payload,
+            `The phonetic service returned ${response.status}.`,
+          ),
+      phoneticSpelling,
+    };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "The phonetic service could not be reached.",
+      phoneticSpelling: "",
+    };
+  }
 }
 
 export async function POST(request: Request) {
@@ -126,10 +174,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const responseModel =
-    process.env.OPENAI_PHONETIC_MODEL?.trim() ||
-    process.env.OPENAI_MODEL?.trim() ||
-    "gpt-5-mini";
+  // Keep this short, deterministic task independent from the adjudication
+  // narrative model. Reasoning models can spend a small output allowance on
+  // hidden reasoning and return no visible spelling at all.
+  const configuredModel =
+    process.env.OPENAI_PHONETIC_MODEL?.trim() || DEFAULT_PHONETIC_MODEL;
   const responsePrompt = [
     "Create a clear, school-program-friendly phonetic respelling of a person's name.",
     "Use ordinary English letters only, hyphens between syllables, and CAPITAL letters for the stressed syllable.",
@@ -139,56 +188,44 @@ export async function POST(request: Request) {
     `What the pronunciation recording sounded like: ${transcript || "not available"}`,
   ].join("\n");
 
-  const response = await fetch(RESPONSES_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: responseModel,
-      input: responsePrompt,
-      max_output_tokens: 80,
-    }),
-    cache: "no-store",
-  });
+  const modelCandidates = Array.from(
+    new Set([configuredModel, DEFAULT_PHONETIC_MODEL]),
+  );
+  let lastError = "";
 
-  const responsePayload = await response.json().catch(() => null);
-  if (!response.ok) {
-    return NextResponse.json(
-      {
-        error: errorMessage(
-          responsePayload,
-          "A phonetic suggestion could not be generated. Enter it manually.",
-        ),
-      },
-      { status: 502 },
+  for (const model of modelCandidates) {
+    const suggestion = await requestPhoneticSuggestion(
+      apiKey,
+      model,
+      responsePrompt,
     );
+    if (suggestion.phoneticSpelling) {
+      return NextResponse.json(
+        {
+          phoneticSpelling: suggestion.phoneticSpelling,
+          transcript,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+    lastError = suggestion.error || lastError;
   }
 
-  const phoneticSpelling = cleanSingleLine(
-    extractOpenAIText(responsePayload),
-  ).slice(0, 160);
-
-  if (!phoneticSpelling) {
-    return NextResponse.json(
-      {
-        error:
-          "A phonetic suggestion could not be generated. Enter it manually.",
-      },
-      { status: 502 },
-    );
+  if (lastError) {
+    console.error("Phonetic suggestion request failed:", lastError);
+  } else {
+    console.error("Phonetic suggestion request returned no visible text.");
   }
 
   return NextResponse.json(
     {
-      phoneticSpelling,
-      transcript,
+      error:
+        "The automatic phonetic suggestion is temporarily unavailable.",
     },
-    {
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    },
+    { status: 502 },
   );
 }

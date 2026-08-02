@@ -397,7 +397,7 @@ export function PronunciationRecorder() {
       if (!phoneticInput) {
         setPhoneticState("error");
         setPhoneticMessage(
-          "The phonetic-spelling field could not be found. Enter it manually.",
+          "The phonetic-spelling field could not be found. Your recording is still attached and can be uploaded.",
         );
         return;
       }
@@ -447,10 +447,12 @@ export function PronunciationRecorder() {
           return;
         }
         setPhoneticState("error");
-        setPhoneticMessage(
+        const reason =
           error instanceof Error
-            ? `${error.message} Enter it manually before uploading.`
-            : "A phonetic suggestion could not be generated. Enter it manually before uploading.",
+            ? error.message.replace(/[.\s]+$/, "")
+            : "The automatic phonetic suggestion is temporarily unavailable";
+        setPhoneticMessage(
+          `${reason}. You can enter it manually if you want; the recording is still attached and can be uploaded.`,
         );
       } finally {
         if (phoneticRequestRef.current === controller) {
@@ -612,7 +614,7 @@ export function PronunciationRecorder() {
             {phoneticState === "generating"
               ? "Creating phonetic spelling"
               : phoneticState === "error"
-                ? "Manual spelling needed"
+                ? "Automatic suggestion unavailable"
                 : "Phonetic suggestion ready"}
           </strong>
           <span>{phoneticMessage}</span>
