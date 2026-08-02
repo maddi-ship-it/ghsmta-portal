@@ -149,10 +149,15 @@ export default async function ApplicationDetailPage({
         selectedStage?.id === application.current_stage_id));
 
   const answeredCount = selectedQuestions.filter(
-    (question) => question.question_type !== "content" && hasAnswer(answerMap.get(question.id)),
+    (question) =>
+      question.question_type !== "content" &&
+      question.question_type !== "adobe_sign" &&
+      hasAnswer(answerMap.get(question.id)),
   ).length;
   const answerableCount = selectedQuestions.filter(
-    (question) => question.question_type !== "content",
+    (question) =>
+      question.question_type !== "content" &&
+      question.question_type !== "adobe_sign",
   ).length;
 
   return (

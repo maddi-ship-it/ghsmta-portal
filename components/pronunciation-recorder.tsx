@@ -22,8 +22,20 @@ type RecordingState =
   | "recording"
   | "preview"
   | "attached"
-  | "unsupported"
   | "error";
+
+type PhoneticState =
+  | "idle"
+  | "generating"
+  | "success"
+  | "preserved"
+  | "error";
+
+type PhoneticResponse = {
+  phoneticSpelling?: string;
+  transcript?: string;
+  error?: string;
+};
 
 function normalize(value: string | null | undefined) {
   return String(value ?? "").trim().toLowerCase();
@@ -52,22 +64,17 @@ function chooseMimeType() {
 
 function extensionForMimeType(type: string) {
   const normalized = type.toLowerCase();
-
   if (normalized.includes("mp4") || normalized.includes("m4a")) {
     return "m4a";
   }
-
   if (normalized.includes("ogg")) {
     return "ogg";
   }
-
   return "webm";
 }
 
 function findFileTypeSelect(form: HTMLFormElement | null) {
-  if (!form) {
-    return null;
-  }
+  if (!form) return null;
 
   const preferredNames = [
     "file_type",
@@ -81,10 +88,7 @@ function findFileTypeSelect(form: HTMLFormElement | null) {
     const select = form.querySelector<HTMLSelectElement>(
       `select[name="${name}"]`,
     );
-
-    if (select) {
-      return select;
-    }
+    if (select) return select;
   }
 
   return (
@@ -98,11 +102,10 @@ function findFileTypeSelect(form: HTMLFormElement | null) {
 }
 
 function findFileInput(form: HTMLFormElement | null) {
-  if (!form) {
-    return null;
-  }
+  if (!form) return null;
 
   const preferredNames = [
+    "files",
     "file",
     "upload",
     "attachment",
@@ -113,13 +116,18 @@ function findFileInput(form: HTMLFormElement | null) {
     const input = form.querySelector<HTMLInputElement>(
       `input[type="file"][name="${name}"]`,
     );
-
-    if (input) {
-      return input;
-    }
+    if (input) return input;
   }
 
   return form.querySelector<HTMLInputElement>('input[type="file"]');
+}
+
+function findTextInput(
+  form: HTMLFormElement | null,
+  name: string,
+) {
+  if (!form) return null;
+  return form.querySelector<HTMLInputElement>(`input[name="${name}"]`);
 }
 
 function setInputFile(input: HTMLInputElement, file: File) {
@@ -130,11 +138,18 @@ function setInputFile(input: HTMLInputElement, file: File) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function clearInputFile(input: HTMLInputElement | null) {
-  if (!input) {
-    return;
-  }
+function setInputValue(input: HTMLInputElement, value: string) {
+  const nativeSetter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  nativeSetter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
 
+function clearInputFile(input: HTMLInputElement | null) {
+  if (!input) return;
   input.value = "";
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -147,9 +162,12 @@ export function PronunciationRecorder() {
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
-
+  const phoneticRequestRef = useRef<AbortController | null>(null);
   const [visible, setVisible] = useState(false);
   const [state, setState] = useState<RecordingState>("idle");
+  const [phoneticState, setPhoneticState] =
+    useState<PhoneticState>("idle");
+  const [phoneticMessage, setPhoneticMessage] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -163,10 +181,7 @@ export function PronunciationRecorder() {
 
   const releasePreview = useCallback(() => {
     setPreviewUrl((current) => {
-      if (current) {
-        URL.revokeObjectURL(current);
-      }
-
+      if (current) URL.revokeObjectURL(current);
       return "";
     });
   }, []);
@@ -183,10 +198,18 @@ export function PronunciationRecorder() {
     }
   }, []);
 
+  const resetPhonetic = useCallback(() => {
+    phoneticRequestRef.current?.abort();
+    phoneticRequestRef.current = null;
+    setPhoneticState("idle");
+    setPhoneticMessage("");
+  }, []);
+
   const discardRecording = useCallback(
     (clearFile = true) => {
       stopTimer();
       stopStream();
+      resetPhonetic();
       recorderRef.current = null;
       chunksRef.current = [];
       releasePreview();
@@ -200,17 +223,15 @@ export function PronunciationRecorder() {
         clearInputFile(findFileInput(getForm()));
       }
     },
-    [getForm, releasePreview, stopStream, stopTimer],
+    [getForm, releasePreview, resetPhonetic, stopStream, stopTimer],
   );
 
   useEffect(() => {
     mountedRef.current = true;
-
     const form = getForm();
     const select = findFileTypeSelect(form);
 
     if (!select) {
-      setVisible(false);
       return () => {
         mountedRef.current = false;
       };
@@ -224,10 +245,7 @@ export function PronunciationRecorder() {
         PRONUNCIATION_LABELS.has(normalize(select.value));
 
       setVisible(shouldShow);
-
-      if (!shouldShow) {
-        discardRecording(true);
-      }
+      if (!shouldShow) discardRecording(true);
     };
 
     updateVisibility();
@@ -241,25 +259,10 @@ export function PronunciationRecorder() {
     };
   }, [discardRecording, getForm]);
 
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    if (
-      typeof navigator === "undefined" ||
-      !navigator.mediaDevices?.getUserMedia ||
-      typeof MediaRecorder === "undefined"
-    ) {
-      setState("unsupported");
-    } else if (state === "unsupported") {
-      setState("idle");
-    }
-  }, [state, visible]);
-
   useEffect(
     () => () => {
       mountedRef.current = false;
+      phoneticRequestRef.current?.abort();
       stopTimer();
       stopStream();
       releasePreview();
@@ -269,10 +272,7 @@ export function PronunciationRecorder() {
 
   const finishRecording = useCallback(() => {
     const recorder = recorderRef.current;
-
-    if (recorder && recorder.state !== "inactive") {
-      recorder.stop();
-    }
+    if (recorder && recorder.state !== "inactive") recorder.stop();
   }, []);
 
   const startRecording = useCallback(async () => {
@@ -297,7 +297,6 @@ export function PronunciationRecorder() {
 
       streamRef.current = stream;
       chunksRef.current = [];
-
       const selectedMimeType = chooseMimeType();
       const recorder = selectedMimeType
         ? new MediaRecorder(stream, {
@@ -309,22 +308,15 @@ export function PronunciationRecorder() {
           });
 
       recorderRef.current = recorder;
-
       recorder.addEventListener("dataavailable", (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) chunksRef.current.push(event.data);
       });
 
       recorder.addEventListener("stop", () => {
         stopTimer();
         stopStream();
-
         const type =
-          recorder.mimeType ||
-          selectedMimeType ||
-          "audio/webm";
-
+          recorder.mimeType || selectedMimeType || "audio/webm";
         const blob = new Blob(chunksRef.current, { type });
         chunksRef.current = [];
 
@@ -337,10 +329,8 @@ export function PronunciationRecorder() {
         }
 
         releasePreview();
-        const url = URL.createObjectURL(blob);
-
         setRecordingBlob(blob);
-        setPreviewUrl(url);
+        setPreviewUrl(URL.createObjectURL(blob));
         setState("preview");
       });
 
@@ -356,15 +346,12 @@ export function PronunciationRecorder() {
       recorder.start(250);
       setState("recording");
       setSeconds(0);
-
       timerRef.current = window.setInterval(() => {
         setSeconds((current) => {
           const next = current + 1;
-
           if (next >= MAX_RECORDING_SECONDS) {
             window.setTimeout(finishRecording, 0);
           }
-
           return Math.min(next, MAX_RECORDING_SECONDS);
         });
       }, 1_000);
@@ -401,13 +388,83 @@ export function PronunciationRecorder() {
     stopTimer,
   ]);
 
+  const generatePhoneticSpelling = useCallback(
+    async (file: File) => {
+      const form = getForm();
+      const personInput = findTextInput(form, "person_name");
+      const phoneticInput = findTextInput(form, "phonetic_spelling");
+
+      if (!phoneticInput) {
+        setPhoneticState("error");
+        setPhoneticMessage(
+          "The phonetic-spelling field could not be found. Enter it manually.",
+        );
+        return;
+      }
+
+      const controller = new AbortController();
+      phoneticRequestRef.current?.abort();
+      phoneticRequestRef.current = controller;
+      setPhoneticState("generating");
+      setPhoneticMessage("Generating an editable phonetic suggestion…");
+
+      const body = new FormData();
+      body.set("audio", file, file.name);
+      body.set("person_name", personInput?.value.trim() ?? "");
+
+      try {
+        const response = await fetch("/api/pronunciation/phonetic", {
+          method: "POST",
+          body,
+          signal: controller.signal,
+        });
+        const payload = (await response
+          .json()
+          .catch(() => null)) as PhoneticResponse | null;
+
+        if (!response.ok || !payload?.phoneticSpelling?.trim()) {
+          throw new Error(
+            payload?.error ||
+              "A phonetic suggestion could not be generated.",
+          );
+        }
+
+        if (phoneticInput.value.trim()) {
+          setPhoneticState("preserved");
+          setPhoneticMessage(
+            `Suggestion: ${payload.phoneticSpelling.trim()}. Your existing phonetic spelling was kept.`,
+          );
+          return;
+        }
+
+        setInputValue(phoneticInput, payload.phoneticSpelling.trim());
+        setPhoneticState("success");
+        setPhoneticMessage(
+          `Suggested spelling added: ${payload.phoneticSpelling.trim()}. Review and edit it before uploading.`,
+        );
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setPhoneticState("error");
+        setPhoneticMessage(
+          error instanceof Error
+            ? `${error.message} Enter it manually before uploading.`
+            : "A phonetic suggestion could not be generated. Enter it manually before uploading.",
+        );
+      } finally {
+        if (phoneticRequestRef.current === controller) {
+          phoneticRequestRef.current = null;
+        }
+      }
+    },
+    [getForm],
+  );
+
   const useRecording = useCallback(() => {
-    if (!recordingBlob) {
-      return;
-    }
+    if (!recordingBlob) return;
 
     const input = findFileInput(getForm());
-
     if (!input) {
       setState("error");
       setErrorMessage(
@@ -417,9 +474,7 @@ export function PronunciationRecorder() {
     }
 
     const extension = extensionForMimeType(recordingBlob.type);
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[:.]/g, "-");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = `name-pronunciation-${timestamp}.${extension}`;
     const file = new File([recordingBlob], fileName, {
       type: recordingBlob.type,
@@ -429,11 +484,17 @@ export function PronunciationRecorder() {
     setInputFile(input, file);
     setRecordingName(fileName);
     setState("attached");
-  }, [getForm, recordingBlob]);
+    void generatePhoneticSpelling(file);
+  }, [generatePhoneticSpelling, getForm, recordingBlob]);
 
   if (!visible) {
     return <div ref={rootRef} hidden aria-hidden="true" />;
   }
+
+  const recordingSupported =
+    typeof navigator !== "undefined" &&
+    Boolean(navigator.mediaDevices?.getUserMedia) &&
+    typeof MediaRecorder !== "undefined";
 
   return (
     <div className={styles.recorder} ref={rootRef}>
@@ -445,7 +506,6 @@ export function PronunciationRecorder() {
             only when it sounds right.
           </p>
         </div>
-
         {state === "recording" ? (
           <span className={styles.recordingBadge}>
             Recording {seconds}s / {MAX_RECORDING_SECONDS}s
@@ -453,7 +513,7 @@ export function PronunciationRecorder() {
         ) : null}
       </div>
 
-      {state === "unsupported" ? (
+      {!recordingSupported ? (
         <div className={styles.notice}>
           Browser recording is unavailable here. Use the normal audio-file
           upload field below.
@@ -466,7 +526,7 @@ export function PronunciationRecorder() {
         </div>
       ) : null}
 
-      {state === "idle" || state === "error" ? (
+      {recordingSupported && (state === "idle" || state === "error") ? (
         <button
           className={styles.primaryButton}
           type="button"
@@ -505,7 +565,6 @@ export function PronunciationRecorder() {
           >
             Your browser does not support audio playback.
           </audio>
-
           <div className={styles.actions}>
             <button
               className={styles.secondaryButton}
@@ -514,7 +573,6 @@ export function PronunciationRecorder() {
             >
               Re-record
             </button>
-
             {state !== "attached" ? (
               <button
                 className={styles.primaryButton}
@@ -538,8 +596,34 @@ export function PronunciationRecorder() {
         </div>
       ) : null}
 
+      {phoneticState !== "idle" ? (
+        <div
+          className={
+            phoneticState === "error"
+              ? styles.phoneticError
+              : phoneticState === "generating"
+                ? styles.phoneticWorking
+                : styles.phoneticSuccess
+          }
+          role={phoneticState === "error" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          <strong>
+            {phoneticState === "generating"
+              ? "Creating phonetic spelling"
+              : phoneticState === "error"
+                ? "Manual spelling needed"
+                : "Phonetic suggestion ready"}
+          </strong>
+          <span>{phoneticMessage}</span>
+        </div>
+      ) : null}
+
       <p className={styles.privacy}>
-        Nothing is uploaded while recording or playing the preview.
+        Nothing is uploaded while recording or playing the preview. When
+        you choose Use this recording, a temporary copy is securely
+        analyzed to create the editable phonetic suggestion. The School
+        File itself is stored only after you submit the normal upload form.
       </p>
     </div>
   );

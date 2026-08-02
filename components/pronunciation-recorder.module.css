@@ -3,14 +3,15 @@
   gap: 14px;
   margin: 14px 0;
   padding: 16px;
-  border: 1px solid rgba(212, 175, 55, 0.34);
+  color: var(--portal-text, #e7ecf5);
+  border: 1px solid var(--portal-line-strong, rgba(212, 175, 55, 0.34));
   border-radius: 14px;
-  background:
-    linear-gradient(
-      145deg,
-      rgba(21, 37, 66, 0.96),
-      rgba(8, 19, 38, 0.96)
-    );
+  background: linear-gradient(
+    145deg,
+    var(--portal-surface-2, #141f36),
+    var(--portal-surface, #0f1729)
+  );
+  box-shadow: 0 12px 30px color-mix(in srgb, #000 16%, transparent);
 }
 
 .heading {
@@ -26,7 +27,7 @@
 }
 
 .heading strong {
-  color: #f6e4aa;
+  color: var(--portal-gold-bright, #f0d37e);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.04rem;
 }
@@ -34,17 +35,17 @@
 .heading p,
 .privacy {
   margin: 0;
-  color: #aeb9ca;
+  color: var(--portal-muted, #9ca9be);
   line-height: 1.45;
 }
 
 .recordingBadge {
   flex: 0 0 auto;
   padding: 6px 9px;
-  border: 1px solid rgba(255, 125, 125, 0.48);
+  color: var(--portal-danger, #ff9c9c);
+  border: 1px solid color-mix(in srgb, var(--portal-danger, #ff9c9c) 48%, transparent);
   border-radius: 999px;
-  color: #ffd2d2;
-  background: rgba(110, 20, 28, 0.46);
+  background: color-mix(in srgb, var(--portal-danger, #ff9c9c) 16%, transparent);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -62,9 +63,13 @@
 }
 
 .primaryButton {
-  border: 1px solid #d4af37;
-  background: #d4af37;
   color: #071328;
+  border: 1px solid var(--portal-gold, #d5b14f);
+  background: linear-gradient(
+    135deg,
+    var(--portal-gold-bright, #f0d37e),
+    var(--portal-gold, #d5b14f)
+  );
 }
 
 .primaryButton:disabled {
@@ -73,28 +78,29 @@
 }
 
 .secondaryButton {
-  border: 1px solid rgba(188, 204, 230, 0.34);
-  background: rgba(22, 40, 70, 0.92);
-  color: #edf2fa;
+  color: var(--portal-text, #e7ecf5);
+  border: 1px solid var(--portal-line, rgba(183, 196, 220, 0.22));
+  background: var(--portal-surface-3, #192743);
 }
 
 .stopButton {
-  border: 1px solid rgba(255, 143, 143, 0.68);
-  background: rgba(126, 28, 37, 0.9);
-  color: #fff3f3;
+  color: var(--portal-danger, #ff9c9c);
+  border: 1px solid color-mix(in srgb, var(--portal-danger, #ff9c9c) 56%, transparent);
+  background: color-mix(in srgb, var(--portal-danger, #ff9c9c) 18%, var(--portal-surface, #0f1729));
 }
 
 .preview {
   display: grid;
   gap: 10px;
   padding: 13px;
-  border: 1px solid rgba(133, 160, 202, 0.24);
+  color: var(--portal-text, #e7ecf5);
+  border: 1px solid var(--portal-line, rgba(183, 196, 220, 0.2));
   border-radius: 11px;
-  background: rgba(7, 17, 34, 0.48);
+  background: var(--portal-surface-3, #192743);
 }
 
 .preview label {
-  color: #dbe4f0;
+  color: var(--portal-ivory, #f7f2e8);
   font-weight: 800;
 }
 
@@ -110,34 +116,47 @@
 
 .notice,
 .error,
-.ready {
+.ready,
+.phoneticWorking,
+.phoneticSuccess,
+.phoneticError {
+  display: grid;
+  gap: 3px;
   padding: 11px 12px;
   border-radius: 9px;
   line-height: 1.45;
 }
 
 .notice {
-  border: 1px solid rgba(158, 176, 207, 0.24);
-  color: #d7dfeb;
-  background: rgba(34, 49, 75, 0.7);
+  color: var(--portal-text, #e7ecf5);
+  border: 1px solid var(--portal-line, rgba(183, 196, 220, 0.22));
+  background: var(--portal-surface-3, #192743);
 }
 
-.error {
-  border: 1px solid rgba(255, 132, 132, 0.42);
-  color: #ffd7d7;
-  background: rgba(91, 20, 29, 0.58);
+.error,
+.phoneticError {
+  color: var(--portal-danger, #ff9c9c);
+  border: 1px solid color-mix(in srgb, var(--portal-danger, #ff9c9c) 42%, transparent);
+  background: color-mix(in srgb, var(--portal-danger, #ff9c9c) 14%, var(--portal-surface, #0f1729));
 }
 
-.ready {
-  display: grid;
-  gap: 3px;
-  border: 1px solid rgba(91, 202, 139, 0.42);
-  color: #dff8e9;
-  background: rgba(20, 76, 49, 0.48);
+.ready,
+.phoneticSuccess {
+  color: var(--portal-success, #81ddb0);
+  border: 1px solid color-mix(in srgb, var(--portal-success, #81ddb0) 42%, transparent);
+  background: color-mix(in srgb, var(--portal-success, #81ddb0) 13%, var(--portal-surface, #0f1729));
 }
 
-.ready span {
-  color: #c5e8d2;
+.ready span,
+.phoneticSuccess span,
+.phoneticWorking span {
+  color: var(--portal-muted, #9ca9be);
+}
+
+.phoneticWorking {
+  color: var(--portal-blue, #7c9ef6);
+  border: 1px solid color-mix(in srgb, var(--portal-blue, #7c9ef6) 40%, transparent);
+  background: color-mix(in srgb, var(--portal-blue, #7c9ef6) 13%, var(--portal-surface, #0f1729));
 }
 
 .privacy {

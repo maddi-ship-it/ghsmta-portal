@@ -22,6 +22,7 @@ function answerValue(question: ApplicationQuestion, formData: FormData): unknown
       const numberValue = Number(raw);
       return Number.isFinite(numberValue) ? numberValue : raw;
     }
+    case "adobe_sign":
     case "content":
       return null;
     default:
@@ -30,7 +31,13 @@ function answerValue(question: ApplicationQuestion, formData: FormData): unknown
 }
 
 function isMissingRequiredAnswer(question: ApplicationQuestion, value: unknown) {
-  if (!question.required || question.question_type === "content") return false;
+  if (
+    !question.required ||
+    question.question_type === "content" ||
+    question.question_type === "adobe_sign"
+  ) {
+    return false;
+  }
   if (
     question.question_type === "checkbox" ||
     question.question_type === "signature_acknowledgement"
@@ -106,7 +113,11 @@ async function persistApplicationAnswers(
   const questions = (questionData ?? []) as ApplicationQuestion[];
   const answerMap = new Map<string, unknown>();
   const rows = questions
-    .filter((question) => question.question_type !== "content")
+    .filter(
+      (question) =>
+        question.question_type !== "content" &&
+        question.question_type !== "adobe_sign",
+    )
     .map((question) => {
       const value = answerValue(question, formData);
       answerMap.set(question.id, value);

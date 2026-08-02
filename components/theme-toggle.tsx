@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type ThemeName = "dark" | "light";
 type ThemeToggleVariant = "icon" | "setting";
 
 const STORAGE_KEY = "ghsmta-theme";
 const THEME_EVENT = "ghsmta-theme-change";
+const THEME_COLORS: Record<ThemeName, string> = {
+  dark: "#070b18",
+  light: "#edf1f7",
+};
 
 function readTheme(): ThemeName {
   if (typeof document === "undefined") return "dark";
@@ -15,15 +19,43 @@ function readTheme(): ThemeName {
     : "dark";
 }
 
-function applyTheme(theme: ThemeName) {
+function setDocumentTheme(theme: ThemeName) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme;
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", THEME_COLORS[theme]);
+}
+
+function applyTheme(theme: ThemeName) {
+  setDocumentTheme(theme);
   window.localStorage.setItem(STORAGE_KEY, theme);
   window.dispatchEvent(
     new CustomEvent<ThemeName>(THEME_EVENT, {
       detail: theme,
     }),
   );
+}
+
+function subscribeToTheme(onStoreChange: () => void) {
+  const handleThemeChange = () => onStoreChange();
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key !== STORAGE_KEY) return;
+    setDocumentTheme(event.newValue === "light" ? "light" : "dark");
+    onStoreChange();
+  };
+
+  window.addEventListener(THEME_EVENT, handleThemeChange);
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    window.removeEventListener(THEME_EVENT, handleThemeChange);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function readServerTheme(): ThemeName {
+  return "dark";
 }
 
 function SunIcon() {
@@ -76,31 +108,12 @@ export function ThemeToggle({
 }: {
   variant?: ThemeToggleVariant;
 }) {
-  const [theme, setTheme] = useState<ThemeName>("dark");
+  const theme = useSyncExternalStore(
+    subscribeToTheme,
+    readTheme,
+    readServerTheme,
+  );
   const nextTheme: ThemeName = theme === "dark" ? "light" : "dark";
-
-  useEffect(() => {
-    setTheme(readTheme());
-
-    const handleThemeChange = (event: Event) => {
-      const customEvent = event as CustomEvent<ThemeName>;
-      setTheme(customEvent.detail ?? readTheme());
-    };
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) {
-        setTheme(event.newValue === "light" ? "light" : "dark");
-      }
-    };
-
-    window.addEventListener(THEME_EVENT, handleThemeChange);
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener(THEME_EVENT, handleThemeChange);
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
 
   const label =
     nextTheme === "light"

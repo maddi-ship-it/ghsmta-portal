@@ -3,9 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  normalizeAdobeSignEmbed,
+  normalizeAdobeSignEmbedHeight,
+} from "@/lib/adobe-sign";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ApplicationQuestionType } from "@/lib/types";
+import type {
+  ApplicationQuestionType,
+  QuestionSettings,
+} from "@/lib/types";
 
 const QUESTION_TYPES: ApplicationQuestionType[] = [
   "short_text",
@@ -21,6 +28,7 @@ const QUESTION_TYPES: ApplicationQuestionType[] = [
   "checkbox",
   "yes_no",
   "signature_acknowledgement",
+  "adobe_sign",
   "content",
 ];
 
@@ -43,6 +51,40 @@ function parseOptions(value: FormDataEntryValue | null): string[] {
 function parseSortOrder(value: FormDataEntryValue | null): number {
   const parsed = Number.parseInt(String(value ?? "0"), 10);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function questionSettings(
+  questionType: ApplicationQuestionType,
+  formData: FormData,
+): QuestionSettings {
+  const externalUrl = String(formData.get("external_url") ?? "").trim();
+  const externalLabel = String(
+    formData.get("external_label") ?? "",
+  ).trim();
+  const placeholder = String(formData.get("placeholder") ?? "").trim();
+  const acknowledgementLabel = String(
+    formData.get("acknowledgement_label") ?? "",
+  ).trim();
+
+  const settings: QuestionSettings = {
+    ...(externalUrl ? { external_url: externalUrl } : {}),
+    ...(externalLabel ? { external_label: externalLabel } : {}),
+    ...(placeholder ? { placeholder } : {}),
+    ...(acknowledgementLabel
+      ? { acknowledgement_label: acknowledgementLabel }
+      : {}),
+  };
+
+  if (questionType === "adobe_sign") {
+    settings.adobe_sign_embed_url = normalizeAdobeSignEmbed(
+      String(formData.get("adobe_sign_embed") ?? ""),
+    );
+    settings.adobe_sign_embed_height = normalizeAdobeSignEmbedHeight(
+      formData.get("adobe_sign_embed_height"),
+    );
+  }
+
+  return settings;
 }
 
 export async function createFormVersion(formData: FormData) {
@@ -144,13 +186,9 @@ export async function createQuestion(formVersionId: string, formData: FormData) 
   const questionType = String(
     formData.get("question_type") ?? "short_text",
   ) as ApplicationQuestionType;
-  const required = formData.get("required") === "on";
+  const required =
+    questionType !== "adobe_sign" && formData.get("required") === "on";
   const sortOrder = parseSortOrder(formData.get("sort_order"));
-  const externalUrl = String(formData.get("external_url") ?? "").trim();
-  const placeholder = String(formData.get("placeholder") ?? "").trim();
-  const acknowledgementLabel = String(
-    formData.get("acknowledgement_label") ?? "",
-  ).trim();
 
   if (!sectionId || !label || !questionKey) {
     throw new Error("Section, label, and question key are required.");
@@ -170,13 +208,7 @@ export async function createQuestion(formVersionId: string, formData: FormData) 
     question_type: questionType,
     required,
     options: parseOptions(formData.get("options")),
-    settings: {
-      ...(externalUrl ? { external_url: externalUrl } : {}),
-      ...(placeholder ? { placeholder } : {}),
-      ...(acknowledgementLabel
-        ? { acknowledgement_label: acknowledgementLabel }
-        : {}),
-    },
+    settings: questionSettings(questionType, formData),
     sort_order: sortOrder,
   });
 
@@ -199,14 +231,10 @@ export async function updateQuestion(
   const questionType = String(
     formData.get("question_type") ?? "short_text",
   ) as ApplicationQuestionType;
-  const required = formData.get("required") === "on";
+  const required =
+    questionType !== "adobe_sign" && formData.get("required") === "on";
   const active = formData.get("active") === "on";
   const sortOrder = parseSortOrder(formData.get("sort_order"));
-  const externalUrl = String(formData.get("external_url") ?? "").trim();
-  const placeholder = String(formData.get("placeholder") ?? "").trim();
-  const acknowledgementLabel = String(
-    formData.get("acknowledgement_label") ?? "",
-  ).trim();
 
   if (!label || !questionKey) {
     throw new Error("Question label and key are required.");
@@ -227,13 +255,7 @@ export async function updateQuestion(
       required,
       active,
       options: parseOptions(formData.get("options")),
-      settings: {
-        ...(externalUrl ? { external_url: externalUrl } : {}),
-        ...(placeholder ? { placeholder } : {}),
-        ...(acknowledgementLabel
-          ? { acknowledgement_label: acknowledgementLabel }
-          : {}),
-      },
+      settings: questionSettings(questionType, formData),
       sort_order: sortOrder,
     })
     .eq("id", questionId)

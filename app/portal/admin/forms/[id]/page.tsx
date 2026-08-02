@@ -38,6 +38,7 @@ const QUESTION_TYPES: Array<{ value: ApplicationQuestionType; label: string }> =
   { value: "checkbox", label: "Checkbox" },
   { value: "yes_no", label: "Yes / No" },
   { value: "signature_acknowledgement", label: "Signature acknowledgement" },
+  { value: "adobe_sign", label: "Adobe Sign Web Form" },
   { value: "content", label: "Instructions / content" },
 ];
 
@@ -155,6 +156,7 @@ export default async function FormBuilderPage({
                   </div>
                   <div className="heading-actions">
                     {question.imported && <span className="badge">Imported</span>}
+                    {question.question_type === "adobe_sign" && <span className="badge badge-complete">Embedded</span>}
                     {question.required && <span className="badge badge-required">Required</span>}
                     {!question.active && <span className="badge">Inactive</span>}
                   </div>
@@ -370,9 +372,39 @@ function QuestionEditorFields({ question }: { question?: ApplicationQuestion }) 
       <div className="field"><label>Options</label><textarea className="textarea" name="options" defaultValue={question?.options.join("\n") ?? ""} placeholder="One option per line" /></div>
       <div className="field"><label>Placeholder</label><input className="input" name="placeholder" defaultValue={question?.settings.placeholder ?? ""} /></div>
       <div className="field"><label>External document URL</label><input className="input" name="external_url" type="url" defaultValue={question?.settings.external_url ?? ""} /></div>
+      <div className="field"><label>External link label</label><input className="input" name="external_label" defaultValue={question?.settings.external_label ?? ""} placeholder="Open required document" /></div>
       <div className="field"><label>Acknowledgement label</label><input className="input" name="acknowledgement_label" defaultValue={question?.settings.acknowledgement_label ?? ""} /></div>
+      <fieldset className="question-type-settings adobe-sign-builder-settings">
+        <legend>Adobe Sign embed</legend>
+        <p className="field-help">
+          Used only for the Adobe Sign Web Form question type. Paste the iframe
+          code Adobe provides under Manage → Web Forms → Get Code. The portal
+          extracts and stores only the secure Adobe URL.
+        </p>
+        <div className="field">
+          <label>Adobe Sign iframe code or Web Form URL</label>
+          <textarea
+            className="textarea adobe-sign-code-input"
+            name="adobe_sign_embed"
+            defaultValue={question?.settings.adobe_sign_embed_url ?? ""}
+            placeholder={'<iframe src="https://secure.na4.adobesign.com/public/esignWidget?wid=…"></iframe>'}
+          />
+        </div>
+        <div className="field">
+          <label>Embed height in pixels</label>
+          <input
+            className="input"
+            name="adobe_sign_embed_height"
+            type="number"
+            min="500"
+            max="1800"
+            step="20"
+            defaultValue={question?.settings.adobe_sign_embed_height ?? 760}
+          />
+        </div>
+      </fieldset>
       <div className="field"><label>Sort order</label><input className="input" name="sort_order" type="number" defaultValue={question?.sort_order ?? 10} /></div>
-      <label className="check-row"><input name="required" type="checkbox" defaultChecked={question?.required ?? false} />Required</label>
+      <label className="check-row"><input name="required" type="checkbox" defaultChecked={question?.required ?? false} />Required (not used for embedded Adobe Sign blocks)</label>
       {question && <label className="check-row"><input name="active" type="checkbox" defaultChecked={question.active} />Active</label>}
     </>
   );

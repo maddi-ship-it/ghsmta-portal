@@ -1,3 +1,7 @@
+import {
+  normalizeAdobeSignEmbedHeight,
+  safeAdobeSignEmbedUrl,
+} from "@/lib/adobe-sign";
 import type { ApplicationQuestion } from "@/lib/types";
 
 function asString(value: unknown): string {
@@ -25,6 +29,56 @@ export function ApplicationQuestionField({
 }) {
   const name = `question_${question.id}`;
   const requiredMark = question.required ? <span className="required-mark">Required</span> : null;
+
+  if (question.question_type === "adobe_sign") {
+    const embedUrl = safeAdobeSignEmbedUrl(
+      question.settings.adobe_sign_embed_url,
+    );
+    const embedHeight = normalizeAdobeSignEmbedHeight(
+      question.settings.adobe_sign_embed_height,
+    );
+
+    return (
+      <article className="application-adobe-sign-block">
+        <div className="application-adobe-sign-heading">
+          <div>
+            <span className="eyebrow">Adobe Acrobat Sign</span>
+            <h3>{question.label}</h3>
+            {question.description && <p>{question.description}</p>}
+          </div>
+          <span className="badge">Secure Adobe form</span>
+        </div>
+
+        {embedUrl ? (
+          <>
+            <div className="application-adobe-sign-frame-shell">
+              <iframe
+                className="application-adobe-sign-frame"
+                height={embedHeight}
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                src={embedUrl}
+                title={`${question.label} — Adobe Acrobat Sign`}
+              />
+            </div>
+            <p className="application-adobe-sign-fallback">
+              Trouble viewing the form?{" "}
+              <a href={embedUrl} target="_blank" rel="noreferrer noopener">
+                {question.settings.external_label ??
+                  "Open the secure Adobe Sign form in a new window"}
+              </a>
+              .
+            </p>
+          </>
+        ) : (
+          <div className="form-error">
+            This Adobe Sign block does not have a valid Web Form embed yet.
+            Please contact GHSMTA support.
+          </div>
+        )}
+      </article>
+    );
+  }
 
   if (question.question_type === "content") {
     return (

@@ -45,6 +45,7 @@ export type ApplicationQuestionType =
   | "checkbox"
   | "yes_no"
   | "signature_acknowledgement"
+  | "adobe_sign"
   | "content";
 
 export type Profile = {
@@ -171,6 +172,8 @@ export type QuestionSettings = {
   external_label?: string;
   acknowledgement_label?: string;
   placeholder?: string;
+  adobe_sign_embed_url?: string;
+  adobe_sign_embed_height?: number;
 };
 
 export type ApplicationQuestion = {

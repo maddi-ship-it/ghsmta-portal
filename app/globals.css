@@ -8860,3 +8860,529 @@ html[data-theme="light"] .theme-setting-icon {
 }
 
 /* GHSMTA COMPLETE LIGHT MODE + 5DP AUDIT END */
+
+/* GHSMTA THEME + ADOBE SIGN AUDIT START */
+
+/* Newer modules share the same semantic surfaces in both portal themes. */
+.portal-shell .portal-main :where(
+  .builder-section-settings,
+  .question-type-settings,
+  .acknowledgement-row,
+  .personal-score-column,
+  .rich-text-toolbar,
+  .factor-row,
+  .mfa-enrollment-card,
+  .owner-message-template-list > details,
+  .owner-digest-summary,
+  .owner-response,
+  .schedule-school-instructions,
+  .schedule-recurring-instructions,
+  .schedule-owner-slot-queue,
+  .schedule-weekday-option,
+  .schedule-bulk-slot,
+  .schedule-list-summary,
+  .schedule-slot-expanded,
+  .schedule-owner-waitlist-row,
+  .schedule-applicant-list-summary,
+  .waitlist-offer-card,
+  .waitlist-status-card,
+  .waitlist-join-form,
+  .specialty-action-bar
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .portal-main :where(
+  .builder-section-settings,
+  .rich-text-toolbar,
+  .owner-message-template-list > details > form
+) {
+  border-color: var(--portal-line);
+}
+
+.portal-shell .portal-main :where(
+  .question-type-settings,
+  .mfa-enrollment-card,
+  .schedule-owner-slot-queue,
+  .schedule-school-instructions,
+  .schedule-recurring-instructions
+) {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--portal-ivory) 4%, transparent);
+}
+
+.portal-shell .portal-main details > summary {
+  color: var(--portal-text);
+}
+
+.portal-shell .portal-main .builder-section-settings {
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .portal-main .question-type-settings {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  margin: 2px 0;
+  padding: 18px;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--portal-radius-sm);
+}
+
+.portal-shell .portal-main .question-type-settings legend {
+  padding: 0 8px;
+  color: var(--portal-gold-bright);
+  font-weight: 850;
+}
+
+.portal-shell .portal-main .adobe-sign-builder-settings .field-help {
+  margin: 0;
+}
+
+.portal-shell .portal-main .adobe-sign-code-input {
+  min-height: 140px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.portal-shell .portal-main .input-with-suffix span {
+  color: var(--portal-muted);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .portal-main .personal-score-column {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .portal-main .personal-score-column label {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .category-subject-input[readonly] {
+  color: var(--portal-muted);
+  background: var(--portal-surface-3);
+}
+
+.portal-shell .portal-main .school-file-list {
+  border-color: var(--portal-line);
+  background: var(--portal-surface);
+}
+
+.portal-shell .portal-main .school-file-row + .school-file-row {
+  border-color: var(--portal-line);
+}
+
+.portal-shell .portal-main .school-file-icon {
+  color: var(--portal-blue);
+  background: color-mix(in srgb, var(--portal-blue) 12%, var(--portal-surface-2));
+}
+
+/* Embedded Adobe Acrobat Sign Web Forms. */
+.portal-shell .portal-main .application-adobe-sign-block {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.portal-shell .portal-main .application-adobe-sign-block:last-child {
+  border-bottom: 0;
+}
+
+.portal-shell .portal-main .application-adobe-sign-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.portal-shell .portal-main .application-adobe-sign-heading h3 {
+  margin: 3px 0 0;
+}
+
+.portal-shell .portal-main .application-adobe-sign-heading p {
+  max-width: 820px;
+  margin: 7px 0 0;
+  color: var(--portal-muted);
+  line-height: 1.55;
+}
+
+.portal-shell .portal-main .application-adobe-sign-frame-shell {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--portal-bg-deep) 24%, transparent);
+}
+
+.portal-shell .portal-main .application-adobe-sign-frame {
+  width: 100%;
+  display: block;
+  border: 0;
+  background: #ffffff;
+  color-scheme: light;
+}
+
+.portal-shell .portal-main .application-adobe-sign-fallback {
+  margin: 0;
+  color: var(--portal-muted);
+  font-size: 0.85rem;
+}
+
+/* Application reference dialog had light-only inner panels. */
+.portal-shell :where(
+  .application-reference-modal,
+  .application-reference-modal-header,
+  .application-reference-modal-body,
+  .application-reference-group,
+  .application-reference-group h3,
+  .application-reference-close
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+}
+
+.portal-shell .application-reference-modal {
+  background: var(--portal-surface);
+}
+
+.portal-shell .application-reference-modal-header,
+.portal-shell .application-reference-group {
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .application-reference-modal-body,
+.portal-shell .application-reference-group h3 {
+  background: var(--portal-surface-3);
+}
+
+.portal-shell .application-reference-modal-header h2,
+.portal-shell .application-reference-group h3,
+.portal-shell .application-reference-row dt {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .application-reference-modal-header p,
+.portal-shell .application-reference-row dd,
+.portal-shell .application-reference-empty {
+  color: var(--portal-muted);
+}
+
+.portal-shell .application-reference-close {
+  color: var(--portal-ivory);
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .application-reference-row,
+.portal-shell .application-reference-group h3 {
+  border-color: var(--portal-line);
+}
+
+/* Scheduling, notification, and account states now derive from theme tokens. */
+.portal-shell .portal-main .notification-row.is-unread,
+.portal-shell .portal-main .admin-collapsible-summary:hover,
+.portal-shell .portal-main .admin-collapsible-section[open] > .admin-collapsible-summary,
+.portal-shell .portal-main .owner-message-template-list > details > summary:hover,
+.portal-shell .portal-main .schedule-list-summary:hover,
+.portal-shell .portal-main .schedule-bulk-slot:hover {
+  background: color-mix(in srgb, var(--portal-blue) 9%, var(--portal-surface-2));
+}
+
+.portal-shell .portal-main .schedule-bulk-slot:has(input:checked) {
+  border-color: var(--portal-line-strong);
+  background: color-mix(in srgb, var(--portal-gold) 11%, var(--portal-surface-2));
+}
+
+.portal-shell .portal-main :where(.schedule-status-open, .schedule-availability-open) {
+  color: var(--portal-success);
+  background: color-mix(in srgb, var(--portal-success) 13%, var(--portal-surface-2));
+}
+
+.portal-shell .portal-main :where(.schedule-status-draft, .schedule-waitlist-status-waiting) {
+  color: var(--portal-muted);
+  background: var(--portal-surface-3);
+}
+
+.portal-shell .portal-main :where(
+  .schedule-status-closed,
+  .schedule-waitlist-status-offered,
+  .pending-booking-approval
+) {
+  color: var(--portal-warning);
+  border-color: color-mix(in srgb, var(--portal-warning) 38%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-warning) 12%, var(--portal-surface-2));
+}
+
+.portal-shell .portal-main :where(.schedule-status-cancelled, .schedule-availability-taken) {
+  color: var(--portal-danger);
+  background: color-mix(in srgb, var(--portal-danger) 12%, var(--portal-surface-2));
+}
+
+.portal-shell .portal-main .mfa-secret code,
+.portal-shell .portal-main .admin-collapsible-toggle,
+.portal-shell .portal-main .owner-message-template-list > details > summary {
+  color: var(--portal-gold-bright);
+}
+
+.portal-shell .portal-main .factor-row small,
+.portal-shell .portal-main .owner-message-template-list > details > summary small,
+.portal-shell .portal-main .owner-digest-summary span {
+  color: var(--portal-muted);
+}
+
+/* Released result accordions from the PDF/pronunciation package. */
+.released-results-list {
+  display: grid;
+  gap: 18px;
+}
+
+.released-result-disclosure,
+.released-results-section,
+.released-feedback-item {
+  overflow: hidden;
+}
+
+.released-result-disclosure > summary,
+.released-results-section > summary,
+.released-feedback-item > summary {
+  list-style: none;
+}
+
+.released-result-disclosure > summary::-webkit-details-marker,
+.released-results-section > summary::-webkit-details-marker,
+.released-feedback-item > summary::-webkit-details-marker {
+  display: none;
+}
+
+.released-results-summary {
+  min-height: 118px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 22px 26px;
+  cursor: pointer;
+  background:
+    radial-gradient(
+      circle at 12% 0%,
+      color-mix(in srgb, var(--portal-blue) 18%, transparent),
+      transparent 44%
+    ),
+    var(--portal-surface-2);
+}
+
+.released-results-summary:hover {
+  background:
+    radial-gradient(
+      circle at 12% 0%,
+      color-mix(in srgb, var(--portal-blue) 25%, transparent),
+      transparent 48%
+    ),
+    var(--portal-surface-hover);
+}
+
+.released-results-summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--portal-gold) 72%, transparent);
+  outline-offset: -3px;
+}
+
+.released-results-summary-copy {
+  min-width: 0;
+}
+
+.released-results-summary-copy h2,
+.released-results-summary-copy p,
+.released-results-section > summary :where(h3, p),
+.released-feedback-item > summary h4 {
+  margin: 0;
+}
+
+.released-results-summary-copy h2,
+.released-results-summary-copy p {
+  margin-top: 3px;
+}
+
+.released-results-summary-copy p,
+.released-results-summary-meta {
+  color: var(--portal-muted);
+}
+
+.released-results-summary-meta {
+  flex: 0 0 auto;
+  display: grid;
+  justify-items: end;
+  gap: 9px;
+  text-align: right;
+}
+
+.released-results-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--portal-gold-bright);
+}
+
+.released-results-close-label {
+  display: none;
+}
+
+.released-results-chevron,
+.released-results-section > summary > span,
+.released-feedback-item > summary > span {
+  display: inline-block;
+  transition: transform 160ms ease;
+}
+
+.released-result-disclosure[open] > summary .released-results-open-label {
+  display: none;
+}
+
+.released-result-disclosure[open] > summary .released-results-close-label {
+  display: inline;
+}
+
+.released-result-disclosure[open] > summary .released-results-chevron,
+.released-results-section[open] > summary > span,
+.released-feedback-item[open] > summary > span {
+  transform: rotate(180deg);
+}
+
+.released-results-expanded {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-top: 1px solid var(--portal-line);
+  background: color-mix(in srgb, var(--portal-surface) 84%, var(--portal-bg));
+}
+
+.released-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.released-results-section,
+.released-feedback-item {
+  border: 1px solid var(--portal-line);
+  border-radius: 12px;
+  background: var(--portal-surface-2);
+}
+
+.released-results-section > summary,
+.released-feedback-item > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 17px 19px;
+  cursor: pointer;
+}
+
+.released-results-section > summary:hover,
+.released-feedback-item > summary:hover {
+  background: var(--portal-surface-hover);
+}
+
+.released-results-section > summary .release-date {
+  margin-top: 4px;
+}
+
+.released-results-section-body {
+  padding: 0 18px 18px;
+}
+
+.released-feedback-list {
+  display: grid;
+  gap: 10px;
+}
+
+.released-feedback-item {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--portal-surface-2) 88%, var(--portal-bg));
+}
+
+.released-feedback-copy {
+  padding: 0 15px 15px;
+  color: var(--portal-text);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.released-feedback-copy p,
+.empty-release-copy {
+  margin: 0;
+}
+
+.empty-release-copy {
+  padding: 14px;
+  border: 1px dashed var(--portal-line-strong);
+  border-radius: 9px;
+  color: var(--portal-muted);
+  background: color-mix(in srgb, var(--portal-gold) 6%, var(--portal-surface-2));
+}
+
+html[data-theme="light"] .portal-main :where(
+  .released-results-expanded,
+  .released-results-section,
+  .released-feedback-item,
+  .builder-section-settings,
+  .question-type-settings,
+  .acknowledgement-row,
+  .personal-score-column,
+  .factor-row,
+  .mfa-enrollment-card,
+  .owner-message-template-list > details,
+  .owner-digest-summary,
+  .schedule-school-instructions,
+  .schedule-recurring-instructions,
+  .schedule-owner-slot-queue,
+  .schedule-weekday-option,
+  .schedule-bulk-slot,
+  .schedule-list-summary,
+  .schedule-slot-expanded,
+  .schedule-owner-waitlist-row,
+  .schedule-applicant-list-summary
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background-color: var(--portal-surface-2) !important;
+}
+
+html[data-theme="light"] .portal-shell .application-reference-modal-body,
+html[data-theme="light"] .portal-shell .application-reference-group h3 {
+  background: var(--portal-surface-3) !important;
+}
+
+@media (max-width: 760px) {
+  .released-results-summary,
+  .portal-shell .portal-main .application-adobe-sign-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .released-results-summary-meta {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .released-results-actions {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .released-results-actions .button {
+    width: 100%;
+  }
+}
+
+/* GHSMTA THEME + ADOBE SIGN AUDIT END */
