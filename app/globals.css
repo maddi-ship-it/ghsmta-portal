@@ -9835,3 +9835,176 @@ html[data-theme="light"] .auth-method-tabs button:not(.active) {
   background: var(--regal-gold);
   box-shadow: 0 4px 14px rgba(8, 11, 19, 0.14);
 }
+
+/* Billing bulk workflows */
+.billing-bulk-send {
+  margin-bottom: 1.25rem;
+}
+
+.billing-bulk-cycle-list,
+.billing-history-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.billing-bulk-cycle {
+  overflow: hidden;
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 1rem;
+  background: var(--portal-surface-2, var(--app-surface-2));
+}
+
+.billing-bulk-cycle > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.billing-bulk-cycle > summary span:first-child {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.billing-bulk-cycle > summary small {
+  color: var(--portal-muted, var(--app-muted));
+}
+
+.billing-bulk-cycle > summary span:last-child {
+  transition: transform 160ms ease;
+}
+
+.billing-bulk-cycle[open] > summary span:last-child {
+  transform: rotate(180deg);
+}
+
+.billing-bulk-form {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--portal-line, var(--app-line));
+}
+
+.billing-school-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.billing-school-picker legend {
+  margin-bottom: 0.65rem;
+  font-weight: 800;
+}
+
+.billing-school-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  max-height: 24rem;
+  overflow: auto;
+  padding: 0.15rem;
+}
+
+.billing-school-choice {
+  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 0.8rem;
+  background: var(--portal-surface, var(--app-surface));
+  cursor: pointer;
+}
+
+.billing-school-choice input {
+  margin-top: 0.2rem;
+}
+
+.billing-school-choice span {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.billing-school-choice small {
+  overflow-wrap: anywhere;
+  color: var(--portal-muted, var(--app-muted));
+}
+
+.billing-school-choice:has(input:checked) {
+  border-color: var(--portal-blue, #2857bd);
+  background: color-mix(in srgb, var(--portal-blue, #2857bd) 9%, var(--portal-surface, #fff));
+}
+
+.billing-school-choice.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.billing-bulk-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 0.9rem;
+  background: var(--portal-surface-2, var(--app-surface-2));
+}
+
+.billing-bulk-toolbar .select {
+  width: min(100%, 22rem);
+}
+
+/* Header popovers must use the resolved portal theme, not header colors. */
+.portal-shell .portal-header :is(
+  .portal-nav-menu-popover,
+  .portal-account-popover
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: color-mix(in srgb, var(--portal-surface) 97%, var(--portal-bg));
+  box-shadow: var(--portal-shadow);
+}
+
+.portal-shell .portal-header .portal-nav-menu-popover a,
+.portal-shell .portal-header .portal-account-popover > a,
+.portal-shell .portal-header .portal-account-popover button,
+.portal-shell .portal-header .portal-account-popover-heading strong {
+  color: var(--portal-text);
+}
+
+.portal-shell .portal-header .portal-account-popover-heading {
+  border-color: var(--portal-line);
+}
+
+.portal-shell .portal-header .portal-account-popover-heading span {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-header .portal-nav-menu-popover a:hover,
+.portal-shell .portal-header .portal-account-popover > a:hover,
+.portal-shell .portal-header .portal-account-popover button:hover {
+  color: var(--portal-gold-bright);
+  background: var(--portal-surface-hover);
+}
+
+.portal-shell .portal-header .portal-nav-menu-icon {
+  color: var(--portal-gold-bright);
+  background: color-mix(in srgb, var(--portal-gold) 11%, var(--portal-surface-2));
+}
+
+@media (max-width: 650px) {
+  .billing-bulk-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .billing-bulk-toolbar .select,
+  .billing-bulk-toolbar .button {
+    width: 100%;
+  }
+}

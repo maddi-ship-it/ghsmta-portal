@@ -8,6 +8,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 const BILLING_PATH = "/portal/admin/billing";
+const BULK_LIMIT = 50;
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -35,6 +36,41 @@ function validHttpsUrl(value: string) {
   } catch {
     return false;
   }
+}
+
+function selectedValues(formData: FormData, key: string) {
+  return [...new Set(formData.getAll(key).map(String).filter(Boolean))];
+}
+
+function parseDueDate(value: string, issuedAt: Date) {
+  const defaultDue = new Date(issuedAt.getTime() + 30 * 24 * 60 * 60_000);
+  const parsedDue = value ? new Date(`${value}T23:59:59`) : defaultDue;
+  if (Number.isNaN(parsedDue.getTime())) {
+    billingRedirect("error", "Enter a valid due date.");
+  }
+  return parsedDue;
+}
+
+function revalidateBilling() {
+  revalidatePath(BILLING_PATH);
+  revalidatePath("/portal/invoices");
+  revalidatePath("/portal/chat");
+}
+
+async function runInBatches<T>(
+  items: T[],
+  worker: (item: T) => Promise<void>,
+) {
+  let completed = 0;
+  let failed = 0;
+  for (let index = 0; index < items.length; index += 5) {
+    const results = await Promise.allSettled(
+      items.slice(index, index + 5).map(worker),
+    );
+    completed += results.filter((result) => result.status === "fulfilled").length;
+    failed += results.filter((result) => result.status === "rejected").length;
+  }
+  return { completed, failed };
 }
 
 export async function updateInvoiceOption(optionId: string, formData: FormData) {
@@ -106,11 +142,7 @@ export async function createAndSendInvoice(formData: FormData) {
   const scholarshipConfirmation =
     option.amount_cents === 0 && formData.get("scholarship_confirmation") === "on";
   const issuedAt = new Date();
-  const defaultDue = new Date(issuedAt.getTime() + 30 * 24 * 60 * 60_000);
-  const parsedDue = dueDate ? new Date(`${dueDate}T23:59:59`) : defaultDue;
-  if (Number.isNaN(parsedDue.getTime())) {
-    billingRedirect("error", "Enter a valid due date.");
-  }
+  const parsedDue = parseDueDate(dueDate, issuedAt);
 
   const { data: invoice, error } = await supabase
     .from("school_invoices")
@@ -156,10 +188,242 @@ export async function createAndSendInvoice(formData: FormData) {
     );
   }
 
-  revalidatePath(BILLING_PATH);
-  revalidatePath("/portal/invoices");
-  revalidatePath("/portal/chat");
+  revalidateBilling();
   billingRedirect("success", "Invoice sent by email and School Messaging.");
+}
+
+export async function bulkCreateAndSendInvoices(formData: FormData) {
+  const owner = await requireProfile(["owner"]);
+  const applicationIds = selectedValues(formData, "application_ids");
+  const optionId = text(formData, "option_id");
+  const paymentUrl = text(formData, "payment_url");
+  const dueDate = text(formData, "due_date");
+
+  if (applicationIds.length === 0 || !optionId) {
+    billingRedirect("error", "Choose a pricing option and at least one school.");
+  }
+  if (applicationIds.length > BULK_LIMIT) {
+    billingRedirect("error", `Choose no more than ${BULK_LIMIT} schools at a time.`);
+  }
+
+  const supabase = await createClient();
+  const [optionResult, applicationResult, memberResult] = await Promise.all([
+    supabase
+      .from("cycle_invoice_options")
+      .select("id,cycle_id,option_key,label,amount_cents,active")
+      .eq("id", optionId)
+      .single(),
+    supabase
+      .from("applications")
+      .select("id,cycle_id,school_name,external_applicant_email")
+      .in("id", applicationIds)
+      .eq("is_archived", false),
+    supabase
+      .from("application_members")
+      .select("application_id,member_role,profiles!application_members_user_id_fkey(email,full_name)")
+      .in("application_id", applicationIds)
+      .eq("active", true),
+  ]);
+  if (optionResult.error || !optionResult.data || !optionResult.data.active) {
+    billingRedirect("error", optionResult.error?.message ?? "Choose an active pricing option.");
+  }
+  if (applicationResult.error) billingRedirect("error", applicationResult.error.message);
+  if (memberResult.error) billingRedirect("error", memberResult.error.message);
+
+  const option = optionResult.data;
+  if (option.amount_cents > 0 && !validHttpsUrl(paymentUrl)) {
+    billingRedirect("error", "Paid invoices require a secure https payment link.");
+  }
+
+  type MemberRow = {
+    application_id: string;
+    member_role: string;
+    profiles:
+      | { email: string | null; full_name: string | null }
+      | Array<{ email: string | null; full_name: string | null }>
+      | null;
+  };
+  const contactByApplication = new Map<string, string>();
+  const memberRows = (memberResult.data ?? []) as unknown as MemberRow[];
+  memberRows
+    .sort((left, right) => Number(right.member_role === "primary") - Number(left.member_role === "primary"))
+    .forEach((member) => {
+      if (contactByApplication.has(member.application_id)) return;
+      const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+      if (profile?.email) contactByApplication.set(member.application_id, profile.email.toLowerCase());
+    });
+
+  const cycleApplications = (applicationResult.data ?? []).filter(
+    (application) => application.cycle_id === option.cycle_id,
+  );
+  const { data: existingInvoices, error: existingError } = cycleApplications.length
+    ? await supabase
+        .from("school_invoices")
+        .select("application_id")
+        .in("application_id", cycleApplications.map((application) => application.id))
+        .eq("cycle_id", option.cycle_id)
+        .eq("option_key", option.option_key)
+        .in("status", ["sent", "paid"])
+    : { data: [], error: null };
+  if (existingError) billingRedirect("error", existingError.message);
+
+  const alreadyInvoiced = new Set(
+    (existingInvoices ?? []).map((invoice) => invoice.application_id),
+  );
+  const issuedAt = new Date();
+  const parsedDue = parseDueDate(dueDate, issuedAt);
+  const scholarshipConfirmation =
+    option.amount_cents === 0 && formData.get("scholarship_confirmation") === "on";
+  const rows = cycleApplications.flatMap((application) => {
+    const recipientEmail =
+      contactByApplication.get(application.id) ??
+      application.external_applicant_email?.toLowerCase();
+    if (!recipientEmail || alreadyInvoiced.has(application.id)) return [];
+    return [{
+      invoice_number: "",
+      cycle_id: application.cycle_id,
+      application_id: application.id,
+      option_key: option.option_key,
+      description_snapshot: option.label,
+      amount_cents: option.amount_cents,
+      document_kind: scholarshipConfirmation ? "scholarship_confirmation" : "invoice",
+      payment_url: option.amount_cents > 0 ? paymentUrl : null,
+      recipient_email: recipientEmail,
+      billing_name: application.school_name,
+      billing_address: null,
+      status: "sent",
+      issued_at: issuedAt.toISOString(),
+      due_at: option.amount_cents > 0 ? parsedDue.toISOString() : null,
+      sent_at: issuedAt.toISOString(),
+      next_reminder_at:
+        option.amount_cents > 0
+          ? new Date(issuedAt.getTime() + 7 * 24 * 60 * 60_000).toISOString()
+          : null,
+      created_by: owner.id,
+    }];
+  });
+  if (rows.length === 0) {
+    billingRedirect(
+      "error",
+      "No invoices were created. Check school contacts, cycle selection, or existing open invoices.",
+    );
+  }
+
+  const { data: invoices, error: insertError } = await supabase
+    .from("school_invoices")
+    .insert(rows)
+    .select("id,document_kind");
+  if (insertError || !invoices?.length) {
+    billingRedirect("error", insertError?.message ?? "Bulk invoices could not be created.");
+  }
+
+  const delivery = await runInBatches(invoices, async (invoice) => {
+    await deliverSchoolInvoice(
+      invoice.id,
+      invoice.document_kind === "scholarship_confirmation"
+        ? "scholarship_confirmation"
+        : "invoice",
+      owner.id,
+    );
+  });
+  revalidateBilling();
+  const skipped = applicationIds.length - invoices.length;
+  if (delivery.failed > 0) {
+    billingRedirect(
+      "error",
+      `${invoices.length} invoices were created; ${delivery.completed} delivered fully and ${delivery.failed} need delivery attention. ${skipped} selections were skipped.`,
+    );
+  }
+  billingRedirect(
+    "success",
+    `${delivery.completed} invoices sent. ${skipped > 0 ? `${skipped} selections were skipped because of cycle, contact, or duplicate-invoice checks.` : ""}`.trim(),
+  );
+}
+
+export async function bulkUpdateInvoices(formData: FormData) {
+  const owner = await requireProfile(["owner"]);
+  const invoiceIds = selectedValues(formData, "invoice_ids");
+  const operation = text(formData, "operation");
+  if (invoiceIds.length === 0) billingRedirect("error", "Select at least one invoice.");
+  if (invoiceIds.length > 100) billingRedirect("error", "Update no more than 100 invoices at a time.");
+
+  const supabase = await createClient();
+  const { data: invoices, error } = await supabase
+    .from("school_invoices")
+    .select("id,status,amount_cents,document_kind,reminder_count")
+    .in("id", invoiceIds);
+  if (error) billingRedirect("error", error.message);
+
+  if (operation === "mark_paid") {
+    const eligibleIds = (invoices ?? [])
+      .filter((invoice) => invoice.status === "sent" && invoice.document_kind === "invoice")
+      .map((invoice) => invoice.id);
+    if (eligibleIds.length === 0) billingRedirect("error", "No selected open invoices can be marked paid.");
+    const { data: updated, error: updateError } = await supabase
+      .from("school_invoices")
+      .update({
+        status: "paid",
+        paid_at: new Date().toISOString(),
+        paid_by: owner.id,
+        next_reminder_at: null,
+      })
+      .in("id", eligibleIds)
+      .eq("status", "sent")
+      .select("id");
+    if (updateError) billingRedirect("error", updateError.message);
+    const delivery = await runInBatches(updated ?? [], async (invoice) => {
+      await deliverSchoolInvoice(invoice.id, "receipt", owner.id);
+    });
+    revalidateBilling();
+    if (delivery.failed > 0) {
+      billingRedirect("error", `${updated?.length ?? 0} invoices were marked paid; ${delivery.failed} receipts need delivery attention.`);
+    }
+    billingRedirect("success", `${delivery.completed} invoices marked paid and receipts sent.`);
+  }
+
+  if (operation === "remind") {
+    const eligible = (invoices ?? []).filter(
+      (invoice) => invoice.status === "sent" && invoice.amount_cents > 0,
+    );
+    if (eligible.length === 0) billingRedirect("error", "No selected invoices can receive reminders.");
+    const now = new Date();
+    const delivery = await runInBatches(eligible, async (invoice) => {
+      await deliverSchoolInvoice(invoice.id, "reminder", owner.id);
+      const { error: updateError } = await supabase
+        .from("school_invoices")
+        .update({
+          last_reminder_at: now.toISOString(),
+          next_reminder_at: new Date(now.getTime() + 7 * 24 * 60 * 60_000).toISOString(),
+          reminder_count: Number(invoice.reminder_count) + 1,
+        })
+        .eq("id", invoice.id)
+        .eq("status", "sent");
+      if (updateError) throw new Error(updateError.message);
+    });
+    revalidateBilling();
+    if (delivery.failed > 0) {
+      billingRedirect("error", `${delivery.completed} reminders sent; ${delivery.failed} need delivery attention.`);
+    }
+    billingRedirect("success", `${delivery.completed} payment reminders sent.`);
+  }
+
+  if (operation === "void") {
+    const eligibleIds = (invoices ?? [])
+      .filter((invoice) => invoice.status !== "paid" && invoice.status !== "void")
+      .map((invoice) => invoice.id);
+    if (eligibleIds.length === 0) billingRedirect("error", "No selected invoices can be voided.");
+    const { data: updated, error: updateError } = await supabase
+      .from("school_invoices")
+      .update({ status: "void", next_reminder_at: null })
+      .in("id", eligibleIds)
+      .neq("status", "paid")
+      .select("id");
+    if (updateError) billingRedirect("error", updateError.message);
+    revalidateBilling();
+    billingRedirect("success", `${updated?.length ?? 0} invoices voided.`);
+  }
+
+  billingRedirect("error", "Choose a valid bulk invoice action.");
 }
 
 export async function markInvoicePaid(invoiceId: string) {

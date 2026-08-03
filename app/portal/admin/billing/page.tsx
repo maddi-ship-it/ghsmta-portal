@@ -5,6 +5,8 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 import {
+  bulkCreateAndSendInvoices,
+  bulkUpdateInvoices,
   createAndSendInvoice,
   markInvoicePaid,
   sendInvoiceReminder,
@@ -53,8 +55,29 @@ export default async function BillingPage({
   const options = optionResult.data ?? [];
   const applications = applicationResult.data ?? [];
   const invoices = (invoiceResult.data ?? []) as SchoolInvoice[];
+  const memberResult = applications.length
+    ? await supabase
+        .from("application_members")
+        .select("application_id,member_role,profiles!application_members_user_id_fkey(email)")
+        .in("application_id", applications.map((application) => application.id))
+        .eq("active", true)
+    : { data: [], error: null };
+  if (memberResult.error) throw new Error(memberResult.error.message);
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const applicationMap = new Map(applications.map((application) => [application.id, application]));
+  type MemberRow = {
+    application_id: string;
+    member_role: string;
+    profiles: { email: string | null } | Array<{ email: string | null }> | null;
+  };
+  const contactByApplication = new Map<string, string>();
+  ((memberResult.data ?? []) as unknown as MemberRow[])
+    .sort((left, right) => Number(right.member_role === "primary") - Number(left.member_role === "primary"))
+    .forEach((member) => {
+      if (contactByApplication.has(member.application_id)) return;
+      const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+      if (profile?.email) contactByApplication.set(member.application_id, profile.email);
+    });
 
   return (
     <>
@@ -68,6 +91,72 @@ export default async function BillingPage({
 
       {params.success && <div className="notice page-message">{params.success}</div>}
       {params.error && <div className="form-error page-message">{params.error}</div>}
+
+      <section className="panel billing-bulk-send">
+        <div className="panel-header">
+          <div>
+            <h2>Bulk send invoices</h2>
+            <p>Select one cycle, configure its invoice, and send to as many as 50 school contacts at once.</p>
+          </div>
+        </div>
+        <div className="panel-body billing-bulk-cycle-list">
+          {cycles.map((cycle) => {
+            const cycleOptions = options.filter(
+              (option) => option.cycle_id === cycle.id && option.active,
+            );
+            const cycleApplications = applications.filter(
+              (application) => application.cycle_id === cycle.id,
+            );
+            return (
+              <details className="billing-bulk-cycle" key={cycle.id} open={cycles.length === 1}>
+                <summary>
+                  <span><strong>{cycle.season_year} · {cycle.name}</strong><small>{cycleApplications.length} schools available</small></span>
+                  <span aria-hidden="true">⌄</span>
+                </summary>
+                <form action={bulkCreateAndSendInvoices} className="form-stack billing-bulk-form">
+                  <div className="field-grid">
+                    <div className="field">
+                      <label htmlFor={`bulk_option_${cycle.id}`}>Track and price</label>
+                      <select className="select" defaultValue="" id={`bulk_option_${cycle.id}`} name="option_id" required>
+                        <option disabled value="">Choose an option</option>
+                        {cycleOptions.map((option) => (
+                          <option key={option.id} value={option.id}>{option.label} · {formatInvoiceAmount(option.amount_cents)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`bulk_due_${cycle.id}`}>Due date</label>
+                      <input className="input" id={`bulk_due_${cycle.id}`} name="due_date" type="date" />
+                      <small>Defaults to 30 days for paid invoices.</small>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`bulk_payment_${cycle.id}`}>Secure payment link</label>
+                    <input className="input" id={`bulk_payment_${cycle.id}`} name="payment_url" placeholder="https://…" type="url" />
+                    <small>One payment link is included on every selected paid invoice.</small>
+                  </div>
+                  <label className="check-row"><input name="scholarship_confirmation" type="checkbox" />For a $0 option, send scholarship confirmations</label>
+                  <fieldset className="billing-school-picker">
+                    <legend>Schools</legend>
+                    <div className="billing-school-grid">
+                      {cycleApplications.map((application) => {
+                        const recipientEmail = contactByApplication.get(application.id) ?? application.external_applicant_email;
+                        return (
+                          <label className={`billing-school-choice${recipientEmail ? "" : " is-disabled"}`} key={application.id}>
+                            <input disabled={!recipientEmail} name="application_ids" type="checkbox" value={application.id} />
+                            <span><strong>{application.school_name}</strong><small>{recipientEmail ?? "Missing school contact email"}</small></span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                  <button className="button button-primary" type="submit">Create and send selected invoices</button>
+                </form>
+              </details>
+            );
+          })}
+        </div>
+      </section>
 
       <div className="billing-layout">
         <section className="panel">
@@ -134,33 +223,48 @@ export default async function BillingPage({
 
       <section className="panel billing-history">
         <div className="panel-header"><div><h2>Invoice history</h2><p>Latest 100 invoices and confirmations.</p></div></div>
-        <div className="panel-body table-wrap">
+        <div className="panel-body billing-history-body">
           {invoices.length === 0 ? <p>No invoices have been created.</p> : (
-            <table className="data-table">
-              <thead><tr><th>Invoice</th><th>School</th><th>Description</th><th>Amount</th><th>Status</th><th>Sent</th><th>Actions</th></tr></thead>
-              <tbody>
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id}>
-                    <td><strong>{invoice.invoice_number}</strong><br /><small>{invoice.document_kind.replaceAll("_", " ")}</small></td>
-                    <td>{applicationMap.get(invoice.application_id)?.school_name ?? invoice.billing_name}</td>
-                    <td>{invoice.description_snapshot}</td>
-                    <td>{formatInvoiceAmount(invoice.amount_cents)}</td>
-                    <td><span className={`badge invoice-status-${invoice.status}`}>{invoice.status}</span></td>
-                    <td>{formatDate(invoice.sent_at)}</td>
-                    <td><div className="table-actions">
-                      <Link className="button button-secondary button-compact" href={`/portal/invoices/${invoice.id}/pdf`} target="_blank">PDF</Link>
-                      {invoice.status === "sent" && invoice.document_kind === "invoice" && (
-                        <form action={markInvoicePaid.bind(null, invoice.id)}><button className="button button-primary button-compact" type="submit">Mark paid</button></form>
-                      )}
-                      {invoice.status === "sent" && invoice.amount_cents > 0 && (
-                        <form action={sendInvoiceReminder.bind(null, invoice.id)}><button className="button button-secondary button-compact" type="submit">Remind</button></form>
-                      )}
-                      {invoice.status !== "paid" && invoice.status !== "void" && <form action={voidInvoice.bind(null, invoice.id)}><button className="button button-ghost button-compact" type="submit">Void</button></form>}
-                    </div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              <form action={bulkUpdateInvoices} className="billing-bulk-toolbar" id="billing-bulk-actions">
+                <strong>Update selected</strong>
+                <select aria-label="Bulk invoice action" className="select" defaultValue="" name="operation" required>
+                  <option disabled value="">Choose action</option>
+                  <option value="mark_paid">Mark paid and send receipts</option>
+                  <option value="remind">Send payment reminders</option>
+                  <option value="void">Void invoices</option>
+                </select>
+                <button className="button button-secondary" type="submit">Apply</button>
+              </form>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th><span className="sr-only">Select</span></th><th>Invoice</th><th>School</th><th>Description</th><th>Amount</th><th>Status</th><th>Sent</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {invoices.map((invoice) => (
+                      <tr key={invoice.id}>
+                        <td><input aria-label={`Select invoice ${invoice.invoice_number}`} form="billing-bulk-actions" name="invoice_ids" type="checkbox" value={invoice.id} /></td>
+                        <td><strong>{invoice.invoice_number}</strong><br /><small>{invoice.document_kind.replaceAll("_", " ")}</small></td>
+                        <td>{applicationMap.get(invoice.application_id)?.school_name ?? invoice.billing_name}</td>
+                        <td>{invoice.description_snapshot}</td>
+                        <td>{formatInvoiceAmount(invoice.amount_cents)}</td>
+                        <td><span className={`badge invoice-status-${invoice.status}`}>{invoice.status}</span></td>
+                        <td>{formatDate(invoice.sent_at)}</td>
+                        <td><div className="table-actions">
+                          <Link className="button button-secondary button-compact" href={`/portal/invoices/${invoice.id}/pdf`} target="_blank">PDF</Link>
+                          {invoice.status === "sent" && invoice.document_kind === "invoice" && (
+                            <form action={markInvoicePaid.bind(null, invoice.id)}><button className="button button-primary button-compact" type="submit">Mark paid</button></form>
+                          )}
+                          {invoice.status === "sent" && invoice.amount_cents > 0 && (
+                            <form action={sendInvoiceReminder.bind(null, invoice.id)}><button className="button button-secondary button-compact" type="submit">Remind</button></form>
+                          )}
+                          {invoice.status !== "paid" && invoice.status !== "void" && <form action={voidInvoice.bind(null, invoice.id)}><button className="button button-ghost button-compact" type="submit">Void</button></form>}
+                        </div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </section>
