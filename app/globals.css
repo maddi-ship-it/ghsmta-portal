@@ -10008,3 +10008,55 @@ html[data-theme="light"] .auth-method-tabs button:not(.active) {
     width: 100%;
   }
 }
+
+/* Resolve the shared semantic aliases used by newer portal modules. */
+.portal-shell {
+  --portal-accent: var(--portal-blue);
+  --portal-border: var(--portal-line);
+  --portal-text-muted: var(--portal-muted);
+  --portal-text-subtle: var(--portal-muted);
+  --portal-surface-soft: var(--portal-surface-3);
+}
+
+html[data-theme="dark"] .portal-shell .portal-main :where(
+  input,
+  select,
+  textarea
+) {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] .portal-shell .portal-main :where(
+  input,
+  select,
+  textarea
+) {
+  color-scheme: light;
+}
+
+.portal-shell .portal-main :where(select, .select) :where(option, optgroup) {
+  color: var(--portal-text);
+  background: var(--portal-surface);
+}
+
+/* Popovers and native controls must always resolve against the active theme. */
+.portal-shell .portal-header :is(
+  .portal-nav-menu-popover,
+  .portal-account-popover
+) {
+  color-scheme: light dark;
+}
+
+html[data-theme="dark"] .portal-shell .portal-header :is(
+  .portal-nav-menu-popover,
+  .portal-account-popover
+) {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] .portal-shell .portal-header :is(
+  .portal-nav-menu-popover,
+  .portal-account-popover
+) {
+  color-scheme: light;
+}

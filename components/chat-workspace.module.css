@@ -1600,7 +1600,9 @@
 
 .railHeader h2,
 .channelHeader h1,
+.channelHeader p strong,
 .channelTitleRow strong,
+.messageMeta strong,
 .threadTitleRow h2,
 .threadTitleRow h3,
 .newThreadHeading h3,
@@ -1769,7 +1771,16 @@
   background: var(--portal-line, rgba(183, 196, 220, 0.14));
 }
 
-.chatMessage,
+.dayDivider span,
+.messageMeta > span {
+  color: var(--portal-muted, #9ca9be);
+  background: var(--portal-surface-3, #192743);
+}
+
+.chatMessage {
+  color: var(--portal-text, #e7ecf5);
+}
+
 .chatBubble,
 .threadCard,
 .reply,
@@ -2022,4 +2033,116 @@
 .reactionPicker > div button:hover,
 .reactionPicker > div button:focus-visible {
   background: var(--portal-surface-soft, rgba(127, 140, 170, 0.12));
+}
+
+/* School conversations share one compact, collapsible home in the channel rail. */
+.schoolGroupList {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.schoolGroup {
+  overflow: hidden;
+  border: 1px solid var(--portal-line);
+  border-radius: 0.85rem;
+  background: var(--portal-surface-2);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.schoolGroupActive {
+  border-color: var(--portal-line-strong);
+  background: color-mix(
+    in srgb,
+    var(--portal-gold) 6%,
+    var(--portal-surface-2)
+  );
+}
+
+.schoolGroupToggle {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 1.55rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.72rem 0.65rem;
+  border: 0;
+  color: var(--portal-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schoolGroupToggle:hover,
+.schoolGroupToggle:focus-visible {
+  background: var(--portal-surface-hover);
+}
+
+.schoolGroupChevron {
+  display: grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  border: 1px solid var(--portal-line);
+  border-radius: 50%;
+  color: var(--portal-gold-bright);
+  background: var(--portal-surface-3);
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.schoolGroupCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.schoolGroupCopy strong,
+.schoolGroupCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schoolGroupCopy strong {
+  color: var(--portal-ivory);
+  font-size: 0.78rem;
+}
+
+.schoolGroupCopy small {
+  color: var(--portal-muted);
+  font-size: 0.65rem;
+}
+
+.schoolGroupUnread {
+  min-width: 1.45rem;
+  padding: 0.2rem 0.38rem;
+  border-radius: 999px;
+  color: #071328;
+  background: var(--portal-gold);
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.schoolGroupChannels {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0 0.3rem 0.35rem;
+  border-top: 1px solid var(--portal-line);
+}
+
+.schoolGroupChannels .channelLink {
+  min-height: 3.55rem;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  padding: 0.5rem;
+  border-radius: 0.68rem;
+}
+
+.schoolGroupChannels .channelIcon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.58rem;
+  font-size: 0.59rem;
 }

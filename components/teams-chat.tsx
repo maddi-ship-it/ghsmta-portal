@@ -112,6 +112,15 @@ type ChannelGroup = {
   unreadCount: number;
 };
 
+type SchoolConversationGroup = {
+  key: string;
+  schoolName: string;
+  productionTitle: string | null;
+  applicationArchived: boolean;
+  channels: ChatChannel[];
+  unreadCount: number;
+};
+
 type ChatAction = (
   formData: FormData,
 ) => Promise<{
@@ -654,9 +663,11 @@ function ChannelNavigation({
     );
   }
 
+  const { standardGroups, schoolGroups } = splitChannelGroups(groups);
+
   return (
     <nav className={styles.channelList} aria-label="Chat channels">
-      {groups.map((group) => (
+      {standardGroups.map((group) => (
         <section className={styles.channelGroup} key={group.key}>
           <div className={styles.channelGroupHeading}>
             <h3>{group.label}</h3>
@@ -666,64 +677,241 @@ function ChannelNavigation({
           </div>
 
           <div className={styles.channelGroupItems}>
-            {group.channels.map((channel) => {
-              const active = channel.channel_id === selectedChannelId;
-              const context =
-                channel.production_title ??
-                channel.latest_message_preview ??
-                channel.channel_description;
-
-              return (
-                <Link
-                  aria-current={active ? "page" : undefined}
-                  className={
-                    active
-                      ? `${styles.channelLink} ${styles.channelLinkActive}`
-                      : styles.channelLink
-                  }
-                  href={`/portal/chat?channel=${channel.channel_id}`}
-                  key={channel.channel_id}
-                  scroll={false}
-                >
-                  <span
-                    className={`${styles.channelIcon} ${styles[`channelIcon_${channel.channel_type}`]}`}
-                    aria-hidden="true"
-                  >
-                    {channelIcon(channel.channel_type)}
-                  </span>
-
-                  <span className={styles.channelCopy}>
-                    <span className={styles.channelTitleRow}>
-                      <strong>{channel.channel_name}</strong>
-                      <time dateTime={channel.last_activity_at}>
-                        {formatChannelActivity(channel.last_activity_at)}
-                      </time>
-                    </span>
-                    {context && (
-                      <small>
-                        {channel.latest_author_name &&
-                        channel.latest_message_preview
-                          ? `${channel.latest_author_name}: `
-                          : ""}
-                        {context}
-                      </small>
-                    )}
-                  </span>
-
-                  {channel.unread_count > 0 && (
-                    <span className={styles.unreadBadge}>
-                      {channel.unread_count > 99
-                        ? "99+"
-                        : channel.unread_count}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+            {group.channels.map((channel) => (
+              <ChannelNavigationLink
+                channel={channel}
+                key={channel.channel_id}
+                selectedChannelId={selectedChannelId}
+              />
+            ))}
           </div>
         </section>
       ))}
+
+      {schoolGroups.length > 0 && (
+        <section className={styles.channelGroup}>
+          <div className={styles.channelGroupHeading}>
+            <h3>Schools</h3>
+            {schoolGroups.some((group) => group.unreadCount > 0) && (
+              <span>
+                {formatUnreadCount(
+                  schoolGroups.reduce(
+                    (sum, group) => sum + group.unreadCount,
+                    0,
+                  ),
+                )}
+              </span>
+            )}
+          </div>
+
+          <div className={styles.schoolGroupList}>
+            {schoolGroups.map((group) => (
+              <SchoolConversationNavigation
+                group={group}
+                key={group.key}
+                selectedChannelId={selectedChannelId}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </nav>
+  );
+}
+
+function isSchoolConversation(channel: ChatChannel) {
+  return channel.channel_type === "school" || channel.channel_type === "school_dm";
+}
+
+function formatUnreadCount(count: number) {
+  return count > 99 ? "99+" : count;
+}
+
+function schoolChannelLabel(channel: ChatChannel) {
+  return channel.channel_type === "school_dm"
+    ? "School Messaging"
+    : "Panel Channel";
+}
+
+function splitChannelGroups(groups: ChannelGroup[]) {
+  const schoolMap = new Map<string, SchoolConversationGroup>();
+  const standardGroups = groups
+    .map((group) => ({
+      ...group,
+      channels: group.channels.filter((channel) => !isSchoolConversation(channel)),
+    }))
+    .filter((group) => group.channels.length > 0)
+    .map((group) => ({
+      ...group,
+      unreadCount: group.channels.reduce(
+        (sum, channel) => sum + channel.unread_count,
+        0,
+      ),
+    }));
+
+  for (const channel of groups.flatMap((group) => group.channels)) {
+    if (!isSchoolConversation(channel)) continue;
+
+    const key = channel.application_id
+      ? `application:${channel.application_id}`
+      : channel.school_name
+        ? `school:${channel.school_name.toLocaleLowerCase()}`
+        : `channel:${channel.channel_id}`;
+    const existing = schoolMap.get(key);
+
+    if (existing) {
+      existing.channels.push(channel);
+      existing.unreadCount += channel.unread_count;
+      continue;
+    }
+
+    schoolMap.set(key, {
+      key,
+      schoolName: channel.school_name ?? channel.channel_name,
+      productionTitle: channel.production_title,
+      applicationArchived: channel.application_archived,
+      channels: [channel],
+      unreadCount: channel.unread_count,
+    });
+  }
+
+  const schoolGroups = [...schoolMap.values()]
+    .map((group) => ({
+      ...group,
+      channels: group.channels.sort((left, right) => {
+        if (left.channel_type === right.channel_type) return 0;
+        return left.channel_type === "school_dm" ? -1 : 1;
+      }),
+    }))
+    .sort((left, right) =>
+      left.schoolName.localeCompare(right.schoolName, undefined, {
+        sensitivity: "base",
+      }),
+    );
+
+  return { standardGroups, schoolGroups };
+}
+
+function ChannelNavigationLink({
+  channel,
+  selectedChannelId,
+  groupedBySchool = false,
+}: {
+  channel: ChatChannel;
+  selectedChannelId: string | null;
+  groupedBySchool?: boolean;
+}) {
+  const active = channel.channel_id === selectedChannelId;
+  const context = groupedBySchool
+    ? channel.latest_message_preview ?? channel.channel_description
+    : channel.production_title ??
+      channel.latest_message_preview ??
+      channel.channel_description;
+
+  return (
+    <Link
+      aria-current={active ? "page" : undefined}
+      className={
+        active
+          ? `${styles.channelLink} ${styles.channelLinkActive}`
+          : styles.channelLink
+      }
+      href={`/portal/chat?channel=${channel.channel_id}`}
+      scroll={false}
+    >
+      <span
+        className={`${styles.channelIcon} ${styles[`channelIcon_${channel.channel_type}`]}`}
+        aria-hidden="true"
+      >
+        {channelIcon(channel.channel_type)}
+      </span>
+
+      <span className={styles.channelCopy}>
+        <span className={styles.channelTitleRow}>
+          <strong>
+            {groupedBySchool ? schoolChannelLabel(channel) : channel.channel_name}
+          </strong>
+          <time dateTime={channel.last_activity_at}>
+            {formatChannelActivity(channel.last_activity_at)}
+          </time>
+        </span>
+        {context && (
+          <small>
+            {channel.latest_author_name && channel.latest_message_preview
+              ? `${channel.latest_author_name}: `
+              : ""}
+            {context}
+          </small>
+        )}
+      </span>
+
+      {channel.unread_count > 0 && (
+        <span className={styles.unreadBadge}>
+          {formatUnreadCount(channel.unread_count)}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function SchoolConversationNavigation({
+  group,
+  selectedChannelId,
+}: {
+  group: SchoolConversationGroup;
+  selectedChannelId: string | null;
+}) {
+  const containsActiveChannel = group.channels.some(
+    (channel) => channel.channel_id === selectedChannelId,
+  );
+  const [isOpen, setIsOpen] = useState(
+    containsActiveChannel || group.unreadCount > 0,
+  );
+
+  return (
+    <section
+      className={
+        containsActiveChannel
+          ? `${styles.schoolGroup} ${styles.schoolGroupActive}`
+          : styles.schoolGroup
+      }
+    >
+      <button
+        aria-expanded={isOpen}
+        className={styles.schoolGroupToggle}
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span className={styles.schoolGroupChevron} aria-hidden="true">
+          {isOpen ? "−" : "+"}
+        </span>
+        <span className={styles.schoolGroupCopy}>
+          <strong>{group.schoolName}</strong>
+          <small>
+            {group.productionTitle ?? "School conversations"}
+            {group.applicationArchived ? " · Archived" : ""}
+          </small>
+        </span>
+        {group.unreadCount > 0 && (
+          <span className={styles.schoolGroupUnread}>
+            {formatUnreadCount(group.unreadCount)}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className={styles.schoolGroupChannels}>
+          {group.channels.map((channel) => (
+            <ChannelNavigationLink
+              channel={channel}
+              groupedBySchool
+              key={channel.channel_id}
+              selectedChannelId={selectedChannelId}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -856,6 +1044,29 @@ export function TeamsChat({
         }),
       }));
   }, [channelSearch, channels, showArchived, showUnreadOnly]);
+
+  const mobileChannelGroups = useMemo(() => {
+    const { standardGroups, schoolGroups } = splitChannelGroups(groups);
+
+    return [
+      ...standardGroups.map((group) => ({
+        key: group.key,
+        label: group.label,
+        channels: group.channels.map((channel) => ({
+          ...channel,
+          navigationLabel: channel.channel_name,
+        })),
+      })),
+      ...schoolGroups.map((group) => ({
+        key: group.key,
+        label: `${group.schoolName}${group.applicationArchived ? " — Archived" : ""}`,
+        channels: group.channels.map((channel) => ({
+          ...channel,
+          navigationLabel: schoolChannelLabel(channel),
+        })),
+      })),
+    ];
+  }, [groups]);
 
   const messages = useMemo<FlatMessage[]>(() => {
     return threads
@@ -1407,11 +1618,11 @@ export function TeamsChat({
               }
               value={activeChannel.channel_id}
             >
-              {groups.map((group) => (
+              {mobileChannelGroups.map((group) => (
                 <optgroup key={group.key} label={group.label}>
                   {group.channels.map((channel) => (
                     <option value={channel.channel_id} key={channel.channel_id}>
-                      {channel.channel_name}
+                      {channel.navigationLabel}
                       {channel.unread_count > 0
                         ? ` (${channel.unread_count} unread)`
                         : ""}
