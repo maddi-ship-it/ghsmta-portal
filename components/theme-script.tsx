@@ -1,7 +1,14 @@
 const THEME_SCRIPT = `
   try {
-    var savedTheme = window.localStorage.getItem("ghsmta-theme");
-    var theme = savedTheme === "light" ? "light" : "dark";
+    var savedTheme = window.localStorage.getItem("ghsmta-theme-preference");
+    var legacyTheme = window.localStorage.getItem("ghsmta-theme");
+    var preference = ["system", "light", "dark"].includes(savedTheme)
+      ? savedTheme
+      : (legacyTheme === "light" || legacyTheme === "dark" ? legacyTheme : "system");
+    var theme = preference === "system"
+      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : preference;
+    document.documentElement.dataset.themePreference = preference;
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     var themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -12,8 +19,12 @@ const THEME_SCRIPT = `
       );
     }
   } catch (error) {
-    document.documentElement.dataset.theme = "dark";
-    document.documentElement.style.colorScheme = "dark";
+    document.documentElement.dataset.themePreference = "system";
+    var fallbackTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+    document.documentElement.dataset.theme = fallbackTheme;
+    document.documentElement.style.colorScheme = fallbackTheme;
   }
 `;
 

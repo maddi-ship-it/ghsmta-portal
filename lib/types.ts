@@ -69,6 +69,7 @@ export type Profile = {
   active: boolean;
   force_password_reset?: boolean;
   password_reset_requested_at?: string | null;
+  theme_preference?: "system" | "light" | "dark";
 };
 
 export type AwardCycle = {

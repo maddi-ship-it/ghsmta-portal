@@ -21,6 +21,7 @@ const PROFILE_COLUMNS = [
   "active",
   "force_password_reset",
   "password_reset_requested_at",
+  "theme_preference",
 ].join(",");
 
 export async function requireProfile(

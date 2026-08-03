@@ -55,6 +55,24 @@ Import the repository and add these environment variables:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SITE_URL`
 
+For the complete production release, also configure these server-only values:
+
+- `SUPABASE_SERVICE_ROLE_KEY` — cron delivery, receipts, and school chat notices
+- `CRON_SECRET` — protects the hourly notification/reminder route
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME` and `SMTP_REPLY_TO` (optional)
+- `OPENAI_API_KEY` — voice dictation and handwritten-note scanning
+- `OPENAI_TRANSCRIBE_MODEL` (optional; defaults to `gpt-4o-mini-transcribe`)
+- `OPENAI_HANDWRITING_MODEL` (optional; defaults to `gpt-5.6-sol`)
+
+Before deploying the release:
+
+1. Apply all migrations through `supabase/migrations/20260802231950_production_release_billing_chat_schedule_theme.sql`.
+2. In Supabase Storage settings, set the project-wide maximum file size to at least 200 MB. The migration sets the private `reference-documents` bucket to 200 MB and the private `chat-files` bucket to 25 MB, but bucket limits cannot exceed the project-wide limit.
+3. Keep both Storage buckets private and verify their RLS policies after migration.
+4. Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS production URL so invoice, receipt, and payment emails contain production links.
+5. Run `npm run lint` and `npm run build` before promoting the deployment.
+
 ## Mobile direction
 
 The web interface already uses safe-area insets, touch-sized controls, responsive tables, and phone/iPad breakpoints. Keep Supabase as the shared backend. When native packaging begins, either:

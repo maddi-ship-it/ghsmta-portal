@@ -3,6 +3,7 @@ import "./globals.css";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeScript } from "@/components/theme-script";
+import { WritingAssist } from "@/components/writing-assist";
 export const metadata: Metadata = {
   title: {
     default: "Georgia High School Musical Theatre Awards",
@@ -27,7 +28,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body><ThemeScript />{children}<SpeedInsights /></body>
+      <body><ThemeScript />{children}<WritingAssist /><SpeedInsights /></body>
     </html>
   );
 }

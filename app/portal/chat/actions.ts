@@ -9,6 +9,8 @@ type ChatActionResult = {
   ok: boolean;
   error?: string;
   count?: number;
+  messageId?: string;
+  messageKind?: "post" | "reply";
 };
 
 type ChannelMode = {
@@ -84,19 +86,23 @@ export async function createChatPost(
     };
   }
 
-  const { error } = await supabase.from("chat_posts").insert({
-    channel_id: channelId,
-    author_id: profile.id,
-    subject,
-    body,
-  });
+  const { data: post, error } = await supabase
+    .from("chat_posts")
+    .insert({
+      channel_id: channelId,
+      author_id: profile.id,
+      subject,
+      body,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return { ok: false, error: error.message };
   }
 
   revalidatePath("/portal/chat");
-  return { ok: true };
+  return { ok: true, messageId: post.id, messageKind: "post" };
 }
 
 export async function createChatReply(
@@ -135,19 +141,23 @@ export async function createChatReply(
     };
   }
 
-  const { error } = await supabase.from("chat_replies").insert({
-    channel_id: channelId,
-    post_id: postId,
-    author_id: profile.id,
-    body,
-  });
+  const { data: reply, error } = await supabase
+    .from("chat_replies")
+    .insert({
+      channel_id: channelId,
+      post_id: postId,
+      author_id: profile.id,
+      body,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return { ok: false, error: error.message };
   }
 
   revalidatePath("/portal/chat");
-  return { ok: true };
+  return { ok: true, messageId: reply.id, messageKind: "reply" };
 }
 
 export async function createChatMessage(
@@ -185,19 +195,23 @@ export async function createChatMessage(
     };
   }
 
-  const { error } = await supabase.from("chat_posts").insert({
-    channel_id: channelId,
-    author_id: profile.id,
-    subject: "Message",
-    body,
-  });
+  const { data: post, error } = await supabase
+    .from("chat_posts")
+    .insert({
+      channel_id: channelId,
+      author_id: profile.id,
+      subject: "Message",
+      body,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return { ok: false, error: error.message };
   }
 
   revalidatePath("/portal/chat");
-  return { ok: true };
+  return { ok: true, messageId: post.id, messageKind: "post" };
 }
 
 export async function moderateChatPost(

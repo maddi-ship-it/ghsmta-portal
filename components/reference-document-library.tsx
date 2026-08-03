@@ -27,6 +27,7 @@ type Folder = {
 };
 
 const BUCKET = "reference-documents";
+const MAX_FILE_SIZE = 200 * 1024 * 1024;
 
 function safeFileName(value: string) {
   return value
@@ -164,8 +165,8 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) {
-      setError("Files must be 50 MB or smaller.");
+    if (file.size > MAX_FILE_SIZE) {
+      setError("Files must be 200 MB or smaller.");
       return;
     }
 
@@ -258,7 +259,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
               <div className="field reference-file-field">
                 <label htmlFor="reference_file">File</label>
                 <input className="input" id="reference_file" name="file" required type="file" />
-                <small>Maximum file size: 50 MB.</small>
+                <small>Maximum file size: 200 MB. Large uploads may take several minutes.</small>
               </div>
 
               <div className="field reference-description-field">

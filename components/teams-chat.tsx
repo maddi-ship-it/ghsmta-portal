@@ -114,7 +114,130 @@ type ChannelGroup = {
 
 type ChatAction = (
   formData: FormData,
-) => Promise<{ ok: boolean; error?: string }>;
+) => Promise<{
+  ok: boolean;
+  error?: string;
+  messageId?: string;
+  messageKind?: "post" | "reply";
+}>;
+
+type ChatReaction = {
+  id: string;
+  channel_id: string;
+  message_kind: "post" | "reply";
+  message_id: string;
+  user_id: string;
+  emoji: string;
+};
+
+type ChatAttachment = {
+  id: string;
+  channel_id: string;
+  message_kind: "post" | "reply";
+  message_id: string;
+  original_name: string;
+  storage_path: string;
+  mime_type: string | null;
+  file_size: number;
+  signed_url?: string;
+};
+
+const QUICK_REACTIONS = ["👍", "❤️", "🎉", "✅", "👀", "👏"];
+const MORE_REACTIONS = ["😂", "😮", "😢", "🙏", "💡", "⭐", "🚀", "🙌", "💯", "🤔", "🔥", "🎭"];
+const MAX_CHAT_FILE_BYTES = 25 * 1024 * 1024;
+
+function safeFileName(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(-150) || "attachment";
+}
+
+function formatFileSize(value: number) {
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function ChatFilePicker() {
+  return (
+    <label className={styles.filePicker}>
+      <span aria-hidden="true">＋</span>
+      <span>Attach files</span>
+      <input
+        accept="image/*,audio/*,video/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        multiple
+        name="attachments"
+        type="file"
+      />
+      <small>Up to 25 MB each</small>
+    </label>
+  );
+}
+
+function AttachmentList({
+  attachments,
+}: {
+  attachments: ChatAttachment[];
+}) {
+  if (attachments.length === 0) return null;
+  return (
+    <div className={styles.attachmentList}>
+      {attachments.map((attachment) => (
+        <a
+          href={attachment.signed_url ?? "#"}
+          key={attachment.id}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <span aria-hidden="true">▱</span>
+          <span><strong>{attachment.original_name}</strong><small>{formatFileSize(attachment.file_size)}</small></span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function ReactionBar({
+  reactions,
+  currentUserId,
+  onToggle,
+}: {
+  reactions: ChatReaction[];
+  currentUserId: string;
+  onToggle: (emoji: string) => void;
+}) {
+  const grouped = new Map<string, ChatReaction[]>();
+  for (const reaction of reactions) {
+    const existing = grouped.get(reaction.emoji) ?? [];
+    existing.push(reaction);
+    grouped.set(reaction.emoji, existing);
+  }
+  return (
+    <div className={styles.reactionBar}>
+      {[...grouped.entries()].map(([emoji, entries]) => (
+        <button
+          aria-label={`${emoji}, ${entries.length} reaction${entries.length === 1 ? "" : "s"}`}
+          aria-pressed={entries.some((entry) => entry.user_id === currentUserId)}
+          key={emoji}
+          onClick={() => onToggle(emoji)}
+          type="button"
+        >
+          {emoji} <span>{entries.length}</span>
+        </button>
+      ))}
+      <details className={styles.reactionPicker}>
+        <summary aria-label="Add a reaction">☺</summary>
+        <div>
+          {[...QUICK_REACTIONS, ...MORE_REACTIONS].map((emoji) => (
+            <button key={emoji} onClick={() => onToggle(emoji)} type="button">{emoji}</button>
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
 
 const GROUP_FALLBACKS: Record<
   ChannelType,
@@ -622,6 +745,8 @@ export function TeamsChat({
   const [channels, setChannels] = useState(initialChannels);
   const [threads, setThreads] = useState(initialThreads);
   const [members, setMembers] = useState(initialMembers);
+  const [reactions, setReactions] = useState<ChatReaction[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [channelSearch, setChannelSearch] = useState("");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [showArchived, setShowArchived] = useState(() =>
@@ -792,6 +917,43 @@ export function TeamsChat({
     }
   }, [supabase]);
 
+  const loadEnhancements = useCallback(async () => {
+    if (!selectedChannelId) {
+      setReactions([]);
+      setAttachments([]);
+      return;
+    }
+    const [reactionResult, attachmentResult] = await Promise.all([
+      supabase
+        .from("chat_reactions")
+        .select("id,channel_id,message_kind,message_id,user_id,emoji")
+        .eq("channel_id", selectedChannelId),
+      supabase
+        .from("chat_attachments")
+        .select("id,channel_id,message_kind,message_id,original_name,storage_path,mime_type,file_size")
+        .eq("channel_id", selectedChannelId)
+        .order("created_at"),
+    ]);
+    if (reactionResult.error) {
+      setStatus(reactionResult.error.message);
+      return;
+    }
+    if (attachmentResult.error) {
+      setStatus(attachmentResult.error.message);
+      return;
+    }
+    setReactions((reactionResult.data ?? []) as ChatReaction[]);
+    const withUrls = await Promise.all(
+      ((attachmentResult.data ?? []) as ChatAttachment[]).map(async (attachment) => {
+        const { data } = await supabase.storage
+          .from("chat-files")
+          .createSignedUrl(attachment.storage_path, 60 * 60);
+        return { ...attachment, signed_url: data?.signedUrl };
+      }),
+    );
+    setAttachments(withUrls);
+  }, [selectedChannelId, supabase]);
+
   const loadChannel = useCallback(async () => {
     if (!selectedChannelId) {
       return;
@@ -818,13 +980,19 @@ export function TeamsChat({
 
     setThreads((threadResult.data ?? []) as ChatThread[]);
     setMembers((memberResult.data ?? []) as ChatMember[]);
+    await loadEnhancements();
 
     await supabase.rpc("mark_chat_channel_read", {
       p_channel_id: selectedChannelId,
     });
 
     await reloadChannels();
-  }, [reloadChannels, selectedChannelId, supabase]);
+  }, [loadEnhancements, reloadChannels, selectedChannelId, supabase]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => void loadEnhancements(), 0);
+    return () => window.clearTimeout(timeout);
+  }, [loadEnhancements]);
 
   useEffect(() => {
     const subscription = supabase
@@ -859,12 +1027,28 @@ export function TeamsChat({
           }
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_reactions" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { channel_id?: string } | undefined;
+          if (row?.channel_id === selectedChannelId) void loadEnhancements();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_attachments" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { channel_id?: string } | undefined;
+          if (row?.channel_id === selectedChannelId) void loadEnhancements();
+        },
+      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(subscription);
     };
-  }, [loadChannel, profile.id, reloadChannels, selectedChannelId, supabase]);
+  }, [loadChannel, loadEnhancements, profile.id, reloadChannels, selectedChannelId, supabase]);
 
   useEffect(() => {
     if (!isThreaded) {
@@ -872,12 +1056,85 @@ export function TeamsChat({
     }
   }, [isThreaded, messages.length]);
 
+  const uploadAttachments = async (
+    files: File[],
+    messageId: string,
+    messageKind: "post" | "reply",
+    channelId: string,
+  ) => {
+    for (const file of files) {
+      const storagePath = `${profile.id}/${channelId}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
+      const uploadResult = await supabase.storage
+        .from("chat-files")
+        .upload(storagePath, file, {
+          cacheControl: "3600",
+          contentType: file.type || "application/octet-stream",
+          upsert: false,
+        });
+      if (uploadResult.error) throw new Error(uploadResult.error.message);
+
+      const metadataResult = await supabase.from("chat_attachments").insert({
+        channel_id: channelId,
+        message_kind: messageKind,
+        message_id: messageId,
+        original_name: file.name,
+        storage_path: storagePath,
+        mime_type: file.type || null,
+        file_size: file.size,
+        uploaded_by: profile.id,
+      });
+      if (metadataResult.error) {
+        await supabase.storage.from("chat-files").remove([storagePath]);
+        throw new Error(metadataResult.error.message);
+      }
+    }
+  };
+
+  const toggleReaction = async (
+    messageId: string,
+    messageKind: "post" | "reply",
+    emoji: string,
+  ) => {
+    if (!selectedChannelId) return;
+    const existing = reactions.find(
+      (reaction) =>
+        reaction.message_id === messageId &&
+        reaction.message_kind === messageKind &&
+        reaction.emoji === emoji &&
+        reaction.user_id === profile.id,
+    );
+    const result = existing
+      ? await supabase.from("chat_reactions").delete().eq("id", existing.id)
+      : await supabase.from("chat_reactions").insert({
+          channel_id: selectedChannelId,
+          message_kind: messageKind,
+          message_id: messageId,
+          emoji,
+          user_id: profile.id,
+        });
+    if (result.error) setStatus(result.error.message);
+    await loadEnhancements();
+  };
+
   const runFormAction = (
     form: HTMLFormElement,
     action: ChatAction,
     successMessage: string,
   ) => {
     const formData = new FormData(form);
+    const files = formData
+      .getAll("attachments")
+      .filter((value): value is File => value instanceof File && value.size > 0);
+    if (files.some((file) => file.size > MAX_CHAT_FILE_BYTES)) {
+      setStatus("Each chat attachment must be 25 MB or smaller.");
+      return;
+    }
+    if (files.length > 10) {
+      setStatus("Attach no more than 10 files to one message.");
+      return;
+    }
+    formData.delete("attachments");
+    const channelId = String(formData.get("channel_id") ?? selectedChannelId ?? "");
     setStatus(null);
 
     startTransition(async () => {
@@ -888,8 +1145,24 @@ export function TeamsChat({
         return;
       }
 
+      if (files.length > 0 && result.messageId && result.messageKind) {
+        try {
+          await uploadAttachments(
+            files,
+            result.messageId,
+            result.messageKind,
+            channelId,
+          );
+        } catch (uploadError) {
+          setStatus(
+            `Message sent, but a file could not be attached: ${uploadError instanceof Error ? uploadError.message : "upload failed"}`,
+          );
+          await loadChannel();
+          return;
+        }
+      }
       form.reset();
-      setStatus(successMessage);
+      setStatus(files.length > 0 ? `${successMessage} Files attached.` : successMessage);
       await loadChannel();
     });
   };
@@ -1159,6 +1432,11 @@ export function TeamsChat({
         {isThreaded ? (
           <div className={styles.threadWorkspace}>
             <form className={styles.newThread} onSubmit={submitPost}>
+              <input
+                name="channel_id"
+                type="hidden"
+                value={activeChannel.channel_id}
+              />
               <div className={styles.newThreadHeading}>
                 <span className={styles.avatar}>
                   {initials(profile.full_name ?? profile.email ?? "User")}
@@ -1193,7 +1471,7 @@ export function TeamsChat({
               </div>
 
               <div className={styles.composerFooter}>
-                <span>Visible to school applicants and GHSMTA Owners.</span>
+                <div><ChatFilePicker /><span>Visible to school applicants and GHSMTA Owners.</span></div>
                 <button
                   className="button button-dark"
                   disabled={isPending}
@@ -1248,6 +1526,20 @@ export function TeamsChat({
                             members={members}
                           />
                         </p>
+                        <AttachmentList
+                          attachments={attachments.filter(
+                            (attachment) => attachment.message_kind === "post" && attachment.message_id === thread.post_id,
+                          )}
+                        />
+                        {!thread.post_deleted_at && (
+                          <ReactionBar
+                            currentUserId={profile.id}
+                            onToggle={(emoji) => void toggleReaction(thread.post_id, "post", emoji)}
+                            reactions={reactions.filter(
+                              (reaction) => reaction.message_kind === "post" && reaction.message_id === thread.post_id,
+                            )}
+                          />
+                        )}
 
                         {profile.role === "owner" && (
                           <div className={styles.ownerControls}>
@@ -1317,6 +1609,20 @@ export function TeamsChat({
                                 members={members}
                               />
                             </p>
+                            <AttachmentList
+                              attachments={attachments.filter(
+                                (attachment) => attachment.message_kind === "reply" && attachment.message_id === reply.id,
+                              )}
+                            />
+                            {!reply.deleted_at && (
+                              <ReactionBar
+                                currentUserId={profile.id}
+                                onToggle={(emoji) => void toggleReaction(reply.id, "reply", emoji)}
+                                reactions={reactions.filter(
+                                  (reaction) => reaction.message_kind === "reply" && reaction.message_id === reply.id,
+                                )}
+                              />
+                            )}
                             {profile.role === "owner" && !reply.deleted_at && (
                               <button
                                 className={`${styles.messageDeleteButton} danger-text`}
@@ -1365,6 +1671,7 @@ export function TeamsChat({
                             rows={2}
                             submitOnEnter
                           />
+                          <ChatFilePicker />
                           <button
                             className="button button-secondary button-compact"
                             disabled={isPending}
@@ -1436,6 +1743,20 @@ export function TeamsChat({
                               members={members}
                             />
                           </div>
+                          <AttachmentList
+                            attachments={attachments.filter(
+                              (attachment) => attachment.message_kind === message.message_kind && attachment.message_id === message.id,
+                            )}
+                          />
+                          {!message.deleted_at && (
+                            <ReactionBar
+                              currentUserId={profile.id}
+                              onToggle={(emoji) => void toggleReaction(message.id, message.message_kind, emoji)}
+                              reactions={reactions.filter(
+                                (reaction) => reaction.message_kind === message.message_kind && reaction.message_id === message.id,
+                              )}
+                            />
+                          )}
                           <div className={styles.messageFooter}>
                             <time dateTime={message.created_at}>
                               {formatTime(message.created_at)}
@@ -1483,7 +1804,7 @@ export function TeamsChat({
                 submitOnEnter
               />
               <div className={styles.composerFooter}>
-                <span>{activeChannel.visibility_label}</span>
+                <div><ChatFilePicker /><span>{activeChannel.visibility_label}</span></div>
                 <button
                   className="button button-dark"
                   disabled={isPending}

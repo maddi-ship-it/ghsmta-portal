@@ -94,6 +94,7 @@ type StaffEnrollment = {
   full_name: string | null;
   email: string | null;
   role: AppRole;
+  participation_mode: "panel" | "understudy" | "shadow";
   joined_at: string;
 };
 
@@ -197,6 +198,14 @@ function personName(person: StaffEnrollment) {
 
 function staffRoleLabel(role: AppRole) {
   return role === "advisory_member" ? "Advisory" : roleLabel(role);
+}
+
+function participationModeLabel(mode: StaffEnrollment["participation_mode"]) {
+  return mode === "panel"
+    ? "Panel"
+    : mode === "understudy"
+      ? "Understudy"
+      : "Shadow";
 }
 
 function formatAccessDateTime(value: string) {
@@ -460,7 +469,7 @@ export default async function SchedulePage({
         case 'waitlisted':
           return slotWaitlistCount(slot) > 0;
         case 'understaffed':
-          return participants.length < 3;
+          return participants.filter((participant) => participant.participation_mode === "panel").length < 3;
         case 'mine':
           return Boolean(availabilityItem?.is_mine) ||
             participants.some((participant) => participant.user_id === profile.id);
@@ -492,8 +501,8 @@ export default async function SchedulePage({
 
       if (selectedSort === 'staff_desc') {
         const result =
-          (staffBySlot.get(right.id)?.length ?? 0) -
-          (staffBySlot.get(left.id)?.length ?? 0);
+          (staffBySlot.get(right.id)?.filter((participant) => participant.participation_mode === "panel").length ?? 0) -
+          (staffBySlot.get(left.id)?.filter((participant) => participant.participation_mode === "panel").length ?? 0);
         if (result !== 0) return result;
       }
 
@@ -913,6 +922,9 @@ export default async function SchedulePage({
               const booking = bookingMap.get(slot.id);
               const visitDetails = schoolDetailsMap.get(slot.id) ?? null;
               const participants = staffBySlot.get(slot.id) ?? [];
+              const panelists = participants.filter(
+                (participant) => participant.participation_mode === "panel",
+              );
               const currentEnrollment = participants.find(
                 (participant) => participant.user_id === profile.id,
               );
@@ -981,8 +993,8 @@ export default async function SchedulePage({
                         <small>{cycle ? `${cycle.season_year} · ${cycle.name}` : "Program"}</small>
                       </span>
                       <span className="schedule-list-metric">
-                        <strong>{participants.length}</strong>
-                        <small>reviewers</small>
+                        <strong>{panelists.length}</strong>
+                        <small>panel</small>
                       </span>
                       <span className="schedule-list-metric">
                         <strong>{waitlistCount}</strong>
@@ -1108,7 +1120,7 @@ export default async function SchedulePage({
                               <span className="eyebrow">Review team</span>
                               <h3>Adjudicators &amp; advisory members</h3>
                             </div>
-                            <span className="badge">{participants.length}</span>
+                            <span className="badge">{panelists.length} panel · {participants.length} total</span>
                           </div>
 
                           {participants.length === 0 ? (
@@ -1122,17 +1134,26 @@ export default async function SchedulePage({
                                   </span>
                                   <span>
                                     <strong>{personName(participant)}</strong>
-                                    <small>{staffRoleLabel(participant.role)}</small>
+                                    <small>{staffRoleLabel(participant.role)} · {participationModeLabel(participant.participation_mode)}</small>
                                   </span>
                                   {(profile.role === "owner" || profile.role === "advisory_member") && (
-                                    <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
-                                      {profile.role === "advisory_member" && (
-                                        <input className="input input-compact" name="reason" placeholder="Removal reason" required />
-                                      )}
-                                      <button className="text-button danger-text" type="submit">
-                                        Remove
-                                      </button>
-                                    </form>
+                                    <div className="schedule-participant-actions">
+                                      <form action={ownerAddStaff.bind(null, slot.id)} className="schedule-participant-mode-form">
+                                        <input name="user_id" type="hidden" value={participant.user_id} />
+                                        <select aria-label={`Participation mode for ${personName(participant)}`} className="select input-compact" defaultValue={participant.participation_mode} name="participation_mode">
+                                          <option value="panel">Panel</option>
+                                          <option value="understudy">Understudy</option>
+                                          <option value="shadow">Shadow</option>
+                                        </select>
+                                        <button className="text-button" type="submit">Update</button>
+                                      </form>
+                                      <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
+                                        {profile.role === "advisory_member" && (
+                                          <input className="input input-compact" name="reason" placeholder="Removal reason" required />
+                                        )}
+                                        <button className="text-button danger-text" type="submit">Remove</button>
+                                      </form>
+                                    </div>
                                   )}
                                 </div>
                               ))}
@@ -1146,13 +1167,19 @@ export default async function SchedulePage({
                             {currentEnrollment ? (
                               <>
                                 <button className="button button-secondary" disabled type="button">
-                                  Joined as {staffRoleLabel(currentEnrollment.role)}
+                                  Joined as {participationModeLabel(currentEnrollment.participation_mode)}
                                 </button>
-                                <small>Only an owner can remove you from this slot.</small>
+                                <small>An Owner or Advisory member can change or remove this assignment.</small>
                               </>
                             ) : (
-                              <form action={joinScheduleSlot}>
+                              <form action={joinScheduleSlot} className="schedule-join-form">
                                 <input name="slot_id" type="hidden" value={slot.id} />
+                                <label className="sr-only" htmlFor={`join_mode_${slot.id}`}>Participation type</label>
+                                <select className="select" defaultValue="panel" id={`join_mode_${slot.id}`} name="participation_mode">
+                                  <option value="panel">Panel — score the assigned school</option>
+                                  <option value="understudy">Understudy — available to be promoted</option>
+                                  <option value="shadow">Shadow — observe without scoring</option>
+                                </select>
                                 <button
                                   className="button button-dark"
                                   disabled={!canSelfJoin}
@@ -1184,6 +1211,7 @@ export default async function SchedulePage({
                                       ))}
                                   </select>
                                 </div>
+                                <div className="field"><label htmlFor={`advisory_mode_${slot.id}`}>Participation type</label><select className="select" defaultValue="panel" id={`advisory_mode_${slot.id}`} name="participation_mode"><option value="panel">Panel</option><option value="understudy">Understudy</option><option value="shadow">Shadow</option></select></div>
                                 <button className="button button-secondary button-compact" type="submit">Add reviewer</button>
                               </form>
                             </div>
@@ -1363,6 +1391,7 @@ export default async function SchedulePage({
                                       ))}
                                     </select>
                                   </div>
+                                  <div className="field"><label htmlFor={`owner_mode_${slot.id}`}>Participation type</label><select className="select" defaultValue="panel" id={`owner_mode_${slot.id}`} name="participation_mode"><option value="panel">Panel</option><option value="understudy">Understudy</option><option value="shadow">Shadow</option></select></div>
                                   <button className="button button-secondary button-compact" type="submit">
                                     Add reviewer
                                   </button>

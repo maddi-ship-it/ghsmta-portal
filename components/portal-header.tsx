@@ -79,6 +79,12 @@ function buildNavigation(
 
     resources.push(
       {
+        href: "/portal/invoices",
+        label: "Invoices & payments",
+        shortLabel: "Invoices",
+        icon: "$",
+      },
+      {
         href: "/portal/school-team",
         label: "School team",
         shortLabel: "Team",
@@ -119,6 +125,12 @@ function buildNavigation(
 
   if (profile.role === "owner") {
     management.push(
+      {
+        href: "/portal/admin/billing",
+        label: "Billing & invoices",
+        shortLabel: "Billing",
+        icon: "$",
+      },
       {
         href: "/portal/admin/setup",
         label: "Program setup",

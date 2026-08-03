@@ -721,6 +721,7 @@ export async function joinScheduleSlot(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("join_schedule_slot", {
     p_slot_id: slotId,
+    p_participation_mode: text(formData, "participation_mode") || "panel",
   });
 
   if (error) scheduleRedirect("error", error.message);
@@ -728,7 +729,7 @@ export async function joinScheduleSlot(formData: FormData) {
   revalidateSchedule();
   scheduleRedirect(
     "success",
-    "You joined the slot. Only an owner can remove you.",
+    "Your schedule participation was saved. An Owner or Advisory member can change it.",
   );
 }
 
@@ -780,6 +781,7 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
     p_user_id: userId,
     p_action: "add",
     p_reason: text(formData, "reason") || null,
+    p_participation_mode: text(formData, "participation_mode") || "panel",
   });
 
   if (error) scheduleRedirect("error", error.message);
@@ -825,6 +827,7 @@ export async function removeScheduleStaff(
     p_user_id: enrollment.user_id,
     p_action: "remove",
     p_reason: text(formData, "reason") || null,
+    p_participation_mode: "panel",
   });
 
   if (error) scheduleRedirect("error", error.message);

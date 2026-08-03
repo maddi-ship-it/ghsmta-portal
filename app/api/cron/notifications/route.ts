@@ -1,4 +1,5 @@
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import { deliverSchoolInvoice } from "@/lib/billing/delivery";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -39,6 +40,45 @@ function formatSlotTime(start: string, end: string) {
 }
 
 const sendEmail = sendSmtpEmail;
+
+async function processInvoiceReminders() {
+  const supabase = createAdminClient();
+  const now = new Date();
+  const { data: invoices, error } = await supabase
+    .from("school_invoices")
+    .select("id,reminder_count")
+    .eq("status", "sent")
+    .gt("amount_cents", 0)
+    .not("next_reminder_at", "is", null)
+    .lte("next_reminder_at", now.toISOString())
+    .limit(100);
+  if (error) throw new Error(error.message);
+
+  let sent = 0;
+  const failures: string[] = [];
+  for (const invoice of invoices ?? []) {
+    try {
+      await deliverSchoolInvoice(invoice.id, "reminder");
+      await supabase
+        .from("school_invoices")
+        .update({
+          last_reminder_at: now.toISOString(),
+          next_reminder_at: new Date(
+            now.getTime() + 7 * 24 * 60 * 60_000,
+          ).toISOString(),
+          reminder_count: Number(invoice.reminder_count) + 1,
+        })
+        .eq("id", invoice.id)
+        .eq("status", "sent");
+      sent += 1;
+    } catch (invoiceError) {
+      failures.push(
+        `${invoice.id}: ${invoiceError instanceof Error ? invoiceError.message : "delivery failed"}`,
+      );
+    }
+  }
+  return { sent, failures };
+}
 
 function localParts(date: Date, timeZone: string) {
   return Object.fromEntries(
@@ -260,11 +300,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [notifications, digests] = await Promise.all([
+    const [notifications, digests, invoiceReminders] = await Promise.all([
       processScheduleNotifications(),
       processOwnerDigests(),
+      processInvoiceReminders(),
     ]);
-    return Response.json({ ok: true, notifications, digests });
+    return Response.json({
+      ok: true,
+      notifications,
+      digests,
+      invoiceReminders,
+    });
   } catch (error) {
     console.error("GHSMTA cron failed", error);
     return Response.json(
