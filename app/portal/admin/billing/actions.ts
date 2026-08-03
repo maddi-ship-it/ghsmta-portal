@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { deliverSchoolInvoice } from "@/lib/billing/delivery";
+import { defaultInvoiceMessageTemplates } from "@/lib/billing/delivery-copy";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -40,6 +41,27 @@ function validHttpsUrl(value: string) {
 
 function selectedValues(formData: FormData, key: string) {
   return [...new Set(formData.getAll(key).map(String).filter(Boolean))];
+}
+
+function invoiceMessageTemplates(
+  formData: FormData,
+  documentKind: "invoice" | "scholarship_confirmation",
+) {
+  const defaults = defaultInvoiceMessageTemplates(documentKind);
+  const subject = text(formData, "message_subject") || defaults.subject;
+  const message = text(formData, "message_body") || defaults.message;
+
+  if (subject.length < 3 || subject.length > 200 || /[\r\n]/.test(subject)) {
+    billingRedirect(
+      "error",
+      "The email subject must be 3–200 characters and remain on one line.",
+    );
+  }
+  if (message.length < 3 || message.length > 5_000) {
+    billingRedirect("error", "The send message must be 3–5,000 characters.");
+  }
+
+  return { subject, message };
 }
 
 function parseDueDate(value: string, issuedAt: Date) {
@@ -156,6 +178,10 @@ export async function createAndSendInvoice(formData: FormData) {
 
   const scholarshipConfirmation =
     option.amount_cents === 0 && formData.get("scholarship_confirmation") === "on";
+  const documentKind = scholarshipConfirmation
+    ? "scholarship_confirmation"
+    : "invoice";
+  const messageTemplates = invoiceMessageTemplates(formData, documentKind);
   const issuedAt = new Date();
   const parsedDue = parseDueDate(dueDate, issuedAt);
 
@@ -168,11 +194,13 @@ export async function createAndSendInvoice(formData: FormData) {
       option_key: option.option_key,
       description_snapshot: option.label,
       amount_cents: option.amount_cents,
-      document_kind: scholarshipConfirmation ? "scholarship_confirmation" : "invoice",
+      document_kind: documentKind,
       payment_url: option.amount_cents > 0 ? paymentUrl : null,
       recipient_email: recipientEmail,
       billing_name: billingName,
       billing_address: billingAddress || null,
+      message_subject_snapshot: messageTemplates.subject,
+      message_body_snapshot: messageTemplates.message,
       status: "sent",
       delivery_status: "pending",
       issued_at: issuedAt.toISOString(),
@@ -289,6 +317,10 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
   const parsedDue = parseDueDate(dueDate, issuedAt);
   const scholarshipConfirmation =
     option.amount_cents === 0 && formData.get("scholarship_confirmation") === "on";
+  const documentKind = scholarshipConfirmation
+    ? "scholarship_confirmation"
+    : "invoice";
+  const messageTemplates = invoiceMessageTemplates(formData, documentKind);
   const rows = cycleApplications.flatMap((application) => {
     const recipientEmail =
       contactByApplication.get(application.id) ??
@@ -301,11 +333,13 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
       option_key: option.option_key,
       description_snapshot: option.label,
       amount_cents: option.amount_cents,
-      document_kind: scholarshipConfirmation ? "scholarship_confirmation" : "invoice",
+      document_kind: documentKind,
       payment_url: option.amount_cents > 0 ? paymentUrl : null,
       recipient_email: recipientEmail,
       billing_name: application.school_name,
       billing_address: null,
+      message_subject_snapshot: messageTemplates.subject,
+      message_body_snapshot: messageTemplates.message,
       status: "sent",
       delivery_status: "pending",
       issued_at: issuedAt.toISOString(),

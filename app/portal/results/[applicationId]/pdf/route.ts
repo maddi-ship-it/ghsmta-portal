@@ -28,7 +28,7 @@ export async function GET(
     params: Promise<{ applicationId: string }>;
   },
 ) {
-  await requireProfile(["applicant"]);
+  await requireProfile(["applicant", "program_manager"]);
   const { applicationId } = await context.params;
   const supabase = await createClient();
 

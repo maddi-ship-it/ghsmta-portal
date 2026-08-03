@@ -35,6 +35,7 @@ import type { AppRole, Profile } from "@/lib/types";
 export type ChannelType =
   | "school"
   | "school_dm"
+  | "scholarship_dm"
   | "applicant_community"
   | "general"
   | "networking"
@@ -259,6 +260,11 @@ const GROUP_FALLBACKS: Record<
   { key: string; label: string; order: number }
 > = {
   applicant_community: { key: "community", label: "Community", order: 10 },
+  scholarship_dm: {
+    key: "scholarship_applicants",
+    label: "Scholarship Applicants",
+    order: 15,
+  },
   general: { key: "staff", label: ADJUDICATOR_CHANNELS_LABEL, order: 20 },
   networking: { key: "staff", label: ADJUDICATOR_CHANNELS_LABEL, order: 20 },
   advisory_committee: {
@@ -286,6 +292,8 @@ function roleName(role: AppRole) {
       return "Adjudicator";
     case "advisory_member":
       return "Advisory Committee";
+    case "program_manager":
+      return "Program Manager";
     case "owner":
       return "Owner";
   }
@@ -297,6 +305,8 @@ function channelIcon(type: ChannelType) {
       return "ST";
     case "school_dm":
       return "DM";
+    case "scholarship_dm":
+      return "SA";
     case "applicant_community":
       return "CO";
     case "general":

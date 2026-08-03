@@ -2,6 +2,7 @@ export type AppRole =
   | "applicant"
   | "adjudicator"
   | "advisory_member"
+  | "program_manager"
   | "owner";
 
 export type ApplicationStatus =

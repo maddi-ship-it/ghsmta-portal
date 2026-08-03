@@ -45,7 +45,12 @@ export async function updateUserAccess(userId: string, formData: FormData) {
     phone_e164: phone,
     phone_verified_at: phoneChanged ? null : undefined,
     phone_required_at: phoneChanged && phone ? new Date().toISOString() : undefined,
-    mfa_required: role === "owner" || role === "advisory_member" ? true : mfaRequired,
+    mfa_required:
+      role === "owner" ||
+      role === "advisory_member" ||
+      role === "program_manager"
+        ? true
+        : mfaRequired,
   }).eq("id", userId);
   if (error) throw new Error(error.message);
   revalidateUsers();
@@ -60,7 +65,14 @@ export async function bulkUpdateUsers(formData: FormData) {
 
   const updates: Record<string, unknown> = {};
   if (operation === "role") {
-    updates.role = String(formData.get("bulk_role") ?? "applicant") as AppRole;
+    const role = String(formData.get("bulk_role") ?? "applicant") as AppRole;
+    updates.role = role;
+    if (["advisory_member", "program_manager", "owner"].includes(role)) {
+      updates.mfa_required = true;
+      updates.mfa_grace_until = new Date(
+        Date.now() + 14 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+    }
   } else if (operation === "activate") {
     updates.active = true;
   } else if (operation === "deactivate") {

@@ -19,7 +19,7 @@ function formatReleaseDate(value: string) {
 }
 
 export default async function ReleasedResultsPage() {
-  await requireProfile(["applicant"]);
+  const profile = await requireProfile(["applicant", "program_manager"]);
   const supabase = await createClient();
 
   const { data: applicationData, error: applicationError } = await supabase
@@ -76,14 +76,17 @@ export default async function ReleasedResultsPage() {
           <div className="empty-state">
             <h3>No results have been released yet.</h3>
             <p>
-              Your application and adjudication work remain private while the
-              panel completes its review.
+              {profile.role === "program_manager"
+                ? "Scores and comments remain private until they are formally released to the school."
+                : "Your application and adjudication work remain private while the panel completes its review."}
             </p>
             <Link
               className="button button-secondary"
               href="/portal/admin/applications"
             >
-              Return to my application
+              {profile.role === "program_manager"
+                ? "Return to applications"
+                : "Return to my application"}
             </Link>
           </div>
         </section>

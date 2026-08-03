@@ -98,21 +98,29 @@ function buildNavigation(
       },
     );
   } else {
-    primary.push(
-      {
-        href: "/portal/admin/applications",
-        label: "Applications",
-        icon: "▤",
-      },
-      {
+    primary.push({
+      href: "/portal/admin/applications",
+      label: "Applications",
+      icon: "▤",
+    });
+
+    if (profile.role === "program_manager") {
+      resources.push({
+        href: "/portal/results",
+        label: "Released results",
+        shortLabel: "Results",
+        icon: "★",
+      });
+    } else {
+      primary.push({
         href: "/portal/adjudication",
         label:
           profile.role === "adjudicator"
             ? "Assignments"
             : "Adjudication",
         icon: "✓",
-      },
-    );
+      });
+    }
   }
 
   if (profile.role === "advisory_member") {

@@ -11,6 +11,7 @@ export function RegalConfirmDialog({
   destructive = false,
   pending = false,
   confirmDisabled = false,
+  wide = false,
   children,
   onConfirm,
   onCancel,
@@ -23,6 +24,7 @@ export function RegalConfirmDialog({
   destructive?: boolean;
   pending?: boolean;
   confirmDisabled?: boolean;
+  wide?: boolean;
   children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
@@ -83,7 +85,10 @@ export function RegalConfirmDialog({
       }}
       role="dialog"
     >
-      <section className="regal-dialog-card" ref={cardRef}>
+      <section
+        className={`regal-dialog-card${wide ? " regal-dialog-card-wide" : ""}`}
+        ref={cardRef}
+      >
         <div className="regal-dialog-mark" aria-hidden="true">
           {destructive ? "!" : "✓"}
         </div>
@@ -100,7 +105,7 @@ export function RegalConfirmDialog({
         <div className="regal-dialog-actions">
           <button
             className="button button-secondary"
-            disabled={pending || confirmDisabled}
+            disabled={pending}
             onClick={onCancel}
             ref={cancelButtonRef}
             type="button"
@@ -114,7 +119,7 @@ export function RegalConfirmDialog({
                 ? "button button-danger"
                 : "button button-gold"
             }
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             onClick={onConfirm}
             type="button"
           >

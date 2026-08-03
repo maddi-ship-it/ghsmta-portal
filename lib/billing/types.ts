@@ -18,6 +18,8 @@ export type SchoolInvoice = {
   recipient_email: string;
   billing_name: string;
   billing_address: string | null;
+  message_subject_snapshot: string | null;
+  message_body_snapshot: string | null;
   status: "draft" | "sent" | "paid" | "void";
   issued_at: string | null;
   due_at: string | null;

@@ -18,6 +18,7 @@ type ChannelMode = {
   channel_type:
     | "school"
     | "school_dm"
+    | "scholarship_dm"
     | "applicant_community"
     | "general"
     | "networking"

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { GlobalFeedbackDialog } from "@/components/global-feedback-dialog";
 import { PortalHeader } from "@/components/portal-header";
+import { PortalScrollManager } from "@/components/portal-scroll-manager";
 import { ThemeProfileSync } from "@/components/theme-profile-sync";
 import { requireProfile } from "@/lib/auth";
 
@@ -16,6 +17,7 @@ export default async function PortalLayout({ children }: { children: React.React
   return (
     <div className="portal-shell">
       <ThemeProfileSync preference={profile.theme_preference ?? "system"} />
+      <PortalScrollManager />
       <PortalHeader profile={profile} />
       {showMfaGrace && graceDeadline && (
         <div className="security-grace-banner">

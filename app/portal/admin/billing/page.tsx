@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
+import { InvoicePreviewSubmitButton } from "@/components/invoice-preview-submit-button";
+import { activeInvoiceApplicationIds } from "@/lib/billing/eligibility";
 import { formatInvoiceAmount, type SchoolInvoice } from "@/lib/billing/types";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +34,14 @@ export default async function BillingPage({
   await requireProfile(["owner"]);
   const params = await searchParams;
   const supabase = await createClient();
-  const [cycleResult, optionResult, applicationResult, invoiceResult, deliveryResult] = await Promise.all([
+  const [
+    cycleResult,
+    optionResult,
+    applicationResult,
+    invoiceResult,
+    activeInvoiceResult,
+    deliveryResult,
+  ] = await Promise.all([
     supabase
       .from("award_cycles")
       .select("id,name,season_year,status")
@@ -53,18 +62,34 @@ export default async function BillingPage({
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
+      .from("school_invoices")
+      .select("application_id,status"),
+    supabase
       .from("invoice_delivery_log")
       .select("invoice_id,email_status,chat_status,detail,created_at")
       .order("created_at", { ascending: false })
       .limit(300),
   ]);
-  for (const result of [cycleResult, optionResult, applicationResult, invoiceResult, deliveryResult]) {
+  for (const result of [
+    cycleResult,
+    optionResult,
+    applicationResult,
+    invoiceResult,
+    activeInvoiceResult,
+    deliveryResult,
+  ]) {
     if (result.error) throw new Error(result.error.message);
   }
   const cycles = cycleResult.data ?? [];
   const options = optionResult.data ?? [];
   const applications = applicationResult.data ?? [];
   const invoices = (invoiceResult.data ?? []) as SchoolInvoice[];
+  const invoicedApplicationIds = activeInvoiceApplicationIds(
+    (activeInvoiceResult.data ?? []) as Array<{
+      application_id: string;
+      status: "draft" | "sent" | "paid" | "void";
+    }>,
+  );
   const latestDeliveryByInvoice = new Map<
     string,
     { email_status: string | null; chat_status: string | null; detail: string | null; created_at: string }
@@ -123,13 +148,26 @@ export default async function BillingPage({
             const cycleOptions = options.filter(
               (option) => option.cycle_id === cycle.id && option.active,
             );
-            const cycleApplications = applications.filter(
+            const allCycleApplications = applications.filter(
               (application) => application.cycle_id === cycle.id,
             );
+            const cycleApplications = allCycleApplications.filter(
+              (application) => !invoicedApplicationIds.has(application.id),
+            );
+            const alreadyInvoicedCount =
+              allCycleApplications.length - cycleApplications.length;
             return (
               <details className="billing-bulk-cycle" key={cycle.id} open={cycles.length === 1}>
                 <summary>
-                  <span><strong>{cycle.season_year} · {cycle.name}</strong><small>{cycleApplications.length} schools available</small></span>
+                  <span>
+                    <strong>{cycle.season_year} · {cycle.name}</strong>
+                    <small>
+                      {cycleApplications.length} ready to invoice
+                      {alreadyInvoicedCount > 0
+                        ? ` · ${alreadyInvoicedCount} already sent or paid`
+                        : ""}
+                    </small>
+                  </span>
                   <span aria-hidden="true">⌄</span>
                 </summary>
                 <form action={bulkCreateAndSendInvoices} className="form-stack billing-bulk-form">
@@ -139,7 +177,14 @@ export default async function BillingPage({
                       <select className="select" defaultValue="" id={`bulk_option_${cycle.id}`} name="option_id" required>
                         <option disabled value="">Choose an option</option>
                         {cycleOptions.map((option) => (
-                          <option key={option.id} value={option.id}>{option.label} · {formatInvoiceAmount(option.amount_cents)}</option>
+                          <option
+                            data-amount-cents={option.amount_cents}
+                            data-label={option.label}
+                            key={option.id}
+                            value={option.id}
+                          >
+                            {option.label} · {formatInvoiceAmount(option.amount_cents)}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -158,23 +203,29 @@ export default async function BillingPage({
                   <fieldset className="billing-school-picker">
                     <legend>Schools</legend>
                     <div className="billing-school-grid">
-                      {cycleApplications.map((application) => {
+                      {cycleApplications.length === 0 ? (
+                        <div className="empty-state billing-school-empty">
+                          <h3>Every school has an active invoice</h3>
+                          <p>Void an invoice to return that school to this list.</p>
+                        </div>
+                      ) : cycleApplications.map((application) => {
                         const recipientEmail = contactByApplication.get(application.id) ?? application.external_applicant_email;
                         return (
                           <label className={`billing-school-choice${recipientEmail ? "" : " is-disabled"}`} key={application.id}>
-                            <input disabled={!recipientEmail} name="application_ids" type="checkbox" value={application.id} />
+                            <input
+                              data-school-name={application.school_name}
+                              disabled={!recipientEmail}
+                              name="application_ids"
+                              type="checkbox"
+                              value={application.id}
+                            />
                             <span><strong>{application.school_name}</strong><small>{recipientEmail ?? "Missing school contact email"}</small></span>
                           </label>
                         );
                       })}
                     </div>
                   </fieldset>
-                  <ConfirmedSubmitButton
-                    className="button button-primary"
-                    description="This creates invoices and sends email and School Messaging notifications to every selected school."
-                    label="Create and send selected invoices"
-                    title="Send these invoices?"
-                  />
+                  <InvoicePreviewSubmitButton bulk />
                 </form>
               </details>
             );
@@ -192,7 +243,11 @@ export default async function BillingPage({
                 <select className="select" id="billing_application" name="application_id" required defaultValue="">
                   <option disabled value="">Choose a school</option>
                   {applications.map((application) => (
-                    <option key={application.id} value={application.id}>
+                    <option
+                      data-school-name={application.school_name}
+                      key={application.id}
+                      value={application.id}
+                    >
                       {application.school_name} — {cycleMap.get(application.cycle_id)?.season_year ?? "Cycle"}
                     </option>
                   ))}
@@ -203,7 +258,12 @@ export default async function BillingPage({
                 <select className="select" id="billing_option" name="option_id" required defaultValue="">
                   <option disabled value="">Choose an option</option>
                   {options.filter((option) => option.active).map((option) => (
-                    <option key={option.id} value={option.id}>
+                    <option
+                      data-amount-cents={option.amount_cents}
+                      data-label={option.label}
+                      key={option.id}
+                      value={option.id}
+                    >
                       {cycleMap.get(option.cycle_id)?.season_year ?? "Cycle"} · {option.label} · {formatInvoiceAmount(option.amount_cents)}
                     </option>
                   ))}
@@ -220,7 +280,7 @@ export default async function BillingPage({
                 <div className="field"><label htmlFor="due_date">Due date</label><input className="input" id="due_date" name="due_date" type="date" /><small>Defaults to 30 days.</small></div>
               </div>
               <label className="check-row"><input name="scholarship_confirmation" type="checkbox" />For a $0 option, send a scholarship confirmation instead of a standard invoice</label>
-              <button className="button button-primary" type="submit">Create and send</button>
+              <InvoicePreviewSubmitButton />
             </form>
           </div>
         </section>

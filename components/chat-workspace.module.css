@@ -177,6 +177,11 @@
   background: #d4af37;
 }
 
+.channelIcon_scholarship_dm {
+  color: #071328;
+  background: #9bd7c8;
+}
+
 .channelIcon_school {
   background: #243fbd;
 }
@@ -1140,6 +1145,11 @@
   background: #d5b14f;
 }
 
+.channelIcon_scholarship_dm {
+  color: #080b13;
+  background: #7bc7b5;
+}
+
 .channelIcon_school {
   background: #3158c2;
 }
@@ -1693,6 +1703,11 @@
 .channelIcon_advisory_committee {
   color: #071328;
   background: var(--portal-gold, #d5b14f);
+}
+
+.channelIcon_scholarship_dm {
+  color: #071328;
+  background: #8bd4c3;
 }
 
 .emptyPanel,

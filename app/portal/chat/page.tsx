@@ -33,6 +33,12 @@ function fallbackChannelGroup(
   switch (channelType) {
     case "applicant_community":
       return { key: "community", label: "Community", order: 10 };
+    case "scholarship_dm":
+      return {
+        key: "scholarship_applicants",
+        label: "Scholarship Applicants",
+        order: 15,
+      };
     case "general":
     case "networking":
       return {
@@ -57,6 +63,8 @@ function fallbackVisibilityLabel(channelType: ChatChannel["channel_type"]) {
   switch (channelType) {
     case "applicant_community":
       return "Applicants + Owners";
+    case "scholarship_dm":
+      return "Applicant + Program Managers + Owners";
     case "general":
     case "networking":
       return "Adjudicators + Advisory + Owners";
@@ -190,8 +198,8 @@ export default async function ChatPage({
           <span className="eyebrow">Communication</span>
           <h1>GHSMTA Chat</h1>
           <p>
-            School community discussions, private School Messaging, and
-            assigned panel channels in one workspace.
+            General Announcements and the private conversations available to
+            your portal role in one workspace.
           </p>
         </div>
       </div>

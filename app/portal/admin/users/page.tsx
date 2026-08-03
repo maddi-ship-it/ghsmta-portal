@@ -60,7 +60,13 @@ export default async function UsersPage({
       return direction === "desc" ? -result : result;
     });
 
-  const roles: AppRole[] = ["applicant", "adjudicator", "advisory_member", "owner"];
+  const roles: AppRole[] = [
+    "applicant",
+    "adjudicator",
+    "advisory_member",
+    "program_manager",
+    "owner",
+  ];
 
   return (
     <>
@@ -84,7 +90,7 @@ export default async function UsersPage({
       <form action={bulkUpdateUsers} className="panel user-bulk-toolbar" id="bulk-users-form">
         <div><strong>{profiles.length} users shown</strong><small>Select users in the table, then apply one action.</small></div>
         <select className="select" name="bulk_operation" required><option value="">Bulk action</option><option value="role">Change role</option><option value="activate">Activate</option><option value="deactivate">Deactivate</option></select>
-        <select className="select" name="bulk_role"><option value="applicant">Applicant</option><option value="adjudicator">Adjudicator</option><option value="advisory_member">Advisory Committee</option><option value="owner">Owner</option></select>
+        <select className="select" name="bulk_role"><option value="applicant">Applicant</option><option value="adjudicator">Adjudicator</option><option value="advisory_member">Advisory Committee</option><option value="program_manager">Program Manager</option><option value="owner">Owner</option></select>
         <button className="button button-dark button-compact" type="submit">Apply to selected</button>
       </form>
 

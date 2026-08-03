@@ -6,8 +6,8 @@ import { createInvoicePdf } from "@/lib/reports/invoice-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { INVOICE_SCHOOL_CHAT_CHANNEL_TYPE } from "./delivery-routing";
+import { resolveInvoiceDeliveryCopy } from "./delivery-copy";
 import {
-  formatInvoiceAmount,
   type InvoiceDeliveryType,
   type SchoolInvoice,
 } from "./types";
@@ -27,40 +27,6 @@ function siteUrl() {
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : "http://localhost:3000")
   ).replace(/\/$/, "");
-}
-
-function deliveryCopy(
-  invoice: SchoolInvoice,
-  schoolName: string,
-  deliveryType: InvoiceDeliveryType,
-) {
-  const amount = formatInvoiceAmount(invoice.amount_cents);
-  if (deliveryType === "receipt") {
-    return {
-      subject: `Payment receipt — ${invoice.invoice_number}`,
-      title: "Payment received",
-      body: `Thank you. ${schoolName}'s ${amount} payment for ${invoice.description_snapshot} has been marked paid.`,
-    };
-  }
-  if (deliveryType === "reminder") {
-    return {
-      subject: `Payment reminder — ${invoice.invoice_number}`,
-      title: "Payment reminder",
-      body: `${schoolName}'s ${amount} invoice for ${invoice.description_snapshot} remains open.`,
-    };
-  }
-  if (deliveryType === "scholarship_confirmation") {
-    return {
-      subject: `Scholarship confirmation — ${invoice.invoice_number}`,
-      title: "Scholarship confirmed",
-      body: `${schoolName}'s full scholarship for ${invoice.description_snapshot} is confirmed. No payment is due.`,
-    };
-  }
-  return {
-    subject: `GHSMTA invoice ${invoice.invoice_number}`,
-    title: "New invoice",
-    body: `${schoolName} has a new ${amount} invoice for ${invoice.description_snapshot}.`,
-  };
 }
 
 export async function deliverSchoolInvoice(
@@ -112,7 +78,11 @@ export async function deliverSchoolInvoice(
     ]);
 
   const schoolName = application?.school_name ?? invoice.billing_name;
-  const copy = deliveryCopy(invoice as SchoolInvoice, schoolName, deliveryType);
+  const copy = resolveInvoiceDeliveryCopy(
+    invoice as SchoolInvoice,
+    schoolName,
+    deliveryType,
+  );
   const invoiceUrl = `${siteUrl()}/portal/invoices/${invoice.id}/pdf`;
   const paymentUrl = invoice.payment_url as string | null;
   const actionUrl =
@@ -166,7 +136,7 @@ export async function deliverSchoolInvoice(
       to: [invoice.recipient_email],
       subject: copy.subject,
       text: `${copy.body}${textAction}\n\nA PDF copy is attached. School team members can also view it in the GHSMTA Portal.`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><h2>${escapeHtml(copy.title)}</h2><p>${escapeHtml(copy.body)}</p>${emailAction}<p>A PDF copy is attached. School team members can also view it in the GHSMTA Portal.</p></div>`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><h2>${escapeHtml(copy.title)}</h2><p>${escapeHtml(copy.body).replaceAll("\n", "<br />")}</p>${emailAction}<p>A PDF copy is attached. School team members can also view it in the GHSMTA Portal.</p></div>`,
       attachments: [
         {
           filename: `${invoice.invoice_number}-${attachmentLabel}.pdf`,

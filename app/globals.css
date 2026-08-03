@@ -16,7 +16,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: auto; }
 body {
   margin: 0;
   color: var(--ink);
@@ -7277,6 +7277,16 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   box-shadow: 0 32px 100px rgba(0, 0, 0, 0.56);
 }
 
+.regal-dialog-card-wide {
+  width: min(100%, 1120px);
+  max-height: calc(100svh - 48px);
+}
+
+.regal-dialog-card-wide .regal-dialog-copy {
+  min-width: 0;
+  overflow: auto;
+}
+
 .regal-dialog-mark {
   display: grid;
   width: 50px;
@@ -9944,6 +9954,77 @@ html[data-theme="light"] .auth-method-tabs button:not(.active) {
   opacity: 0.62;
 }
 
+.billing-school-empty {
+  grid-column: 1 / -1;
+  min-height: 9rem;
+}
+
+.invoice-preview-trigger-error {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.invoice-send-review {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.invoice-preview-pane,
+.invoice-message-editor {
+  min-width: 0;
+}
+
+.invoice-preview-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.invoice-preview-pane iframe,
+.invoice-preview-state {
+  width: 100%;
+  height: min(58svh, 600px);
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 0.8rem;
+  background: #ffffff;
+}
+
+.invoice-preview-state {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  color: var(--portal-muted, var(--app-muted));
+}
+
+.invoice-message-editor {
+  align-content: start;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.invoice-zero-message-note {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+}
+
+.invoice-email-preview {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.9rem;
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 0.8rem;
+  background: var(--portal-surface-2, var(--app-surface-2));
+}
+
+.invoice-email-preview :where(p, small) {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .billing-bulk-toolbar {
   align-items: center;
   display: flex;
@@ -10006,6 +10087,15 @@ html[data-theme="light"] .auth-method-tabs button:not(.active) {
   .billing-bulk-toolbar .select,
   .billing-bulk-toolbar .button {
     width: 100%;
+  }
+
+  .invoice-send-review {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-preview-pane iframe,
+  .invoice-preview-state {
+    height: 40svh;
   }
 }
 
