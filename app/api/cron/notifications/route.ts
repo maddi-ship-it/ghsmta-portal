@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { deliverSchoolInvoice } from "@/lib/billing/delivery";
+import { logEvent } from "@/lib/observability";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -44,14 +47,11 @@ const sendEmail = sendSmtpEmail;
 async function processInvoiceReminders() {
   const supabase = createAdminClient();
   const now = new Date();
-  const { data: invoices, error } = await supabase
-    .from("school_invoices")
-    .select("id,reminder_count")
-    .eq("status", "sent")
-    .gt("amount_cents", 0)
-    .not("next_reminder_at", "is", null)
-    .lte("next_reminder_at", now.toISOString())
-    .limit(100);
+  const claimToken = randomUUID();
+  const { data: invoices, error } = await supabase.rpc(
+    "claim_due_invoice_reminders",
+    { p_claim_token: claimToken, p_limit: 100 },
+  );
   if (error) throw new Error(error.message);
 
   let sent = 0;
@@ -59,7 +59,7 @@ async function processInvoiceReminders() {
   for (const invoice of invoices ?? []) {
     try {
       await deliverSchoolInvoice(invoice.id, "reminder");
-      await supabase
+      const { data: completedInvoice, error: completionError } = await supabase
         .from("school_invoices")
         .update({
           last_reminder_at: now.toISOString(),
@@ -67,13 +67,35 @@ async function processInvoiceReminders() {
             now.getTime() + 7 * 24 * 60 * 60_000,
           ).toISOString(),
           reminder_count: Number(invoice.reminder_count) + 1,
+          reminder_claimed_at: null,
+          reminder_claim_token: null,
         })
         .eq("id", invoice.id)
-        .eq("status", "sent");
+        .eq("status", "sent")
+        .eq("reminder_claim_token", claimToken)
+        .select("id")
+        .maybeSingle();
+      if (completionError || !completedInvoice) {
+        throw new Error(
+          completionError?.message ?? "The reminder claim could not be completed.",
+        );
+      }
       sent += 1;
     } catch (invoiceError) {
+      const { error: releaseError } = await supabase
+        .from("school_invoices")
+        .update({
+          reminder_claimed_at: null,
+          reminder_claim_token: null,
+          next_reminder_at: new Date(now.getTime() + 15 * 60_000).toISOString(),
+        })
+        .eq("id", invoice.id)
+        .eq("reminder_claim_token", claimToken);
+      const releaseDetail = releaseError
+        ? `; claim release failed: ${releaseError.message}`
+        : "";
       failures.push(
-        `${invoice.id}: ${invoiceError instanceof Error ? invoiceError.message : "delivery failed"}`,
+        `${invoice.id}: ${invoiceError instanceof Error ? invoiceError.message : "delivery failed"}${releaseDetail}`,
       );
     }
   }
@@ -305,16 +327,42 @@ export async function GET(request: Request) {
       processOwnerDigests(),
       processInvoiceReminders(),
     ]);
-    return Response.json({
+    const result = {
       ok: true,
       notifications,
       digests,
       invoiceReminders,
-    });
+    };
+    logEvent("info", "cron.notifications.completed", result);
+    return Response.json(result);
   } catch (error) {
-    console.error("GHSMTA cron failed", error);
+    const message = error instanceof Error ? error.message : "Cron failed";
+    logEvent("error", "cron.notifications.failed", { message });
+    try {
+      const supabase = createAdminClient();
+      const { data: owners } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("role", "owner")
+        .eq("active", true);
+      if (owners?.length) {
+        await supabase.from("user_notifications").insert(
+          owners.map((owner) => ({
+            user_id: owner.id,
+            notification_type: "system_alert",
+            title: "Scheduled notification run needs attention",
+            body: message.slice(0, 500),
+            href: "/portal/admin/workflows",
+          })),
+        );
+      }
+    } catch (notificationError) {
+      logEvent("error", "cron.notifications.owner_alert_failed", {
+        message: notificationError instanceof Error ? notificationError.message : "Owner alert failed",
+      });
+    }
     return Response.json(
-      { error: error instanceof Error ? error.message : "Cron failed" },
+      { error: message },
       { status: 500 },
     );
   }

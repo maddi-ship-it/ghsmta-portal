@@ -3,7 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+import { isAllowedPortalFile, PORTAL_FILE_ACCEPT } from "@/lib/file-upload-policy";
 import type { AppRole } from "@/lib/types";
+import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 
 type ReferenceDocument = {
   id: string;
@@ -75,6 +77,8 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
   );
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ReferenceDocument | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -169,6 +173,10 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
       setError("Files must be 200 MB or smaller.");
       return;
     }
+    if (!isAllowedPortalFile(file)) {
+      setError("Choose a supported document, image, audio, video, or ZIP file.");
+      return;
+    }
 
     setUploading(true);
 
@@ -216,32 +224,36 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
   }
 
   async function deleteDocument(document: ReferenceDocument) {
-    if (!window.confirm(`Delete ${document.file_name}? This cannot be undone.`)) return;
-
     setError(null);
     setMessage(null);
+    setDeleting(true);
 
-    const { error: storageError } = await supabase.storage
-      .from(BUCKET)
-      .remove([document.storage_path]);
+    try {
+      const { error: storageError } = await supabase.storage
+        .from(BUCKET)
+        .remove([document.storage_path]);
 
-    if (storageError) {
-      setError(storageError.message);
-      return;
+      if (storageError) {
+        setError(storageError.message);
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from("reference_documents")
+        .delete()
+        .eq("id", document.id);
+
+      if (deleteError) {
+        setError(deleteError.message);
+        return;
+      }
+
+      setPendingDelete(null);
+      setMessage("Reference document deleted.");
+      await loadDocuments();
+    } finally {
+      setDeleting(false);
     }
-
-    const { error: deleteError } = await supabase
-      .from("reference_documents")
-      .delete()
-      .eq("id", document.id);
-
-    if (deleteError) {
-      setError(deleteError.message);
-      return;
-    }
-
-    setMessage("Reference document deleted.");
-    await loadDocuments();
   }
 
   return (
@@ -258,7 +270,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
             <form className="reference-upload-form" onSubmit={uploadDocument}>
               <div className="field reference-file-field">
                 <label htmlFor="reference_file">File</label>
-                <input className="input" id="reference_file" name="file" required type="file" />
+                <input accept={PORTAL_FILE_ACCEPT} className="input" id="reference_file" name="file" required type="file" />
                 <small>Maximum file size: 200 MB. Large uploads may take several minutes.</small>
               </div>
 
@@ -344,7 +356,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
                       <button className="button button-secondary button-compact" disabled type="button">Unavailable</button>
                     )}
                     {role === "owner" && (
-                      <button className="text-button danger-text" onClick={() => void deleteDocument(document)} type="button">
+                      <button className="text-button danger-text" onClick={() => setPendingDelete(document)} type="button">
                         Delete
                       </button>
                     )}
@@ -355,6 +367,18 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
           )}
         </div>
       </section>
+      <RegalConfirmDialog
+        confirmLabel="Delete document"
+        description={pendingDelete ? `${pendingDelete.file_name} will be permanently removed from every audience folder.` : "The document will be permanently removed."}
+        destructive
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) void deleteDocument(pendingDelete);
+        }}
+        open={Boolean(pendingDelete)}
+        pending={deleting}
+        title="Delete this reference document?"
+      />
     </div>
   );
 }

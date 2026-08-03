@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { extractOpenAIText } from "@/lib/adjudication";
+import { consumeApiQuota } from "@/lib/api-quota";
 import { requireProfile } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,6 +86,22 @@ async function requestPhoneticSuggestion(
 
 export async function POST(request: Request) {
   await requireProfile(["applicant"]);
+
+  const supabase = await createClient();
+  try {
+    if (!(await consumeApiQuota(supabase, "pronunciation_phonetic", 20))) {
+      return NextResponse.json(
+        { error: "Pronunciation analysis limit reached. Try again in about an hour." },
+        { status: 429, headers: { "Retry-After": "3600" } },
+      );
+    }
+  } catch (error) {
+    console.error("Pronunciation quota check failed", error);
+    return NextResponse.json(
+      { error: "Automatic phonetic spelling is temporarily unavailable." },
+      { status: 503 },
+    );
+  }
 
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {

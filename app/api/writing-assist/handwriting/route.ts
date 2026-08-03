@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { extractOpenAIText } from "@/lib/adjudication";
+import { consumeApiQuota } from "@/lib/api-quota";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -22,6 +23,18 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+
+  try {
+    if (!(await consumeApiQuota(supabase, "writing_handwriting", 10))) {
+      return NextResponse.json(
+        { error: "Handwritten-note scan limit reached. Try again in about an hour." },
+        { status: 429, headers: { "Retry-After": "3600" } },
+      );
+    }
+  } catch (error) {
+    console.error("Handwriting quota check failed", error);
+    return NextResponse.json({ error: "Handwritten-note scanning is temporarily unavailable." }, { status: 503 });
+  }
 
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) return NextResponse.json({ error: "Handwritten-note scanning is not configured." }, { status: 503 });

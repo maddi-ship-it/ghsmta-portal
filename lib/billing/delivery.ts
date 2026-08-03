@@ -1,4 +1,8 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import { createInvoicePdf } from "@/lib/reports/invoice-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import {
@@ -73,12 +77,22 @@ export async function deliverSchoolInvoice(
     throw new Error(invoiceError?.message ?? "Invoice not found.");
   }
 
-  const [{ data: application }, { data: members }, { data: owner }] =
+  const [
+    { data: application },
+    { data: cycle },
+    { data: members },
+    { data: owner },
+  ] =
     await Promise.all([
       supabase
         .from("applications")
         .select("school_name,production_title")
         .eq("id", invoice.application_id)
+        .single(),
+      supabase
+        .from("award_cycles")
+        .select("name,season_year")
+        .eq("id", invoice.cycle_id)
         .single(),
       supabase
         .from("application_members")
@@ -109,19 +123,70 @@ export async function deliverSchoolInvoice(
         ? "Pay securely"
         : "View confirmation";
 
-  const emailResult = await sendSmtpEmail({
-    to: [invoice.recipient_email],
-    subject: copy.subject,
-    text: `${copy.body}\n\n${actionLabel}: ${actionUrl}\nInvoice PDF: ${invoiceUrl}`,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><h2>${escapeHtml(copy.title)}</h2><p>${escapeHtml(copy.body)}</p><p><a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:12px 18px;background:#153f8f;color:#fff;text-decoration:none;border-radius:8px">${escapeHtml(actionLabel)}</a></p><p><a href="${escapeHtml(invoiceUrl)}">View or download the invoice PDF</a></p></div>`,
-  });
+  let emailResult: Awaited<ReturnType<typeof sendSmtpEmail>>;
+  try {
+    if (!application || !cycle) {
+      throw new Error("Invoice PDF context is incomplete.");
+    }
+
+    let logoBytes: Uint8Array | undefined;
+    try {
+      logoBytes = await readFile(
+        join(process.cwd(), "public", "artsbridge-foundation-logo.png"),
+      );
+    } catch {
+      logoBytes = undefined;
+    }
+
+    const pdfBytes = await createInvoicePdf(
+      {
+        ...(invoice as SchoolInvoice),
+        school_name: application.school_name,
+        production_title: application.production_title,
+        cycle_name: cycle.name,
+        season_year: cycle.season_year,
+      },
+      logoBytes,
+    );
+    const attachmentLabel =
+      invoice.status === "paid"
+        ? "receipt"
+        : invoice.document_kind === "scholarship_confirmation"
+          ? "scholarship-confirmation"
+          : "invoice";
+    const emailAction = paymentUrl && deliveryType !== "receipt"
+      ? `<p><a href="${escapeHtml(paymentUrl)}" style="display:inline-block;padding:12px 18px;background:#153f8f;color:#fff;text-decoration:none;border-radius:8px">Pay securely</a></p>`
+      : "";
+    const textAction = paymentUrl && deliveryType !== "receipt"
+      ? `\n\nPay securely: ${paymentUrl}`
+      : "";
+
+    emailResult = await sendSmtpEmail({
+      to: [invoice.recipient_email],
+      subject: copy.subject,
+      text: `${copy.body}${textAction}\n\nA PDF copy is attached. School team members can also view it in the GHSMTA Portal.`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><h2>${escapeHtml(copy.title)}</h2><p>${escapeHtml(copy.body)}</p>${emailAction}<p>A PDF copy is attached. School team members can also view it in the GHSMTA Portal.</p></div>`,
+      attachments: [
+        {
+          filename: `${invoice.invoice_number}-${attachmentLabel}.pdf`,
+          content: Buffer.from(pdfBytes),
+          contentType: "application/pdf",
+        },
+      ],
+    });
+  } catch (error) {
+    emailResult = {
+      ok: false,
+      detail: `PDF/email preparation failed: ${error instanceof Error ? error.message : "unknown error"}`,
+    };
+  }
 
   let chatStatus = "skipped";
   const { data: channel } = await supabase
     .from("chat_channels")
     .select("id")
     .eq("application_id", invoice.application_id)
-    .in("channel_type", ["school_dm", "school"])
+    .eq("channel_type", "school_dm")
     .eq("active", true)
     .limit(1)
     .maybeSingle();
@@ -134,11 +199,14 @@ export async function deliverSchoolInvoice(
       body: `${copy.body}\n\n${actionLabel}: ${actionUrl}\nInvoice PDF: ${invoiceUrl}`,
     });
     chatStatus = chatResult.error ? `failed: ${chatResult.error.message}` : "sent";
+  } else {
+    chatStatus = "failed: private School Messaging channel not found";
   }
 
+  const failures: string[] = [];
   const memberIds = [...new Set((members ?? []).map((member) => member.user_id))];
   if (memberIds.length > 0) {
-    await supabase.from("user_notifications").insert(
+    const notificationResult = await supabase.from("user_notifications").insert(
       memberIds.map((userId) => ({
         user_id: userId,
         notification_type: `invoice_${deliveryType}`,
@@ -148,18 +216,41 @@ export async function deliverSchoolInvoice(
         related_application_id: invoice.application_id,
       })),
     );
+    if (notificationResult.error) {
+      failures.push(`notifications: ${notificationResult.error.message}`);
+    }
   }
 
-  await supabase.from("invoice_delivery_log").insert({
-    invoice_id: invoice.id,
-    delivery_type: deliveryType,
-    email_status: emailResult.ok ? "sent" : "failed",
-    chat_status: chatStatus,
-    detail: emailResult.ok ? emailResult.detail : emailResult.detail,
-    delivered_by: requestedBy ?? authorId ?? null,
-  });
+  const emailStatus = emailResult.ok ? "sent" : "failed";
+  const delivered = emailResult.ok && chatStatus === "sent";
+  const partial = emailResult.ok || chatStatus === "sent";
+  const deliveryStatus = delivered ? "delivered" : partial ? "partial" : "failed";
+  const deliveredAt = new Date().toISOString();
 
-  const failures: string[] = [];
+  const [deliveryLogResult, invoiceStateResult] = await Promise.all([
+    supabase.from("invoice_delivery_log").insert({
+      invoice_id: invoice.id,
+      delivery_type: deliveryType,
+      email_status: emailStatus,
+      chat_status: chatStatus,
+      detail: `Email: ${emailResult.detail}; Chat: ${chatStatus}`,
+      delivered_by: requestedBy ?? authorId ?? null,
+    }),
+    supabase
+      .from("school_invoices")
+      .update({
+        delivery_status: deliveryStatus,
+        last_delivery_at: deliveredAt,
+      })
+      .eq("id", invoice.id),
+  ]);
+
+  if (deliveryLogResult.error) {
+    failures.push(`delivery audit: ${deliveryLogResult.error.message}`);
+  }
+  if (invoiceStateResult.error) {
+    failures.push(`invoice status: ${invoiceStateResult.error.message}`);
+  }
   if (!emailResult.ok) failures.push(`email: ${emailResult.detail}`);
   if (chatStatus !== "sent") failures.push(`chat: ${chatStatus}`);
   if (failures.length > 0) {

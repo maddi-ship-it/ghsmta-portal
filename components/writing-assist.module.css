@@ -55,6 +55,13 @@
   padding: 0 0.55rem;
 }
 
+.disclosure {
+  color: var(--portal-text-muted, #667085);
+  font-size: 0.67rem;
+  padding: 0 0.55rem;
+  white-space: nowrap;
+}
+
 .error {
   align-items: center;
   background: #8f1835;
@@ -129,6 +136,10 @@
 
   .toolbar button {
     padding-inline: 0.65rem;
+  }
+
+  .disclosure {
+    display: none;
   }
 
   .actions > * {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { consumeApiQuota } from "@/lib/api-quota";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -19,6 +20,18 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+
+  try {
+    if (!(await consumeApiQuota(supabase, "writing_transcribe", 20))) {
+      return NextResponse.json(
+        { error: "Voice dictation limit reached. Try again in about an hour." },
+        { status: 429, headers: { "Retry-After": "3600" } },
+      );
+    }
+  } catch (error) {
+    console.error("Voice dictation quota check failed", error);
+    return NextResponse.json({ error: "Voice dictation is temporarily unavailable." }, { status: 503 });
+  }
 
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) return NextResponse.json({ error: "Voice dictation is not configured." }, { status: 503 });

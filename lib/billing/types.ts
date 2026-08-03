@@ -26,6 +26,13 @@ export type SchoolInvoice = {
   next_reminder_at: string | null;
   last_reminder_at: string | null;
   reminder_count: number;
+  delivery_status: "pending" | "delivered" | "partial" | "failed";
+  last_delivery_at: string | null;
+  reminder_claimed_at: string | null;
+  reminder_claim_token: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
   created_at: string;
   updated_at: string;
 };

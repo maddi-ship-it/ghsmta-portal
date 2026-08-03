@@ -15,7 +15,7 @@ const THEME_SCRIPT = `
     if (themeMeta) {
       themeMeta.setAttribute(
         "content",
-        theme === "light" ? "#edf1f7" : "#070b18"
+        theme === "light" ? "#fffdf7" : "#070b18"
       );
     }
   } catch (error) {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
 import { formatInvoiceAmount, type SchoolInvoice } from "@/lib/billing/types";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,7 @@ import {
   bulkUpdateInvoices,
   createAndSendInvoice,
   markInvoicePaid,
+  retryInvoiceDelivery,
   sendInvoiceReminder,
   updateInvoiceOption,
   voidInvoice,
@@ -30,7 +32,7 @@ export default async function BillingPage({
   await requireProfile(["owner"]);
   const params = await searchParams;
   const supabase = await createClient();
-  const [cycleResult, optionResult, applicationResult, invoiceResult] = await Promise.all([
+  const [cycleResult, optionResult, applicationResult, invoiceResult, deliveryResult] = await Promise.all([
     supabase
       .from("award_cycles")
       .select("id,name,season_year,status")
@@ -50,11 +52,28 @@ export default async function BillingPage({
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100),
+    supabase
+      .from("invoice_delivery_log")
+      .select("invoice_id,email_status,chat_status,detail,created_at")
+      .order("created_at", { ascending: false })
+      .limit(300),
   ]);
+  for (const result of [cycleResult, optionResult, applicationResult, invoiceResult, deliveryResult]) {
+    if (result.error) throw new Error(result.error.message);
+  }
   const cycles = cycleResult.data ?? [];
   const options = optionResult.data ?? [];
   const applications = applicationResult.data ?? [];
   const invoices = (invoiceResult.data ?? []) as SchoolInvoice[];
+  const latestDeliveryByInvoice = new Map<
+    string,
+    { email_status: string | null; chat_status: string | null; detail: string | null; created_at: string }
+  >();
+  for (const delivery of deliveryResult.data ?? []) {
+    if (!latestDeliveryByInvoice.has(delivery.invoice_id)) {
+      latestDeliveryByInvoice.set(delivery.invoice_id, delivery);
+    }
+  }
   const memberResult = applications.length
     ? await supabase
         .from("application_members")
@@ -150,7 +169,12 @@ export default async function BillingPage({
                       })}
                     </div>
                   </fieldset>
-                  <button className="button button-primary" type="submit">Create and send selected invoices</button>
+                  <ConfirmedSubmitButton
+                    className="button button-primary"
+                    description="This creates invoices and sends email and School Messaging notifications to every selected school."
+                    label="Create and send selected invoices"
+                    title="Send these invoices?"
+                  />
                 </form>
               </details>
             );
@@ -232,15 +256,23 @@ export default async function BillingPage({
                   <option disabled value="">Choose action</option>
                   <option value="mark_paid">Mark paid and send receipts</option>
                   <option value="remind">Send payment reminders</option>
+                  <option value="resend">Resend invoice documents</option>
                   <option value="void">Void invoices</option>
                 </select>
-                <button className="button button-secondary" type="submit">Apply</button>
+                <input className="input input-compact" name="void_reason" placeholder="Reason (required only when voiding)" />
+                <ConfirmedSubmitButton
+                  description="The selected action will apply to every checked invoice that is eligible."
+                  label="Apply selected action"
+                  title="Update the selected invoices?"
+                />
               </form>
               <div className="table-wrap">
                 <table className="data-table">
-                  <thead><tr><th><span className="sr-only">Select</span></th><th>Invoice</th><th>School</th><th>Description</th><th>Amount</th><th>Status</th><th>Sent</th><th>Actions</th></tr></thead>
+                  <thead><tr><th><span className="sr-only">Select</span></th><th>Invoice</th><th>School</th><th>Description</th><th>Amount</th><th>Status</th><th>Delivery</th><th>Sent</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {invoices.map((invoice) => (
+                    {invoices.map((invoice) => {
+                      const latestDelivery = latestDeliveryByInvoice.get(invoice.id);
+                      return (
                       <tr key={invoice.id}>
                         <td><input aria-label={`Select invoice ${invoice.invoice_number}`} form="billing-bulk-actions" name="invoice_ids" type="checkbox" value={invoice.id} /></td>
                         <td><strong>{invoice.invoice_number}</strong><br /><small>{invoice.document_kind.replaceAll("_", " ")}</small></td>
@@ -248,19 +280,42 @@ export default async function BillingPage({
                         <td>{invoice.description_snapshot}</td>
                         <td>{formatInvoiceAmount(invoice.amount_cents)}</td>
                         <td><span className={`badge invoice-status-${invoice.status}`}>{invoice.status}</span></td>
+                        <td>
+                          <span className={`badge invoice-delivery-${invoice.delivery_status ?? "pending"}`}>
+                            {invoice.delivery_status ?? "pending"}
+                          </span>
+                          {latestDelivery ? (
+                            <small className="invoice-delivery-detail">
+                              Email: {latestDelivery.email_status ?? "—"} · Chat: {latestDelivery.chat_status ?? "—"}
+                            </small>
+                          ) : null}
+                        </td>
                         <td>{formatDate(invoice.sent_at)}</td>
                         <td><div className="table-actions">
                           <Link className="button button-secondary button-compact" href={`/portal/invoices/${invoice.id}/pdf`} target="_blank">PDF</Link>
                           {invoice.status === "sent" && invoice.document_kind === "invoice" && (
-                            <form action={markInvoicePaid.bind(null, invoice.id)}><button className="button button-primary button-compact" type="submit">Mark paid</button></form>
+                            <form action={markInvoicePaid.bind(null, invoice.id)}>
+                              <ConfirmedSubmitButton className="button button-primary button-compact" description="This records payment and immediately sends the school a receipt." label="Mark paid" title="Record this payment?" />
+                            </form>
                           )}
                           {invoice.status === "sent" && invoice.amount_cents > 0 && (
-                            <form action={sendInvoiceReminder.bind(null, invoice.id)}><button className="button button-secondary button-compact" type="submit">Remind</button></form>
+                            <form action={sendInvoiceReminder.bind(null, invoice.id)}>
+                              <ConfirmedSubmitButton className="button button-secondary button-compact" description="A payment reminder will be sent by email and private School Messaging." label="Remind" title="Send a payment reminder?" />
+                            </form>
                           )}
-                          {invoice.status !== "paid" && invoice.status !== "void" && <form action={voidInvoice.bind(null, invoice.id)}><button className="button button-ghost button-compact" type="submit">Void</button></form>}
+                          {invoice.status !== "void" ? (
+                            <form action={retryInvoiceDelivery.bind(null, invoice.id)}>
+                              <ConfirmedSubmitButton className="button button-secondary button-compact" description="The current invoice, receipt, or scholarship confirmation will be sent again by email and private School Messaging." label={invoice.delivery_status === "failed" || invoice.delivery_status === "partial" ? "Retry" : "Resend"} title="Resend this document?" />
+                            </form>
+                          ) : null}
+                          {invoice.status !== "paid" && invoice.status !== "void" && (
+                            <form action={voidInvoice.bind(null, invoice.id)}>
+                              <ConfirmedSubmitButton className="button button-ghost button-compact" description="This stops reminders and preserves the invoice in the financial audit history." destructive label="Void" requireReason title="Void this invoice?" />
+                            </form>
+                          )}
                         </div></td>
                       </tr>
-                    ))}
+                    );})}
                   </tbody>
                 </table>
               </div>

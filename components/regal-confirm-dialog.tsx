@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 
 export function RegalConfirmDialog({
   open,
@@ -10,6 +10,8 @@ export function RegalConfirmDialog({
   cancelLabel = "Cancel",
   destructive = false,
   pending = false,
+  confirmDisabled = false,
+  children,
   onConfirm,
   onCancel,
 }: {
@@ -20,32 +22,58 @@ export function RegalConfirmDialog({
   cancelLabel?: string;
   destructive?: boolean;
   pending?: boolean;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     if (!open) return;
 
-    cancelButtonRef.current?.focus();
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const preferredFocus = cardRef.current?.querySelector<HTMLElement>("[autofocus]");
+    (preferredFocus ?? cancelButtonRef.current)?.focus();
 
     function handleKeydown(event: KeyboardEvent) {
       if (event.key === "Escape" && !pending) {
         event.preventDefault();
         onCancel();
       }
+      if (event.key === "Tab") {
+        const focusable = cardRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        );
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     }
 
     document.addEventListener("keydown", handleKeydown);
-    return () => document.removeEventListener("keydown", handleKeydown);
+    return () => {
+      document.removeEventListener("keydown", handleKeydown);
+      previouslyFocused?.focus();
+    };
   }, [onCancel, open, pending]);
 
   if (!open) return null;
 
   return (
     <div
-      aria-labelledby="regal-confirm-title"
+      aria-describedby={descriptionId}
+      aria-labelledby={titleId}
       aria-modal="true"
       className="regal-dialog-backdrop"
       onMouseDown={(event) => {
@@ -55,7 +83,7 @@ export function RegalConfirmDialog({
       }}
       role="dialog"
     >
-      <section className="regal-dialog-card">
+      <section className="regal-dialog-card" ref={cardRef}>
         <div className="regal-dialog-mark" aria-hidden="true">
           {destructive ? "!" : "✓"}
         </div>
@@ -64,14 +92,15 @@ export function RegalConfirmDialog({
           <span className="eyebrow">
             {destructive ? "Please confirm" : "Confirmation"}
           </span>
-          <h2 id="regal-confirm-title">{title}</h2>
-          <p>{description}</p>
+          <h2 id={titleId}>{title}</h2>
+          <p id={descriptionId}>{description}</p>
+          {children}
         </div>
 
         <div className="regal-dialog-actions">
           <button
             className="button button-secondary"
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             onClick={onCancel}
             ref={cancelButtonRef}
             type="button"

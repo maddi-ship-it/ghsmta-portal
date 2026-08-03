@@ -171,6 +171,7 @@ export function WritingAssist() {
             <span aria-hidden="true">▣</span> Scan notes
           </button>
           {mode === "processing" && <span className={styles.progress}>Processing…</span>}
+          <span className={styles.disclosure}>AI transcription · review before inserting</span>
           <input accept="image/*" capture="environment" hidden onChange={scanImage} ref={imageInputRef} type="file" />
         </div>
       )}
@@ -182,7 +183,7 @@ export function WritingAssist() {
           <div className={styles.dialog}>
             <span className="eyebrow">{source}</span>
             <h2 id="writing-review-title">Review before adding</h2>
-            <p>Edit the text below. Nothing is inserted until you choose an action.</p>
+            <p>Edit the text below. Nothing is inserted until you choose an action. The portal does not retain the source audio or image.</p>
             <textarea autoFocus className="textarea" onChange={(event) => setDraft(event.target.value)} rows={10} value={draft} />
             <div className={styles.actions}>
               <button className="button button-secondary" onClick={() => setDraft("")} type="button">Cancel</button>

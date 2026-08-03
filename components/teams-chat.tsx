@@ -23,7 +23,9 @@ import {
   ownerDeleteChatMessage,
 } from "@/app/portal/chat/actions";
 import styles from "@/components/chat-workspace.module.css";
+import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import { createClient } from "@/lib/supabase/client";
+import { isAllowedPortalFile, PORTAL_FILE_ACCEPT } from "@/lib/file-upload-policy";
 import type { AppRole, Profile } from "@/lib/types";
 
 export type ChannelType =
@@ -175,7 +177,7 @@ function ChatFilePicker() {
       <span aria-hidden="true">＋</span>
       <span>Attach files</span>
       <input
-        accept="image/*,audio/*,video/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        accept={PORTAL_FILE_ACCEPT}
         multiple
         name="attachments"
         type="file"
@@ -945,6 +947,11 @@ export function TeamsChat({
   );
   const [showBroadcastComposer, setShowBroadcastComposer] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [pendingDeletion, setPendingDeletion] = useState<{
+    messageId: string;
+    messageKind: "post" | "reply";
+  } | null>(null);
+  const [deletionReason, setDeletionReason] = useState("");
   const [isPending, startTransition] = useTransition();
   const feedEndRef = useRef<HTMLDivElement>(null);
 
@@ -1340,6 +1347,10 @@ export function TeamsChat({
       setStatus("Each chat attachment must be 25 MB or smaller.");
       return;
     }
+    if (files.some((file) => !isAllowedPortalFile(file))) {
+      setStatus("One or more attachments use an unsupported file type.");
+      return;
+    }
     if (files.length > 10) {
       setStatus("Attach no more than 10 files to one message.");
       return;
@@ -1440,27 +1451,16 @@ export function TeamsChat({
     messageId: string,
     messageKind: "post" | "reply",
   ) => {
-    const reason = window.prompt(
-      "Optional deletion reason. The original message will remain in the audit record.",
-      "",
-    );
+    setDeletionReason("");
+    setPendingDeletion({ messageId, messageKind });
+  };
 
-    if (reason === null) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Remove this message from the chat? Users will see a deletion placeholder.",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
+  const confirmMessageDeletion = () => {
+    if (!pendingDeletion) return;
     const formData = new FormData();
-    formData.set("message_id", messageId);
-    formData.set("message_kind", messageKind);
-    formData.set("reason", reason);
+    formData.set("message_id", pendingDeletion.messageId);
+    formData.set("message_kind", pendingDeletion.messageKind);
+    formData.set("reason", deletionReason.trim());
     setStatus(null);
 
     startTransition(async () => {
@@ -1471,6 +1471,8 @@ export function TeamsChat({
         return;
       }
 
+      setPendingDeletion(null);
+      setDeletionReason("");
       setStatus("Message removed. The original remains in the audit record.");
       await loadChannel();
     });
@@ -2098,6 +2100,32 @@ export function TeamsChat({
           </form>
         </div>
       )}
+      <RegalConfirmDialog
+        confirmLabel="Remove message"
+        description="Users will see a deletion placeholder. The original message remains available in the Owner audit record."
+        destructive
+        onCancel={() => {
+          setPendingDeletion(null);
+          setDeletionReason("");
+        }}
+        onConfirm={confirmMessageDeletion}
+        open={Boolean(pendingDeletion)}
+        pending={isPending}
+        title="Remove this message from chat?"
+      >
+        <div className="field regal-dialog-reason">
+          <label htmlFor="chat-deletion-reason">Deletion reason (optional)</label>
+          <textarea
+            className="textarea"
+            id="chat-deletion-reason"
+            maxLength={500}
+            onChange={(event) => setDeletionReason(event.target.value)}
+            placeholder="Add context for the audit record"
+            rows={3}
+            value={deletionReason}
+          />
+        </div>
+      </RegalConfirmDialog>
     </div>
   );
 }

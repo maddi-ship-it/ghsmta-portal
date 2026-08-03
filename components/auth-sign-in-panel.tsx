@@ -13,9 +13,11 @@ type LoginMethod = "password" | "magic" | "phone";
 export function AuthSignInPanel({
   initialError,
   initialMessage,
+  phoneEnabled,
 }: {
   initialError?: string;
   initialMessage?: string;
+  phoneEnabled: boolean;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -120,7 +122,7 @@ export function AuthSignInPanel({
       <h2>Sign in</h2>
       <p>Choose the sign-in method that works best for your account.</p>
 
-      <div className="auth-method-tabs" role="tablist" aria-label="Sign-in methods">
+      <div className={`auth-method-tabs${phoneEnabled ? "" : " auth-method-tabs-two"}`} role="tablist" aria-label="Sign-in methods">
         <button
           aria-selected={method === "password"}
           className={method === "password" ? "active" : ""}
@@ -139,15 +141,17 @@ export function AuthSignInPanel({
         >
           Magic Link
         </button>
-        <button
-          aria-selected={method === "phone"}
-          className={method === "phone" ? "active" : ""}
-          onClick={() => chooseMethod("phone")}
-          role="tab"
-          type="button"
-        >
-          Text code
-        </button>
+        {phoneEnabled ? (
+          <button
+            aria-selected={method === "phone"}
+            className={method === "phone" ? "active" : ""}
+            onClick={() => chooseMethod("phone")}
+            role="tab"
+            type="button"
+          >
+            Text code
+          </button>
+        ) : null}
       </div>
 
       {error && <div className="form-error">{error}</div>}
@@ -212,7 +216,7 @@ export function AuthSignInPanel({
         </form>
       )}
 
-      {method === "phone" && !phoneCodeSent && (
+      {phoneEnabled && method === "phone" && !phoneCodeSent && (
         <form
           className="form-stack auth-method-form"
           onSubmit={(event) => {
@@ -239,7 +243,7 @@ export function AuthSignInPanel({
         </form>
       )}
 
-      {method === "phone" && phoneCodeSent && (
+      {phoneEnabled && method === "phone" && phoneCodeSent && (
         <form
           className="form-stack auth-method-form"
           onSubmit={(event) => {
@@ -276,6 +280,7 @@ export function AuthSignInPanel({
       <p className="auth-links">
         Applying for the first time? <Link href="/signup">Create an applicant account</Link>
       </p>
+      <p className="auth-links auth-privacy-link"><Link href="/privacy">Privacy &amp; data use</Link></p>
     </div>
   );
 }

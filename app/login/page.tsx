@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AuthSignInPanel } from "@/components/auth-sign-in-panel";
+import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
 
 export default async function LoginPage({
   searchParams,
@@ -33,6 +34,7 @@ export default async function LoginPage({
         <AuthSignInPanel
           initialError={params.error}
           initialMessage={params.message}
+          phoneEnabled={PHONE_VERIFICATION_ENABLED}
         />
       </section>
     </main>

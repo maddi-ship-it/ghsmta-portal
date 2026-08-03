@@ -28,7 +28,7 @@ function fail(code: string): never {
 }
 
 export async function staffSignup(formData: FormData) {
-  if (process.env.STAFF_SIGNUP_ENABLED === "false") {
+  if (process.env.STAFF_SIGNUP_ENABLED !== "true") {
     fail("disabled");
   }
 

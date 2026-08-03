@@ -1,0 +1,31 @@
+# GHSMTA production release runbook
+
+## Required configuration
+
+- Confirm production Supabase URL, publishable key, and server-only service-role key.
+- Confirm SMTP host, port, account, app password, sender, and reply-to address.
+- Confirm `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET`, and the OpenAI server key.
+- Keep `STAFF_SIGNUP_ENABLED=false` unless a controlled registration window is active.
+- Keep `PHONE_VERIFICATION_ENABLED=false` until the Supabase SMS provider is configured and tested.
+
+## Database rollout
+
+1. Take a Supabase backup or confirm point-in-time recovery.
+2. Run `supabase/migrations/20260803011303_production_hardening_release.sql` in the SQL Editor after all earlier migrations.
+3. Run `supabase/verification/030_production_hardening_check.sql` and require the passing result.
+4. Review the Supabase Security and Performance Advisors before deployment.
+
+## Application rollout
+
+1. Run `npm ci`, `npm run check`, `npm run build`, and `npm audit --omit=dev`.
+2. Deploy to a Vercel preview and smoke-test Owner, applicant, adjudicator, and Advisory Committee accounts.
+3. Verify light, dark, and system themes at desktop and mobile widths.
+4. Send a paid test invoice and a scholarship confirmation; verify email PDF attachment, private School Messaging, receipt, reminder, and retry behavior.
+5. Verify chat reactions, a 25 MB file rejection boundary, school channel grouping, voice dictation, note scanning, schedule panel/understudy/shadow signup, and locked score submission.
+6. Promote the verified deployment to production and watch `/api/health`, Vercel function logs, and Owner system notifications.
+
+## Rollback
+
+- Roll back the Vercel deployment first if application behavior regresses.
+- Do not remove financial or audit columns during an incident. Preserve invoice, delivery, chat, and scoring records.
+- Disable the cron in Vercel if reminder delivery is involved, then investigate delivery logs before re-enabling it.

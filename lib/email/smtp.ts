@@ -5,6 +5,11 @@ type SendSmtpEmailInput = {
   subject: string;
   html: string;
   text?: string;
+  attachments?: Array<{
+    filename: string;
+    content: Buffer;
+    contentType: string;
+  }>;
 };
 
 function requiredEnv(name: string) {
@@ -28,6 +33,7 @@ export async function sendSmtpEmail({
   subject,
   html,
   text,
+  attachments,
 }: SendSmtpEmailInput) {
   if (to.length === 0) {
     return { ok: false as const, detail: "No recipients." };
@@ -48,6 +54,8 @@ export async function sendSmtpEmail({
       user: requiredEnv("SMTP_USER"),
       pass: requiredEnv("SMTP_PASSWORD"),
     },
+    disableFileAccess: true,
+    disableUrlAccess: true,
   });
 
   try {
@@ -61,6 +69,9 @@ export async function sendSmtpEmail({
       subject,
       html,
       text,
+      attachments,
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
 
     return { ok: true as const, detail: info.messageId };

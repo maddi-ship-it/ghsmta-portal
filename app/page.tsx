@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
+
 const portalPaths = [
   { number: "01", title: "Schools", copy: "Applications, scheduling, school files, appeals, and direct communication with GHSMTA." },
   { number: "02", title: "Adjudicators", copy: "Assigned productions, collaborative observations, scoring, and category decisions." },
@@ -32,7 +34,7 @@ export default function LandingPage() {
             <h1>Excellence takes the stage.</h1>
             <p className="regal-hero-lede">The secure 2026–2027 home for school applications, adjudication visits, award materials, and GHSMTA program administration.</p>
             <div className="hero-actions"><Link className="button button-gold" href="/signup">Begin your school application</Link><Link className="button button-ghost-gold" href="/login">Continue to the portal</Link></div>
-            <div className="regal-signin-note"><span>Secure access</span><span>Email + password</span><span>Magic Link</span><span>Phone code</span><span>MFA</span></div>
+            <div className="regal-signin-note"><span>Secure access</span><span>Email + password</span><span>Magic Link</span>{PHONE_VERIFICATION_ENABLED ? <span>Phone code</span> : null}<span>MFA</span></div>
           </div>
 
           <aside className="regal-season-card">
@@ -53,7 +55,7 @@ export default function LandingPage() {
       </section>
 
       <section className="regal-callout"><div className="container regal-callout-inner"><div><p className="eyebrow">Ready for the season?</p><h2>Step into the GHSMTA Awards Portal.</h2></div><div className="button-row"><Link className="button button-gold" href="/signup">Create school account</Link><Link className="button button-ghost-gold" href="/login">Sign in securely</Link></div></div></section>
-      <footer className="regal-footer"><div className="container"><strong>Georgia High School Musical Theatre Awards</strong><span>Secure applications · Live scheduling · Collaborative adjudication</span></div></footer>
+      <footer className="regal-footer"><div className="container"><strong>Georgia High School Musical Theatre Awards</strong><span>Secure applications · Live scheduling · Collaborative adjudication · <Link href="/privacy">Privacy &amp; data use</Link></span></div></footer>
     </main>
   );
 }

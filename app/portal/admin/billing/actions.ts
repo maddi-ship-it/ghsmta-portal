@@ -139,6 +139,21 @@ export async function createAndSendInvoice(formData: FormData) {
     billingRedirect("error", "Paid invoices require a secure https payment link.");
   }
 
+  const { data: priorInvoices, error: priorInvoiceError } = await supabase
+    .from("school_invoices")
+    .select("id,status")
+    .eq("application_id", application.id)
+    .eq("cycle_id", application.cycle_id)
+    .neq("status", "void")
+    .limit(1);
+  if (priorInvoiceError) billingRedirect("error", priorInvoiceError.message);
+  if (priorInvoices?.length) {
+    billingRedirect(
+      "error",
+      "This school already has an invoice or confirmation for the selected cycle. Void it before issuing a replacement.",
+    );
+  }
+
   const scholarshipConfirmation =
     option.amount_cents === 0 && formData.get("scholarship_confirmation") === "on";
   const issuedAt = new Date();
@@ -159,6 +174,7 @@ export async function createAndSendInvoice(formData: FormData) {
       billing_name: billingName,
       billing_address: billingAddress || null,
       status: "sent",
+      delivery_status: "pending",
       issued_at: issuedAt.toISOString(),
       due_at: option.amount_cents > 0 ? parsedDue.toISOString() : null,
       sent_at: issuedAt.toISOString(),
@@ -262,8 +278,7 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
         .select("application_id")
         .in("application_id", cycleApplications.map((application) => application.id))
         .eq("cycle_id", option.cycle_id)
-        .eq("option_key", option.option_key)
-        .in("status", ["sent", "paid"])
+        .neq("status", "void")
     : { data: [], error: null };
   if (existingError) billingRedirect("error", existingError.message);
 
@@ -292,6 +307,7 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
       billing_name: application.school_name,
       billing_address: null,
       status: "sent",
+      delivery_status: "pending",
       issued_at: issuedAt.toISOString(),
       due_at: option.amount_cents > 0 ? parsedDue.toISOString() : null,
       sent_at: issuedAt.toISOString(),
@@ -366,6 +382,7 @@ export async function bulkUpdateInvoices(formData: FormData) {
         paid_at: new Date().toISOString(),
         paid_by: owner.id,
         next_reminder_at: null,
+        delivery_status: "pending",
       })
       .in("id", eligibleIds)
       .eq("status", "sent")
@@ -407,14 +424,50 @@ export async function bulkUpdateInvoices(formData: FormData) {
     billingRedirect("success", `${delivery.completed} payment reminders sent.`);
   }
 
+  if (operation === "resend") {
+    const eligible = (invoices ?? []).filter((invoice) => invoice.status !== "void");
+    if (eligible.length === 0) {
+      billingRedirect("error", "No selected invoices can be resent.");
+    }
+    const delivery = await runInBatches(eligible, async (invoice) => {
+      const deliveryType =
+        invoice.status === "paid"
+          ? "receipt"
+          : invoice.document_kind === "scholarship_confirmation"
+            ? "scholarship_confirmation"
+            : "invoice";
+      await deliverSchoolInvoice(invoice.id, deliveryType, owner.id);
+    });
+    revalidateBilling();
+    if (delivery.failed > 0) {
+      billingRedirect(
+        "error",
+        `${delivery.completed} documents resent; ${delivery.failed} still need delivery attention.`,
+      );
+    }
+    billingRedirect("success", `${delivery.completed} documents resent.`);
+  }
+
   if (operation === "void") {
+    const voidReason = text(formData, "void_reason");
+    if (voidReason.length < 3) {
+      billingRedirect("error", "Enter a reason before voiding invoices.");
+    }
     const eligibleIds = (invoices ?? [])
       .filter((invoice) => invoice.status !== "paid" && invoice.status !== "void")
       .map((invoice) => invoice.id);
     if (eligibleIds.length === 0) billingRedirect("error", "No selected invoices can be voided.");
     const { data: updated, error: updateError } = await supabase
       .from("school_invoices")
-      .update({ status: "void", next_reminder_at: null })
+      .update({
+        status: "void",
+        next_reminder_at: null,
+        reminder_claimed_at: null,
+        reminder_claim_token: null,
+        voided_at: new Date().toISOString(),
+        voided_by: owner.id,
+        void_reason: voidReason.slice(0, 500),
+      })
       .in("id", eligibleIds)
       .neq("status", "paid")
       .select("id");
@@ -437,6 +490,7 @@ export async function markInvoicePaid(invoiceId: string) {
       paid_at: paidAt,
       paid_by: owner.id,
       next_reminder_at: null,
+      delivery_status: "pending",
     })
     .eq("id", invoiceId)
     .eq("status", "sent")
@@ -497,12 +551,55 @@ export async function sendInvoiceReminder(invoiceId: string) {
   billingRedirect("success", "Payment reminder sent.");
 }
 
-export async function voidInvoice(invoiceId: string) {
-  await requireProfile(["owner"]);
+export async function retryInvoiceDelivery(invoiceId: string) {
+  const owner = await requireProfile(["owner"]);
   const supabase = await createClient();
   const { data: invoice, error } = await supabase
     .from("school_invoices")
-    .update({ status: "void", next_reminder_at: null })
+    .select("id,status,document_kind")
+    .eq("id", invoiceId)
+    .single();
+  if (error || !invoice || invoice.status === "void") {
+    billingRedirect("error", "Voided invoices cannot be delivered.");
+  }
+
+  const deliveryType =
+    invoice.status === "paid"
+      ? "receipt"
+      : invoice.document_kind === "scholarship_confirmation"
+        ? "scholarship_confirmation"
+        : "invoice";
+  try {
+    await deliverSchoolInvoice(invoice.id, deliveryType, owner.id);
+  } catch (deliveryError) {
+    revalidateBilling();
+    billingRedirect(
+      "error",
+      `Delivery still needs attention: ${deliveryError instanceof Error ? deliveryError.message : "delivery failed"}`,
+    );
+  }
+  revalidateBilling();
+  billingRedirect("success", "Invoice document resent by email and School Messaging.");
+}
+
+export async function voidInvoice(invoiceId: string, formData: FormData) {
+  const owner = await requireProfile(["owner"]);
+  const voidReason = text(formData, "void_reason");
+  if (voidReason.length < 3) {
+    billingRedirect("error", "Enter a reason before voiding an invoice.");
+  }
+  const supabase = await createClient();
+  const { data: invoice, error } = await supabase
+    .from("school_invoices")
+    .update({
+      status: "void",
+      next_reminder_at: null,
+      reminder_claimed_at: null,
+      reminder_claim_token: null,
+      voided_at: new Date().toISOString(),
+      voided_by: owner.id,
+      void_reason: voidReason.slice(0, 500),
+    })
     .eq("id", invoiceId)
     .neq("status", "paid")
     .select("id")

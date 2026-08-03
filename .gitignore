@@ -1,10 +1,10 @@
-
-# Dependencies
+# Dependencies and build output
 node_modules/
-
-# Next.js
 .next/
 out/
+dist/
+*.tsbuildinfo
+tmp/
 
 # Vercel
 .vercel/
@@ -12,38 +12,8 @@ out/
 # Local environment files
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
 # macOS
 .DS_Store
 .ghsmta-patch-backups/
-
-# Dependencies and build output
-node_modules/
-.next/
-out/
-dist/
-
-# Local environment files
-.env
-.env.local
-.env.*.local
-
-# macOS
-.DS_Store
-
-# Dependencies and build output
-node_modules/
-.next/
-out/
-dist/
-
-# Local environment files
-.env
-.env.local
-.env.*.local
-
-# macOS
-.DS_Store

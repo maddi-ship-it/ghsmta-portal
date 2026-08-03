@@ -13,7 +13,7 @@ const THEME_EVENT = "ghsmta-theme-preference-change";
 const PREFERENCES: ThemePreference[] = ["system", "light", "dark"];
 const THEME_COLORS: Record<ThemeName, string> = {
   dark: "#070b18",
-  light: "#edf1f7",
+  light: "#fffdf7",
 };
 
 function resolveTheme(preference: ThemePreference): ThemeName {

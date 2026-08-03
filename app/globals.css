@@ -10060,3 +10060,328 @@ html[data-theme="light"] .portal-shell .portal-header :is(
 ) {
   color-scheme: light;
 }
+
+/* Production light theme: clean white and warm ivory surfaces. This final
+   semantic layer intentionally replaces the former blue/gray page wash. */
+html[data-theme="light"] {
+  --app-bg: #fffdf7;
+  --app-surface: #ffffff;
+  --app-surface-2: #fff9ed;
+  --app-text: #172033;
+  --app-muted: #59667b;
+  --app-line: rgba(35, 50, 75, 0.17);
+  --paper: #ffffff;
+  --cream: #fff9ed;
+  --ink: #172033;
+  --muted: #59667b;
+  --line: rgba(35, 50, 75, 0.17);
+}
+
+html[data-theme="light"] body,
+html[data-theme="light"] .safe-shell,
+html[data-theme="light"] .portal-shell,
+html[data-theme="light"] .auth-page,
+html[data-theme="light"] .auth-panel,
+html[data-theme="light"] .regal-landing {
+  color: #172033;
+  background: #fffdf7;
+}
+
+html[data-theme="light"] .portal-shell {
+  --portal-bg-deep: #fff8e9;
+  --portal-bg: #fffdf7;
+  --portal-surface: #ffffff;
+  --portal-surface-2: #fffaf0;
+  --portal-surface-3: #fff3d8;
+  --portal-surface-hover: #fff0cb;
+  --portal-line: rgba(35, 50, 75, 0.16);
+  --portal-line-strong: rgba(145, 105, 17, 0.38);
+  --portal-ivory: #172033;
+  --portal-text: #243047;
+  --portal-muted: #59667b;
+  --portal-gold: #a37410;
+  --portal-gold-bright: #765109;
+  --portal-blue: #2254ac;
+  --portal-blue-deep: #173a7d;
+  --portal-success: #147547;
+  --portal-warning: #925600;
+  --portal-danger: #b4232d;
+  --portal-shadow: 0 16px 44px rgba(38, 45, 62, 0.1);
+}
+
+html[data-theme="light"] .portal-main {
+  color: var(--portal-text);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(206, 166, 55, 0.1), transparent 28rem),
+    #fffdf7 !important;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel,
+  .metric-card,
+  .settings-section,
+  .detail-item,
+  .application-section,
+  .application-question,
+  .application-content-block,
+  .application-filter-panel,
+  .builder-section,
+  .builder-stage,
+  .check-card,
+  .compact-check-card,
+  .cycle-card,
+  .feedback-request-card,
+  .notification-center,
+  .notification-row,
+  .panelist-card,
+  .question-admin-card,
+  .question-editor,
+  .raw-comment-card,
+  .reference-document-card,
+  .reference-library-panel,
+  .reference-upload-panel,
+  .release-panel,
+  .released-results-panel,
+  .rubric-category-editor,
+  .rubric-criterion-row,
+  .schedule-school-card,
+  .schedule-slot-card,
+  .schedule-visit-detail-card,
+  .school-file-row,
+  .school-files-main,
+  .school-files-sidebar,
+  .school-team-panel,
+  .school-team-member,
+  .score-category-panel,
+  .scoring-admin-section,
+  .specialty-award-card,
+  .specialty-summary-card,
+  .workflow-feedback-card,
+  .workflow-rule-card
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: #ffffff !important;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel-body,
+  .application-answer,
+  .builder-question-card,
+  .criterion-copy,
+  .criterion-score-cell,
+  .inline-category-decision,
+  .live-score-observation,
+  .panel-criterion-comment,
+  .panel-feedback-editor,
+  .panel-review-category,
+  .private-category-notes,
+  .raw-comment-grid,
+  .reference-audience-option,
+  .released-feedback-section,
+  .reply-composer,
+  .reply-thread,
+  .schedule-booking-summary,
+  .schedule-owner-controls,
+  .school-file-upload-panel,
+  .specialty-action-bar,
+  .billing-bulk-cycle,
+  .billing-bulk-toolbar
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: #fffaf0 !important;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .panel-header,
+  .application-section-header,
+  .application-action-bar,
+  .application-archive-toolbar,
+  .application-reference-bar,
+  .owner-application-tools,
+  .schedule-live-strip,
+  .schedule-owner-tool-bar,
+  .schedule-workspace-toolbar,
+  .schedule-workspace-filters,
+  .scorecard-action-bar,
+  .scoring-category-header,
+  .user-bulk-toolbar,
+  .workflow-builder-header
+) {
+  color: #1d2a42 !important;
+  border-color: var(--portal-line) !important;
+  background: #fff8e8 !important;
+}
+
+html[data-theme="light"] .portal-main :where(
+  .button-secondary,
+  .button-secondary-light,
+  .button-compact,
+  .text-button,
+  .category-collapse-toggle,
+  .category-average-review-button
+) {
+  color: #243047 !important;
+  border-color: rgba(35, 50, 75, 0.2) !important;
+  background: #ffffff !important;
+}
+
+html[data-theme="light"] .portal-main :where(.data-table th, .user-admin-table th, .criterion-score-table th, .consensus-matrix-table th) {
+  color: #6f4e08 !important;
+  border-color: var(--portal-line) !important;
+  background: #fff4dc !important;
+}
+
+html[data-theme="light"] .portal-main :where(.data-table tbody tr:nth-child(even), .user-admin-table tbody tr:nth-child(even), .criterion-score-table tbody tr:nth-child(even), .collaborative-criterion-row:nth-child(odd)) {
+  background: #fffdf7 !important;
+}
+
+html[data-theme="light"] .portal-main :where(.data-table tbody tr:hover, .user-admin-table tbody tr:hover, .criterion-score-table tbody tr:hover) {
+  background: #fff2d4 !important;
+}
+
+html[data-theme="light"] .portal-main :where(.category-average-summary, .score-range-modal-average, .category-decision-response-card) {
+  background: #fff8e8 !important;
+}
+
+html[data-theme="light"] .regal-path-section {
+  color: #172033;
+  background: linear-gradient(180deg, #fffdf7, #fff7e7);
+}
+
+html[data-theme="light"] .auth-method-tabs {
+  background: #fff7e5;
+}
+
+html[data-theme="light"] .auth-card .eyebrow,
+html[data-theme="light"] .public-policy-card .eyebrow {
+  color: #765109 !important;
+}
+
+html[data-theme="light"] .auth-card :where(.text-button, .auth-forgot-link) {
+  color: #173f82 !important;
+}
+
+.auth-method-tabs-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-privacy-link {
+  margin-top: 0.65rem;
+}
+
+.invoice-delivery-detail {
+  display: block;
+  margin-top: 0.35rem;
+  max-width: 15rem;
+}
+
+.invoice-delivery-delivered {
+  color: var(--portal-success);
+  background: color-mix(in srgb, #169b62 16%, transparent);
+}
+
+.invoice-delivery-partial,
+.invoice-delivery-pending {
+  color: var(--portal-warning);
+  background: color-mix(in srgb, #d58b13 16%, transparent);
+}
+
+.invoice-delivery-failed {
+  color: var(--portal-danger);
+  background: color-mix(in srgb, #c83a4e 15%, transparent);
+}
+
+.billing-bulk-toolbar .input-compact {
+  width: min(100%, 24rem);
+}
+
+.regal-dialog-reason {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.system-state-page,
+.public-policy-page {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  color: var(--app-text, #172033);
+  background: var(--app-bg, #fffdf7);
+}
+
+.system-state-card,
+.public-policy-card {
+  width: min(100%, 48rem);
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  border: 1px solid var(--app-line, rgba(35, 50, 75, 0.17));
+  border-radius: 1.5rem;
+  background: var(--app-surface, #ffffff);
+  box-shadow: 0 24px 80px rgba(5, 11, 25, 0.12);
+}
+
+.system-state-card h1,
+.public-policy-card h1 {
+  margin: 0.35rem 0 1rem;
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  letter-spacing: -0.045em;
+}
+
+.public-policy-card h2 {
+  margin: 2rem 0 0.5rem;
+}
+
+.public-policy-card p,
+.system-state-card p {
+  color: var(--app-muted, #59667b);
+  line-height: 1.7;
+}
+
+.policy-brand {
+  width: max-content;
+  margin-bottom: 2rem;
+  color: var(--app-text, #172033);
+}
+
+html[data-theme="light"] .policy-brand,
+html[data-theme="light"] .policy-brand strong {
+  color: #172033 !important;
+}
+
+html[data-theme="light"] .policy-brand small {
+  color: #59667b !important;
+}
+
+html[data-theme="light"] .policy-brand .regal-brand-mark {
+  color: #765109;
+  border-color: rgba(118, 81, 9, 0.45);
+}
+
+.portal-loading-state {
+  display: grid;
+  min-height: 45vh;
+  place-items: center;
+  align-content: center;
+  gap: 1rem;
+  color: var(--portal-muted);
+}
+
+.portal-loading-mark {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border: 2px solid var(--portal-gold);
+  border-radius: 50%;
+  color: var(--portal-gold-bright);
+  font-family: Georgia, serif;
+  font-size: 1.5rem;
+}
+
+@media (max-width: 650px) {
+  .billing-bulk-toolbar .input-compact {
+    width: 100%;
+  }
+}
