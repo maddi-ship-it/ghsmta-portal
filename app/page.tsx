@@ -1,61 +1,100 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
-import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
-
-const portalPaths = [
-  { number: "01", title: "Schools", copy: "Applications, scheduling, school files, appeals, and direct communication with GHSMTA." },
-  { number: "02", title: "Adjudicators", copy: "Assigned productions, collaborative observations, scoring, and category decisions." },
-  { number: "03", title: "Advisory & Owners", copy: "Live oversight, eligibility review, program setup, reporting, and preserved archives." },
-];
+export const metadata: Metadata = {
+  title: "GHSMTA Awards Portal",
+  description:
+    "The secure home for Georgia High School Musical Theatre Awards applications, scheduling, adjudication, and school communication.",
+};
 
 export default function LandingPage() {
   return (
-    <main className="regal-landing safe-shell">
-      <header className="regal-public-header">
-        <div className="container regal-public-nav">
-          <Link href="/" className="regal-brand" aria-label="GHSMTA home">
-            <span className="regal-brand-mark">G</span>
-            <span><strong>GHSMTA</strong><small>Awards Portal</small></span>
+    <main className="public-home public-home-calm safe-shell">
+      <header className="public-home-header">
+        <div className="container public-home-nav">
+          <Link className="public-home-brand" href="/" aria-label="GHSMTA home">
+            <Image
+              alt=""
+              className="public-home-brand-icon"
+              height={48}
+              loading="eager"
+              src="/ghsmta-icon-512.png"
+              width={48}
+            />
+            <span>
+              <strong>GHSMTA</strong>
+              <small>Awards Portal</small>
+            </span>
           </Link>
-          <nav className="nav-actions" aria-label="Primary navigation">
-            <Link className="button button-ghost-gold" href="/login">Sign in</Link>
-            <Link className="button button-gold" href="/signup">Start an application</Link>
+
+          <nav className="public-home-nav-actions" aria-label="Primary navigation">
+            <Link className="public-home-nav-choice" href="/login">
+              SIGN IN
+            </Link>
+            <Link className="public-home-nav-choice is-primary" href="/signup">
+              SIGN-UP
+            </Link>
+            <Link className="public-home-nav-choice" href="/staff-signup">
+              STAFF SIGN UP
+            </Link>
           </nav>
         </div>
       </header>
 
-      <section className="regal-hero">
-        <div className="regal-curtain regal-curtain-left" />
-        <div className="regal-curtain regal-curtain-right" />
-        <div className="regal-spotlight" />
-        <div className="container regal-hero-grid">
-          <div className="regal-hero-copy">
-            <p className="eyebrow">Georgia High School Musical Theatre Awards</p>
-            <h1>Excellence takes the stage.</h1>
-            <p className="regal-hero-lede">The secure 2026–2027 home for school applications, adjudication visits, award materials, and GHSMTA program administration.</p>
-            <div className="hero-actions"><Link className="button button-gold" href="/signup">Begin your school application</Link><Link className="button button-ghost-gold" href="/login">Continue to the portal</Link></div>
-            <div className="regal-signin-note"><span>Secure access</span><span>Email + password</span><span>Magic Link</span>{PHONE_VERIFICATION_ENABLED ? <span>Phone code</span> : null}<span>MFA</span></div>
+      <section className="public-home-calm-hero">
+        <div className="container public-home-calm-hero-inner">
+          <h1>The entire season, all in one place.</h1>
+          <p>
+            A secure, shared home for applications, scheduling, communication,
+            adjudication, and results.
+          </p>
+          <div className="public-home-hero-actions">
+            <Link className="public-home-button public-home-button-primary" href="/signup">
+              Start an application <span aria-hidden="true">→</span>
+            </Link>
+            <Link className="public-home-button public-home-button-secondary" href="/login">
+              Sign in
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="public-home-footer public-home-calm-footer">
+        <div className="container public-home-footer-grid">
+          <div>
+            <Link className="public-home-brand" href="/" aria-label="GHSMTA home">
+              <Image
+                alt=""
+                className="public-home-brand-icon"
+                height={44}
+                src="/ghsmta-icon-512.png"
+                width={44}
+              />
+              <span>
+                <strong>GHSMTA</strong>
+                <small>Awards Portal</small>
+              </span>
+            </Link>
+            <p>
+              Celebrating excellence in Georgia high school musical theatre. ·{" "}
+              <Link href="/privacy">Privacy &amp; data use</Link>
+            </p>
           </div>
 
-          <aside className="regal-season-card">
-            <div className="regal-season-seal">2026<br /><span>–</span><br />2027</div>
-            <p className="eyebrow">Current awards cycle</p>
-            <h2>One portal.<br />Every part of the journey.</h2>
-            <div className="regal-season-rule" />
-            <p>Built for schools, adjudicators, Advisory Committee members, and program Owners—with role-based access throughout.</p>
-          </aside>
+          <div className="public-home-presented-by">
+            <span>Presented by</span>
+            <span className="public-home-artsbridge-logo">
+              <Image
+                alt="ArtsBridge Foundation"
+                height={43}
+                src="/artsbridge-foundation-logo.png"
+                width={190}
+              />
+            </span>
+          </div>
         </div>
-      </section>
-
-      <section className="regal-path-section">
-        <div className="container">
-          <div className="regal-section-heading"><p className="eyebrow">Designed for the full awards process</p><h2>A clear path for every participant.</h2></div>
-          <div className="regal-path-grid">{portalPaths.map((path) => <article className="regal-path-card" key={path.title}><span>{path.number}</span><h3>{path.title}</h3><p>{path.copy}</p></article>)}</div>
-        </div>
-      </section>
-
-      <section className="regal-callout"><div className="container regal-callout-inner"><div><p className="eyebrow">Ready for the season?</p><h2>Step into the GHSMTA Awards Portal.</h2></div><div className="button-row"><Link className="button button-gold" href="/signup">Create school account</Link><Link className="button button-ghost-gold" href="/login">Sign in securely</Link></div></div></section>
-      <footer className="regal-footer"><div className="container"><strong>Georgia High School Musical Theatre Awards</strong><span>Secure applications · Live scheduling · Collaborative adjudication · <Link href="/privacy">Privacy &amp; data use</Link></span></div></footer>
+      </footer>
     </main>
   );
 }
