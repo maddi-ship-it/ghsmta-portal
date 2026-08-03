@@ -148,6 +148,12 @@ function buildNavigation(
         icon: "▦",
       },
       {
+        href: "/portal/admin/feedback",
+        label: "Bug & feature tickets",
+        shortLabel: "Tickets",
+        icon: "?",
+      },
+      {
         href: "/portal/admin/archive",
         label: "View archive",
         shortLabel: "Archive",

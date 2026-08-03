@@ -12,8 +12,11 @@
 
 1. Take a Supabase backup or confirm point-in-time recovery.
 2. Run `supabase/migrations/20260803011303_production_hardening_release.sql` in the SQL Editor after all earlier migrations.
-3. Run `supabase/verification/030_production_hardening_check.sql` and require the passing result.
-4. Review the Supabase Security and Performance Advisors before deployment.
+3. Run `supabase/migrations/20260803140701_chat_channel_rebrand.sql`.
+4. Run `supabase/migrations/20260803141257_owner_reference_upload_500mb.sql`.
+5. Run `supabase/migrations/20260803142145_admin_feedback_ticket_workspace.sql`.
+6. Run verification scripts `030` through `033`; require passing results from all four.
+7. Review the Supabase Security and Performance Advisors before deployment.
 
 ## Application rollout
 

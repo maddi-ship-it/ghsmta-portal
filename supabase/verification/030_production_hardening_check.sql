@@ -62,7 +62,7 @@ begin
   if not exists (
     select 1 from storage.buckets
     where id = 'reference-documents'
-      and file_size_limit = 209715200
+      and file_size_limit = 524288000
       and allowed_mime_types is not null
   ) then
     raise exception 'reference-documents bucket policy is incomplete.';

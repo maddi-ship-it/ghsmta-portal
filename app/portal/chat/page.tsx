@@ -5,6 +5,11 @@ import type {
 } from "@/components/teams-chat";
 import { TeamsChat } from "@/components/teams-chat";
 import { requireProfile } from "@/lib/auth";
+import {
+  ADJUDICATOR_CHANNELS_LABEL,
+  chatChannelDisplayName,
+  chatChannelGroupLabel,
+} from "@/lib/chat-terminology";
 import { createClient } from "@/lib/supabase/server";
 
 type RawChannel = Partial<ChatChannel> & {
@@ -30,7 +35,11 @@ function fallbackChannelGroup(
       return { key: "community", label: "Community", order: 10 };
     case "general":
     case "networking":
-      return { key: "staff", label: "Staff channels", order: 20 };
+      return {
+        key: "staff",
+        label: ADJUDICATOR_CHANNELS_LABEL,
+        order: 20,
+      };
     case "advisory_committee":
       return { key: "committee", label: "Advisory Committee", order: 30 };
     case "school_dm":
@@ -68,7 +77,10 @@ function normalizeChannels(rows: RawChannel[]): ChatChannel[] {
     return {
       channel_id: row.channel_id,
       channel_type: row.channel_type,
-      channel_name: row.channel_name,
+      channel_name: chatChannelDisplayName(
+        row.channel_type,
+        row.channel_name,
+      ),
       channel_description: row.channel_description ?? null,
       application_id: row.application_id ?? null,
       school_name: row.school_name ?? null,
@@ -79,7 +91,12 @@ function normalizeChannels(rows: RawChannel[]): ChatChannel[] {
       latest_message_preview: row.latest_message_preview ?? null,
       latest_author_name: row.latest_author_name ?? null,
       channel_group: row.channel_group ?? group.key,
-      channel_group_label: row.channel_group_label ?? group.label,
+      channel_group_label: archived
+        ? row.channel_group_label ?? group.label
+        : chatChannelGroupLabel(
+            row.channel_type,
+            row.channel_group_label ?? group.label,
+          ),
       channel_group_order: Number(row.channel_group_order ?? group.order),
       visibility_label:
         row.visibility_label ?? fallbackVisibilityLabel(row.channel_type),
@@ -173,8 +190,8 @@ export default async function ChatPage({
           <span className="eyebrow">Communication</span>
           <h1>GHSMTA Chat</h1>
           <p>
-            Community discussions, private School Messaging, and assigned panel
-            channels in one workspace.
+            School community discussions, private School Messaging, and
+            assigned panel channels in one workspace.
           </p>
         </div>
       </div>

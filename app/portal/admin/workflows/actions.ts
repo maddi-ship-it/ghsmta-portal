@@ -84,18 +84,3 @@ export async function assignScoringParticipant(formData: FormData) {
   revalidatePath(SETUP_PATH);
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }
-
-export async function updateFeedbackRequest(formData: FormData) {
-  await requireProfile(["owner"]);
-  const id = text(formData, "id");
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("portal_feedback_requests")
-    .update({
-      status: text(formData, "status"),
-      owner_notes: text(formData, "owner_notes") || null,
-    })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-  revalidatePath(SETUP_PATH);
-}

@@ -1,11 +1,17 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Upload } from "tus-js-client";
 
-import { createClient } from "@/lib/supabase/client";
-import { isAllowedPortalFile, PORTAL_FILE_ACCEPT } from "@/lib/file-upload-policy";
-import type { AppRole } from "@/lib/types";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
+import { createClient } from "@/lib/supabase/client";
+import {
+  isAllowedPortalFile,
+  portalFileMimeType,
+  PORTAL_FILE_ACCEPT,
+  REFERENCE_DOCUMENT_MAX_FILE_BYTES,
+} from "@/lib/file-upload-policy";
+import type { AppRole } from "@/lib/types";
 
 type ReferenceDocument = {
   id: string;
@@ -29,7 +35,22 @@ type Folder = {
 };
 
 const BUCKET = "reference-documents";
-const MAX_FILE_SIZE = 200 * 1024 * 1024;
+const RESUMABLE_CHUNK_SIZE = 6 * 1024 * 1024;
+
+function resumableStorageEndpoint() {
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!projectUrl) {
+    throw new Error("Supabase storage is not configured.");
+  }
+
+  const url = new URL(projectUrl);
+  if (url.hostname.endsWith(".supabase.co")) {
+    const projectRef = url.hostname.split(".")[0];
+    return `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`;
+  }
+
+  return new URL("/storage/v1/upload/resumable", url).toString();
+}
 
 function safeFileName(value: string) {
   return value
@@ -77,6 +98,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
   );
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ReferenceDocument | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -169,8 +191,8 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      setError("Files must be 200 MB or smaller.");
+    if (file.size > REFERENCE_DOCUMENT_MAX_FILE_BYTES) {
+      setError("Files must be 500 MB or smaller.");
       return;
     }
     if (!isAllowedPortalFile(file)) {
@@ -178,22 +200,84 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
       return;
     }
 
+    const contentType = portalFileMimeType(file);
+    if (!contentType) {
+      setError("The selected file type could not be verified.");
+      return;
+    }
+
     setUploading(true);
+    setUploadProgress(0);
 
     const fileName = safeFileName(file.name) || "reference-document";
-    const storagePath = `${new Date().getFullYear()}/${crypto.randomUUID()}-${fileName}`;
+    let storagePath = `${new Date().getFullYear()}/${crypto.randomUUID()}-${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, file, {
-        cacheControl: "3600",
-        contentType: file.type || undefined,
-        upsert: false,
-      });
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-    if (uploadError) {
-      setError(uploadError.message);
+    if (sessionError || !accessToken || !publishableKey) {
+      setError(sessionError?.message ?? "Your upload session is unavailable. Sign in again and retry.");
       setUploading(false);
+      setUploadProgress(null);
+      return;
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const upload = new Upload(file, {
+          endpoint: resumableStorageEndpoint(),
+          retryDelays: [0, 3_000, 5_000, 10_000, 20_000],
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            apikey: publishableKey,
+            "x-upsert": "false",
+          },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          chunkSize: RESUMABLE_CHUNK_SIZE,
+          metadata: {
+            bucketName: BUCKET,
+            objectName: storagePath,
+            contentType,
+            cacheControl: "3600",
+          },
+          onProgress: (bytesUploaded, bytesTotal) => {
+            setUploadProgress(
+              bytesTotal > 0
+                ? Math.min(100, Math.round((bytesUploaded / bytesTotal) * 100))
+                : 0,
+            );
+          },
+          onError: reject,
+          onSuccess: () => resolve(),
+        });
+
+        void upload
+          .findPreviousUploads()
+          .then((previousUploads) => {
+            const previousUpload = previousUploads.find(
+              (candidate) =>
+                candidate.metadata.bucketName === BUCKET &&
+                Boolean(candidate.metadata.objectName),
+            );
+            if (previousUpload) {
+              storagePath = previousUpload.metadata.objectName;
+              upload.resumeFromPreviousUpload(previousUpload);
+            }
+            upload.start();
+          })
+          .catch(reject);
+      });
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "The resumable upload failed.",
+      );
+      setUploading(false);
+      setUploadProgress(null);
       return;
     }
 
@@ -214,6 +298,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
       await supabase.storage.from(BUCKET).remove([storagePath]);
       setError(metadataError.message);
       setUploading(false);
+      setUploadProgress(null);
       return;
     }
 
@@ -221,6 +306,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
     setMessage("Reference document uploaded.");
     await loadDocuments();
     setUploading(false);
+    setUploadProgress(null);
   }
 
   async function deleteDocument(document: ReferenceDocument) {
@@ -271,7 +357,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
               <div className="field reference-file-field">
                 <label htmlFor="reference_file">File</label>
                 <input accept={PORTAL_FILE_ACCEPT} className="input" id="reference_file" name="file" required type="file" />
-                <small>Maximum file size: 200 MB. Large uploads may take several minutes.</small>
+                <small>Maximum file size: 500 MB. Large uploads are resumable and may take several minutes.</small>
               </div>
 
               <div className="field reference-description-field">
@@ -294,8 +380,14 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
               </fieldset>
 
               <button className="button button-dark" disabled={uploading} type="submit">
-                {uploading ? "Uploading…" : "Upload document"}
+                {uploading ? `Uploading ${uploadProgress ?? 0}%…` : "Upload document"}
               </button>
+              {uploading && (
+                <div className="reference-upload-progress" role="status" aria-live="polite">
+                  <progress max="100" value={uploadProgress ?? 0} />
+                  <span>{uploadProgress ?? 0}% uploaded</span>
+                </div>
+              )}
             </form>
           </div>
         </section>

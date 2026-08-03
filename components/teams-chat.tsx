@@ -24,6 +24,10 @@ import {
 } from "@/app/portal/chat/actions";
 import styles from "@/components/chat-workspace.module.css";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
+import {
+  ADJUDICATOR_CHANNELS_LABEL,
+  SCHOOL_COMMUNITY_CHAT_LABEL,
+} from "@/lib/chat-terminology";
 import { createClient } from "@/lib/supabase/client";
 import { isAllowedPortalFile, PORTAL_FILE_ACCEPT } from "@/lib/file-upload-policy";
 import type { AppRole, Profile } from "@/lib/types";
@@ -255,8 +259,8 @@ const GROUP_FALLBACKS: Record<
   { key: string; label: string; order: number }
 > = {
   applicant_community: { key: "community", label: "Community", order: 10 },
-  general: { key: "staff", label: "Staff channels", order: 20 },
-  networking: { key: "staff", label: "Staff channels", order: 20 },
+  general: { key: "staff", label: ADJUDICATOR_CHANNELS_LABEL, order: 20 },
+  networking: { key: "staff", label: ADJUDICATOR_CHANNELS_LABEL, order: 20 },
   advisory_committee: {
     key: "committee",
     label: "Advisory Committee",
@@ -296,7 +300,7 @@ function channelIcon(type: ChannelType) {
     case "applicant_community":
       return "CO";
     case "general":
-      return "GE";
+      return "GA";
     case "networking":
       return "NW";
     case "advisory_committee":
@@ -1577,7 +1581,7 @@ export function TeamsChat({
             <div>
               <div className={styles.channelEyebrowRow}>
                 <span className="eyebrow">
-                  {isThreaded ? "Threaded community" : "Live channel"}
+                  {isThreaded ? "Threaded discussion" : "Live channel"}
                 </span>
                 {activeChannel.application_archived && (
                   <span className={styles.archivedBadge}>Archived</span>
@@ -1678,7 +1682,7 @@ export function TeamsChat({
                   id="chat-body"
                   members={members}
                   name="body"
-                  placeholder="Write a message to Community Chat"
+                  placeholder={`Write a message to ${SCHOOL_COMMUNITY_CHAT_LABEL}`}
                   rows={4}
                 />
               </div>
@@ -1699,7 +1703,7 @@ export function TeamsChat({
               {threads.length === 0 ? (
                 <div className={`empty-state ${styles.threadEmpty}`}>
                   <h2>No conversations yet.</h2>
-                  <p>Start the first Community Chat topic.</p>
+                  <p>Start the first {SCHOOL_COMMUNITY_CHAT_LABEL} topic.</p>
                 </div>
               ) : (
                 threads.map((thread) => (

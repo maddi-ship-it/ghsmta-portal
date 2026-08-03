@@ -47,8 +47,8 @@ begin
   select file_size_limit into chat_limit
   from storage.buckets where id = 'chat-files';
 
-  if reference_limit is distinct from 209715200 then
-    raise exception 'Reference document limit is %, expected 209715200.', reference_limit;
+  if reference_limit is distinct from 524288000 then
+    raise exception 'Reference document limit is %, expected 524288000.', reference_limit;
   end if;
   if chat_limit is distinct from 26214400 then
     raise exception 'Chat file limit is %, expected 26214400.', chat_limit;

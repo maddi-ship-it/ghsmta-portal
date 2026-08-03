@@ -67,30 +67,10 @@ export async function submitPortalFeedback(
   }
 
   revalidatePath("/portal/feedback");
-  revalidatePath("/portal/admin/workflows");
+  revalidatePath("/portal/admin/feedback");
   return {
     ok: true,
     requestId: request.id as string,
     referenceCode: request.reference_code as string,
   };
-}
-
-export async function updatePortalFeedbackRequest(
-  requestId: string,
-  formData: FormData,
-) {
-  await requireProfile(["owner"]);
-  const status = text(formData, "status");
-  const ownerNotes = text(formData, "owner_notes");
-  const allowed = ["new", "needs_information", "reviewing", "planned", "in_progress", "resolved", "closed"];
-  if (!allowed.includes(status)) throw new Error("Invalid request status.");
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("portal_feedback_requests")
-    .update({ status, owner_notes: ownerNotes || null })
-    .eq("id", requestId);
-  if (error) throw new Error(error.message);
-  revalidatePath("/portal/feedback");
-  revalidatePath("/portal/admin/workflows");
 }

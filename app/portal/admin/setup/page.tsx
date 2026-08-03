@@ -37,7 +37,7 @@ const tabs: Array<{
   {
     key: "workflows",
     label: "Workflows & notifications",
-    description: "Configure reminders, daily review emails, appeals, and support requests.",
+    description: "Configure reminders, daily review emails, and scoring permissions.",
   },
 ];
 

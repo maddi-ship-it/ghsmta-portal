@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireProfile } from "@/lib/auth";
+import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
 import { createClient } from "@/lib/supabase/server";
 
 type ChatActionResult = {
@@ -82,7 +83,7 @@ export async function createChatPost(
   if (channel.channel_type !== "applicant_community") {
     return {
       ok: false,
-      error: "Only Community Chat uses threaded conversations.",
+      error: `Only ${SCHOOL_COMMUNITY_CHAT_LABEL} uses threaded conversations.`,
     };
   }
 
@@ -137,7 +138,7 @@ export async function createChatReply(
   if (channel.channel_type !== "applicant_community") {
     return {
       ok: false,
-      error: "Replies are only available in Community Chat.",
+      error: `Replies are only available in ${SCHOOL_COMMUNITY_CHAT_LABEL}.`,
     };
   }
 
@@ -191,7 +192,7 @@ export async function createChatMessage(
   if (channel.channel_type === "applicant_community") {
     return {
       ok: false,
-      error: "Start a threaded conversation in Community Chat instead.",
+      error: `Start a threaded conversation in ${SCHOOL_COMMUNITY_CHAT_LABEL} instead.`,
     };
   }
 
@@ -247,7 +248,7 @@ export async function moderateChatPost(
   if (relatedChannel?.channel_type !== "applicant_community") {
     return {
       ok: false,
-      error: "Thread moderation is only available in Applicant Community.",
+      error: `Thread moderation is only available in ${SCHOOL_COMMUNITY_CHAT_LABEL}.`,
     };
   }
 

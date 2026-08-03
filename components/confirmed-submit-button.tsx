@@ -13,6 +13,9 @@ export function ConfirmedSubmitButton({
   destructive = false,
   requireReason = false,
   reasonName = "void_reason",
+  reasonLabel = "Reason",
+  reasonPlaceholder = "Enter a short audit reason",
+  reasonMaxLength = 500,
 }: {
   label: string;
   title: string;
@@ -21,6 +24,9 @@ export function ConfirmedSubmitButton({
   destructive?: boolean;
   requireReason?: boolean;
   reasonName?: string;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  reasonMaxLength?: number;
 }) {
   const { pending } = useFormStatus();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -62,14 +68,14 @@ export function ConfirmedSubmitButton({
       >
         {requireReason ? (
           <div className="field regal-dialog-reason">
-            <label htmlFor={`reason-${reasonName}`}>Reason</label>
+            <label htmlFor={`reason-${reasonName}`}>{reasonLabel}</label>
             <textarea
               autoFocus
               className="textarea"
               id={`reason-${reasonName}`}
-              maxLength={500}
+              maxLength={reasonMaxLength}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Enter a short audit reason"
+              placeholder={reasonPlaceholder}
               rows={3}
               value={reason}
             />

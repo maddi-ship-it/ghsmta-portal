@@ -5,6 +5,7 @@ import { sendSmtpEmail } from "@/lib/email/smtp";
 import { createInvoicePdf } from "@/lib/reports/invoice-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { INVOICE_SCHOOL_CHAT_CHANNEL_TYPE } from "./delivery-routing";
 import {
   formatInvoiceAmount,
   type InvoiceDeliveryType,
@@ -186,7 +187,9 @@ export async function deliverSchoolInvoice(
     .from("chat_channels")
     .select("id")
     .eq("application_id", invoice.application_id)
-    .eq("channel_type", "school_dm")
+    // Financial messages must reach the school-facing conversation. The
+    // `school` channel type is the private adjudication Panel Channel.
+    .eq("channel_type", INVOICE_SCHOOL_CHAT_CHANNEL_TYPE)
     .eq("active", true)
     .limit(1)
     .maybeSingle();

@@ -184,7 +184,7 @@ export default async function BillingPage({
 
       <div className="billing-layout">
         <section className="panel">
-          <div className="panel-header"><div><h2>Send an invoice</h2><p>The school receives email, chat, and an in-app notification.</p></div></div>
+          <div className="panel-header"><div><h2>Send an invoice</h2><p>The school receives email, School Messaging, and an in-app notification. Invoice notices never enter Panel Channels.</p></div></div>
           <div className="panel-body">
             <form action={createAndSendInvoice} className="form-stack">
               <div className="field">
