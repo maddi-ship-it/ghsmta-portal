@@ -28,7 +28,7 @@
 3. Verify light, dark, and system themes at desktop and mobile widths.
 4. Preview and send a paid test invoice and a scholarship confirmation; verify edited message personalization, email PDF attachment, private School Messaging, queue removal/void return, receipt, reminder, and retry behavior.
 5. Verify chat reactions, a 25 MB file rejection boundary, school channel grouping, voice dictation, note scanning, schedule panel/understudy/shadow signup, and locked score submission.
-6. Submit a scholarship application and verify its private chat is visible only to that applicant, Program Managers, and Owners. Confirm Program Managers see General Announcements and released results, but cannot open school messaging, panel channels, Advisory chat, School Community Chat, adjudication, or configuration pages.
+6. Submit a scholarship application and verify its private chat is visible only to that applicant, Program Managers, and Owners. Confirm Program Managers see General Announcements, submitted applications, released results, and read-only scheduling, but cannot open school messaging, panel channels, Advisory chat, School Community Chat, adjudication, or configuration pages.
 7. Promote the verified deployment to production and watch `/api/health`, Vercel function logs, and Owner system notifications.
 
 ## Rollback

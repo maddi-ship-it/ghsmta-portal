@@ -27,6 +27,8 @@ export default async function PortalDashboard() {
     ? "Manage your school’s application and submission status."
     : profile.role === "adjudicator"
       ? "Review the applications currently assigned to you."
+      : profile.role === "program_manager"
+        ? "Coordinate submitted applications and scholarship applicant conversations."
       : `View the current awards cycle as an ${roleLabel(profile.role).toLowerCase()}.`;
 
   return (
@@ -48,7 +50,7 @@ export default async function PortalDashboard() {
         {applications.length === 0 ? (
           <div className="empty-state">
             <h3>No applications are available yet.</h3>
-            <p>{profile.role === "applicant" ? "Once an owner opens an awards cycle, your application can be created here." : "Create or activate an awards cycle, then applicant records will appear here according to your role."}</p>
+            <p>{profile.role === "applicant" ? "Once an owner opens an awards cycle, your application can be created here." : profile.role === "program_manager" ? "Submitted applications will appear here when they become available." : "Create or activate an awards cycle, then applicant records will appear here according to your role."}</p>
           </div>
         ) : (
           <div className="table-wrap"><table className="data-table"><thead><tr><th>School</th><th>Production</th><th>Status</th><th>Updated</th></tr></thead><tbody>

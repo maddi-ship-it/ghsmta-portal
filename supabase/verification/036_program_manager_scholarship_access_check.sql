@@ -6,6 +6,12 @@ declare
   member_function_definition text;
   channel_list_function_definition text;
   security_function_definition text;
+  schedule_bookings_function_definition text;
+  schedule_directory_function_definition text;
+  schedule_details_function_definition text;
+  shared_observations_function_definition text;
+  release_function_definition text;
+  scorecard_function_definition text;
   channel_type_definition text;
   application_type_definition text;
 begin
@@ -44,6 +50,36 @@ begin
 
   if security_function_definition not ilike '%program_manager%' then
     raise exception 'Program Managers are missing from MFA defaults.';
+  end if;
+
+  select pg_get_functiondef(
+    'public.get_schedule_bookings_for_staff()'::regprocedure
+  ) into schedule_bookings_function_definition;
+
+  select pg_get_functiondef(
+    'public.get_schedule_staff_directory()'::regprocedure
+  ) into schedule_directory_function_definition;
+
+  select pg_get_functiondef(
+    'public.can_read_schedule_school_details(uuid,uuid)'::regprocedure
+  ) into schedule_details_function_definition;
+
+  if schedule_bookings_function_definition not ilike '%program_manager%'
+     or schedule_directory_function_definition not ilike '%program_manager%'
+     or schedule_details_function_definition not ilike '%program_manager%' then
+    raise exception 'Program Manager read-only scheduling access is incomplete.';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies policy_record
+    where policy_record.schemaname = 'public'
+      and policy_record.tablename = 'schedule_slots'
+      and policy_record.policyname = 'authenticated read visible schedule slots'
+      and policy_record.cmd = 'SELECT'
+      and policy_record.qual ilike '%program_manager%'
+  ) then
+    raise exception 'Program Manager schedule-slot visibility is missing.';
   end if;
 
   select pg_get_constraintdef(constraint_record.oid)
@@ -148,6 +184,24 @@ begin
       ) ilike '%program_manager%'
   ) then
     raise exception 'Program Managers were granted unreleased adjudication access.';
+  end if;
+
+  select pg_get_functiondef(
+    'public.get_shared_adjudication_observations(uuid)'::regprocedure
+  ) into shared_observations_function_definition;
+
+  select pg_get_functiondef(
+    'public.release_adjudication(uuid,boolean,boolean,text)'::regprocedure
+  ) into release_function_definition;
+
+  select pg_get_functiondef(
+    'public.ensure_adjudication_scorecard(uuid)'::regprocedure
+  ) into scorecard_function_definition;
+
+  if shared_observations_function_definition ilike '%program_manager%'
+     or release_function_definition ilike '%program_manager%'
+     or scorecard_function_definition ilike '%program_manager%' then
+    raise exception 'An adjudication RPC grants Program Manager access.';
   end if;
 
   if exists (

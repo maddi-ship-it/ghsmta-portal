@@ -24,10 +24,19 @@ begin
 
   if new.role in ('owner', 'advisory_member', 'program_manager') then
     new.mfa_required := true;
-    new.mfa_grace_until := coalesce(
-      new.mfa_grace_until,
-      now() + interval '14 days'
-    );
+    if tg_op = 'INSERT' then
+      new.mfa_grace_until := coalesce(
+        new.mfa_grace_until,
+        now() + interval '14 days'
+      );
+    elsif old.role is distinct from new.role then
+      new.mfa_grace_until := now() + interval '14 days';
+    else
+      new.mfa_grace_until := coalesce(
+        new.mfa_grace_until,
+        now() + interval '14 days'
+      );
+    end if;
   end if;
 
   return new;
@@ -69,6 +78,187 @@ using (
     )
   )
 );
+
+-- Scheduling remains an operational read-only area for Program Managers. The
+-- existing mutation functions continue to accept only their original roles.
+drop policy if exists "authenticated read visible schedule slots"
+on public.schedule_slots;
+
+create policy "authenticated read visible schedule slots"
+on public.schedule_slots
+for select
+to authenticated
+using (
+  (select public.current_user_role()) = 'owner'
+  or (
+    (select public.current_user_role()) in (
+      'adjudicator',
+      'advisory_member',
+      'program_manager'
+    )
+    and status in ('open', 'closed', 'cancelled')
+  )
+  or (
+    (select public.current_user_role()) = 'applicant'
+    and (
+      exists (
+        select 1
+        from public.schedule_school_bookings booking
+        where booking.slot_id = schedule_slots.id
+          and public.is_application_member(
+            booking.application_id,
+            (select auth.uid())
+          )
+      )
+      or (
+        status = 'open'
+        and starts_at > now()
+        and school_booking_opens_at is not null
+        and school_booking_opens_at <= now()
+        and (
+          school_booking_closes_at is null
+          or school_booking_closes_at > now()
+        )
+      )
+    )
+  )
+);
+
+create or replace function public.get_schedule_bookings_for_staff()
+returns table (
+  booking_id uuid,
+  slot_id uuid,
+  application_id uuid,
+  cycle_id uuid,
+  school_name text,
+  production_title text,
+  application_status public.application_status,
+  booked_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if public.current_user_role() not in (
+    'adjudicator',
+    'advisory_member',
+    'program_manager',
+    'owner'
+  ) then
+    raise exception 'Staff access required.';
+  end if;
+
+  return query
+  select
+    booking.id,
+    booking.slot_id,
+    application.id,
+    application.cycle_id,
+    application.school_name,
+    application.production_title,
+    application.status,
+    booking.booked_at
+  from public.schedule_school_bookings booking
+  join public.applications application
+    on application.id = booking.application_id;
+end;
+$$;
+
+revoke all on function public.get_schedule_bookings_for_staff()
+from public, anon;
+grant execute on function public.get_schedule_bookings_for_staff()
+to authenticated;
+
+create or replace function public.get_schedule_staff_directory()
+returns table (
+  enrollment_id uuid,
+  slot_id uuid,
+  user_id uuid,
+  full_name text,
+  email text,
+  role public.app_role,
+  participation_mode text,
+  joined_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if public.current_user_role() not in (
+    'adjudicator',
+    'advisory_member',
+    'program_manager',
+    'owner'
+  ) then
+    raise exception 'Staff access required.';
+  end if;
+
+  return query
+  select
+    enrollment.id,
+    enrollment.slot_id,
+    profile.id,
+    profile.full_name,
+    profile.email,
+    enrollment.joined_as,
+    enrollment.participation_mode,
+    enrollment.joined_at
+  from public.schedule_slot_staff enrollment
+  join public.profiles profile
+    on profile.id = enrollment.user_id
+  where profile.active = true;
+end;
+$$;
+
+revoke all on function public.get_schedule_staff_directory()
+from public, anon;
+grant execute on function public.get_schedule_staff_directory()
+to authenticated;
+
+create or replace function public.can_read_schedule_school_details(
+  p_slot_id uuid,
+  p_user_id uuid default auth.uid()
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.profiles profile
+    where profile.id = p_user_id
+      and profile.active = true
+      and (
+        profile.role in ('owner', 'program_manager')
+        or exists (
+          select 1
+          from public.schedule_slot_staff staff
+          where staff.slot_id = p_slot_id
+            and staff.user_id = p_user_id
+        )
+        or exists (
+          select 1
+          from public.schedule_school_bookings booking
+          where booking.slot_id = p_slot_id
+            and public.is_application_member(
+              booking.application_id,
+              p_user_id
+            )
+        )
+      )
+  );
+$$;
+
+revoke all on function public.can_read_schedule_school_details(uuid, uuid)
+from public, anon;
+grant execute on function public.can_read_schedule_school_details(uuid, uuid)
+to authenticated;
 
 -- Add a dedicated application-scoped channel type for scholarship applicants.
 alter table public.chat_channels

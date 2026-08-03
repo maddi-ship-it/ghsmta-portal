@@ -46,26 +46,29 @@ function buildNavigation(
     },
   ];
 
-  const resources: NavItem[] = [
-    {
-      href: "/portal/files",
-      label: "School files",
-      shortLabel: "Files",
-      icon: "▱",
-    },
-    {
-      href: "/portal/reference-documents",
-      label: "Reference documents",
-      shortLabel: "Reference",
-      icon: "◫",
-    },
-    {
-      href: "/portal/appeals",
-      label: "Eligibility appeals",
-      shortLabel: "Appeals",
-      icon: "⚖",
-    },
-  ];
+  const resources: NavItem[] =
+    profile.role === "program_manager"
+      ? []
+      : [
+          {
+            href: "/portal/files",
+            label: "School files",
+            shortLabel: "Files",
+            icon: "▱",
+          },
+          {
+            href: "/portal/reference-documents",
+            label: "Reference documents",
+            shortLabel: "Reference",
+            icon: "◫",
+          },
+          {
+            href: "/portal/appeals",
+            label: "Eligibility appeals",
+            shortLabel: "Appeals",
+            icon: "⚖",
+          },
+        ];
 
   const management: NavItem[] = [];
 
