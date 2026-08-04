@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
@@ -9,9 +10,11 @@ import type {
   ApplicationSection,
   ApplicationStage,
   AwardCycle,
+  ScoringRubric,
 } from "@/lib/types";
 
 import {
+  assignActiveRubricToForm,
   createQuestion,
   createSection,
   createStage,
@@ -51,11 +54,18 @@ export default async function FormBuilderPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [versionResult, stagesResult, sectionsResult, questionsResult, cyclesResult] =
+  const [
+    versionResult,
+    stagesResult,
+    sectionsResult,
+    questionsResult,
+    cyclesResult,
+    rubricsResult,
+  ] =
     await Promise.all([
       supabase
         .from("application_form_versions")
-        .select("id,cycle_id,version_number,name,status,published_at,created_at,updated_at")
+        .select("id,cycle_id,scoring_rubric_id,version_number,name,status,published_at,created_at,updated_at")
         .eq("id", id)
         .single(),
       supabase
@@ -81,6 +91,10 @@ export default async function FormBuilderPage({
         .select("id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at")
         .order("season_year", { ascending: false })
         .order("name"),
+      supabase
+        .from("scoring_rubrics")
+        .select("*")
+        .order("version_number", { ascending: false }),
     ]);
 
   if (!versionResult.data) notFound();
@@ -91,6 +105,15 @@ export default async function FormBuilderPage({
   const stages = (stagesResult.data ?? []) as ApplicationStage[];
   const sections = (sectionsResult.data ?? []) as ApplicationSection[];
   const questions = (questionsResult.data ?? []) as ApplicationQuestion[];
+  const rubrics = ((rubricsResult.data ?? []) as ScoringRubric[]).filter(
+    (rubric) => rubric.cycle_id === version.cycle_id,
+  );
+  const activeRubric = rubrics.find(
+    (rubric) => rubric.status === "published",
+  ) ?? null;
+  const assignedRubric = rubrics.find(
+    (rubric) => rubric.id === version.scoring_rubric_id,
+  ) ?? null;
   const isDraft = version.status === "draft";
 
   const renderSection = (section: ApplicationSection) => {
@@ -217,6 +240,58 @@ export default async function FormBuilderPage({
           This version is {version.status}. “Edit published form” creates a safe draft version, so existing applications remain attached to the historical form they completed.
         </div>
       )}
+
+      <section className="panel form-duplicate-panel">
+        <div className="panel-header">
+          <div>
+            <h2>Scoring rubric</h2>
+            <p>
+              Applications using this form inherit its assigned scoring guide.
+            </p>
+          </div>
+          <span className={`badge ${assignedRubric ? "badge-complete" : "badge-warning"}`}>
+            {assignedRubric ? "Assigned" : "Not assigned"}
+          </span>
+        </div>
+        <div className="panel-body">
+          {version.status !== "published" ? (
+            <p>Publish this form before assigning its scoring rubric.</p>
+          ) : !activeRubric ? (
+            <p>
+              This program does not have an active published rubric. Publish one
+              in <Link href="/portal/admin/setup?tab=scoring">Scoring setup</Link> first.
+            </p>
+          ) : (
+            <div className="inline-form-grid">
+              <div>
+                <strong>
+                  {assignedRubric
+                    ? `${assignedRubric.name} — Version ${assignedRubric.version_number}`
+                    : "No rubric assigned"}
+                </strong>
+                <p>
+                  Active rubric: {activeRubric.name} — Version {activeRubric.version_number}
+                </p>
+              </div>
+              {version.scoring_rubric_id === activeRubric.id ? (
+                <span className="badge badge-complete">Active rubric assigned</span>
+              ) : (
+                <form
+                  action={assignActiveRubricToForm.bind(
+                    null,
+                    version.id,
+                    activeRubric.id,
+                  )}
+                >
+                  <button className="button button-dark" type="submit">
+                    Assign active rubric
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="panel form-duplicate-panel">
         <div className="panel-header"><h2>Duplicate this form</h2></div>

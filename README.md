@@ -68,7 +68,7 @@ For the complete production release, also configure these server-only values:
 
 Before deploying the release:
 
-1. Apply all migrations through `supabase/migrations/20260804163627_acceptd_cron_only.sql`.
+1. Apply all migrations through `supabase/migrations/20260804194218_assign_scoring_rubric_to_form.sql`.
 2. In Supabase Storage settings, set the project-wide maximum file size to at least 200 MB. The migration sets the private `reference-documents` bucket to 200 MB and the private `chat-files` bucket to 25 MB, but bucket limits cannot exceed the project-wide limit.
 3. Keep both Storage buckets private and verify their RLS policies after migration.
 4. Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS production URL so invoice, receipt, and payment emails contain production links.
@@ -156,6 +156,7 @@ node scripts/seed-2025-2026-scoring.mjs
 The scoring module includes:
 
 - 15 GHSMTA scoring categories and 58 criteria from the supplied workbook
+- explicit assignment of the active rubric to each published application form
 - private adjudicator scorecards and four-part comment quadrants
 - advisory/owner panel review
 - owner-edited ChatGPT prompt and AI-assisted panel narratives

@@ -18,7 +18,7 @@ export default async function FormsPage() {
       .order("season_year", { ascending: false }),
     supabase
       .from("application_form_versions")
-      .select("id,cycle_id,version_number,name,status,published_at,created_at,updated_at")
+      .select("id,cycle_id,scoring_rubric_id,version_number,name,status,published_at,created_at,updated_at")
       .order("created_at", { ascending: false }),
   ]);
 

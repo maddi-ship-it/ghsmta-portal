@@ -122,6 +122,29 @@ export async function publishFormVersion(formVersionId: string) {
   revalidatePath(`/portal/admin/forms/${formVersionId}`);
 }
 
+export async function assignActiveRubricToForm(
+  formVersionId: string,
+  rubricId: string,
+) {
+  await requireProfile(["owner"]);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "owner_assign_scoring_rubric_to_form",
+    {
+      p_form_version_id: formVersionId,
+      p_rubric_id: rubricId,
+    },
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/portal/admin/forms");
+  revalidatePath("/portal/admin/setup");
+  revalidatePath(`/portal/admin/forms/${formVersionId}`);
+  revalidatePath("/portal/adjudication");
+}
+
 export async function createSection(formVersionId: string, formData: FormData) {
   await requireProfile(["owner"]);
 

@@ -8,23 +8,26 @@ export default async function AppealsPage() {
 
   const [
     applicationsResult,
+    formVersionsResult,
     appealsResult,
     categoriesResult,
-    rubricsResult,
     filesResult,
     cyclesResult,
   ] = await Promise.all([
       profile.role === "applicant"
         ? supabase
             .from("applications")
-            .select("id,school_name,production_title,cycle_id")
+            .select("id,school_name,production_title,cycle_id,form_version_id")
             .eq("is_archived", false)
             .order("updated_at", { ascending: false })
         : supabase
             .from("applications")
-            .select("id,school_name,production_title,cycle_id")
+            .select("id,school_name,production_title,cycle_id,form_version_id")
             .eq("is_archived", false)
             .order("school_name"),
+      supabase
+        .from("application_form_versions")
+        .select("id,scoring_rubric_id"),
       supabase
         .from("appeals")
         .select("*")
@@ -34,11 +37,6 @@ export default async function AppealsPage() {
         .select("id,title,rubric_id")
         .eq("active", true)
         .order("sort_order"),
-      supabase
-        .from("scoring_rubrics")
-        .select("id,cycle_id,status,version_number")
-        .eq("status", "published")
-        .order("version_number", { ascending: false }),
       supabase
         .from("portal_files")
         .select("id,context_id,original_name,generated_name,storage_path,mime_type,file_size,created_at")
@@ -54,9 +52,9 @@ export default async function AppealsPage() {
 
   for (const result of [
     applicationsResult,
+    formVersionsResult,
     appealsResult,
     categoriesResult,
-    rubricsResult,
     filesResult,
     cyclesResult,
   ]) {
@@ -66,9 +64,20 @@ export default async function AppealsPage() {
   const activeCycleIds = new Set(
     (cyclesResult.data ?? []).map((cycle) => cycle.id),
   );
-  const applications = (applicationsResult.data ?? []).filter((application) =>
-    activeCycleIds.has(application.cycle_id),
+  const formRubricMap = new Map(
+    (formVersionsResult.data ?? []).map((formVersion) => [
+      formVersion.id,
+      formVersion.scoring_rubric_id,
+    ]),
   );
+  const applications = (applicationsResult.data ?? [])
+    .filter((application) => activeCycleIds.has(application.cycle_id))
+    .map((application) => ({
+      ...application,
+      scoring_rubric_id: application.form_version_id
+        ? formRubricMap.get(application.form_version_id) ?? null
+        : null,
+    }));
   const activeApplicationIds = new Set(
     applications.map((application) => application.id),
   );
@@ -79,32 +88,6 @@ export default async function AppealsPage() {
   const files = (filesResult.data ?? []).filter((file) =>
     activeAppealIds.has(file.context_id),
   );
-
-  const publishedRubricByCycle = new Map<string, string>();
-  for (const rubric of rubricsResult.data ?? []) {
-    if (!publishedRubricByCycle.has(rubric.cycle_id)) {
-      publishedRubricByCycle.set(rubric.cycle_id, rubric.id);
-    }
-  }
-
-  const rubricCycleMap = new Map(
-    [...publishedRubricByCycle.entries()].map(([cycleId, rubricId]) => [
-      rubricId,
-      cycleId,
-    ]),
-  );
-
-  const applicationCategories = (categoriesResult.data ?? [])
-    .map((category) => ({
-      ...category,
-      cycle_id: rubricCycleMap.get(category.rubric_id) ?? null,
-    }))
-    .filter(
-      (
-        category,
-      ): category is typeof category & { cycle_id: string } =>
-        Boolean(category.cycle_id),
-    );
 
   return (
     <>
@@ -121,7 +104,7 @@ export default async function AppealsPage() {
       <AppealWorkspace
         appeals={appeals}
         applications={applications}
-        categories={applicationCategories}
+        categories={categoriesResult.data ?? []}
         cycles={cyclesResult.data ?? []}
         files={files}
         profile={profile}

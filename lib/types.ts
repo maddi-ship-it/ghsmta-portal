@@ -120,6 +120,7 @@ export type Application = {
 export type ApplicationFormVersion = {
   id: string;
   cycle_id: string;
+  scoring_rubric_id: string | null;
   version_number: number;
   name: string;
   status: FormVersionStatus;

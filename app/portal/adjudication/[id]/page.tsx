@@ -28,6 +28,7 @@ import type {
   AdjudicatorAssignment,
   Application,
   ApplicationAnswer,
+  ApplicationFormVersion,
   ApplicationQuestion,
   AwardCycle,
   Profile,
@@ -181,14 +182,24 @@ export default async function AdjudicationApplicationPage({
   const { data: cycleData } = await supabase.from("award_cycles").select("*").eq("id", application.cycle_id).single();
   const cycle = cycleData as AwardCycle | null;
 
-  const { data: rubricData, error: rubricError } = await supabase
-    .from("scoring_rubrics")
-    .select("*")
-    .eq("cycle_id", application.cycle_id)
-    .eq("status", "published")
-    .order("version_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data: formVersionData, error: formVersionError } =
+    application.form_version_id
+      ? await supabase
+          .from("application_form_versions")
+          .select("id,cycle_id,scoring_rubric_id,version_number,name,status,published_at,created_at,updated_at")
+          .eq("id", application.form_version_id)
+          .maybeSingle()
+      : { data: null, error: null };
+  if (formVersionError) throw new Error(formVersionError.message);
+  const applicationForm = formVersionData as ApplicationFormVersion | null;
+
+  const { data: rubricData, error: rubricError } = applicationForm?.scoring_rubric_id
+    ? await supabase
+        .from("scoring_rubrics")
+        .select("*")
+        .eq("id", applicationForm.scoring_rubric_id)
+        .maybeSingle()
+    : { data: null, error: null };
   if (rubricError) throw new Error(rubricError.message);
   const rubric = rubricData as ScoringRubric | null;
 
@@ -233,7 +244,7 @@ export default async function AdjudicationApplicationPage({
     return (
       <>
         <div className="page-heading"><div><h1>{application.school_name}</h1><p>{application.production_title ?? "Untitled production"}</p></div></div>
-        <section className="panel"><div className="empty-state"><h3>No published scoring rubric</h3><p>An owner must seed or publish a rubric for this program before adjudication can begin.</p>{profile.role === "owner" && <Link className="button button-dark" href="/portal/admin/scoring">Open scoring setup</Link>}</div></section>
+        <section className="panel"><div className="empty-state"><h3>No scoring rubric assigned</h3><p>An owner must assign the active rubric to this application&apos;s published form before adjudication can begin.</p>{profile.role === "owner" && application.form_version_id && <Link className="button button-dark" href={`/portal/admin/forms/${application.form_version_id}`}>Open application form</Link>}</div></section>
       </>
     );
   }

@@ -68,7 +68,7 @@ export default async function ApplicationDetailPage({
       ? await Promise.all([
           supabase
             .from("application_form_versions")
-            .select("id,cycle_id,version_number,name,status,published_at,created_at,updated_at")
+            .select("id,cycle_id,scoring_rubric_id,version_number,name,status,published_at,created_at,updated_at")
             .eq("id", application.form_version_id)
             .single(),
           supabase

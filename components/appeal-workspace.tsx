@@ -9,12 +9,11 @@ import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 
 type Appeal = { id: string; application_id: string; category_id: string | null; explanation: string; status: string; advisory_notes: string | null; owner_notes: string | null; resolution: string | null; submitted_at: string; resolved_at: string | null; current_eligibility: boolean | null; requested_eligibility: boolean; school_contact_name: string | null; school_contact_email: string | null; school_contact_phone: string | null };
-type ApplicationOption = { id: string; school_name: string; production_title: string | null; cycle_id: string };
+type ApplicationOption = { id: string; school_name: string; production_title: string | null; cycle_id: string; scoring_rubric_id: string | null };
 type CategoryOption = {
   id: string;
   title: string;
   rubric_id: string;
-  cycle_id: string;
 };
 type CycleOption = { id: string; name: string; season_year: string };
 type PortalFile = { id: string; context_id: string; original_name: string; generated_name: string; storage_path: string; mime_type: string | null; file_size: number | null; created_at: string };
@@ -39,7 +38,7 @@ export function AppealWorkspace({ profile, applications, appeals, categories, cy
   const selectedApplication = applicationMap.get(selectedApplicationId);
   const availableCategories = selectedApplication
     ? categories.filter(
-        (category) => category.cycle_id === selectedApplication.cycle_id,
+        (category) => category.rubric_id === selectedApplication.scoring_rubric_id,
       )
     : [];
 
@@ -108,7 +107,7 @@ export function AppealWorkspace({ profile, applications, appeals, categories, cy
                 </select>
                 {selectedApplication && availableCategories.length === 0 && (
                   <small className="field-warning">
-                    This application does not have a published scoring guide.
+                    This application form does not have an assigned scoring guide.
                   </small>
                 )}</div>
               </div>
