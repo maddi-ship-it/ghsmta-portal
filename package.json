@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "audit:dialogs": "node scripts/audit-browser-dialogs.mjs",
+    "acceptd:pull": "node scripts/pull-acceptd-applications.mjs",
     "check": "npm run lint && npm run typecheck && npm run test && npm run audit:dialogs"
   },
   "dependencies": {

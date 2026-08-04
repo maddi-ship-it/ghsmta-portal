@@ -82,6 +82,33 @@ The web interface already uses safe-area insets, touch-sized controls, responsiv
 
 For a durable App Store product, the Expo companion app is the recommended long-term route; this web starter remains the public site and full admin workspace.
 
+## Acceptd application pull
+
+The first-stage Acceptd integration can pull v2 application records into a
+private local JSON snapshot. It follows API pagination, retries transient
+failures, optionally retrieves each application's full detail record, and does
+not write to Supabase.
+
+Request API access from [Acceptd's developer portal](https://api.getacceptd.com),
+then add the server-only token to `.env.local`:
+
+```env
+ACCEPTD_API_TOKEN=YOUR_BEARER_TOKEN
+```
+
+Pull a small schema sample before mapping fields into the portal:
+
+```bash
+npm run acceptd:pull -- \
+  --limit 5 \
+  --output ./acceptd-application-sample.json
+```
+
+Use `--query 'key=value'` for any list filters supplied by Acceptd. Add
+`--list-only` to skip detail requests, and `--force` only when intentionally
+replacing an existing snapshot. Snapshot files are created with owner-only
+permissions and can contain applicant PII, so keep them out of source control.
+
 ## Immediate next modules
 
 1. Dynamic application form builder and form versions
