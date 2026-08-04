@@ -10,7 +10,7 @@ import {
 } from "@/lib/acceptd/model";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type AcceptdSyncTrigger = "manual" | "webhook" | "cron" | "schema";
+export type AcceptdSyncTrigger = "manual" | "cron" | "schema";
 
 type ProgramMapping = {
   id: string;
@@ -77,18 +77,6 @@ async function mappingById(mappingId: string) {
     .single();
   if (error || !data) throw new Error(error?.message ?? "Acceptd program mapping not found.");
   return data as ProgramMapping;
-}
-
-async function mappingByProgramId(programId: number) {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("acceptd_program_mappings")
-    .select("id,acceptd_program_id,acceptd_program_name,portal_cycle_id,portal_form_version_id,schema_source_program_ids,enabled,sync_drafts")
-    .eq("acceptd_program_id", programId)
-    .eq("enabled", true)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return (data as ProgramMapping | null) ?? null;
 }
 
 async function startRun(mappingId: string | null, triggerSource: AcceptdSyncTrigger) {
@@ -666,25 +654,6 @@ export async function refreshAcceptdSchema(mappingId: string) {
     );
   } catch (error) {
     return failRun(mapping.id, runId, error);
-  }
-}
-
-export async function syncAcceptdApplicationById(
-  applicationId: number,
-  hintedProgramId: number | null = null,
-) {
-  const client = createAcceptdClient();
-  const raw = await client.getApplication(applicationId);
-  const application = normalizeAcceptdApplication(raw);
-  const programId = application.programId ?? hintedProgramId;
-  if (!programId) throw new Error("The Acceptd webhook application has no program ID.");
-  const mapping = await mappingByProgramId(programId);
-  if (!mapping) return null;
-  try {
-    return await runProgramApplications(mapping, [application], "webhook");
-  } catch (error) {
-    if (error instanceof AcceptdSyncBusyError) return null;
-    throw error;
   }
 }
 

@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/cron/acceptd-sync",
-      "schedule": "*/2 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }

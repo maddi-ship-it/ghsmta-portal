@@ -69,13 +69,11 @@ export default async function AcceptdAdminPage({
   );
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const cycleById = new Map(cycles.map((cycle) => [cycle.id, cycle]));
-  const webhookHeader = process.env.ACCEPTD_WEBHOOK_SIGNATURE_HEADER?.trim();
   const integrationReady = Boolean(
     process.env.ACCEPTD_API_TOKEN &&
-      process.env.ACCEPTD_WEBHOOK_SECRET &&
-      webhookHeader,
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      process.env.CRON_SECRET,
   );
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://YOUR-PORTAL-DOMAIN";
   const defaultCycle =
     cycles.find((cycle) => cycle.cycle_key === "26-27-dir-app") ??
     cycles.find(
@@ -110,17 +108,17 @@ export default async function AcceptdAdminPage({
         <div className="panel-header">
           <div>
             <span className="eyebrow">Server configuration</span>
-            <h2>Webhook and API readiness</h2>
+            <h2>API and scheduler readiness</h2>
           </div>
           <span className={`badge${integrationReady ? " badge-complete" : ""}`}>
             {integrationReady ? "Ready" : "Needs environment variables"}
           </span>
         </div>
         <div className="panel-body detail-grid">
-          <div className="detail-item"><span>Webhook URL</span><strong>{siteUrl}/api/integrations/acceptd/webhook</strong></div>
-          <div className="detail-item"><span>Signature header</span><strong>{webhookHeader || "Not configured"}</strong></div>
-          <div className="detail-item"><span>Webhook secret</span><strong>{process.env.ACCEPTD_WEBHOOK_SECRET ? "Configured" : "Missing"}</strong></div>
+          <div className="detail-item"><span>Pull schedule</span><strong>Every minute · production</strong></div>
+          <div className="detail-item"><span>Scheduler secret</span><strong>{process.env.CRON_SECRET ? "Configured" : "Missing"}</strong></div>
           <div className="detail-item"><span>Acceptd API token</span><strong>{process.env.ACCEPTD_API_TOKEN ? "Configured" : "Missing"}</strong></div>
+          <div className="detail-item"><span>Supabase service role</span><strong>{process.env.SUPABASE_SERVICE_ROLE_KEY ? "Configured" : "Missing"}</strong></div>
         </div>
       </section>
 
@@ -143,7 +141,7 @@ export default async function AcceptdAdminPage({
                   <div className="field"><label htmlFor={`portal_cycle_id_${mapping.id}`}>Portal program</label><select className="select" id={`portal_cycle_id_${mapping.id}`} name="portal_cycle_id" defaultValue={mapping.portal_cycle_id} required>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.season_year} — {cycle.name}</option>)}</select></div>
                   <div className="field"><label htmlFor={`portal_form_version_id_${mapping.id}`}>Target form</label><select className="select" id={`portal_form_version_id_${mapping.id}`} name="portal_form_version_id" defaultValue={mapping.portal_form_version_id} required>{forms.map((form) => <option key={form.id} value={form.id}>{cycleById.get(form.cycle_id)?.season_year ?? "Program"} — v{form.version_number} — {form.name} ({form.status})</option>)}</select></div>
                   <div className="field"><label htmlFor={`schema_sources_${mapping.id}`}>Schema source program IDs</label><input className="input" id={`schema_sources_${mapping.id}`} name="schema_source_program_ids" defaultValue={(mapping.schema_source_program_ids ?? []).join(",")} /><p className="field-help">Use 162204 to discover the 628 fields observed in 2025–26. New conditional questions are added automatically.</p></div>
-                  <div className="field"><label>Sync scope</label><label className="check-row"><input name="enabled" type="checkbox" value="true" defaultChecked={mapping.enabled} />Enable webhooks and reconciliation</label><label className="check-row"><input name="sync_drafts" type="checkbox" value="true" defaultChecked={mapping.sync_drafts} />Sync draft applications</label></div>
+                  <div className="field"><label>Sync scope</label><label className="check-row"><input name="enabled" type="checkbox" value="true" defaultChecked={mapping.enabled} />Enable automatic minute pulls</label><label className="check-row"><input name="sync_drafts" type="checkbox" value="true" defaultChecked={mapping.sync_drafts} />Sync draft applications</label></div>
                 </div>
                 <div className="heading-actions">
                   <button className="button button-secondary" type="submit">Save connection</button>
@@ -167,7 +165,7 @@ export default async function AcceptdAdminPage({
                 <div className="field"><label htmlFor="portal_cycle_id">Portal program</label><select className="select" id="portal_cycle_id" name="portal_cycle_id" defaultValue={defaultCycle?.id ?? ""} required><option value="">Choose the 26–27 program</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.season_year} — {cycle.name}</option>)}</select></div>
                 <div className="field"><label htmlFor="portal_form_version_id">Target form</label><select className="select" id="portal_form_version_id" name="portal_form_version_id" defaultValue={defaultForm?.id ?? ""} required><option value="">Choose its published form</option>{forms.map((form) => <option key={form.id} value={form.id}>{cycleById.get(form.cycle_id)?.season_year ?? "Program"} — v{form.version_number} — {form.name} ({form.status})</option>)}</select></div>
                 <div className="field"><label htmlFor="schema_source_program_ids">Schema source program IDs</label><input className="input" id="schema_source_program_ids" name="schema_source_program_ids" defaultValue="162204" /><p className="field-help">The historic program exposes 628 known questions; conditional questions will be added when first seen.</p></div>
-                <div className="field"><label>Sync scope</label><label className="check-row"><input name="enabled" type="checkbox" value="true" defaultChecked />Enable webhooks and reconciliation</label><label className="check-row"><input name="sync_drafts" type="checkbox" value="true" defaultChecked />Sync draft applications</label></div>
+                <div className="field"><label>Sync scope</label><label className="check-row"><input name="enabled" type="checkbox" value="true" defaultChecked />Enable automatic minute pulls</label><label className="check-row"><input name="sync_drafts" type="checkbox" value="true" defaultChecked />Sync draft applications</label></div>
               </div>
               <button className="button button-dark" type="submit">Save Acceptd connection</button>
             </form>

@@ -58,9 +58,8 @@ Import the repository and add these environment variables:
 For the complete production release, also configure these server-only values:
 
 - `SUPABASE_SERVICE_ROLE_KEY` — cron delivery, receipts, and school chat notices
-- `CRON_SECRET` — protects the hourly notification/reminder route
-- `ACCEPTD_API_TOKEN`, `ACCEPTD_WEBHOOK_SECRET`, and
-  `ACCEPTD_WEBHOOK_SIGNATURE_HEADER` — Acceptd pull and signed webhook sync
+- `CRON_SECRET` — protects the hourly notifications and minute Acceptd pull routes
+- `ACCEPTD_API_TOKEN` — server-only Acceptd application pull access
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
 - `SMTP_FROM_NAME` and `SMTP_REPLY_TO` (optional)
 - `OPENAI_API_KEY` — voice dictation and handwritten-note scanning
@@ -69,7 +68,7 @@ For the complete production release, also configure these server-only values:
 
 Before deploying the release:
 
-1. Apply all migrations through `supabase/migrations/20260804153139_acceptd_api_sync_admin.sql`.
+1. Apply all migrations through `supabase/migrations/20260804163627_acceptd_cron_only.sql`.
 2. In Supabase Storage settings, set the project-wide maximum file size to at least 200 MB. The migration sets the private `reference-documents` bucket to 200 MB and the private `chat-files` bucket to 25 MB, but bucket limits cannot exceed the project-wide limit.
 3. Keep both Storage buckets private and verify their RLS policies after migration.
 4. Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS production URL so invoice, receipt, and payment emails contain production links.
@@ -98,25 +97,16 @@ then add the server-only token to `.env.local`:
 
 ```env
 ACCEPTD_API_TOKEN=YOUR_BEARER_TOKEN
-ACCEPTD_WEBHOOK_SECRET=YOUR_ACCEPTD_WEBHOOK_SECRET
-ACCEPTD_WEBHOOK_SIGNATURE_HEADER=THE_EXACT_ACCEPTD_SIGNATURE_HEADER
+CRON_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 ```
 
 Apply the Acceptd migration, configure program `175284`, and use historical
-program `162204` as the schema source. In Acceptd, configure this HTTPS webhook:
-
-```text
-https://YOUR-PORTAL-DOMAIN/api/integrations/acceptd/webhook
-```
-
-Acceptd's public webhook guide specifies HMAC-SHA256 but does not publish the
-signature header name. Set `ACCEPTD_WEBHOOK_SIGNATURE_HEADER` to the exact name
-shown/provided for the account. Webhooks normally sync within seconds, with a
-two-minute reconciliation cron as a backstop. The admin status page refreshes
-through a private, owner-only Supabase Broadcast topic containing no applicant
-PII. The two-minute schedule requires a Vercel Pro plan (the webhook remains the
-primary fast path); Hobby deployments must reduce cron frequency to once daily
-or use another scheduler for the reconciliation endpoint.
+program `162204` as the schema source. No Acceptd webhook or Integration setup is
+required. Vercel calls `/api/cron/acceptd-sync` every minute in production; the
+route verifies `CRON_SECRET` and pulls only enabled program mappings. The admin
+status page refreshes through a private, owner-only Supabase Broadcast topic
+containing no applicant PII. A one-minute Vercel schedule requires Pro. Hobby
+deployments must reduce the schedule to once daily or use another scheduler.
 
 For read-only API troubleshooting, pull a small private schema sample:
 

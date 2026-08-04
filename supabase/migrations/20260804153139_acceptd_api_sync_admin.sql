@@ -89,7 +89,7 @@ create table public.acceptd_sync_runs (
   id uuid primary key default gen_random_uuid(),
   program_mapping_id uuid references public.acceptd_program_mappings(id) on delete set null,
   trigger_source text not null
-    check (trigger_source in ('manual', 'webhook', 'cron', 'schema')),
+    check (trigger_source in ('manual', 'cron', 'schema')),
   status text not null default 'running'
     check (status in ('running', 'succeeded', 'partial', 'failed')),
   applications_seen integer not null default 0 check (applications_seen >= 0),
@@ -107,28 +107,6 @@ create table public.acceptd_sync_runs (
   check (jsonb_typeof(detail) = 'object')
 );
 
-create table public.acceptd_webhook_deliveries (
-  id uuid primary key default gen_random_uuid(),
-  delivery_key text not null unique,
-  event_type text,
-  acceptd_application_id bigint,
-  acceptd_program_id bigint,
-  signature_header text not null,
-  payload jsonb not null,
-  status text not null default 'received'
-    check (status in ('received', 'processing', 'processed', 'failed', 'ignored')),
-  processing_attempts integer not null default 0 check (processing_attempts >= 0),
-  error text,
-  received_at timestamptz not null default now(),
-  processed_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  check (acceptd_application_id is null or acceptd_application_id > 0),
-  check (acceptd_program_id is null or acceptd_program_id > 0),
-  check (delivery_key ~ '^[0-9a-f]{64}$'),
-  check (jsonb_typeof(payload) = 'object')
-);
-
 create index acceptd_program_mappings_enabled_idx
   on public.acceptd_program_mappings(enabled, acceptd_program_id);
 create index acceptd_user_mappings_profile_idx
@@ -141,8 +119,6 @@ create index acceptd_snapshots_user_idx
   on public.acceptd_application_snapshots(acceptd_user_id);
 create index acceptd_sync_runs_recent_idx
   on public.acceptd_sync_runs(program_mapping_id, started_at desc);
-create index acceptd_webhook_deliveries_status_idx
-  on public.acceptd_webhook_deliveries(status, received_at);
 
 create or replace function public.validate_acceptd_program_mapping()
 returns trigger
@@ -212,16 +188,11 @@ create trigger acceptd_sync_runs_set_updated_at
 before update on public.acceptd_sync_runs
 for each row execute function public.set_updated_at();
 
-create trigger acceptd_webhook_deliveries_set_updated_at
-before update on public.acceptd_webhook_deliveries
-for each row execute function public.set_updated_at();
-
 alter table public.acceptd_program_mappings enable row level security;
 alter table public.acceptd_user_mappings enable row level security;
 alter table public.acceptd_question_mappings enable row level security;
 alter table public.acceptd_application_snapshots enable row level security;
 alter table public.acceptd_sync_runs enable row level security;
-alter table public.acceptd_webhook_deliveries enable row level security;
 
 create policy "owners manage Acceptd program mappings"
 on public.acceptd_program_mappings for all to authenticated
@@ -245,30 +216,23 @@ create policy "owners read Acceptd sync runs"
 on public.acceptd_sync_runs for select to authenticated
 using (public.current_user_role() = 'owner');
 
-create policy "owners read Acceptd webhook deliveries"
-on public.acceptd_webhook_deliveries for select to authenticated
-using (public.current_user_role() = 'owner');
-
 revoke all on table public.acceptd_program_mappings from anon, authenticated;
 revoke all on table public.acceptd_user_mappings from anon, authenticated;
 revoke all on table public.acceptd_question_mappings from anon, authenticated;
 revoke all on table public.acceptd_application_snapshots from anon, authenticated;
 revoke all on table public.acceptd_sync_runs from anon, authenticated;
-revoke all on table public.acceptd_webhook_deliveries from anon, authenticated;
 
 grant select, insert, update, delete on table public.acceptd_program_mappings to authenticated;
 grant select, insert, update, delete on table public.acceptd_user_mappings to authenticated;
 grant select on table public.acceptd_question_mappings to authenticated;
 grant select on table public.acceptd_application_snapshots to authenticated;
 grant select on table public.acceptd_sync_runs to authenticated;
-grant select on table public.acceptd_webhook_deliveries to authenticated;
 
 grant all on table public.acceptd_program_mappings to service_role;
 grant all on table public.acceptd_user_mappings to service_role;
 grant all on table public.acceptd_question_mappings to service_role;
 grant all on table public.acceptd_application_snapshots to service_role;
 grant all on table public.acceptd_sync_runs to service_role;
-grant all on table public.acceptd_webhook_deliveries to service_role;
 
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;

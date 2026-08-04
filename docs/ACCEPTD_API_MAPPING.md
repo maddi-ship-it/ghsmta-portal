@@ -93,22 +93,19 @@ keys such as `acceptd_q_82999`, store source metadata in `settings`, and are
 linked through `acceptd_question_mappings`. They remain visible to authorized
 staff on application records but are rendered read-only.
 
-## Delivery and freshness
+## Pull schedule and freshness
 
-The webhook route validates the raw body with HMAC-SHA256 before storing a
-delivery. Acceptd's public setup article documents HMAC-SHA256 but does not name
-the signature header, so `ACCEPTD_WEBHOOK_SIGNATURE_HEADER` must be set to the
-exact header supplied in the account's webhook setup/support response. Hex,
-`sha256=`-prefixed hex, and Base64 digests are accepted.
+The integration does not use Acceptd webhooks. Vercel invokes the protected
+`/api/cron/acceptd-sync` route every minute in production, and that route pulls
+only program IDs explicitly enabled in `acceptd_program_mappings`. A database
+claim prevents two pulls for the same program from running at once and permits
+recovery after a stale run.
 
-Verified deliveries receive an immediate `202`; processing continues with
-Next.js `after()`. Acceptd disables a webhook after five consecutive delivery
-failures, so a Vercel cron also reconciles enabled program mappings every two
-minutes. The owner admin page receives status-only events through a private
-Supabase Broadcast topic (`admin:acceptd-sync`). No application payload or PII
-is included in Broadcast messages. Vercel schedules more frequent than daily
-require a Pro plan; on Hobby, invoke the protected reconciliation endpoint from
-another scheduler or reduce its Vercel schedule.
+The owner admin page receives status-only events through a private Supabase
+Broadcast topic (`admin:acceptd-sync`). No application payload or PII is
+included in Broadcast messages. A one-minute Vercel schedule requires Pro; on
+Hobby, invoke the protected route from another scheduler or reduce its Vercel
+schedule to once daily.
 
 Attachments remain metadata/links; the integration does not copy source files
 into portal storage. Copying them requires a separate retention and access
