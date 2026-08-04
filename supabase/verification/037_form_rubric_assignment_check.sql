@@ -40,16 +40,6 @@ begin
     select 1
     from public.application_form_versions form_version
     join public.scoring_rubrics rubric
-      on rubric.id = form_version.scoring_rubric_id
-    where rubric.cycle_id <> form_version.cycle_id
-  ) then
-    raise exception 'A form is assigned to a rubric from another program.';
-  end if;
-
-  if exists (
-    select 1
-    from public.application_form_versions form_version
-    join public.scoring_rubrics rubric
       on rubric.cycle_id = form_version.cycle_id
      and rubric.status = 'published'
     where form_version.status in ('published', 'archived')

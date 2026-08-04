@@ -122,11 +122,14 @@ export async function publishFormVersion(formVersionId: string) {
   revalidatePath(`/portal/admin/forms/${formVersionId}`);
 }
 
-export async function assignActiveRubricToForm(
+export async function assignRubricToForm(
   formVersionId: string,
-  rubricId: string,
+  formData: FormData,
 ) {
   await requireProfile(["owner"]);
+
+  const rubricId = String(formData.get("rubric_id") ?? "").trim();
+  if (!rubricId) throw new Error("Choose a published scoring rubric.");
 
   const supabase = await createClient();
   const { error } = await supabase.rpc(

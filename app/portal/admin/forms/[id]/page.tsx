@@ -14,7 +14,7 @@ import type {
 } from "@/lib/types";
 
 import {
-  assignActiveRubricToForm,
+  assignRubricToForm,
   createQuestion,
   createSection,
   createStage,
@@ -105,12 +105,10 @@ export default async function FormBuilderPage({
   const stages = (stagesResult.data ?? []) as ApplicationStage[];
   const sections = (sectionsResult.data ?? []) as ApplicationSection[];
   const questions = (questionsResult.data ?? []) as ApplicationQuestion[];
-  const rubrics = ((rubricsResult.data ?? []) as ScoringRubric[]).filter(
-    (rubric) => rubric.cycle_id === version.cycle_id,
-  );
-  const activeRubric = rubrics.find(
+  const rubrics = (rubricsResult.data ?? []) as ScoringRubric[];
+  const publishedRubrics = rubrics.filter(
     (rubric) => rubric.status === "published",
-  ) ?? null;
+  );
   const assignedRubric = rubrics.find(
     (rubric) => rubric.id === version.scoring_rubric_id,
   ) ?? null;
@@ -256,39 +254,50 @@ export default async function FormBuilderPage({
         <div className="panel-body">
           {version.status !== "published" ? (
             <p>Publish this form before assigning its scoring rubric.</p>
-          ) : !activeRubric ? (
+          ) : publishedRubrics.length === 0 ? (
             <p>
-              This program does not have an active published rubric. Publish one
+              There are no published scoring rubrics. Publish one
               in <Link href="/portal/admin/setup?tab=scoring">Scoring setup</Link> first.
             </p>
           ) : (
-            <div className="inline-form-grid">
+            <form
+              action={assignRubricToForm.bind(null, version.id)}
+              className="inline-form-grid"
+            >
               <div>
                 <strong>
                   {assignedRubric
                     ? `${assignedRubric.name} — Version ${assignedRubric.version_number}`
                     : "No rubric assigned"}
                 </strong>
-                <p>
-                  Active rubric: {activeRubric.name} — Version {activeRubric.version_number}
-                </p>
+                <p>Select the published scoring guide this form should use.</p>
               </div>
-              {version.scoring_rubric_id === activeRubric.id ? (
-                <span className="badge badge-complete">Active rubric assigned</span>
-              ) : (
-                <form
-                  action={assignActiveRubricToForm.bind(
-                    null,
-                    version.id,
-                    activeRubric.id,
-                  )}
+              <div className="field">
+                <label htmlFor="rubric_id">Published rubric</label>
+                <select
+                  className="select"
+                  defaultValue={version.scoring_rubric_id ?? publishedRubrics[0]?.id}
+                  id="rubric_id"
+                  name="rubric_id"
+                  required
                 >
-                  <button className="button button-dark" type="submit">
-                    Assign active rubric
-                  </button>
-                </form>
-              )}
-            </div>
+                  {publishedRubrics.map((rubric) => {
+                    const rubricCycle = cycles.find(
+                      (item) => item.id === rubric.cycle_id,
+                    );
+                    return (
+                      <option key={rubric.id} value={rubric.id}>
+                        {rubric.name} — Version {rubric.version_number}
+                        {rubricCycle ? ` (${rubricCycle.season_year})` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <button className="button button-dark" type="submit">
+                {assignedRubric ? "Update assigned rubric" : "Assign rubric"}
+              </button>
+            </form>
           )}
         </div>
       </section>
