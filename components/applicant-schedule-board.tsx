@@ -43,8 +43,12 @@ type ApplicantScheduleSlot = {
 };
 
 type SlotAvailability = { slot_id: string; is_booked: boolean; is_mine: boolean; my_application_id: string | null };
+type ScheduleAvailabilityBroadcast = {
+  payload?: { slot_id?: unknown; is_booked?: unknown };
+};
 type LiveStatus = "connecting" | "live" | "refreshing" | "degraded";
 const FALLBACK_REFRESH_MS = 15_000;
+const SCHEDULE_AVAILABILITY_TOPIC = "schedule:availability";
 
 export function ApplicantScheduleBoard({ slots, initialAvailability, view }: { slots: ApplicantScheduleSlot[]; initialAvailability: SlotAvailability[]; view: "list" | "cards" }) {
   const router = useRouter();
@@ -58,7 +62,8 @@ export function ApplicantScheduleBoard({ slots, initialAvailability, view }: { s
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const refresh = async () => {
+    let disposed = false;
+    const refreshAvailability = async () => {
       setLiveStatus((current) => current === "degraded" ? current : "refreshing");
       const { data, error } = await supabase.rpc("get_schedule_slot_availability");
       if (!active) return;
@@ -66,23 +71,61 @@ export function ApplicantScheduleBoard({ slots, initialAvailability, view }: { s
       setAvailability((data ?? []) as SlotAvailability[]);
       setLastUpdatedAt(new Date());
       setLiveStatus("live");
+    };
+    const refreshAll = async () => {
+      await refreshAvailability();
+      if (!active) return;
       router.refresh();
     };
-    refreshRef.current = refresh;
-    const queue = () => { if (timer) clearTimeout(timer); timer = setTimeout(() => void refresh(), 250); };
-    const channel = supabase.channel(`schedule-live-${crypto.randomUUID()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedule_slots" }, queue)
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedule_school_bookings" }, queue)
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedule_slot_waitlist" }, queue)
-      .subscribe((status) => {
+    refreshRef.current = refreshAll;
+    const queueMetadataRefresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void refreshAll(), 250);
+    };
+    const receiveAvailability = (message: ScheduleAvailabilityBroadcast) => {
+      const slotId = message.payload?.slot_id;
+      const isBooked = message.payload?.is_booked;
+      if (typeof slotId !== "string" || typeof isBooked !== "boolean") return;
+
+      setAvailability((current) => current.map((item) => {
+        if (item.slot_id !== slotId) return item;
+        return isBooked
+          ? { ...item, is_booked: true }
+          : { ...item, is_booked: false, is_mine: false, my_application_id: null };
+      }));
+      setLastUpdatedAt(new Date());
+      setLiveStatus("live");
+    };
+    const availabilityChannel = supabase
+      .channel(SCHEDULE_AVAILABILITY_TOPIC, { config: { private: true } })
+      .on("broadcast", { event: "availability_changed" }, receiveAvailability);
+    const metadataChannel = supabase
+      .channel(`schedule-metadata-${crypto.randomUUID()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedule_slots" }, queueMetadataRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedule_slot_waitlist" }, queueMetadataRefresh);
+    void supabase.realtime.setAuth().then(() => {
+      if (disposed) return;
+      availabilityChannel.subscribe((status) => {
         if (!active) return;
-        if (status === "SUBSCRIBED") { setLiveStatus("live"); void refresh(); }
+        if (status === "SUBSCRIBED") { setLiveStatus("live"); void refreshAvailability(); }
         if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)) setLiveStatus("degraded");
       });
-    const fallback = window.setInterval(() => void refresh(), FALLBACK_REFRESH_MS);
-    const focus = () => void refresh();
+      metadataChannel.subscribe();
+    }).catch(() => {
+      if (active) setLiveStatus("degraded");
+    });
+    const fallback = window.setInterval(() => void refreshAvailability(), FALLBACK_REFRESH_MS);
+    const focus = () => void refreshAll();
     window.addEventListener("focus", focus);
-    return () => { active = false; if (timer) clearTimeout(timer); clearInterval(fallback); window.removeEventListener("focus", focus); void supabase.removeChannel(channel); };
+    return () => {
+      active = false;
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      clearInterval(fallback);
+      window.removeEventListener("focus", focus);
+      void supabase.removeChannel(availabilityChannel);
+      void supabase.removeChannel(metadataChannel);
+    };
   }, [router, supabase]);
 
   return (

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import { login } from "@/app/login/actions";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/client";
 
@@ -37,6 +36,29 @@ export function AuthSignInPanel({
     setError(null);
     setMessage(null);
     setPhoneCodeSent(false);
+  }
+
+  function signInWithPassword(form: HTMLFormElement) {
+    const formData = new FormData(form);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+    setError(null);
+    setMessage(null);
+
+    startTransition(async () => {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError("We could not sign you in. Check your information and try again.");
+        return;
+      }
+
+      router.replace("/portal");
+      router.refresh();
+    });
   }
 
   function sendMagicLink(form: HTMLFormElement) {
@@ -158,7 +180,13 @@ export function AuthSignInPanel({
       {message && <div className="notice">{message}</div>}
 
       {method === "password" && (
-        <form action={login} className="form-stack auth-method-form">
+        <form
+          className="form-stack auth-method-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            signInWithPassword(event.currentTarget);
+          }}
+        >
           <div className="field">
             <label htmlFor="email">Email address</label>
             <input
@@ -181,8 +209,8 @@ export function AuthSignInPanel({
               type="password"
             />
           </div>
-          <button className="button button-primary" type="submit">
-            Sign in
+          <button className="button button-primary" disabled={pending} type="submit">
+            {pending ? "Signing in…" : "Sign in"}
           </button>
           <Link className="text-button auth-forgot-link" href="/forgot-password">
             Forgot your password?

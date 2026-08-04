@@ -68,7 +68,7 @@ For the complete production release, also configure these server-only values:
 
 Before deploying the release:
 
-1. Apply all migrations through `supabase/migrations/20260804195959_allow_reusable_published_form_rubrics.sql`.
+1. Apply all migrations through `supabase/migrations/20260804205013_schedule_broadcast_auth_audit_hardening.sql`.
 2. In Supabase Storage settings, set the project-wide maximum file size to at least 200 MB. The migration sets the private `reference-documents` bucket to 200 MB and the private `chat-files` bucket to 25 MB, but bucket limits cannot exceed the project-wide limit.
 3. Keep both Storage buckets private and verify their RLS policies after migration.
 4. Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS production URL so invoice, receipt, and payment emails contain production links.

@@ -18,8 +18,9 @@
 6. Run `supabase/migrations/20260803152247_invoice_message_templates.sql`.
 7. Run `supabase/migrations/20260803173346_add_program_manager_role.sql`.
 8. Run `supabase/migrations/20260803173350_program_manager_scholarship_access.sql`.
-9. Run verification scripts `030` through `036`; require passing results from all seven.
-10. Review the Supabase Security and Performance Advisors before deployment.
+9. Run every remaining migration in filename order through `supabase/migrations/20260804205013_schedule_broadcast_auth_audit_hardening.sql`.
+10. Run verification scripts `030` through `039`; require passing results from all ten.
+11. Review the Supabase Security and Performance Advisors before deployment.
 
 ## Application rollout
 
@@ -30,6 +31,7 @@
 5. Verify chat reactions, a 25 MB file rejection boundary, school channel grouping, voice dictation, note scanning, schedule panel/understudy/shadow signup, and locked score submission.
 6. Submit a scholarship application and verify its private chat is visible only to that applicant, Program Managers, and Owners. Confirm Program Managers see General Announcements, submitted applications, released results, and read-only scheduling, but cannot open school messaging, panel channels, Advisory chat, School Community Chat, adjudication, or configuration pages.
 7. Promote the verified deployment to production and watch `/api/health`, Vercel function logs, and Owner system notifications.
+8. For an approved scheduling stress test, run `npm run loadtest:schedule -- --users 200 --allow-host <project-ref>.supabase.co`; require one booking, 199 clean conflicts, complete Broadcast delivery, and complete fixture cleanup.
 
 ## Rollback
 
