@@ -176,6 +176,12 @@ export type QuestionSettings = {
   placeholder?: string;
   adobe_sign_embed_url?: string;
   adobe_sign_embed_height?: number;
+  source_managed?: boolean;
+  source_system?: string;
+  acceptd_program_id?: number;
+  acceptd_question_id?: number;
+  acceptd_question_type?: string;
+  acceptd_archived?: boolean;
 };
 
 export type ApplicationQuestion = {

@@ -138,10 +138,12 @@ export default async function ApplicationDetailPage({
     : sections.filter((section) => !section.stage_id);
   const selectedSectionIds = new Set(selectedSections.map((section) => section.id));
   const selectedQuestions = questions.filter((question) => selectedSectionIds.has(question.section_id));
+  const selectedStageIsSourceManaged = selectedStage?.settings.source_managed === true;
 
   const canEditMetadata = profile.role === "owner";
   const canEditAnswers =
     !application.is_archived &&
+    !selectedStageIsSourceManaged &&
     (profile.role === "owner" ||
       (profile.role === "applicant" &&
         applicantCanEdit &&
@@ -273,7 +275,7 @@ export default async function ApplicationDetailPage({
       ) : (
         <form
           action={saveApplicationAnswers.bind(null, id, selectedStage?.id ?? "")}
-          className="application-form"
+          className={`application-form${selectedStageIsSourceManaged ? " application-form-source-managed" : ""}`}
         >
           {selectedSections.map((section, sectionIndex) => {
             const sectionQuestions = selectedQuestions.filter((question) => question.section_id === section.id);

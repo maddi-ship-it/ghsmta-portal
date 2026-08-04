@@ -18,6 +18,30 @@ function asBoolean(value: unknown): boolean {
   return value === true || value === "true" || value === "yes";
 }
 
+function safeHttpUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function displaySourceValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.length ? value.map(displaySourceValue).join(", ") : "—";
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([key, item]) => key !== "attachment" && item !== null && item !== "")
+      .map(([key, item]) => `${key.replaceAll("_", " ")}: ${displaySourceValue(item)}`)
+      .join(" · ") || "—";
+  }
+  return String(value);
+}
+
 export function ApplicationQuestionField({
   question,
   value,
@@ -29,6 +53,37 @@ export function ApplicationQuestionField({
 }) {
   const name = `question_${question.id}`;
   const requiredMark = question.required ? <span className="required-mark">Required</span> : null;
+
+  if (question.settings.source_managed) {
+    const sourceRecord =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
+    const attachment =
+      sourceRecord?.attachment &&
+      typeof sourceRecord.attachment === "object" &&
+      !Array.isArray(sourceRecord.attachment)
+        ? (sourceRecord.attachment as Record<string, unknown>)
+        : null;
+    const attachmentUrl = safeHttpUrl(attachment?.url);
+    return (
+      <div className="application-question">
+        <div className="question-label-row">
+          <strong>{question.label}</strong>
+          <span className="badge">Acceptd</span>
+        </div>
+        {question.description && <p className="field-help">{question.description}</p>}
+        <p>{displaySourceValue(sourceRecord && "answer" in sourceRecord ? sourceRecord.answer : value)}</p>
+        {attachmentUrl && (
+          <a className="document-link" href={attachmentUrl} target="_blank" rel="noreferrer noopener">
+            {typeof attachment?.name === "string" && attachment.name
+              ? attachment.name
+              : "Open Acceptd attachment"}
+          </a>
+        )}
+      </div>
+    );
+  }
 
   if (question.question_type === "adobe_sign") {
     const embedUrl = safeAdobeSignEmbedUrl(

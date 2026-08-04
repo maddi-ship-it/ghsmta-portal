@@ -3405,6 +3405,11 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   display: none;
 }
 
+.application-form-source-managed .application-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 620px;
+}
+
 /* =========================================================
    Owner schedule popups and sorting
    ========================================================= */

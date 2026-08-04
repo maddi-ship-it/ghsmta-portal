@@ -56,13 +56,19 @@ describe("Acceptd API client", () => {
       fetchImpl,
     });
 
-    const result = await client.pullApplications({ concurrency: 2 });
+    const result = await client.pullApplications({
+      concurrency: 2,
+      detailQuery: [["include", "user,program,tags"]],
+    });
 
     expect(result.applications).toEqual([
       { id: "100", attributes: { stage: "Submitted" } },
       { id: "200", attributes: { stage: "Submitted" } },
     ]);
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(new URL(fetchImpl.mock.calls[1][0]).searchParams.get("include")).toBe(
+      "user,program,tags",
+    );
   });
 
   it("retries rate-limited requests using Retry-After", async () => {

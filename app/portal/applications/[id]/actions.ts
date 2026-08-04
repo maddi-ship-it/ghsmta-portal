@@ -90,6 +90,29 @@ async function persistApplicationAnswers(
 ) {
   const { profile, supabase, application } = await getEditableApplication(applicationId);
 
+  const { data: stage, error: stageLookupError } = await supabase
+    .from("application_stages")
+    .select("id,applicant_visible,settings")
+    .eq("id", stageId)
+    .eq("form_version_id", application.form_version_id)
+    .maybeSingle();
+  if (stageLookupError) throw new Error(stageLookupError.message);
+  if (!stage) throw new Error("This application stage does not exist.");
+  const sourceManaged =
+    stage.settings &&
+    typeof stage.settings === "object" &&
+    !Array.isArray(stage.settings) &&
+    (stage.settings as Record<string, unknown>).source_managed === true;
+  if (sourceManaged) {
+    throw new Error("Acceptd-synchronized data is read-only.");
+  }
+  if (
+    profile.role === "applicant" &&
+    (!stage.applicant_visible || application.current_stage_id !== stage.id)
+  ) {
+    throw new Error("Applicants can only edit their current visible stage.");
+  }
+
   const { data: sectionData, error: sectionError } = await supabase
     .from("application_sections")
     .select("id")
@@ -110,7 +133,9 @@ async function persistApplicationAnswers(
     .in("section_id", sectionIds);
   if (questionError) throw new Error(questionError.message);
 
-  const questions = (questionData ?? []) as ApplicationQuestion[];
+  const questions = ((questionData ?? []) as ApplicationQuestion[]).filter(
+    (question) => question.settings.source_managed !== true,
+  );
   const answerMap = new Map<string, unknown>();
   const rows = questions
     .filter(

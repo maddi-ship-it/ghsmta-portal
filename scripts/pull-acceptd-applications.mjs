@@ -8,9 +8,8 @@
  *   ACCEPTD_API_TOKEN
  *
  * Usage:
- *   npm run acceptd:pull -- --output ./acceptd-applications.json
- *   npm run acceptd:pull -- --list-only --limit 10 --output ./acceptd-sample.json
- *   npm run acceptd:pull -- --query 'filter[program]=PROGRAM_ID' --output ./acceptd-applications.json
+ *   npm run acceptd:pull -- --programs 175284 --output ./acceptd-applications.json
+ *   npm run acceptd:pull -- --programs 175284 --list-only --limit 10 --output ./acceptd-sample.json
  */
 
 import fs from "node:fs";
@@ -44,7 +43,12 @@ export function parseArgs(argv) {
   const options = { queries: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
-    if (token === "--list-only" || token === "--force" || token === "--help") {
+    if (
+      token === "--list-only" ||
+      token === "--all-programs" ||
+      token === "--force" ||
+      token === "--help"
+    ) {
       options[token.slice(2).replaceAll("-", "_")] = true;
       continue;
     }
@@ -82,6 +86,32 @@ function queryEntries(values) {
   });
 }
 
+function commaSeparatedIds(value, label) {
+  const normalized = String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (normalized.length === 0 || normalized.some((item) => !/^\d+$/.test(item))) {
+    throw new Error(`${label} must be a comma-separated list of numeric Acceptd IDs.`);
+  }
+  return [...new Set(normalized)].join(",");
+}
+
+function includeRelationships(value) {
+  const supported = new Set(["user", "program", "tags"]);
+  const relationships = String(value ?? "user,program,tags")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (
+    relationships.length === 0 ||
+    relationships.some((relationship) => !supported.has(relationship))
+  ) {
+    throw new Error("--include supports only user, program, and tags.");
+  }
+  return [...new Set(relationships)].join(",");
+}
+
 function writeSnapshot(filename, snapshot, force) {
   const outputPath = path.resolve(filename);
   const flags = force ? "w" : "wx";
@@ -102,11 +132,16 @@ Usage:
 
 Options:
   --output <file>       Required destination; created with owner-only permissions
+  --programs <ids>      Required comma-separated Acceptd program IDs
+  --all-programs        Explicitly allow an unfiltered organization-wide pull
+  --tags <ids>          Optional comma-separated Acceptd tag IDs
+  --users <ids>         Optional comma-separated Acceptd user IDs
+  --include <names>     Relationships: user,program,tags (default: all three)
   --list-only           Skip per-application detail requests
   --limit <number>      Stop after this many applications
   --max-pages <number>  Pagination safety limit (default: 100)
   --concurrency <n>     Concurrent detail requests, 1-20 (default: 4)
-  --query <key=value>   Pass an Acceptd list query; may be repeated
+  --query <key=value>   Pass another Acceptd list query; may be repeated
   --force               Explicitly allow overwriting the output file
   --help                Show this help
 
@@ -129,6 +164,17 @@ export async function main(argv = process.argv.slice(2)) {
   if (!args.output) {
     throw new Error("Provide --output so application PII is not printed to the terminal.");
   }
+  if (args.programs && args.all_programs) {
+    throw new Error("Use --programs or --all-programs, not both.");
+  }
+
+  const customQueries = queryEntries(args.queries);
+  const queryProgramFilter = customQueries.find(([key]) => key === "programs")?.[1];
+  if (!args.programs && !queryProgramFilter && !args.all_programs) {
+    throw new Error(
+      "Provide --programs to scope applicant PII, or explicitly use --all-programs.",
+    );
+  }
 
   const token = process.env.ACCEPTD_API_TOKEN;
   if (!token) {
@@ -147,6 +193,20 @@ export async function main(argv = process.argv.slice(2)) {
   const limit = args.limit
     ? positiveInteger(args.limit, undefined, "--limit")
     : Number.POSITIVE_INFINITY;
+  const programs = args.programs
+    ? commaSeparatedIds(args.programs, "--programs")
+    : queryProgramFilter
+      ? commaSeparatedIds(queryProgramFilter, "--query programs")
+      : null;
+  const tags = args.tags ? commaSeparatedIds(args.tags, "--tags") : null;
+  const users = args.users ? commaSeparatedIds(args.users, "--users") : null;
+  const include = includeRelationships(args.include);
+
+  const listQuery = customQueries.filter(([key]) => key !== "programs");
+  if (programs) listQuery.push(["programs", programs]);
+  if (tags) listQuery.push(["tags", tags]);
+  if (users) listQuery.push(["users", users]);
+  listQuery.push(["include", include], ["per_page", "100"]);
 
   const client = createAcceptdClient({
     token,
@@ -160,18 +220,25 @@ export async function main(argv = process.argv.slice(2)) {
   const result = await client.pullApplications({
     includeDetails: !args.list_only,
     concurrency,
+    detailQuery: [["include", include]],
     limit,
     maxPages,
-    query: queryEntries(args.queries),
+    query: listQuery,
     onPage: ({ page, received }) =>
       console.log(`Received list page ${page} (${received} records).`),
   });
 
   const snapshot = {
-    schema_version: 1,
+    schema_version: 2,
     source: "acceptd-api-v2",
     pulled_at: new Date().toISOString(),
     includes_application_details: !args.list_only,
+    request: {
+      programs: programs ? programs.split(",").map(Number) : null,
+      tags: tags ? tags.split(",").map(Number) : null,
+      users: users ? users.split(",").map(Number) : null,
+      relationships: include.split(","),
+    },
     application_count: result.applications.length,
     applications: result.applications,
   };

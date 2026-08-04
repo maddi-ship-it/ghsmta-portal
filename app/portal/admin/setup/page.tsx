@@ -2,16 +2,22 @@ import Link from "next/link";
 
 import CyclesPage from "@/app/portal/admin/cycles/page";
 import FormsPage from "@/app/portal/admin/forms/page";
+import AcceptdAdminPage from "@/app/portal/admin/acceptd/page";
 import ScoringAdminPage from "@/app/portal/admin/scoring/page";
 import WorkflowsAdminPage from "@/app/portal/admin/workflows/page";
 import { requireProfile } from "@/lib/auth";
 
-type AdminSetupTab = "programs" | "forms" | "scoring" | "workflows";
+type AdminSetupTab = "programs" | "forms" | "acceptd" | "scoring" | "workflows";
 
 type AdminSetupSearchParams = {
   tab?: string;
   assigned?: string;
   prompt_saved?: string;
+  configured?: string;
+  mapped?: string;
+  unmapped?: string;
+  synced?: string;
+  schema_synced?: string;
 };
 
 const tabs: Array<{
@@ -28,6 +34,11 @@ const tabs: Array<{
     key: "forms",
     label: "Form builder",
     description: "Create and manage staged application form versions.",
+  },
+  {
+    key: "acceptd",
+    label: "Acceptd sync",
+    description: "Map applicants, load the hidden schema, and monitor API syncs.",
   },
   {
     key: "scoring",
@@ -86,6 +97,17 @@ export default async function AdminSetupPage({
       <div className="admin-setup-content">
         {activeTab === "programs" && <CyclesPage />}
         {activeTab === "forms" && <FormsPage />}
+        {activeTab === "acceptd" && (
+          <AcceptdAdminPage
+            searchParams={Promise.resolve({
+              configured: params.configured,
+              mapped: params.mapped,
+              unmapped: params.unmapped,
+              synced: params.synced,
+              schema_synced: params.schema_synced,
+            })}
+          />
+        )}
         {activeTab === "scoring" && (
           <ScoringAdminPage
             searchParams={Promise.resolve({

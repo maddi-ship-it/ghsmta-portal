@@ -274,16 +274,19 @@ export function createAcceptdClient({
     return { applications, pageCount };
   }
 
-  async function getApplication(applicationId) {
+  async function getApplication(applicationId, { query } = {}) {
     const id = String(applicationId ?? "").trim();
     if (!id) throw new TypeError("An Acceptd application ID is required.");
-    const payload = await requestJson(`/v2/applications/${encodeURIComponent(id)}`);
+    const url = resolveApiUrl(`/v2/applications/${encodeURIComponent(id)}`);
+    appendQuery(url, query);
+    const payload = await requestJson(url);
     return singleResourceData(payload);
   }
 
   async function pullApplications({
     includeDetails = true,
     concurrency = 4,
+    detailQuery,
     onDetail,
     ...listOptions
   } = {}) {
@@ -304,7 +307,7 @@ export function createAcceptdClient({
             `Acceptd application list item ${index + 1} does not include an ID.`,
           );
         }
-        const detail = await getApplication(id);
+        const detail = await getApplication(id, { query: detailQuery });
         if (typeof onDetail === "function") {
           onDetail({ completed: index + 1, total: listed.applications.length });
         }

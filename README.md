@@ -59,6 +59,8 @@ For the complete production release, also configure these server-only values:
 
 - `SUPABASE_SERVICE_ROLE_KEY` — cron delivery, receipts, and school chat notices
 - `CRON_SECRET` — protects the hourly notification/reminder route
+- `ACCEPTD_API_TOKEN`, `ACCEPTD_WEBHOOK_SECRET`, and
+  `ACCEPTD_WEBHOOK_SIGNATURE_HEADER` — Acceptd pull and signed webhook sync
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
 - `SMTP_FROM_NAME` and `SMTP_REPLY_TO` (optional)
 - `OPENAI_API_KEY` — voice dictation and handwritten-note scanning
@@ -67,7 +69,7 @@ For the complete production release, also configure these server-only values:
 
 Before deploying the release:
 
-1. Apply all migrations through `supabase/migrations/20260802231950_production_release_billing_chat_schedule_theme.sql`.
+1. Apply all migrations through `supabase/migrations/20260804153139_acceptd_api_sync_admin.sql`.
 2. In Supabase Storage settings, set the project-wide maximum file size to at least 200 MB. The migration sets the private `reference-documents` bucket to 200 MB and the private `chat-files` bucket to 25 MB, but bucket limits cannot exceed the project-wide limit.
 3. Keep both Storage buckets private and verify their RLS policies after migration.
 4. Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS production URL so invoice, receipt, and payment emails contain production links.
@@ -82,32 +84,59 @@ The web interface already uses safe-area insets, touch-sized controls, responsiv
 
 For a durable App Store product, the Expo companion app is the recommended long-term route; this web starter remains the public site and full admin workspace.
 
-## Acceptd application pull
+## Acceptd API sync
 
-The first-stage Acceptd integration can pull v2 application records into a
-private local JSON snapshot. It follows API pagination, retries transient
-failures, optionally retrieves each application's full detail record, and does
-not write to Supabase.
+The owner-only **Program setup → Acceptd sync** page connects an Acceptd program
+to a portal cycle/form, loads a hidden read-only question schema, reconciles
+Acceptd user IDs to portal applicants, and monitors automatic application syncs.
+The 2025–26 source program exposes 628 observed question IDs; conditional fields
+are added automatically when the API first returns them, allowing the schema to
+grow toward the expected roughly 688 questions without unsafe label matching.
 
 Request API access from [Acceptd's developer portal](https://api.getacceptd.com),
 then add the server-only token to `.env.local`:
 
 ```env
 ACCEPTD_API_TOKEN=YOUR_BEARER_TOKEN
+ACCEPTD_WEBHOOK_SECRET=YOUR_ACCEPTD_WEBHOOK_SECRET
+ACCEPTD_WEBHOOK_SIGNATURE_HEADER=THE_EXACT_ACCEPTD_SIGNATURE_HEADER
 ```
 
-Pull a small schema sample before mapping fields into the portal:
+Apply the Acceptd migration, configure program `175284`, and use historical
+program `162204` as the schema source. In Acceptd, configure this HTTPS webhook:
+
+```text
+https://YOUR-PORTAL-DOMAIN/api/integrations/acceptd/webhook
+```
+
+Acceptd's public webhook guide specifies HMAC-SHA256 but does not publish the
+signature header name. Set `ACCEPTD_WEBHOOK_SIGNATURE_HEADER` to the exact name
+shown/provided for the account. Webhooks normally sync within seconds, with a
+two-minute reconciliation cron as a backstop. The admin status page refreshes
+through a private, owner-only Supabase Broadcast topic containing no applicant
+PII. The two-minute schedule requires a Vercel Pro plan (the webhook remains the
+primary fast path); Hobby deployments must reduce cron frequency to once daily
+or use another scheduler for the reconciliation endpoint.
+
+For read-only API troubleshooting, pull a small private schema sample:
 
 ```bash
 npm run acceptd:pull -- \
+  --programs 175284 \
   --limit 5 \
-  --output ./acceptd-application-sample.json
+  --output ./acceptd-2026-27-application-sample.json
 ```
 
-Use `--query 'key=value'` for any list filters supplied by Acceptd. Add
-`--list-only` to skip detail requests, and `--force` only when intentionally
+Program `175284` is the 2026–27 GHSMTA Director's Application. A program scope
+is required by default to avoid collecting unrelated historical applicant PII;
+use `--all-programs` only for an intentional organization-wide pull. Add
+`--list-only` to skip detail requests, or `--query 'key=value'` for another
+documented Acceptd list parameter. Use `--force` only when intentionally
 replacing an existing snapshot. Snapshot files are created with owner-only
 permissions and can contain applicant PII, so keep them out of source control.
+The verified source contract, question coverage, security boundary, and sync
+behavior are documented in
+[`docs/ACCEPTD_API_MAPPING.md`](docs/ACCEPTD_API_MAPPING.md).
 
 ## Immediate next modules
 
