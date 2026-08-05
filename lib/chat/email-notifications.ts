@@ -90,12 +90,16 @@ function channelApplication(channel: ChatChannel) {
 
 export async function sendChatEmailNotifications({
   channelId,
+  messageId,
+  messageKind,
   authorId,
   authorName,
   subject,
   body,
 }: {
   channelId: string;
+  messageId: string;
+  messageKind: "post" | "reply";
   authorId: string;
   authorName: string;
   subject: string;
@@ -103,7 +107,31 @@ export async function sendChatEmailNotifications({
 }) {
   const supabase = await createClient();
   const admin = createAdminClient();
-  const [{ data: members }, { data: channel }, { data: author }] = await Promise.all([
+  const logDelivery = async (
+    status: "sent" | "skipped_no_recipients" | "failed",
+    recipientCount: number,
+    detail: string,
+  ) => {
+    try {
+      await admin.from("chat_email_delivery_log").insert({
+        channel_id: channelId,
+        message_id: messageId,
+        message_kind: messageKind,
+        author_id: authorId,
+        status,
+        recipient_count: recipientCount,
+        detail: detail.slice(0, 1000),
+      });
+    } catch {
+      // Logging is best-effort; email delivery should not depend on the audit table.
+    }
+  };
+
+  const [
+    { data: members, error: memberError },
+    { data: channel },
+    { data: author },
+  ] = await Promise.all([
     supabase.rpc("get_chat_channel_members", { p_channel_id: channelId }),
     admin
       .from("chat_channels")
@@ -116,6 +144,10 @@ export async function sendChatEmailNotifications({
       .eq("id", authorId)
       .maybeSingle(),
   ]);
+  if (memberError) {
+    await logDelivery("failed", 0, memberError.message);
+    throw new Error(`Chat email channel members could not be loaded: ${memberError.message}`);
+  }
 
   const recipientIds = [
     ...new Set(
@@ -124,14 +156,16 @@ export async function sendChatEmailNotifications({
         .filter((id) => id !== authorId),
     ),
   ];
-  if (recipientIds.length === 0) return;
 
-  const { data: profiles, error: profileError } = await admin
-    .from("profiles")
-    .select("id,email,notification_preferences")
-    .in("id", recipientIds)
-    .eq("active", true);
+  const { data: profiles, error: profileError } = recipientIds.length > 0
+    ? await admin
+        .from("profiles")
+        .select("id,email,notification_preferences")
+        .in("id", recipientIds)
+        .eq("active", true)
+    : { data: [], error: null };
   if (profileError) {
+    await logDelivery("failed", 0, profileError.message);
     throw new Error(`Chat email recipients could not be loaded: ${profileError.message}`);
   }
 
@@ -163,7 +197,14 @@ export async function sendChatEmailNotifications({
   }
   const finalRecipients = [...recipientSet];
 
-  if (finalRecipients.length === 0) return;
+  if (finalRecipients.length === 0) {
+    await logDelivery(
+      "skipped_no_recipients",
+      0,
+      "Channel members had no eligible email recipients after preferences and sender exclusion.",
+    );
+    return;
+  }
 
   const chatUrl = `${siteUrl()}/portal/chat?channel=${channelId}`;
   const preview = truncate(body.replace(/\s+/g, " ").trim(), 500);
@@ -192,10 +233,16 @@ export async function sendChatEmailNotifications({
   );
   const failures = results.filter((result) => !result.ok);
   if (failures.length > 0) {
+    await logDelivery(
+      "failed",
+      finalRecipients.length,
+      failures.map((failure) => failure.detail).join("; "),
+    );
     throw new Error(
       `Chat email notification failed for ${failures.length} recipient(s): ${failures
         .map((failure) => failure.detail)
         .join("; ")}`,
     );
   }
+  await logDelivery("sent", finalRecipients.length, "Chat email notification sent.");
 }

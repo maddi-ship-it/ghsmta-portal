@@ -19,6 +19,7 @@ import {
   createChatMessage,
   createChatPost,
   createChatReply,
+  markChatChannelUnread,
   moderateChatPost,
   ownerDeleteChatMessage,
 } from "@/app/portal/chat/actions";
@@ -1497,6 +1498,25 @@ export function TeamsChat({
     });
   };
 
+  const markActiveChannelUnread = () => {
+    if (!activeChannel) return;
+    const formData = new FormData();
+    formData.set("channel_id", activeChannel.channel_id);
+    setStatus(null);
+
+    startTransition(async () => {
+      const result = await markChatChannelUnread(formData);
+
+      if (!result.ok) {
+        setStatus(result.error ?? "The chat could not be marked unread.");
+        return;
+      }
+
+      setStatus("Chat marked unread.");
+      await reloadChannels();
+    });
+  };
+
   if (!activeChannel) {
     return (
       <section className={`panel ${styles.emptyPanel}`}>
@@ -1617,6 +1637,14 @@ export function TeamsChat({
             <span className={styles.visibilityPill}>
               {activeChannel.visibility_label}
             </span>
+            <button
+              className="button button-secondary button-compact"
+              disabled={isPending}
+              onClick={markActiveChannelUnread}
+              type="button"
+            >
+              Mark unread
+            </button>
             <div className={styles.memberSummary}>
               <div className={styles.memberAvatars} aria-hidden="true">
                 {members.slice(0, 4).map((member) => (
