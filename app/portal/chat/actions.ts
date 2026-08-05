@@ -116,7 +116,8 @@ export async function createChatPost(
       subject,
       body,
     });
-  } catch {
+  } catch (error) {
+    console.warn("Chat email notification failed", error);
     // Chat should remain sent even if email notification delivery is unavailable.
   }
 
@@ -191,7 +192,8 @@ export async function createChatReply(
       subject: parentPost?.subject ? `Reply: ${parentPost.subject}` : "New reply",
       body,
     });
-  } catch {
+  } catch (error) {
+    console.warn("Chat email notification failed", error);
     // Chat should remain sent even if email notification delivery is unavailable.
   }
 
@@ -257,7 +259,8 @@ export async function createChatMessage(
       subject: "Message",
       body,
     });
-  } catch {
+  } catch (error) {
+    console.warn("Chat email notification failed", error);
     // Chat should remain sent even if email notification delivery is unavailable.
   }
 

@@ -1,4 +1,5 @@
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type ChannelMember = {
@@ -95,9 +96,10 @@ export async function sendChatEmailNotifications({
   body: string;
 }) {
   const supabase = await createClient();
+  const admin = createAdminClient();
   const [{ data: members }, { data: channel }] = await Promise.all([
     supabase.rpc("get_chat_channel_members", { p_channel_id: channelId }),
-    supabase
+    admin
       .from("chat_channels")
       .select("id,channel_type,name,application_id,applications(school_name,production_title)")
       .eq("id", channelId)
@@ -113,11 +115,14 @@ export async function sendChatEmailNotifications({
   ];
   if (recipientIds.length === 0) return;
 
-  const { data: profiles } = await supabase
+  const { data: profiles, error: profileError } = await admin
     .from("profiles")
     .select("id,email,notification_preferences")
     .in("id", recipientIds)
     .eq("active", true);
+  if (profileError) {
+    throw new Error(`Chat email recipients could not be loaded: ${profileError.message}`);
+  }
 
   const recipients = ((profiles ?? []) as RecipientProfile[])
     .filter((profile) => profile.email)
@@ -143,10 +148,13 @@ export async function sendChatEmailNotifications({
     </div>
   `;
 
-  await sendSmtpEmail({
+  const result = await sendSmtpEmail({
     to: recipients,
     subject: emailSubject,
     text: emailText,
     html: emailHtml,
   });
+  if (!result.ok) {
+    throw new Error(`Chat email notification failed: ${result.detail}`);
+  }
 }
