@@ -147,7 +147,17 @@ export async function createInvoicePdf(
     font: bold,
     color: NAVY,
   });
-  const billTo = [invoice.billing_name, invoice.billing_address, invoice.recipient_email]
+  const billTo = [
+    invoice.billing_name,
+    invoice.billing_contact_name ? `Contact: ${invoice.billing_contact_name}` : null,
+    invoice.billing_address || invoice.school_address_snapshot,
+    invoice.school_phone_snapshot ? `School phone: ${invoice.school_phone_snapshot}` : null,
+    invoice.billing_contact_phone && invoice.billing_contact_phone !== invoice.school_phone_snapshot
+      ? `Billing phone: ${invoice.billing_contact_phone}`
+      : null,
+    invoice.school_type_snapshot ? `School type: ${invoice.school_type_snapshot}` : null,
+    invoice.recipient_email,
+  ]
     .filter(Boolean)
     .join("\n");
   page.drawText(billTo, {
@@ -276,6 +286,15 @@ export async function createInvoicePdf(
     for (const line of wrapText(invoice.payment_url ?? "Payment link not provided", 235, regular, 8.2)) {
       page.drawText(line, { x: 314, y: paymentY, size: 8.2, font: regular, color: rgb(0.03, 0.3, 0.7) });
       paymentY -= 11;
+    }
+    if (invoice.payment_promo_code) {
+      page.drawText(`Promo code: ${invoice.payment_promo_code}`, {
+        x: 314,
+        y: Math.max(paymentY - 2, 145),
+        size: 10,
+        font: bold,
+        color: NAVY,
+      });
     }
   } else {
     const information =

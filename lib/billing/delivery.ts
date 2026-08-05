@@ -85,6 +85,7 @@ export async function deliverSchoolInvoice(
   );
   const invoiceUrl = `${siteUrl()}/portal/invoices/${invoice.id}/pdf`;
   const paymentUrl = invoice.payment_url as string | null;
+  const promoCode = invoice.payment_promo_code as string | null;
   const actionUrl =
     deliveryType === "receipt" || !paymentUrl ? invoiceUrl : paymentUrl;
   const actionLabel =
@@ -125,11 +126,17 @@ export async function deliverSchoolInvoice(
         : invoice.document_kind === "scholarship_confirmation"
           ? "scholarship-confirmation"
           : "invoice";
+    const promoHtml = promoCode && deliveryType !== "receipt"
+      ? `<p><strong>Promo code:</strong> ${escapeHtml(promoCode)}</p>`
+      : "";
+    const promoText = promoCode && deliveryType !== "receipt"
+      ? `\nPromo code: ${promoCode}`
+      : "";
     const emailAction = paymentUrl && deliveryType !== "receipt"
-      ? `<p><a href="${escapeHtml(paymentUrl)}" style="display:inline-block;padding:12px 18px;background:#153f8f;color:#fff;text-decoration:none;border-radius:8px">Pay securely</a></p>`
+      ? `<p><a href="${escapeHtml(paymentUrl)}" style="display:inline-block;padding:12px 18px;background:#153f8f;color:#fff;text-decoration:none;border-radius:8px">Pay securely</a></p>${promoHtml}`
       : "";
     const textAction = paymentUrl && deliveryType !== "receipt"
-      ? `\n\nPay securely: ${paymentUrl}`
+      ? `\n\nPay securely: ${paymentUrl}${promoText}`
       : "";
 
     emailResult = await sendSmtpEmail({
@@ -169,7 +176,7 @@ export async function deliverSchoolInvoice(
       channel_id: channel.id,
       author_id: authorId,
       subject: copy.title,
-      body: `${copy.body}\n\n${actionLabel}: ${actionUrl}\nInvoice PDF: ${invoiceUrl}`,
+      body: `${copy.body}\n\n${actionLabel}: ${actionUrl}${promoCode && deliveryType !== "receipt" ? `\nPromo code: ${promoCode}` : ""}\nInvoice PDF: ${invoiceUrl}`,
     });
     chatStatus = chatResult.error ? `failed: ${chatResult.error.message}` : "sent";
   } else {

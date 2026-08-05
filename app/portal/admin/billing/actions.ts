@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 
 import { deliverSchoolInvoice } from "@/lib/billing/delivery";
 import { defaultInvoiceMessageTemplates } from "@/lib/billing/delivery-copy";
+import {
+  DEFAULT_INVOICE_PAYMENT_URL,
+  loadBillingApplicationDetails,
+} from "@/lib/billing/application-details";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -37,6 +41,17 @@ function validHttpsUrl(value: string) {
   } catch {
     return false;
   }
+}
+
+function optionKeyFromLabel(label: string) {
+  const base = label
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return `custom_${base || "payment"}_${Date.now().toString(36)}`;
 }
 
 function selectedValues(formData: FormData, key: string) {
@@ -99,7 +114,12 @@ export async function updateInvoiceOption(optionId: string, formData: FormData) 
   await requireProfile(["owner"]);
   const label = text(formData, "label");
   const amount = text(formData, "amount");
+  const promoCode = text(formData, "promo_code").toUpperCase();
+  const paymentUrl = text(formData, "payment_url") || DEFAULT_INVOICE_PAYMENT_URL;
   if (!label) billingRedirect("error", "Enter a pricing option label.");
+  if (paymentUrl && !validHttpsUrl(paymentUrl)) {
+    billingRedirect("error", "Payment links must start with https://.");
+  }
 
   let amountCents: number;
   try {
@@ -115,12 +135,75 @@ export async function updateInvoiceOption(optionId: string, formData: FormData) 
       label,
       amount_cents: amountCents,
       active: formData.get("active") === "on",
+      payment_url: paymentUrl || null,
+      promo_code: promoCode || null,
     })
     .eq("id", optionId);
   if (error) billingRedirect("error", error.message);
 
   revalidatePath(BILLING_PATH);
   billingRedirect("success", "Cycle pricing updated.");
+}
+
+export async function createInvoiceOption(formData: FormData) {
+  await requireProfile(["owner"]);
+  const cycleId = text(formData, "cycle_id");
+  const label = text(formData, "label");
+  const amount = text(formData, "amount");
+  const promoCode = text(formData, "promo_code").toUpperCase();
+  const paymentUrl = text(formData, "payment_url") || DEFAULT_INVOICE_PAYMENT_URL;
+  if (!cycleId || !label) billingRedirect("error", "Choose a cycle and add a payment label.");
+  if (paymentUrl && !validHttpsUrl(paymentUrl)) {
+    billingRedirect("error", "Payment links must start with https://.");
+  }
+
+  let amountCents: number;
+  try {
+    amountCents = parseDollars(amount);
+  } catch (error) {
+    billingRedirect("error", error instanceof Error ? error.message : "Invalid amount.");
+  }
+
+  const supabase = await createClient();
+  const { data: maxOrder } = await supabase
+    .from("cycle_invoice_options")
+    .select("sort_order")
+    .eq("cycle_id", cycleId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { error } = await supabase.from("cycle_invoice_options").insert({
+    cycle_id: cycleId,
+    option_key: optionKeyFromLabel(label),
+    label,
+    amount_cents: amountCents,
+    promo_code: promoCode || null,
+    payment_url: paymentUrl || null,
+    active: true,
+    sort_order: Number(maxOrder?.sort_order ?? 0) + 10,
+  });
+  if (error) billingRedirect("error", error.message);
+
+  revalidatePath(BILLING_PATH);
+  billingRedirect("success", "Payment amount added.");
+}
+
+export async function archiveInvoiceOption(optionId: string) {
+  const owner = await requireProfile(["owner"]);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("cycle_invoice_options")
+    .update({
+      active: false,
+      archived_at: new Date().toISOString(),
+      archived_by: owner.id,
+    })
+    .eq("id", optionId)
+    .is("archived_at", null);
+  if (error) billingRedirect("error", error.message);
+
+  revalidatePath(BILLING_PATH);
+  billingRedirect("success", "Payment amount archived.");
 }
 
 export async function createAndSendInvoice(formData: FormData) {
@@ -130,10 +213,12 @@ export async function createAndSendInvoice(formData: FormData) {
   const recipientEmail = text(formData, "recipient_email").toLowerCase();
   const billingName = text(formData, "billing_name");
   const billingAddress = text(formData, "billing_address");
+  const billingContactName = text(formData, "billing_contact_name");
+  const billingContactPhone = text(formData, "billing_contact_phone");
   const paymentUrl = text(formData, "payment_url");
   const dueDate = text(formData, "due_date");
 
-  if (!applicationId || !optionId || !recipientEmail || !billingName) {
+  if (!applicationId || !optionId || !recipientEmail) {
     billingRedirect("error", "Choose a school and price, then add the billing contact.");
   }
   if (!/^\S+@\S+\.\S+$/.test(recipientEmail)) {
@@ -144,22 +229,28 @@ export async function createAndSendInvoice(formData: FormData) {
   const [{ data: application }, { data: option }] = await Promise.all([
     supabase
       .from("applications")
-      .select("id,cycle_id,school_name")
+      .select("id,cycle_id,school_name,form_version_id")
       .eq("id", applicationId)
       .eq("is_archived", false)
       .single(),
     supabase
       .from("cycle_invoice_options")
-      .select("id,cycle_id,option_key,label,amount_cents,active")
+      .select("id,cycle_id,option_key,label,amount_cents,active,payment_url,promo_code")
       .eq("id", optionId)
       .single(),
   ]);
   if (!application || !option || application.cycle_id !== option.cycle_id || !option.active) {
     billingRedirect("error", "That school and pricing option do not belong to the same active cycle.");
   }
-  if (option.amount_cents > 0 && !validHttpsUrl(paymentUrl)) {
+  const resolvedPaymentUrl = paymentUrl || option.payment_url || DEFAULT_INVOICE_PAYMENT_URL;
+  if (option.amount_cents > 0 && !validHttpsUrl(resolvedPaymentUrl)) {
     billingRedirect("error", "Paid invoices require a secure https payment link.");
   }
+  const applicationDetails = (
+    await loadBillingApplicationDetails(supabase, [application])
+  ).get(application.id);
+  const resolvedBillingName = billingName || application.school_name;
+  const resolvedBillingAddress = billingAddress || applicationDetails?.schoolAddress || "";
 
   const { data: priorInvoices, error: priorInvoiceError } = await supabase
     .from("school_invoices")
@@ -195,10 +286,16 @@ export async function createAndSendInvoice(formData: FormData) {
       description_snapshot: option.label,
       amount_cents: option.amount_cents,
       document_kind: documentKind,
-      payment_url: option.amount_cents > 0 ? paymentUrl : null,
+      payment_url: option.amount_cents > 0 ? resolvedPaymentUrl : null,
+      payment_promo_code: option.promo_code || null,
       recipient_email: recipientEmail,
-      billing_name: billingName,
-      billing_address: billingAddress || null,
+      billing_name: resolvedBillingName,
+      billing_address: resolvedBillingAddress || null,
+      billing_contact_name: billingContactName || null,
+      billing_contact_phone: billingContactPhone || applicationDetails?.schoolPhone || null,
+      school_address_snapshot: applicationDetails?.schoolAddress ?? null,
+      school_phone_snapshot: applicationDetails?.schoolPhone ?? null,
+      school_type_snapshot: applicationDetails?.schoolType ?? null,
       message_subject_snapshot: messageTemplates.subject,
       message_body_snapshot: messageTemplates.message,
       status: "sent",
@@ -254,12 +351,12 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
   const [optionResult, applicationResult, memberResult] = await Promise.all([
     supabase
       .from("cycle_invoice_options")
-      .select("id,cycle_id,option_key,label,amount_cents,active")
+      .select("id,cycle_id,option_key,label,amount_cents,active,payment_url,promo_code")
       .eq("id", optionId)
       .single(),
     supabase
       .from("applications")
-      .select("id,cycle_id,school_name,external_applicant_email")
+      .select("id,cycle_id,school_name,external_applicant_email,form_version_id")
       .in("id", applicationIds)
       .eq("is_archived", false),
     supabase
@@ -275,7 +372,8 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
   if (memberResult.error) billingRedirect("error", memberResult.error.message);
 
   const option = optionResult.data;
-  if (option.amount_cents > 0 && !validHttpsUrl(paymentUrl)) {
+  const resolvedPaymentUrl = paymentUrl || option.payment_url || DEFAULT_INVOICE_PAYMENT_URL;
+  if (option.amount_cents > 0 && !validHttpsUrl(resolvedPaymentUrl)) {
     billingRedirect("error", "Paid invoices require a secure https payment link.");
   }
 
@@ -299,6 +397,10 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
 
   const cycleApplications = (applicationResult.data ?? []).filter(
     (application) => application.cycle_id === option.cycle_id,
+  );
+  const detailsByApplication = await loadBillingApplicationDetails(
+    supabase,
+    cycleApplications,
   );
   const { data: existingInvoices, error: existingError } = cycleApplications.length
     ? await supabase
@@ -326,6 +428,7 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
       contactByApplication.get(application.id) ??
       application.external_applicant_email?.toLowerCase();
     if (!recipientEmail || alreadyInvoiced.has(application.id)) return [];
+    const applicationDetails = detailsByApplication.get(application.id);
     return [{
       invoice_number: "",
       cycle_id: application.cycle_id,
@@ -334,10 +437,16 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
       description_snapshot: option.label,
       amount_cents: option.amount_cents,
       document_kind: documentKind,
-      payment_url: option.amount_cents > 0 ? paymentUrl : null,
+      payment_url: option.amount_cents > 0 ? resolvedPaymentUrl : null,
+      payment_promo_code: option.promo_code || null,
       recipient_email: recipientEmail,
       billing_name: application.school_name,
-      billing_address: null,
+      billing_address: applicationDetails?.schoolAddress ?? null,
+      billing_contact_name: null,
+      billing_contact_phone: applicationDetails?.schoolPhone ?? null,
+      school_address_snapshot: applicationDetails?.schoolAddress ?? null,
+      school_phone_snapshot: applicationDetails?.schoolPhone ?? null,
+      school_type_snapshot: applicationDetails?.schoolType ?? null,
       message_subject_snapshot: messageTemplates.subject,
       message_body_snapshot: messageTemplates.message,
       status: "sent",

@@ -10017,7 +10017,28 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
   align-items: center;
   display: grid;
   gap: 0.55rem;
-  grid-template-columns: minmax(12rem, 1fr) 8rem auto auto;
+  grid-template-columns: minmax(12rem, 1fr) 7rem minmax(7rem, 0.55fr) minmax(13rem, 1fr) auto auto;
+  padding: 0.65rem;
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 0.85rem;
+  background: var(--portal-surface, var(--app-surface));
+}
+
+.billing-price-row-new {
+  border-style: dashed;
+}
+
+.billing-archive-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: -0.45rem;
+  padding: 0 0.65rem 0.35rem;
+}
+
+.billing-archive-row small {
+  color: var(--portal-muted, var(--app-muted));
 }
 
 .money-input {
@@ -10121,7 +10142,7 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
   }
 
   .billing-price-row {
-    grid-template-columns: minmax(0, 1fr) 8rem;
+    grid-template-columns: 1fr;
   }
 }
 
@@ -10129,6 +10150,11 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
   .theme-preference-options,
   .billing-price-row {
     grid-template-columns: 1fr;
+  }
+
+  .billing-archive-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .schedule-participant-actions,

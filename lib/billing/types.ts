@@ -15,9 +15,15 @@ export type SchoolInvoice = {
   currency: "usd";
   document_kind: "invoice" | "scholarship_confirmation";
   payment_url: string | null;
+  payment_promo_code: string | null;
   recipient_email: string;
   billing_name: string;
   billing_address: string | null;
+  billing_contact_name: string | null;
+  billing_contact_phone: string | null;
+  school_address_snapshot: string | null;
+  school_phone_snapshot: string | null;
+  school_type_snapshot: string | null;
   message_subject_snapshot: string | null;
   message_body_snapshot: string | null;
   status: "draft" | "sent" | "paid" | "void";

@@ -2,6 +2,10 @@ import Link from "next/link";
 
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
 import { InvoicePreviewSubmitButton } from "@/components/invoice-preview-submit-button";
+import {
+  DEFAULT_INVOICE_PAYMENT_URL,
+  loadBillingApplicationDetails,
+} from "@/lib/billing/application-details";
 import { activeInvoiceApplicationIds } from "@/lib/billing/eligibility";
 import { formatInvoiceAmount, type SchoolInvoice } from "@/lib/billing/types";
 import { requireProfile } from "@/lib/auth";
@@ -10,6 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   bulkCreateAndSendInvoices,
   bulkUpdateInvoices,
+  archiveInvoiceOption,
+  createInvoiceOption,
   createAndSendInvoice,
   markInvoicePaid,
   retryInvoiceDelivery,
@@ -49,11 +55,11 @@ export default async function BillingPage({
       .order("season_year", { ascending: false }),
     supabase
       .from("cycle_invoice_options")
-      .select("id,cycle_id,option_key,label,amount_cents,active,sort_order")
+      .select("id,cycle_id,option_key,label,amount_cents,active,sort_order,payment_url,promo_code,archived_at")
       .order("sort_order"),
     supabase
       .from("applications")
-      .select("id,cycle_id,school_name,production_title,applicant_user_id,external_applicant_email")
+      .select("id,cycle_id,school_name,production_title,applicant_user_id,external_applicant_email,form_version_id")
       .eq("is_archived", false)
       .order("school_name"),
     supabase
@@ -81,7 +87,7 @@ export default async function BillingPage({
     if (result.error) throw new Error(result.error.message);
   }
   const cycles = cycleResult.data ?? [];
-  const options = optionResult.data ?? [];
+  const options = (optionResult.data ?? []).filter((option) => !option.archived_at);
   const applications = applicationResult.data ?? [];
   const invoices = (invoiceResult.data ?? []) as SchoolInvoice[];
   const invoicedApplicationIds = activeInvoiceApplicationIds(
@@ -107,6 +113,10 @@ export default async function BillingPage({
         .eq("active", true)
     : { data: [], error: null };
   if (memberResult.error) throw new Error(memberResult.error.message);
+  const billingDetailsByApplication = await loadBillingApplicationDetails(
+    supabase,
+    applications,
+  );
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const applicationMap = new Map(applications.map((application) => [application.id, application]));
   type MemberRow = {
@@ -184,6 +194,7 @@ export default async function BillingPage({
                             value={option.id}
                           >
                             {option.label} · {formatInvoiceAmount(option.amount_cents)}
+                            {option.promo_code ? ` · code ${option.promo_code}` : ""}
                           </option>
                         ))}
                       </select>
@@ -196,8 +207,8 @@ export default async function BillingPage({
                   </div>
                   <div className="field">
                     <label htmlFor={`bulk_payment_${cycle.id}`}>Secure payment link</label>
-                    <input className="input" id={`bulk_payment_${cycle.id}`} name="payment_url" placeholder="https://…" type="url" />
-                    <small>One payment link is included on every selected paid invoice.</small>
+                    <input className="input" defaultValue={DEFAULT_INVOICE_PAYMENT_URL} id={`bulk_payment_${cycle.id}`} name="payment_url" placeholder="https://…" type="url" />
+                    <small>Each payment amount can also store its own default link and promo code.</small>
                   </div>
                   <label className="check-row"><input name="scholarship_confirmation" type="checkbox" />For a $0 option, send scholarship confirmations</label>
                   <fieldset className="billing-school-picker">
@@ -210,6 +221,7 @@ export default async function BillingPage({
                         </div>
                       ) : cycleApplications.map((application) => {
                         const recipientEmail = contactByApplication.get(application.id) ?? application.external_applicant_email;
+                        const billingDetails = billingDetailsByApplication.get(application.id);
                         return (
                           <label className={`billing-school-choice${recipientEmail ? "" : " is-disabled"}`} key={application.id}>
                             <input
@@ -219,7 +231,13 @@ export default async function BillingPage({
                               type="checkbox"
                               value={application.id}
                             />
-                            <span><strong>{application.school_name}</strong><small>{recipientEmail ?? "Missing school contact email"}</small></span>
+                            <span>
+                              <strong>{application.school_name}</strong>
+                              <small>
+                                {billingDetails?.schoolType ? `${billingDetails.schoolType} · ` : ""}
+                                {recipientEmail ?? "Missing school contact email"}
+                              </small>
+                            </span>
                           </label>
                         );
                       })}
@@ -248,7 +266,12 @@ export default async function BillingPage({
                       key={application.id}
                       value={application.id}
                     >
-                      {application.school_name} — {cycleMap.get(application.cycle_id)?.season_year ?? "Cycle"}
+                      {application.school_name}
+                      {billingDetailsByApplication.get(application.id)?.schoolType
+                        ? ` · ${billingDetailsByApplication.get(application.id)?.schoolType}`
+                        : ""}
+                      {" — "}
+                      {cycleMap.get(application.cycle_id)?.season_year ?? "Cycle"}
                     </option>
                   ))}
                 </select>
@@ -265,18 +288,23 @@ export default async function BillingPage({
                       value={option.id}
                     >
                       {cycleMap.get(option.cycle_id)?.season_year ?? "Cycle"} · {option.label} · {formatInvoiceAmount(option.amount_cents)}
+                      {option.promo_code ? ` · code ${option.promo_code}` : ""}
                     </option>
                   ))}
                 </select>
                 <small>The selected school and option must be from the same cycle.</small>
               </div>
               <div className="field-grid">
-                <div className="field"><label htmlFor="billing_name">Bill to</label><input className="input" id="billing_name" name="billing_name" placeholder="School or district name" required /></div>
-                <div className="field"><label htmlFor="recipient_email">Recipient email</label><input className="input" id="recipient_email" name="recipient_email" type="email" required /></div>
+                <div className="field"><label htmlFor="billing_name">Bill to override</label><input className="input" id="billing_name" name="billing_name" placeholder="Defaults to the school name" /></div>
+                <div className="field"><label htmlFor="recipient_email">Billing email override</label><input className="input" id="recipient_email" name="recipient_email" type="email" required /></div>
               </div>
-              <div className="field"><label htmlFor="billing_address">Billing address</label><textarea className="textarea" id="billing_address" name="billing_address" rows={3} /></div>
               <div className="field-grid">
-                <div className="field"><label htmlFor="payment_url">Secure payment link</label><input className="input" id="payment_url" name="payment_url" type="url" placeholder="https://…" /><small>Required for invoices above $0.</small></div>
+                <div className="field"><label htmlFor="billing_contact_name">Billing contact name override</label><input className="input" id="billing_contact_name" name="billing_contact_name" placeholder="Optional" /></div>
+                <div className="field"><label htmlFor="billing_contact_phone">Billing phone override</label><input className="input" id="billing_contact_phone" name="billing_contact_phone" placeholder="Defaults to Acceptd school phone" /></div>
+              </div>
+              <div className="field"><label htmlFor="billing_address">Billing address override</label><textarea className="textarea" id="billing_address" name="billing_address" placeholder="Defaults to the Acceptd school address when available." rows={3} /></div>
+              <div className="field-grid">
+                <div className="field"><label htmlFor="payment_url">Secure payment link override</label><input className="input" defaultValue={DEFAULT_INVOICE_PAYMENT_URL} id="payment_url" name="payment_url" type="url" placeholder="https://…" /><small>Defaults to the selected amount’s link, then the Qgiv link.</small></div>
                 <div className="field"><label htmlFor="due_date">Due date</label><input className="input" id="due_date" name="due_date" type="date" /><small>Defaults to 30 days.</small></div>
               </div>
               <label className="check-row"><input name="scholarship_confirmation" type="checkbox" />For a $0 option, send a scholarship confirmation instead of a standard invoice</label>
@@ -295,8 +323,25 @@ export default async function BillingPage({
                   <form action={updateInvoiceOption.bind(null, option.id)} className="billing-price-row" key={option.id}>
                     <input className="input" aria-label="Option label" name="label" defaultValue={option.label} required />
                     <div className="money-input"><span>$</span><input className="input" aria-label="Amount" name="amount" inputMode="decimal" defaultValue={(option.amount_cents / 100).toFixed(2)} required /></div>
+                    <input className="input" aria-label="Promo code" name="promo_code" defaultValue={option.promo_code ?? ""} placeholder="Promo code" />
+                    <input className="input" aria-label="Payment link" name="payment_url" defaultValue={option.payment_url ?? DEFAULT_INVOICE_PAYMENT_URL} placeholder="https://…" type="url" />
                     <label className="check-row"><input defaultChecked={option.active} name="active" type="checkbox" />Active</label>
                     <button className="button button-secondary button-compact" type="submit">Save</button>
+                  </form>
+                ))}
+                <form action={createInvoiceOption} className="billing-price-row billing-price-row-new">
+                  <input name="cycle_id" type="hidden" value={cycle.id} />
+                  <input className="input" aria-label="New payment label" name="label" placeholder="New payment amount label" required />
+                  <div className="money-input"><span>$</span><input className="input" aria-label="New amount" name="amount" inputMode="decimal" placeholder="0.00" required /></div>
+                  <input className="input" aria-label="New promo code" name="promo_code" placeholder="Promo code" />
+                  <input className="input" aria-label="New payment link" name="payment_url" defaultValue={DEFAULT_INVOICE_PAYMENT_URL} placeholder="https://…" type="url" />
+                  <span />
+                  <button className="button button-primary button-compact" type="submit">Add amount</button>
+                </form>
+                {options.filter((option) => option.cycle_id === cycle.id).map((option) => (
+                  <form action={archiveInvoiceOption.bind(null, option.id)} className="billing-archive-row" key={`${option.id}-archive`}>
+                    <small>Archive {option.label} when it should no longer appear for new invoices.</small>
+                    <ConfirmedSubmitButton className="button button-ghost button-compact" description="Archived payment amounts are hidden for new invoices, but existing invoice history stays intact." destructive label="Archive" title="Archive this payment amount?" />
                   </form>
                 ))}
               </section>

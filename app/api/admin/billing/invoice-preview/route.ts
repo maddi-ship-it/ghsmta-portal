@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { createInvoicePdf } from "@/lib/reports/invoice-pdf";
 import { createClient } from "@/lib/supabase/server";
 import type { InvoiceContext } from "@/lib/billing/types";
+import {
+  DEFAULT_INVOICE_PAYMENT_URL,
+  loadBillingApplicationDetails,
+} from "@/lib/billing/application-details";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,13 +60,13 @@ export async function POST(request: Request) {
   const [{ data: application }, { data: option }] = await Promise.all([
     supabase
       .from("applications")
-      .select("id,cycle_id,school_name,production_title,external_applicant_email")
+      .select("id,cycle_id,school_name,production_title,external_applicant_email,form_version_id")
       .eq("id", applicationId)
       .eq("is_archived", false)
       .single(),
     supabase
       .from("cycle_invoice_options")
-      .select("id,cycle_id,option_key,label,amount_cents,active")
+      .select("id,cycle_id,option_key,label,amount_cents,active,payment_url,promo_code")
       .eq("id", optionId)
       .single(),
   ]);
@@ -116,7 +120,13 @@ export async function POST(request: Request) {
     return previewError("The selected school needs a valid billing contact email.");
   }
 
-  const paymentUrl = value(formData, "payment_url");
+  const applicationDetails = (
+    await loadBillingApplicationDetails(supabase, [application])
+  ).get(application.id);
+  const paymentUrl =
+    value(formData, "payment_url") ||
+    option.payment_url ||
+    DEFAULT_INVOICE_PAYMENT_URL;
   if (option.amount_cents > 0 && !validHttpsUrl(paymentUrl)) {
     return previewError("Paid invoices require a secure https payment link.");
   }
@@ -146,9 +156,21 @@ export async function POST(request: Request) {
       ? "scholarship_confirmation"
       : "invoice",
     payment_url: option.amount_cents > 0 ? paymentUrl : null,
+    payment_promo_code: option.promo_code ?? null,
     recipient_email: recipientEmail,
     billing_name: value(formData, "billing_name") || application.school_name,
-    billing_address: value(formData, "billing_address") || null,
+    billing_address:
+      value(formData, "billing_address") ||
+      applicationDetails?.schoolAddress ||
+      null,
+    billing_contact_name: value(formData, "billing_contact_name") || null,
+    billing_contact_phone:
+      value(formData, "billing_contact_phone") ||
+      applicationDetails?.schoolPhone ||
+      null,
+    school_address_snapshot: applicationDetails?.schoolAddress ?? null,
+    school_phone_snapshot: applicationDetails?.schoolPhone ?? null,
+    school_type_snapshot: applicationDetails?.schoolType ?? null,
     message_subject_snapshot: null,
     message_body_snapshot: null,
     status: "draft",
