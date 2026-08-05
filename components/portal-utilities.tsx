@@ -75,6 +75,20 @@ export function PortalUtilities({
   }, [supabase]);
 
   useEffect(() => {
+    const updateChatBadges = (count: number) => {
+      document
+        .querySelectorAll<HTMLElement>("[data-live-chat-badge]")
+        .forEach((badge) => {
+          badge.hidden = count < 1;
+          badge.textContent = count > 99 ? "99+" : String(count);
+          badge.setAttribute("aria-label", `${count} unread`);
+        });
+    };
+
+    updateChatBadges(chatMessageCount);
+  }, [chatMessageCount]);
+
+  useEffect(() => {
     const channel = supabase
       .channel(`portal-unread-counts-${profile.id}`)
       .on(

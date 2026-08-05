@@ -2,11 +2,6 @@ import Link from "next/link";
 
 import { signOut } from "@/app/portal/actions";
 import { AutoClosingDetails } from "@/components/auto-closing-details";
-import {
-  LiveMobilePortalNavigation,
-  LivePortalNavigation,
-  type LiveNavItem,
-} from "@/components/live-portal-navigation";
 import { PortalUtilities } from "@/components/portal-utilities";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -22,7 +17,7 @@ function buildNavigation(
   profile: Profile,
   chatMessageCount: number,
 ) {
-  const primary: LiveNavItem[] = [
+  const primary: NavItem[] = [
     {
       href: "/portal",
       label: "Dashboard",
@@ -43,7 +38,7 @@ function buildNavigation(
     },
   ];
 
-  const resources: LiveNavItem[] =
+  const resources: NavItem[] =
     profile.role === "program_manager"
       ? []
       : [
@@ -67,7 +62,7 @@ function buildNavigation(
           },
         ];
 
-  const management: LiveNavItem[] = [];
+  const management: NavItem[] = [];
 
   if (profile.role === "applicant") {
     primary.push({
@@ -187,6 +182,83 @@ function buildNavigation(
   };
 }
 
+type NavItem = {
+  href: string;
+  label: string;
+  shortLabel?: string;
+  icon: string;
+  badgeCount?: number;
+};
+
+function renderBadge(
+  count: number | undefined,
+  options: { liveChat?: boolean } = {},
+) {
+  if ((!count || count < 1) && !options.liveChat) {
+    return null;
+  }
+
+  return (
+    <span
+      className="portal-nav-badge"
+      aria-label={`${count ?? 0} unread`}
+      data-live-chat-badge={options.liveChat ? "true" : undefined}
+      hidden={options.liveChat && (!count || count < 1)}
+    >
+      {count && count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+function DesktopLink({ item }: { item: NavItem }) {
+  const isChat = item.href === "/portal/chat";
+  return (
+    <Link href={item.href} className="portal-desktop-link">
+      <span>{item.label}</span>
+      {renderBadge(item.badgeCount, { liveChat: isChat })}
+    </Link>
+  );
+}
+
+function DesktopMenu({
+  label,
+  items,
+}: {
+  label: string;
+  items: NavItem[];
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <AutoClosingDetails
+      className="portal-nav-menu"
+      summary={
+        <>
+          {label}
+          <span className="portal-menu-chevron" aria-hidden="true">
+            ⌄
+          </span>
+        </>
+      }
+      summaryAriaLabel={`Open ${label} menu`}
+    >
+      <div className="portal-nav-menu-popover">
+        {items.map((item) => (
+          <Link href={item.href} key={item.href}>
+            <span className="portal-nav-menu-icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span>{item.label}</span>
+            {renderBadge(item.badgeCount, { liveChat: item.href === "/portal/chat" })}
+          </Link>
+        ))}
+      </div>
+    </AutoClosingDetails>
+  );
+}
+
 export async function PortalHeader({
   profile,
 }: {
@@ -226,14 +298,18 @@ export async function PortalHeader({
             </span>
           </Link>
 
-          <LivePortalNavigation
-            userId={profile.id}
-            resourcesLabel={profile.role === "applicant" ? "School" : "Resources"}
-            primary={navigation.primary}
-            resources={navigation.resources}
-            management={navigation.management}
-            initialChatMessageCount={chatMessageCount}
-          />
+          <nav className="portal-nav" aria-label="Portal navigation">
+            {navigation.primary.map((item) => (
+              <DesktopLink item={item} key={item.href} />
+            ))}
+
+            <DesktopMenu
+              label={profile.role === "applicant" ? "School" : "Resources"}
+              items={navigation.resources}
+            />
+
+            <DesktopMenu label="Admin" items={navigation.management} />
+          </nav>
 
           <div className="portal-header-actions">
             <PortalUtilities
@@ -280,11 +356,20 @@ export async function PortalHeader({
         </div>
       </header>
 
-      <LiveMobilePortalNavigation
-        userId={profile.id}
-        mobile={navigation.mobile}
-        initialChatMessageCount={chatMessageCount}
-      />
+      <nav
+        className="mobile-portal-nav"
+        aria-label="Mobile portal navigation"
+      >
+        {navigation.mobile.map((item) => (
+          <Link href={item.href} key={item.href}>
+            <span className="mobile-nav-icon" aria-hidden="true">
+              {item.icon}
+              {renderBadge(item.badgeCount, { liveChat: item.href === "/portal/chat" })}
+            </span>
+            <small>{item.shortLabel ?? item.label}</small>
+          </Link>
+        ))}
+      </nav>
     </>
   );
 }
