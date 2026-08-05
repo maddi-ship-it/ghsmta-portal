@@ -25,6 +25,7 @@ function buildNavigation(
   profile: Profile,
   chatMessageCount: number,
 ) {
+  const isApplicant = profile.role === "applicant";
   const primary: NavItem[] = [
     {
       href: "/portal",
@@ -40,7 +41,8 @@ function buildNavigation(
     },
     {
       href: "/portal/chat",
-      label: "Chat",
+      label: isApplicant ? "School Messaging" : "Chat",
+      shortLabel: isApplicant ? "Messages" : undefined,
       icon: "✉",
       badgeCount: chatMessageCount,
     },

@@ -420,11 +420,22 @@ try {
   fixture.slotId = slot.id;
   report.fixture_setup_ms = Number((performance.now() - fixtureStartedAt).toFixed(1));
 
+  const realtimeEvents = Array.from({ length: userCount }, () => null);
+  const realtimePayloads = Array.from({ length: userCount }, () => null);
+  const eventResolvers = [];
+  const eventPromises = Array.from(
+    { length: userCount },
+    (_, index) => new Promise((resolve) => {
+      eventResolvers[index] = resolve;
+    }),
+  );
+
   console.log(
-    `Signing in virtual applicants in batches of ${loginBatchSize} to avoid the single-IP Auth burst limit...`,
+    `Signing in applicants and opening private Broadcast connections in batches of ${loginBatchSize}...`,
   );
   const loginStartedAt = performance.now();
   const loginResults = [];
+  const subscriptionResults = [];
   for (let index = 0; index < createdUsers.length; index += loginBatchSize) {
     const batch = createdUsers.slice(index, index + loginBatchSize);
     const results = await Promise.all(
@@ -441,7 +452,44 @@ try {
         return { client, testUser, latency, error: result.error };
       }),
     );
+    const resultOffset = loginResults.length;
     loginResults.push(...results);
+    const batchSubscriptions = await Promise.all(
+      results.map(async ({ client, error }, batchIndex) => {
+        if (error) return { status: "LOGIN_FAILED", latency: null };
+
+        const clientIndex = resultOffset + batchIndex;
+        const channel = client
+          .channel("schedule:availability", { config: { private: true } })
+          .on(
+            "broadcast",
+            { event: "availability_changed" },
+            (message) => {
+              const payload = message.payload;
+              if (payload?.slot_id !== fixture.slotId || realtimeEvents[clientIndex] !== null) return;
+              const receivedAt = performance.now();
+              realtimeEvents[clientIndex] = receivedAt;
+              realtimePayloads[clientIndex] = payload;
+              eventResolvers[clientIndex]();
+            },
+          );
+        channels.push({ client, channel });
+
+        const startedAt = performance.now();
+        await client.realtime.setAuth();
+        const status = await new Promise((resolve) => {
+          const timeout = setTimeout(() => resolve("SUBSCRIBE_TIMEOUT"), 15_000);
+          channel.subscribe((nextStatus) => {
+            if (nextStatus === "SUBSCRIBED" || ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(nextStatus)) {
+              clearTimeout(timeout);
+              resolve(nextStatus);
+            }
+          });
+        });
+        return { status, latency: performance.now() - startedAt };
+      }),
+    );
+    subscriptionResults.push(...batchSubscriptions);
     if (index + loginBatchSize < createdUsers.length) {
       console.log(`Waiting ${Math.round(loginBatchDelayMs / 1000)}s for the Auth token bucket to refill...`);
       await delay(loginBatchDelayMs);
@@ -460,59 +508,16 @@ try {
   if (loginFailures.length > 0) {
     throw new Error(`${loginFailures.length} virtual applicants could not sign in.`);
   }
-
-  const realtimeEvents = Array.from({ length: userCount }, () => null);
-  const realtimePayloads = Array.from({ length: userCount }, () => null);
-  const eventResolvers = [];
-  const eventPromises = Array.from(
-    { length: userCount },
-    (_, index) => new Promise((resolve) => {
-      eventResolvers[index] = resolve;
-    }),
-  );
-
-  console.log(`Opening ${userCount} private Broadcast subscriptions and running the initial availability refresh...`);
-  const subscriptionResults = await Promise.all(
-    loginResults.map(async ({ client }, index) => {
-      const channel = client
-        .channel("schedule:availability", { config: { private: true } })
-        .on(
-          "broadcast",
-          { event: "availability_changed" },
-          (message) => {
-            const payload = message.payload;
-            if (payload?.slot_id !== fixture.slotId || realtimeEvents[index] !== null) return;
-            const receivedAt = performance.now();
-            realtimeEvents[index] = receivedAt;
-            realtimePayloads[index] = payload;
-            eventResolvers[index]();
-          },
-        );
-      channels.push({ client, channel });
-
-      const startedAt = performance.now();
-      await client.realtime.setAuth();
-      const status = await new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve("SUBSCRIBE_TIMEOUT"), 15_000);
-        channel.subscribe((nextStatus) => {
-          if (nextStatus === "SUBSCRIBED" || ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(nextStatus)) {
-            clearTimeout(timeout);
-            resolve(nextStatus);
-          }
-        });
-      });
-      return { status, latency: performance.now() - startedAt };
-    }),
-  );
   report.realtime_subscriptions = {
     subscribed: subscriptionResults.filter((result) => result.status === "SUBSCRIBED").length,
     statuses: subscriptionResults.reduce((counts, result) => {
       counts[result.status] = (counts[result.status] ?? 0) + 1;
       return counts;
     }, {}),
-    latency: latencySummary(subscriptionResults.map((result) => result.latency)),
+    latency: latencySummary(subscriptionResults.map((result) => result.latency).filter((value) => value !== null)),
   };
 
+  console.log(`Running ${userCount} initial availability reads before the booking race...`);
   const initialAvailability = await Promise.all(
     loginResults.map(async ({ client }) => {
       const startedAt = performance.now();
