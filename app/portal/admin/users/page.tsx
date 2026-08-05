@@ -1,9 +1,11 @@
 import { requireProfile } from "@/lib/auth";
+import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Profile } from "@/lib/types";
 
 import { bulkUpdateUsers, forcePasswordReset, updateUserAccess } from "./actions";
+import { startApplicantImpersonation } from "@/app/portal/impersonation/actions";
 
 type UserSort = "name" | "email" | "role" | "status";
 type Direction = "asc" | "desc";
@@ -16,6 +18,7 @@ type SearchParams = {
   direction?: Direction;
   updated?: string;
   reset_sent?: string;
+  impersonation_ended?: string;
 };
 
 function compare(left: string | null | undefined, right: string | null | undefined) {
@@ -27,7 +30,7 @@ export default async function UsersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireProfile(["owner"]);
+  const owner = await requireProfile(["owner"]);
   const params = await searchParams;
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -73,6 +76,7 @@ export default async function UsersPage({
       <div className="page-heading"><div><h1>Portal users</h1><p>Search, filter, sort, and update access in bulk. Passwords remain private; Owners can only send secure reset links.</p></div></div>
       {params.updated && <div className="notice page-message">Updated {params.updated} user accounts.</div>}
       {params.reset_sent && <div className="notice page-message">Password-reset email sent and reset required at the next portal visit.</div>}
+      {params.impersonation_ended && <div className="notice page-message">Applicant impersonation ended. Your Owner session has been restored.</div>}
 
       <section className="panel user-admin-filter-panel">
         <div className="panel-body">
@@ -94,7 +98,7 @@ export default async function UsersPage({
         <button className="button button-dark button-compact" type="submit">Apply to selected</button>
       </form>
 
-      <section className="panel"><div className="table-wrap"><table className="data-table user-admin-table"><thead><tr><th><span className="sr-only">Select</span></th><th>User</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th><th>Password</th><th>Change access</th></tr></thead><tbody>
+      <section className="panel"><div className="table-wrap"><table className="data-table user-admin-table"><thead><tr><th><span className="sr-only">Select</span></th><th>User</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th><th>Password</th><th>Support view</th><th>Change access</th></tr></thead><tbody>
         {profiles.map((profile) => (
           <tr key={profile.id}>
             <td><input aria-label={`Select ${profile.full_name ?? profile.email}`} form="bulk-users-form" name="user_ids" type="checkbox" value={profile.id} /></td>
@@ -104,6 +108,28 @@ export default async function UsersPage({
             <td><span className="badge">{roleLabel(profile.role)}</span></td>
             <td><span className={`badge ${profile.active ? "badge-complete" : "badge-warning"}`}>{profile.active ? "Active" : "Inactive"}</span></td>
             <td>{profile.force_password_reset ? <span className="badge badge-warning">Reset required</span> : "Current"}</td>
+            <td>
+              {profile.role === "applicant" &&
+              profile.active &&
+              profile.email &&
+              !profile.force_password_reset &&
+              profile.id !== owner.id ? (
+                <form action={startApplicantImpersonation.bind(null, profile.id)}>
+                  <ConfirmedSubmitButton
+                    className="button button-secondary button-compact"
+                    description={`This will temporarily open the portal as ${profile.full_name ?? profile.email}. Your Owner session will be restored when you end impersonation.`}
+                    label="View as"
+                    reasonLabel="Support reason"
+                    reasonName="impersonation_reason"
+                    reasonPlaceholder="Example: verifying applicant messaging access"
+                    requireReason
+                    title="View as this applicant?"
+                  />
+                </form>
+              ) : (
+                <small>Applicant only</small>
+              )}
+            </td>
             <td>
               <div className="user-row-actions">
                 <form action={updateUserAccess.bind(null, profile.id)} className="user-inline-access-form">
@@ -118,7 +144,7 @@ export default async function UsersPage({
             </td>
           </tr>
         ))}
-        {profiles.length === 0 && <tr><td colSpan={8}>No users match these filters.</td></tr>}
+        {profiles.length === 0 && <tr><td colSpan={9}>No users match these filters.</td></tr>}
       </tbody></table></div></section>
     </>
   );

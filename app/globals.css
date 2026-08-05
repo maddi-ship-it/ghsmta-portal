@@ -5085,6 +5085,9 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 .security-grace-banner { background: linear-gradient(90deg, rgba(212,175,55,.18), rgba(24,54,164,.18)); border-bottom: 1px solid var(--regal-line); }
 .security-grace-banner .container { display: flex; justify-content: center; gap: 16px; padding: 10px; font-size: .86rem; }
 .security-grace-banner a { color: var(--regal-gold-light); font-weight: 800; }
+.impersonation-banner { background: #7f1d1d; border-bottom: 1px solid rgba(255,255,255,.24); color: white; }
+.impersonation-banner .container { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 10px; font-size: .88rem; }
+.impersonation-banner strong { color: white; }
 
 .regal-public-header { position: absolute; z-index: 20; inset: max(20px, env(safe-area-inset-top)) 0 auto; }
 .regal-public-nav, .regal-brand { display: flex; align-items: center; }
