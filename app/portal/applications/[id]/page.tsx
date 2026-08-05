@@ -215,55 +215,64 @@ export default async function ApplicationDetailPage({
       )}
 
       {canEditMetadata && (
-        <div className="split-grid owner-application-tools">
-          <section className="panel owner-controls-panel">
-            <div className="panel-header"><h2>Owner controls</h2></div>
-            <div className="panel-body">
-              <form action={updateApplication.bind(null, id)} className="form-stack">
-                <div className="field"><label htmlFor="school_name">School name</label><input className="input" id="school_name" name="school_name" defaultValue={application.school_name} required /></div>
-                <div className="field"><label htmlFor="production_title">Production title</label><input className="input" id="production_title" name="production_title" defaultValue={application.production_title ?? ""} /></div>
-                <div className="field">
-                  <label htmlFor="current_stage_id">Current stage</label>
-                  <select className="select" id="current_stage_id" name="current_stage_id" defaultValue={application.current_stage_id ?? ""}>
-                    <option value="">No stage</option>
-                    {allStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.title}</option>)}
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="status">Status</label>
-                  <select className="select" id="status" name="status" defaultValue={application.status}>
-                    <option value="draft">Draft</option>
-                    <option value="submitted">Submitted</option>
-                    <option value="under_review">Under review</option>
-                    <option value="complete">Complete</option>
-                    <option value="withdrawn">Withdrawn</option>
-                  </select>
-                </div>
-                <div className="field"><label htmlFor="owner_notes">Internal owner notes</label><textarea className="textarea" id="owner_notes" name="owner_notes" defaultValue={application.owner_notes ?? ""} /></div>
-                <button className="button button-dark" type="submit">Save application details</button>
-              </form>
-            </div>
-          </section>
+        <details className="owner-application-tools owner-application-disclosure">
+          <summary className="owner-application-summary">
+            <span>
+              <strong>Owner tools</strong>
+              <small>Edit application details or duplicate this application.</small>
+            </span>
+            <span className="owner-application-summary-action">tools</span>
+          </summary>
+          <div className="split-grid owner-application-tool-grid">
+            <section className="panel owner-controls-panel">
+              <div className="panel-header"><h2>Owner controls</h2></div>
+              <div className="panel-body">
+                <form action={updateApplication.bind(null, id)} className="form-stack">
+                  <div className="field"><label htmlFor="school_name">School name</label><input className="input" id="school_name" name="school_name" defaultValue={application.school_name} required /></div>
+                  <div className="field"><label htmlFor="production_title">Production title</label><input className="input" id="production_title" name="production_title" defaultValue={application.production_title ?? ""} /></div>
+                  <div className="field">
+                    <label htmlFor="current_stage_id">Current stage</label>
+                    <select className="select" id="current_stage_id" name="current_stage_id" defaultValue={application.current_stage_id ?? ""}>
+                      <option value="">No stage</option>
+                      {allStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.title}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="status">Status</label>
+                    <select className="select" id="status" name="status" defaultValue={application.status}>
+                      <option value="draft">Draft</option>
+                      <option value="submitted">Submitted</option>
+                      <option value="under_review">Under review</option>
+                      <option value="complete">Complete</option>
+                      <option value="withdrawn">Withdrawn</option>
+                    </select>
+                  </div>
+                  <div className="field"><label htmlFor="owner_notes">Internal owner notes</label><textarea className="textarea" id="owner_notes" name="owner_notes" defaultValue={application.owner_notes ?? ""} /></div>
+                  <button className="button button-dark" type="submit">Save application details</button>
+                </form>
+              </div>
+            </section>
 
-          <section className="panel">
-            <div className="panel-header"><h2>Duplicate application</h2></div>
-            <div className="panel-body">
-              <form action={duplicateApplicationRecord.bind(null, id)} className="form-stack">
-                <div className="field">
-                  <label htmlFor="target_cycle_id">Target program</label>
-                  <select className="select" id="target_cycle_id" name="target_cycle_id" required>
-                    <option value="">Choose a target program</option>
-                    {cycles.filter((cycle) => cycle.id !== application.cycle_id).map((cycle) => (
-                      <option key={cycle.id} value={cycle.id}>{cycle.season_year} — {cycle.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <label className="check-row"><input name="copy_answers" type="checkbox" defaultChecked />Copy matching answers</label>
-                <button className="button button-secondary" type="submit">Duplicate application</button>
-              </form>
-            </div>
-          </section>
-        </div>
+            <section className="panel">
+              <div className="panel-header"><h2>Duplicate application</h2></div>
+              <div className="panel-body">
+                <form action={duplicateApplicationRecord.bind(null, id)} className="form-stack">
+                  <div className="field">
+                    <label htmlFor="target_cycle_id">Target program</label>
+                    <select className="select" id="target_cycle_id" name="target_cycle_id" required>
+                      <option value="">Choose a target program</option>
+                      {cycles.filter((cycle) => cycle.id !== application.cycle_id).map((cycle) => (
+                        <option key={cycle.id} value={cycle.id}>{cycle.season_year} — {cycle.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="check-row"><input name="copy_answers" type="checkbox" defaultChecked />Copy matching answers</label>
+                  <button className="button button-secondary" type="submit">Duplicate application</button>
+                </form>
+              </div>
+            </section>
+          </div>
+        </details>
       )}
 
       {!application.form_version_id ? (

@@ -443,6 +443,79 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   margin-bottom: 1.25rem;
 }
 
+.owner-application-disclosure {
+  position: static;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 18px;
+}
+
+.owner-application-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.owner-application-summary::-webkit-details-marker {
+  display: none;
+}
+
+.owner-application-summary strong,
+.owner-application-summary small {
+  display: block;
+}
+
+.owner-application-summary small {
+  margin-top: 4px;
+  color: var(--portal-muted, var(--muted));
+  line-height: 1.4;
+}
+
+.owner-application-summary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(213, 177, 79, 0.35);
+  border-radius: 999px;
+  color: var(--portal-gold-bright, var(--gold-500));
+  font-size: .84rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.owner-application-summary-action::before {
+  content: "Open ";
+}
+
+.owner-application-disclosure[open] .owner-application-summary {
+  border-bottom: 1px solid var(--portal-line, var(--line));
+}
+
+.owner-application-disclosure[open] .owner-application-summary-action {
+  color: var(--portal-ivory, white);
+}
+
+.owner-application-disclosure[open] .owner-application-summary-action::before {
+  content: "Close ";
+}
+
+.owner-application-tool-grid {
+  padding: 18px;
+}
+
+.owner-application-tool-grid .panel,
+.owner-application-tool-grid .owner-controls-panel {
+  margin-bottom: 0;
+}
+
 .inline-form-grid {
   align-items: end;
 }
@@ -6595,6 +6668,12 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   position: sticky;
   z-index: 12;
   top: 82px;
+}
+
+.owner-application-disclosure {
+  position: static;
+  top: auto;
+  z-index: auto;
 }
 
 /* Auth and security pages */
