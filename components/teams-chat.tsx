@@ -667,9 +667,11 @@ function MentionTextarea({
 function ChannelNavigation({
   groups,
   selectedChannelId,
+  defaultOpenSchoolGroups = false,
 }: {
   groups: ChannelGroup[];
   selectedChannelId: string | null;
+  defaultOpenSchoolGroups?: boolean;
 }) {
   if (groups.length === 0) {
     return (
@@ -723,6 +725,7 @@ function ChannelNavigation({
           <div className={styles.schoolGroupList}>
             {schoolGroups.map((group) => (
               <SchoolConversationNavigation
+                defaultOpen={defaultOpenSchoolGroups}
                 group={group}
                 key={group.key}
                 selectedChannelId={selectedChannelId}
@@ -871,9 +874,11 @@ function ChannelNavigationLink({
 }
 
 function SchoolConversationNavigation({
+  defaultOpen = false,
   group,
   selectedChannelId,
 }: {
+  defaultOpen?: boolean;
   group: SchoolConversationGroup;
   selectedChannelId: string | null;
 }) {
@@ -881,7 +886,7 @@ function SchoolConversationNavigation({
     (channel) => channel.channel_id === selectedChannelId,
   );
   const [isOpen, setIsOpen] = useState(
-    containsActiveChannel || group.unreadCount > 0,
+    defaultOpen || containsActiveChannel || group.unreadCount > 0,
   );
 
   return (
@@ -1574,6 +1579,7 @@ export function TeamsChat({
         </div>
 
         <ChannelNavigation
+          defaultOpenSchoolGroups={profile.role === "applicant"}
           groups={groups}
           selectedChannelId={selectedChannelId}
         />
