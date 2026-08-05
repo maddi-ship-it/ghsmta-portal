@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { saveAdjudicatorScorecard } from "@/app/portal/adjudication/[id]/actions";
+import { offlineScorecardDraftKey } from "@/components/adjudicator-autosave";
 import { richTextHasContent } from "@/lib/rich-text";
 import type { ScoringCategory, ScoringCriterion } from "@/lib/types";
 
@@ -117,6 +118,8 @@ export function ScorecardSubmitControls({
     complete: false,
     missingCount: 0,
   });
+  const [online, setOnline] = useState(true);
+  const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
 
   const updateCompletion = useCallback(() => {
     const form = hostRef.current?.closest("form");
@@ -142,11 +145,43 @@ export function ScorecardSubmitControls({
     };
   }, [updateCompletion]);
 
+  useEffect(() => {
+    const updateSyncState = () => {
+      setOnline(navigator.onLine);
+      setHasOfflineDraft(
+        Boolean(window.localStorage.getItem(offlineScorecardDraftKey(applicationId))),
+      );
+    };
+
+    const handleDraftChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ applicationId?: string; hasDraft?: boolean }>).detail;
+      if (detail?.applicationId !== applicationId) return;
+      setHasOfflineDraft(Boolean(detail.hasDraft));
+      setOnline(navigator.onLine);
+    };
+
+    updateSyncState();
+    window.addEventListener("online", updateSyncState);
+    window.addEventListener("offline", updateSyncState);
+    window.addEventListener("storage", updateSyncState);
+    window.addEventListener("ghsmta:offline-scorecard-draft-changed", handleDraftChange);
+
+    return () => {
+      window.removeEventListener("online", updateSyncState);
+      window.removeEventListener("offline", updateSyncState);
+      window.removeEventListener("storage", updateSyncState);
+      window.removeEventListener("ghsmta:offline-scorecard-draft-changed", handleDraftChange);
+    };
+  }, [applicationId]);
+
+  const blockedBySync = !online || hasOfflineDraft;
+  const canSubmit = completion.complete && !blockedBySync;
+
   return (
     <div className="scorecard-submit-control" ref={hostRef}>
       <button
         className="button button-dark"
-        disabled={!completion.complete}
+        disabled={!canSubmit}
         formAction={saveAdjudicatorScorecard.bind(
           null,
           applicationId,
@@ -158,7 +193,11 @@ export function ScorecardSubmitControls({
       </button>
 
       <small aria-live="polite" className="scorecard-submit-help">
-        {completion.complete
+        {!online
+          ? "Final submission is available once you are back online."
+          : hasOfflineDraft
+            ? "Final submission unlocks after saved comments finish syncing."
+            : completion.complete
           ? "All required fields are complete."
           : `${completion.missingCount} required field${
               completion.missingCount === 1 ? "" : "s"

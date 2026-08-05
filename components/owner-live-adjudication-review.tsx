@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -152,10 +153,152 @@ function LivePanelFeedbackEditor({
   feedback: AdjudicationPanelFeedback | undefined;
   liveDraft: string;
 }) {
+  const router = useRouter();
   const storedComment = feedback?.final_comment?.trim() ?? "";
+  const storageKey = `ghsmta:offline-panel-feedback:${applicationId}:${category.id}`;
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncingRef = useRef(false);
   const [manualValue, setManualValue] = useState(storedComment);
   const [followingLiveDraft, setFollowingLiveDraft] = useState(!storedComment);
+  const [online, setOnline] = useState(true);
+  const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
   const value = followingLiveDraft ? liveDraft : manualValue;
+
+  const readLocalDraft = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) return null;
+      return JSON.parse(raw) as {
+        finalComment?: string;
+        approved?: boolean;
+      };
+    } catch {
+      window.localStorage.removeItem(storageKey);
+      return null;
+    }
+  }, [storageKey]);
+
+  const syncLocalDraft = useCallback(async () => {
+    if (!navigator.onLine || syncingRef.current) return;
+    const draft = readLocalDraft();
+    const finalComment = draft?.finalComment?.trim();
+    if (!draft || !finalComment) return;
+
+    syncingRef.current = true;
+    setSyncMessage("Syncing panel narrative…");
+
+    const formData = new FormData();
+    formData.set("final_comment", finalComment);
+    if (draft.approved) {
+      formData.set("approved", "on");
+    }
+
+    try {
+      await savePanelFeedback(applicationId, category.id, formData);
+      window.localStorage.removeItem(storageKey);
+      setHasLocalDraft(false);
+      setSyncMessage("Panel narrative synced.");
+      router.refresh();
+    } catch (error) {
+      setHasLocalDraft(true);
+      setSyncMessage(
+        error instanceof Error
+          ? `Panel narrative saved on this device. ${error.message}`
+          : "Panel narrative saved on this device.",
+      );
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [applicationId, category.id, readLocalDraft, router, storageKey]);
+
+  useEffect(() => {
+    const updateOnlineState = () => {
+      setOnline(navigator.onLine);
+      if (navigator.onLine) {
+        if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = setTimeout(() => void syncLocalDraft(), 250);
+      }
+    };
+
+    updateOnlineState();
+    window.addEventListener("online", updateOnlineState);
+    window.addEventListener("offline", updateOnlineState);
+
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      window.removeEventListener("online", updateOnlineState);
+      window.removeEventListener("offline", updateOnlineState);
+    };
+  }, [syncLocalDraft]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const deferStateUpdate = (callback: () => void) => {
+      window.setTimeout(() => {
+        if (!disposed) callback();
+      }, 0);
+    };
+
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) {
+        return () => {
+          disposed = true;
+        };
+      }
+
+      const draft = JSON.parse(raw) as {
+        finalComment?: string;
+        approved?: boolean;
+      };
+
+      if ((draft.finalComment ?? "").trim() === storedComment) {
+        window.localStorage.removeItem(storageKey);
+        deferStateUpdate(() => setHasLocalDraft(false));
+        return () => {
+          disposed = true;
+        };
+      }
+
+      deferStateUpdate(() => {
+        setFollowingLiveDraft(false);
+        setManualValue(draft.finalComment ?? "");
+        setHasLocalDraft(true);
+      });
+    } catch {
+      window.localStorage.removeItem(storageKey);
+      deferStateUpdate(() => setHasLocalDraft(false));
+    }
+
+    return () => {
+      disposed = true;
+    };
+  }, [storageKey, storedComment]);
+
+  const writeLocalDraft = (finalComment: string, approved?: boolean) => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        applicationId,
+        categoryId: category.id,
+        finalComment,
+        approved: Boolean(approved),
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    setHasLocalDraft(true);
+    setSyncMessage(
+      navigator.onLine
+        ? "Panel narrative saved locally — syncing…"
+        : "Offline — panel narrative saved on this device.",
+    );
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    if (navigator.onLine) {
+      syncTimerRef.current = setTimeout(() => void syncLocalDraft(), 900);
+    }
+  };
 
   return (
     <div className="panel-feedback-editor">
@@ -178,6 +321,16 @@ function LivePanelFeedbackEditor({
       <form
         action={savePanelFeedback.bind(null, applicationId, category.id)}
         className="form-stack"
+        onSubmit={(event) => {
+          if (!navigator.onLine) {
+            event.preventDefault();
+            const approvedField = event.currentTarget.elements.namedItem("approved");
+            writeLocalDraft(
+              value,
+              approvedField instanceof HTMLInputElement ? approvedField.checked : false,
+            );
+          }
+        }}
       >
         <div className="field">
           <div className="field-label-row">
@@ -201,10 +354,15 @@ function LivePanelFeedbackEditor({
             onChange={(event) => {
               setFollowingLiveDraft(false);
               setManualValue(event.target.value);
+              writeLocalDraft(event.target.value);
             }}
           />
           <small className="field-help">
-            {followingLiveDraft
+            {!online
+              ? "Offline — panel narrative saved on this device. Save is available when you are back online."
+              : hasLocalDraft
+                ? syncMessage || "Local draft restored. Syncing when online."
+                : followingLiveDraft
               ? "Following live observations and comments. Typing here will preserve your manual edit."
               : "Manual edit preserved. Use Refresh from live notes to replace it."}
           </small>
@@ -214,11 +372,12 @@ function LivePanelFeedbackEditor({
             name="approved"
             type="checkbox"
             defaultChecked={feedback?.status === "approved"}
+            onChange={(event) => writeLocalDraft(value, event.currentTarget.checked)}
           />
           Approved for school release
         </label>
-        <button className="button button-dark" type="submit">
-          Save panel narrative
+        <button className="button button-dark" disabled={!online} type="submit">
+          {online ? "Save panel narrative" : "Save when online"}
         </button>
       </form>
     </div>

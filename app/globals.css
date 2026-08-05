@@ -1124,6 +1124,7 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 }
 .autosave-status-pending > span,
 .autosave-status-saving > span,
+.autosave-status-offline > span,
 .live-review-status-connecting > span { background: #f79009; }
 .autosave-status-saved > span,
 .live-review-status-live > span { background: #12b76a; }

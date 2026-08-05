@@ -81,6 +81,36 @@ export function RichTextField({
     }
   }, [defaultValue]);
 
+  useEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    const restoreDraftValue = (event: Event) => {
+      const detail = (event as CustomEvent<{ values?: Record<string, string> }>).detail;
+      const restoredValue = detail?.values?.[name];
+
+      if (restoredValue === undefined) {
+        return;
+      }
+
+      const nextValue = sanitizeRichTextHtml(restoredValue);
+      editor.innerHTML = nextValue;
+      setValue(nextValue);
+      window.setTimeout(() => {
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      }, 0);
+    };
+
+    window.addEventListener("ghsmta:offline-draft-restore", restoreDraftValue);
+
+    return () => {
+      window.removeEventListener("ghsmta:offline-draft-restore", restoreDraftValue);
+    };
+  }, [name]);
+
   const syncValue = () => {
     const editor = editorRef.current;
 
