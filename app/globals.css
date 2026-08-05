@@ -9998,6 +9998,66 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
   margin-bottom: 1.25rem;
 }
 
+.billing-stack {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.billing-collapsible-panel {
+  overflow: hidden;
+}
+
+.billing-collapsible-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.billing-collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.billing-collapsible-summary > span {
+  color: var(--portal-muted, var(--app-muted));
+  font-size: 1.1rem;
+  transition: transform 160ms ease;
+}
+
+.billing-collapsible-panel[open] .billing-collapsible-summary > span {
+  transform: rotate(180deg);
+}
+
+.billing-selected-school-summary {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 0.85rem;
+  background: var(--portal-surface-2, var(--app-surface-2));
+}
+
+.billing-selected-school-summary.is-empty {
+  display: block;
+  color: var(--portal-muted, var(--app-muted));
+}
+
+.billing-selected-school-summary span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  color: var(--portal-muted, var(--app-muted));
+  overflow-wrap: anywhere;
+}
+
+.billing-selected-school-summary strong {
+  color: var(--portal-text, var(--app-text));
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .billing-pricing-list,
 .billing-cycle-prices {
   display: grid;

@@ -35,6 +35,7 @@ export type BillingApplicationDetails = {
   schoolAddress: string | null;
   schoolPhone: string | null;
   schoolType: string | null;
+  selectedTrack: string | null;
 };
 
 export const DEFAULT_INVOICE_PAYMENT_URL =
@@ -99,6 +100,20 @@ function addressToText(value: unknown): string {
     .join("\n");
 }
 
+function trackToText(value: unknown): string {
+  const text = answerToText(value);
+  const normalized = normalize(text);
+  if (!text) return "";
+  if (normalized.includes("mentorship") || normalized.includes("mentor")) {
+    return "Mentorship Track";
+  }
+  if (normalized.includes("competition")) {
+    return "Competition Track";
+  }
+  const [shortLabel] = text.split(/\s[-–—]\s|-/);
+  return (shortLabel || text).trim();
+}
+
 function questionHaystack(question: BillingQuestionRow) {
   return normalize(
     [
@@ -153,7 +168,18 @@ export function buildBillingApplicationDetails(
     schoolType: findAnswer(
       sortedQuestions,
       answerByQuestionId,
-      ["school type"],
+      ["school type", "school_type"],
+    ),
+    selectedTrack: findAnswer(
+      sortedQuestions,
+      answerByQuestionId,
+      [
+        "which track are you registering",
+        "track are you registering",
+        "program you are registering",
+        "select the program",
+      ],
+      trackToText,
     ),
   };
 }

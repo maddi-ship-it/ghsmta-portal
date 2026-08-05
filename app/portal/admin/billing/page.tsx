@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BillingApplicationAutofill } from "@/components/billing-application-autofill";
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
 import { InvoicePreviewSubmitButton } from "@/components/invoice-preview-submit-button";
 import {
@@ -108,7 +109,7 @@ export default async function BillingPage({
   const memberResult = applications.length
     ? await supabase
         .from("application_members")
-        .select("application_id,member_role,profiles!application_members_user_id_fkey(email)")
+        .select("application_id,member_role,profiles!application_members_user_id_fkey(email,full_name)")
         .in("application_id", applications.map((application) => application.id))
         .eq("active", true)
     : { data: [], error: null };
@@ -122,15 +123,26 @@ export default async function BillingPage({
   type MemberRow = {
     application_id: string;
     member_role: string;
-    profiles: { email: string | null } | Array<{ email: string | null }> | null;
+    profiles:
+      | { email: string | null; full_name: string | null }
+      | Array<{ email: string | null; full_name: string | null }>
+      | null;
   };
-  const contactByApplication = new Map<string, string>();
+  const contactByApplication = new Map<
+    string,
+    { email: string; name: string | null }
+  >();
   ((memberResult.data ?? []) as unknown as MemberRow[])
     .sort((left, right) => Number(right.member_role === "primary") - Number(left.member_role === "primary"))
     .forEach((member) => {
       if (contactByApplication.has(member.application_id)) return;
       const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-      if (profile?.email) contactByApplication.set(member.application_id, profile.email);
+      if (profile?.email) {
+        contactByApplication.set(member.application_id, {
+          email: profile.email,
+          name: profile.full_name,
+        });
+      }
     });
 
   return (
@@ -220,12 +232,17 @@ export default async function BillingPage({
                           <p>Void an invoice to return that school to this list.</p>
                         </div>
                       ) : cycleApplications.map((application) => {
-                        const recipientEmail = contactByApplication.get(application.id) ?? application.external_applicant_email;
+                        const contact = contactByApplication.get(application.id);
+                        const recipientEmail = contact?.email ?? application.external_applicant_email;
                         const billingDetails = billingDetailsByApplication.get(application.id);
+                        const schoolType = billingDetails?.schoolType ?? "School type missing";
+                        const selectedTrack = billingDetails?.selectedTrack ?? "Track missing";
                         return (
                           <label className={`billing-school-choice${recipientEmail ? "" : " is-disabled"}`} key={application.id}>
                             <input
                               data-school-name={application.school_name}
+                              data-selected-track={billingDetails?.selectedTrack ?? ""}
+                              data-school-type={billingDetails?.schoolType ?? ""}
                               disabled={!recipientEmail}
                               name="application_ids"
                               type="checkbox"
@@ -234,7 +251,7 @@ export default async function BillingPage({
                             <span>
                               <strong>{application.school_name}</strong>
                               <small>
-                                {billingDetails?.schoolType ? `${billingDetails.schoolType} · ` : ""}
+                                {schoolType} · {selectedTrack} ·{" "}
                                 {recipientEmail ?? "Missing school contact email"}
                               </small>
                             </span>
@@ -251,30 +268,49 @@ export default async function BillingPage({
         </div>
       </section>
 
-      <div className="billing-layout">
-        <section className="panel">
-          <div className="panel-header"><div><h2>Send an invoice</h2><p>The school receives email, School Messaging, and an in-app notification. Invoice notices never enter Panel Channels.</p></div></div>
+      <div className="billing-stack">
+        <details className="panel billing-collapsible-panel" open>
+          <summary className="panel-header billing-collapsible-summary">
+            <div>
+              <h2>Send an invoice</h2>
+              <p>The school receives email, School Messaging, and an in-app notification. Invoice notices never enter Panel Channels.</p>
+            </div>
+            <span aria-hidden="true">⌄</span>
+          </summary>
           <div className="panel-body">
             <form action={createAndSendInvoice} className="form-stack">
               <div className="field">
                 <label htmlFor="billing_application">School</label>
                 <select className="select" id="billing_application" name="application_id" required defaultValue="">
                   <option disabled value="">Choose a school</option>
-                  {applications.map((application) => (
-                    <option
-                      data-school-name={application.school_name}
-                      key={application.id}
-                      value={application.id}
-                    >
-                      {application.school_name}
-                      {billingDetailsByApplication.get(application.id)?.schoolType
-                        ? ` · ${billingDetailsByApplication.get(application.id)?.schoolType}`
-                        : ""}
-                      {" — "}
-                      {cycleMap.get(application.cycle_id)?.season_year ?? "Cycle"}
-                    </option>
-                  ))}
+                  {applications.map((application) => {
+                    const contact = contactByApplication.get(application.id);
+                    const billingDetails = billingDetailsByApplication.get(application.id);
+                    const schoolType =
+                      billingDetails?.schoolType ?? "School type missing";
+                    const selectedTrack =
+                      billingDetails?.selectedTrack ?? "Track missing";
+                    const recipientEmail =
+                      contact?.email ?? application.external_applicant_email ?? "";
+                    return (
+                      <option
+                        data-billing-address={billingDetails?.schoolAddress ?? ""}
+                        data-billing-contact-name={contact?.name ?? ""}
+                        data-billing-contact-phone={billingDetails?.schoolPhone ?? ""}
+                        data-recipient-email={recipientEmail}
+                        data-school-name={application.school_name}
+                        data-school-type={billingDetails?.schoolType ?? ""}
+                        data-selected-track={billingDetails?.selectedTrack ?? ""}
+                        key={application.id}
+                        value={application.id}
+                      >
+                        {application.school_name} · {schoolType} · {selectedTrack} —{" "}
+                        {cycleMap.get(application.cycle_id)?.season_year ?? "Cycle"}
+                      </option>
+                    );
+                  })}
                 </select>
+                <BillingApplicationAutofill />
               </div>
               <div className="field">
                 <label htmlFor="billing_option">Track and price</label>
@@ -311,10 +347,16 @@ export default async function BillingPage({
               <InvoicePreviewSubmitButton />
             </form>
           </div>
-        </section>
+        </details>
 
-        <section className="panel">
-          <div className="panel-header"><div><h2>Cycle pricing</h2><p>Changes apply to new invoices only.</p></div></div>
+        <details className="panel billing-collapsible-panel">
+          <summary className="panel-header billing-collapsible-summary">
+            <div>
+              <h2>Cycle pricing</h2>
+              <p>Changes apply to new invoices only.</p>
+            </div>
+            <span aria-hidden="true">⌄</span>
+          </summary>
           <div className="panel-body billing-pricing-list">
             {cycles.map((cycle) => (
               <section className="billing-cycle-prices" key={cycle.id}>
@@ -347,7 +389,7 @@ export default async function BillingPage({
               </section>
             ))}
           </div>
-        </section>
+        </details>
       </div>
 
       <section className="panel billing-history">
