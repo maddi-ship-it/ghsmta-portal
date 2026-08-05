@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireProfile } from "@/lib/auth";
+import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
 import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,6 +28,10 @@ type ChannelMode = {
 
 function formText(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
+}
+
+function profileDisplayName(profile: { full_name?: string | null; email?: string | null }) {
+  return profile.full_name?.trim() || profile.email || "Someone";
 }
 
 async function readChannelMode(channelId: string) {
@@ -103,6 +108,18 @@ export async function createChatPost(
     return { ok: false, error: error.message };
   }
 
+  try {
+    await sendChatEmailNotifications({
+      channelId,
+      authorId: profile.id,
+      authorName: profileDisplayName(profile),
+      subject,
+      body,
+    });
+  } catch {
+    // Chat should remain sent even if email notification delivery is unavailable.
+  }
+
   revalidatePath("/portal/chat");
   return { ok: true, messageId: post.id, messageKind: "post" };
 }
@@ -143,19 +160,39 @@ export async function createChatReply(
     };
   }
 
-  const { data: reply, error } = await supabase
-    .from("chat_replies")
-    .insert({
-      channel_id: channelId,
-      post_id: postId,
-      author_id: profile.id,
-      body,
-    })
-    .select("id")
-    .single();
+  const [{ data: parentPost }, { data: reply, error }] = await Promise.all([
+    supabase
+      .from("chat_posts")
+      .select("subject")
+      .eq("id", postId)
+      .eq("channel_id", channelId)
+      .maybeSingle(),
+    supabase
+      .from("chat_replies")
+      .insert({
+        channel_id: channelId,
+        post_id: postId,
+        author_id: profile.id,
+        body,
+      })
+      .select("id")
+      .single(),
+  ]);
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+
+  try {
+    await sendChatEmailNotifications({
+      channelId,
+      authorId: profile.id,
+      authorName: profileDisplayName(profile),
+      subject: parentPost?.subject ? `Reply: ${parentPost.subject}` : "New reply",
+      body,
+    });
+  } catch {
+    // Chat should remain sent even if email notification delivery is unavailable.
   }
 
   revalidatePath("/portal/chat");
@@ -210,6 +247,18 @@ export async function createChatMessage(
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+
+  try {
+    await sendChatEmailNotifications({
+      channelId,
+      authorId: profile.id,
+      authorName: profileDisplayName(profile),
+      subject: "Message",
+      body,
+    });
+  } catch {
+    // Chat should remain sent even if email notification delivery is unavailable.
   }
 
   revalidatePath("/portal/chat");

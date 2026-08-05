@@ -123,6 +123,18 @@ export function NotificationCenter({
           void refreshChatChannels();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_channel_reads",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void refreshChatChannels();
+        },
+      )
       .subscribe();
 
     const onFocus = () => {

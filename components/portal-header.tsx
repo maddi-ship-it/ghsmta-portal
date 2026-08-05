@@ -2,18 +2,15 @@ import Link from "next/link";
 
 import { signOut } from "@/app/portal/actions";
 import { AutoClosingDetails } from "@/components/auto-closing-details";
+import {
+  LiveMobilePortalNavigation,
+  LivePortalNavigation,
+  type LiveNavItem,
+} from "@/components/live-portal-navigation";
 import { PortalUtilities } from "@/components/portal-utilities";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
-
-type NavItem = {
-  href: string;
-  label: string;
-  shortLabel?: string;
-  icon: string;
-  badgeCount?: number;
-};
 
 type UnreadCounts = {
   notification_count: number;
@@ -25,7 +22,7 @@ function buildNavigation(
   profile: Profile,
   chatMessageCount: number,
 ) {
-  const primary: NavItem[] = [
+  const primary: LiveNavItem[] = [
     {
       href: "/portal",
       label: "Dashboard",
@@ -46,7 +43,7 @@ function buildNavigation(
     },
   ];
 
-  const resources: NavItem[] =
+  const resources: LiveNavItem[] =
     profile.role === "program_manager"
       ? []
       : [
@@ -70,7 +67,7 @@ function buildNavigation(
           },
         ];
 
-  const management: NavItem[] = [];
+  const management: LiveNavItem[] = [];
 
   if (profile.role === "applicant") {
     primary.push({
@@ -190,66 +187,6 @@ function buildNavigation(
   };
 }
 
-function renderBadge(count: number | undefined) {
-  if (!count || count < 1) {
-    return null;
-  }
-
-  return (
-    <span className="portal-nav-badge" aria-label={`${count} unread`}>
-      {count > 99 ? "99+" : count}
-    </span>
-  );
-}
-
-function DesktopLink({ item }: { item: NavItem }) {
-  return (
-    <Link href={item.href} className="portal-desktop-link">
-      <span>{item.label}</span>
-      {renderBadge(item.badgeCount)}
-    </Link>
-  );
-}
-
-function DesktopMenu({
-  label,
-  items,
-}: {
-  label: string;
-  items: NavItem[];
-}) {
-  if (items.length === 0) {
-    return null;
-  }
-
-  return (
-    <AutoClosingDetails
-      className="portal-nav-menu"
-      summary={
-        <>
-          {label}
-          <span className="portal-menu-chevron" aria-hidden="true">
-            ⌄
-          </span>
-        </>
-      }
-      summaryAriaLabel={`Open ${label} menu`}
-    >
-      <div className="portal-nav-menu-popover">
-        {items.map((item) => (
-          <Link href={item.href} key={item.href}>
-            <span className="portal-nav-menu-icon" aria-hidden="true">
-              {item.icon}
-            </span>
-            <span>{item.label}</span>
-            {renderBadge(item.badgeCount)}
-          </Link>
-        ))}
-      </div>
-    </AutoClosingDetails>
-  );
-}
-
 export async function PortalHeader({
   profile,
 }: {
@@ -268,10 +205,6 @@ export async function PortalHeader({
 
   const chatMessageCount = Number(
     countRow?.chat_message_count ?? 0,
-  );
-
-  const chatChannelCount = Number(
-    countRow?.chat_channel_count ?? 0,
   );
 
   const navigation = buildNavigation(profile, chatMessageCount);
@@ -293,25 +226,20 @@ export async function PortalHeader({
             </span>
           </Link>
 
-          <nav className="portal-nav" aria-label="Portal navigation">
-            {navigation.primary.map((item) => (
-              <DesktopLink item={item} key={item.href} />
-            ))}
-
-            <DesktopMenu
-              label={profile.role === "applicant" ? "School" : "Resources"}
-              items={navigation.resources}
-            />
-
-            <DesktopMenu label="Admin" items={navigation.management} />
-          </nav>
+          <LivePortalNavigation
+            userId={profile.id}
+            resourcesLabel={profile.role === "applicant" ? "School" : "Resources"}
+            primary={navigation.primary}
+            resources={navigation.resources}
+            management={navigation.management}
+            initialChatMessageCount={chatMessageCount}
+          />
 
           <div className="portal-header-actions">
             <PortalUtilities
               profile={profile}
               initialNotificationCount={notificationCount}
               initialChatMessageCount={chatMessageCount}
-              initialChatChannelCount={chatChannelCount}
             />
 
             <AutoClosingDetails
@@ -352,20 +280,11 @@ export async function PortalHeader({
         </div>
       </header>
 
-      <nav
-        className="mobile-portal-nav"
-        aria-label="Mobile portal navigation"
-      >
-        {navigation.mobile.map((item) => (
-          <Link href={item.href} key={item.href}>
-            <span className="mobile-nav-icon" aria-hidden="true">
-              {item.icon}
-              {renderBadge(item.badgeCount)}
-            </span>
-            <small>{item.shortLabel ?? item.label}</small>
-          </Link>
-        ))}
-      </nav>
+      <LiveMobilePortalNavigation
+        userId={profile.id}
+        mobile={navigation.mobile}
+        initialChatMessageCount={chatMessageCount}
+      />
     </>
   );
 }

@@ -23,7 +23,6 @@ type PortalUtilitiesProps = {
   profile: Profile;
   initialNotificationCount?: number;
   initialChatMessageCount?: number;
-  initialChatChannelCount?: number;
 };
 
 function BellIcon() {
@@ -56,7 +55,6 @@ export function PortalUtilities({
   profile,
   initialNotificationCount = 0,
   initialChatMessageCount = 0,
-  initialChatChannelCount = 0,
 }: PortalUtilitiesProps) {
   const supabase = useMemo(() => createClient(), []);
   const [notificationCount, setNotificationCount] = useState(
@@ -64,9 +62,6 @@ export function PortalUtilities({
   );
   const [chatMessageCount, setChatMessageCount] = useState(
     initialChatMessageCount,
-  );
-  const [chatChannelCount, setChatChannelCount] = useState(
-    initialChatChannelCount,
   );
 
   const refreshUnreadCounts = useCallback(async () => {
@@ -77,7 +72,6 @@ export function PortalUtilities({
 
     setNotificationCount(Number(row?.notification_count ?? 0));
     setChatMessageCount(Number(row?.chat_message_count ?? 0));
-    setChatChannelCount(Number(row?.chat_channel_count ?? 0));
   }, [supabase]);
 
   useEffect(() => {
@@ -111,6 +105,16 @@ export function PortalUtilities({
         },
         () => void refreshUnreadCounts(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_channel_reads",
+          filter: `user_id=eq.${profile.id}`,
+        },
+        () => void refreshUnreadCounts(),
+      )
       .subscribe();
 
     const onFocus = () => void refreshUnreadCounts();
@@ -122,7 +126,7 @@ export function PortalUtilities({
     };
   }, [profile.id, refreshUnreadCounts, supabase]);
 
-  const bellCount = notificationCount + chatChannelCount;
+  const bellCount = notificationCount + chatMessageCount;
 
   return (
     <div className="portal-utilities">
