@@ -1586,6 +1586,14 @@ export function TeamsChat({
               </button>
             )}
           </div>
+          <button
+            className={styles.broadcastButton}
+            disabled={isPending}
+            onClick={markActiveChannelUnread}
+            type="button"
+          >
+            Mark current chat unread
+          </button>
           {profile.role === "owner" && (
             <button
               className={styles.broadcastButton}
@@ -1659,10 +1667,11 @@ export function TeamsChat({
             </div>
           </div>
 
-          <label className={styles.mobilePicker}>
-            <span>Conversation</span>
+          <div className={styles.mobilePicker}>
+            <label htmlFor="mobile-channel-picker">Conversation</label>
             <select
               className="select"
+              id="mobile-channel-picker"
               onChange={(event) =>
                 router.push(`/portal/chat?channel=${event.target.value}`)
               }
@@ -1681,7 +1690,15 @@ export function TeamsChat({
                 </optgroup>
               ))}
             </select>
-          </label>
+            <button
+              className="button button-secondary button-compact"
+              disabled={isPending}
+              onClick={markActiveChannelUnread}
+              type="button"
+            >
+              Mark current chat unread
+            </button>
+          </div>
         </header>
 
         {status && (

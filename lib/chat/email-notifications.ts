@@ -1,12 +1,5 @@
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-
-type ChannelMember = {
-  user_id: string;
-  display_name: string;
-  user_role: string;
-};
 
 type RecipientProfile = {
   id: string;
@@ -15,6 +8,8 @@ type RecipientProfile = {
     email?: boolean;
   } | null;
 };
+
+type AdminClient = ReturnType<typeof createAdminClient>;
 
 type ChatChannel = {
   id: string;
@@ -88,6 +83,190 @@ function channelApplication(channel: ChatChannel) {
     : channel.applications;
 }
 
+function addIds(
+  recipientIds: Set<string>,
+  ids: Array<string | null | undefined>,
+) {
+  ids.filter((id): id is string => Boolean(id)).forEach((id) => {
+    recipientIds.add(id);
+  });
+}
+
+async function addActiveRoleRecipients(
+  admin: AdminClient,
+  recipientIds: Set<string>,
+  roles: string[],
+) {
+  const query = admin.from("profiles").select("id").eq("active", true);
+  const { data, error } =
+    roles.length === 1
+      ? await query.eq("role", roles[0])
+      : await query.in("role", roles);
+
+  if (error) {
+    throw new Error(
+      `Chat email role recipients could not be loaded: ${error.message}`,
+    );
+  }
+
+  addIds(recipientIds, (data ?? []).map((profile) => profile.id));
+}
+
+async function addApplicationApplicantRecipients(
+  admin: AdminClient,
+  recipientIds: Set<string>,
+  applicationId: string | null,
+) {
+  if (!applicationId) return;
+
+  const { data: members, error: memberError } = await admin
+    .from("application_members")
+    .select("user_id")
+    .eq("application_id", applicationId)
+    .eq("active", true);
+
+  if (memberError) {
+    throw new Error(
+      `Chat email school members could not be loaded: ${memberError.message}`,
+    );
+  }
+
+  const memberIds = [
+    ...new Set(
+      (members ?? [])
+        .map((member) => member.user_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (memberIds.length === 0) return;
+
+  const { data: profiles, error: profileError } = await admin
+    .from("profiles")
+    .select("id")
+    .in("id", memberIds)
+    .eq("active", true)
+    .eq("role", "applicant");
+
+  if (profileError) {
+    throw new Error(
+      `Chat email school profiles could not be loaded: ${profileError.message}`,
+    );
+  }
+
+  addIds(recipientIds, (profiles ?? []).map((profile) => profile.id));
+}
+
+async function addPanelRecipients(
+  admin: AdminClient,
+  recipientIds: Set<string>,
+  applicationId: string | null,
+) {
+  if (!applicationId) return;
+
+  const { data: assignments, error: assignmentError } = await admin
+    .from("adjudicator_assignments")
+    .select("adjudicator_user_id")
+    .eq("application_id", applicationId)
+    .is("removed_at", null);
+
+  if (assignmentError) {
+    throw new Error(
+      `Chat email assignments could not be loaded: ${assignmentError.message}`,
+    );
+  }
+
+  addIds(
+    recipientIds,
+    (assignments ?? []).map((assignment) => assignment.adjudicator_user_id),
+  );
+
+  const { data: bookings, error: bookingError } = await admin
+    .from("schedule_school_bookings")
+    .select("slot_id")
+    .eq("application_id", applicationId);
+
+  if (bookingError) {
+    throw new Error(
+      `Chat email schedule bookings could not be loaded: ${bookingError.message}`,
+    );
+  }
+
+  const slotIds = [
+    ...new Set(
+      (bookings ?? [])
+        .map((booking) => booking.slot_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (slotIds.length === 0) return;
+
+  const { data: slotStaff, error: staffError } = await admin
+    .from("schedule_slot_staff")
+    .select("user_id")
+    .in("slot_id", slotIds)
+    .in("joined_as", ["adjudicator", "advisory_member"]);
+
+  if (staffError) {
+    throw new Error(
+      `Chat email schedule staff could not be loaded: ${staffError.message}`,
+    );
+  }
+
+  addIds(recipientIds, (slotStaff ?? []).map((staff) => staff.user_id));
+}
+
+async function loadChannelRecipientIds(
+  admin: AdminClient,
+  channel: ChatChannel,
+) {
+  const recipientIds = new Set<string>();
+
+  await addActiveRoleRecipients(admin, recipientIds, ["owner"]);
+
+  if (channel.channel_type === "applicant_community") {
+    await addActiveRoleRecipients(admin, recipientIds, ["applicant"]);
+  }
+
+  if (channel.channel_type === "general") {
+    await addActiveRoleRecipients(admin, recipientIds, [
+      "adjudicator",
+      "advisory_member",
+      "program_manager",
+    ]);
+  }
+
+  if (channel.channel_type === "networking") {
+    await addActiveRoleRecipients(admin, recipientIds, [
+      "adjudicator",
+      "advisory_member",
+    ]);
+  }
+
+  if (channel.channel_type === "advisory_committee") {
+    await addActiveRoleRecipients(admin, recipientIds, ["advisory_member"]);
+  }
+
+  if (channel.channel_type === "scholarship_dm") {
+    await addActiveRoleRecipients(admin, recipientIds, ["program_manager"]);
+  }
+
+  if (["school_dm", "scholarship_dm"].includes(channel.channel_type)) {
+    await addApplicationApplicantRecipients(
+      admin,
+      recipientIds,
+      channel.application_id,
+    );
+  }
+
+  if (channel.channel_type === "school") {
+    await addPanelRecipients(admin, recipientIds, channel.application_id);
+  }
+
+  return [...recipientIds];
+}
+
 export async function sendChatEmailNotifications({
   channelId,
   messageId,
@@ -105,7 +284,6 @@ export async function sendChatEmailNotifications({
   subject: string;
   body: string;
 }) {
-  const supabase = await createClient();
   const admin = createAdminClient();
   const logDelivery = async (
     status: "sent" | "skipped_no_recipients" | "failed",
@@ -128,11 +306,9 @@ export async function sendChatEmailNotifications({
   };
 
   const [
-    { data: members, error: memberError },
-    { data: channel },
-    { data: author },
+    { data: channel, error: channelError },
+    { data: author, error: authorError },
   ] = await Promise.all([
-    supabase.rpc("get_chat_channel_members", { p_channel_id: channelId }),
     admin
       .from("chat_channels")
       .select("id,channel_type,name,application_id,applications(school_name,production_title,external_applicant_email)")
@@ -144,18 +320,30 @@ export async function sendChatEmailNotifications({
       .eq("id", authorId)
       .maybeSingle(),
   ]);
-  if (memberError) {
-    await logDelivery("failed", 0, memberError.message);
-    throw new Error(`Chat email channel members could not be loaded: ${memberError.message}`);
+
+  if (channelError || !channel) {
+    const detail = channelError?.message ?? "Chat channel not found.";
+    await logDelivery("failed", 0, detail);
+    throw new Error(`Chat email channel could not be loaded: ${detail}`);
   }
 
-  const recipientIds = [
-    ...new Set(
-      ((members ?? []) as ChannelMember[])
-        .map((member) => member.user_id)
-        .filter((id) => id !== authorId),
-    ),
-  ];
+  if (authorError) {
+    await logDelivery("failed", 0, authorError.message);
+    throw new Error(`Chat email author could not be loaded: ${authorError.message}`);
+  }
+
+  const safeChannel = channel as ChatChannel;
+  let recipientIds: string[];
+  try {
+    recipientIds = (await loadChannelRecipientIds(admin, safeChannel)).filter(
+      (id) => id !== authorId,
+    );
+  } catch (error) {
+    const detail =
+      error instanceof Error ? error.message : "Recipient lookup failed.";
+    await logDelivery("failed", 0, detail);
+    throw error;
+  }
 
   const { data: profiles, error: profileError } = recipientIds.length > 0
     ? await admin
@@ -174,9 +362,8 @@ export async function sendChatEmailNotifications({
     .filter((profile) => profile.notification_preferences?.email !== false)
     .map((profile) => profile.email as string);
 
-  const safeChannel = channel as ChatChannel | null;
-  const label = safeChannel ? channelLabel(safeChannel) : "Chat";
-  const application = safeChannel ? channelApplication(safeChannel) : null;
+  const label = channelLabel(safeChannel);
+  const application = channelApplication(safeChannel);
   const externalApplicantEmail =
     safeChannel?.channel_type &&
     ["school_dm", "scholarship_dm"].includes(safeChannel.channel_type)
