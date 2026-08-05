@@ -3,7 +3,12 @@
 import { buildGeneratedFileName } from "@/lib/file-naming";
 import { createClient } from "@/lib/supabase/client";
 
-export type PortalFileContext = "appeal" | "bug_report" | "feature_request" | "application";
+export type PortalFileContext =
+  | "appeal"
+  | "bug_report"
+  | "feature_request"
+  | "application"
+  | "scholarship_request";
 
 export async function uploadPortalFiles({
   files,

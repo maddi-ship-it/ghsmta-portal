@@ -64,8 +64,8 @@ function buildNavigation(
           },
           {
             href: "/portal/appeals",
-            label: "Eligibility appeals",
-            shortLabel: "Appeals",
+            label: "Requests & appeals",
+            shortLabel: "Requests",
             icon: "⚖",
           },
         ];

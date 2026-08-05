@@ -10,8 +10,10 @@ export default async function AppealsPage() {
     applicationsResult,
     formVersionsResult,
     appealsResult,
+    scholarshipRequestsResult,
     categoriesResult,
     filesResult,
+    scholarshipFilesResult,
     cyclesResult,
   ] = await Promise.all([
       profile.role === "applicant"
@@ -33,6 +35,10 @@ export default async function AppealsPage() {
         .select("*")
         .order("submitted_at", { ascending: false }),
       supabase
+        .from("scholarship_requests")
+        .select("*")
+        .order("submitted_at", { ascending: false }),
+      supabase
         .from("scoring_categories")
         .select("id,title,rubric_id")
         .eq("active", true)
@@ -41,6 +47,11 @@ export default async function AppealsPage() {
         .from("portal_files")
         .select("id,context_id,original_name,generated_name,storage_path,mime_type,file_size,created_at")
         .eq("context_type", "appeal")
+        .order("created_at"),
+      supabase
+        .from("portal_files")
+        .select("id,context_id,original_name,generated_name,storage_path,mime_type,file_size,created_at")
+        .eq("context_type", "scholarship_request")
         .order("created_at"),
       supabase
         .from("award_cycles")
@@ -54,8 +65,10 @@ export default async function AppealsPage() {
     applicationsResult,
     formVersionsResult,
     appealsResult,
+    scholarshipRequestsResult,
     categoriesResult,
     filesResult,
+    scholarshipFilesResult,
     cyclesResult,
   ]) {
     if (result.error) throw new Error(result.error.message);
@@ -88,15 +101,24 @@ export default async function AppealsPage() {
   const files = (filesResult.data ?? []).filter((file) =>
     activeAppealIds.has(file.context_id),
   );
+  const scholarshipRequests = (scholarshipRequestsResult.data ?? []).filter((request) =>
+    activeApplicationIds.has(request.application_id),
+  );
+  const activeScholarshipRequestIds = new Set(
+    scholarshipRequests.map((request) => request.id),
+  );
+  const scholarshipFiles = (scholarshipFilesResult.data ?? []).filter((file) =>
+    activeScholarshipRequestIds.has(file.context_id),
+  );
 
   return (
     <>
       <div className="page-heading">
         <div>
           <span className="eyebrow">Formal review</span>
-          <h1>Category Eligibility Appeals</h1>
+          <h1>School Requests</h1>
           <p>
-            Submit and review appeals concerning award-category eligibility only. Scores, rankings, and adjudicator narratives are outside this workflow.
+            Submit eligibility appeals and scholarship support requests. Scholarship requests notify Owners only.
           </p>
         </div>
       </div>
@@ -108,6 +130,8 @@ export default async function AppealsPage() {
         cycles={cyclesResult.data ?? []}
         files={files}
         profile={profile}
+        scholarshipFiles={scholarshipFiles}
+        scholarshipRequests={scholarshipRequests}
       />
     </>
   );
