@@ -152,6 +152,27 @@ export function buildBillingApplicationDetails(
   const answerByQuestionId = new Map(
     answers.map((answer) => [answer.question_id, answer.value]),
   );
+  const selectedTrack =
+    findAnswer(
+      sortedQuestions,
+      answerByQuestionId,
+      [
+        "acceptd_q_163198",
+        "please select the program you are registering for the 2026 2027 ghsmta season",
+        "program you are registering for the 2026 2027 ghsmta season",
+        "select the program",
+      ],
+      trackToText,
+    ) ??
+    findAnswer(
+      sortedQuestions,
+      answerByQuestionId,
+      [
+        "which track are you registering",
+        "track are you registering",
+      ],
+      trackToText,
+    );
 
   return {
     schoolAddress: findAnswer(
@@ -168,19 +189,9 @@ export function buildBillingApplicationDetails(
     schoolType: findAnswer(
       sortedQuestions,
       answerByQuestionId,
-      ["school type", "school_type"],
+      ["acceptd_q_137656", "school type", "school_type"],
     ),
-    selectedTrack: findAnswer(
-      sortedQuestions,
-      answerByQuestionId,
-      [
-        "which track are you registering",
-        "track are you registering",
-        "program you are registering",
-        "select the program",
-      ],
-      trackToText,
-    ),
+    selectedTrack,
   };
 }
 
