@@ -13,6 +13,7 @@ type BillingQuestionRow = {
 };
 
 type BillingAnswerRow = {
+  id?: string;
   application_id: string;
   question_id: string;
   value: unknown;
@@ -23,12 +24,17 @@ type BillingQueryResult = Promise<{
   error: { message: string } | null;
 }>;
 
-type BillingSelectQuery = {
-  in: (column: string, values: string[]) => BillingQueryResult;
+type BillingFilteredQuery = BillingQueryResult & {
+  in: (column: string, values: string[]) => BillingFilteredQuery;
+  order: (
+    column: string,
+    options?: { ascending?: boolean },
+  ) => BillingFilteredQuery;
+  range: (from: number, to: number) => BillingFilteredQuery;
 };
 
 type BillingTableQuery = {
-  select: (columns: string) => BillingSelectQuery;
+  select: (columns: string) => BillingFilteredQuery;
 };
 
 export type BillingApplicationDetails = {
@@ -47,6 +53,46 @@ export const DEFAULT_INVOICE_PROMO_CODES = {
   fullWaiver: "SHUWAIVER",
   check: "CHECK",
 } as const;
+
+const BILLING_QUERY_PAGE_SIZE = 900;
+
+const PROGRAM_QUESTION_FRAGMENTS = [
+  "acceptd_q_163198",
+  "please select the program you are registering for the 2026 2027 ghsmta season",
+  "program you are registering for the 2026 2027 ghsmta season",
+  "select the program",
+];
+
+const LEGACY_TRACK_FRAGMENTS = [
+  "which track are you registering",
+  "track are you registering",
+];
+
+const SCHOOL_ADDRESS_FRAGMENTS = [
+  "please provide the address below",
+  "school address",
+  "mailing address",
+];
+
+const SCHOOL_PHONE_FRAGMENTS = [
+  "school phone number extension",
+  "school phone",
+  "main phone",
+];
+
+const SCHOOL_TYPE_FRAGMENTS = [
+  "acceptd_q_137656",
+  "school type",
+  "school_type",
+];
+
+const BILLING_DETAIL_FRAGMENTS = [
+  ...PROGRAM_QUESTION_FRAGMENTS,
+  ...LEGACY_TRACK_FRAGMENTS,
+  ...SCHOOL_ADDRESS_FRAGMENTS,
+  ...SCHOOL_PHONE_FRAGMENTS,
+  ...SCHOOL_TYPE_FRAGMENTS,
+];
 
 function normalize(value: string) {
   return value
@@ -124,6 +170,16 @@ function questionHaystack(question: BillingQuestionRow) {
   );
 }
 
+function questionMatchesFragments(
+  question: BillingQuestionRow,
+  fragments: string[],
+) {
+  const haystack = questionHaystack(question);
+  return fragments
+    .map(normalize)
+    .some((fragment) => haystack.includes(fragment));
+}
+
 function findAnswer(
   questions: BillingQuestionRow[],
   answerByQuestionId: Map<string, unknown>,
@@ -156,21 +212,13 @@ export function buildBillingApplicationDetails(
     findAnswer(
       sortedQuestions,
       answerByQuestionId,
-      [
-        "acceptd_q_163198",
-        "please select the program you are registering for the 2026 2027 ghsmta season",
-        "program you are registering for the 2026 2027 ghsmta season",
-        "select the program",
-      ],
+      PROGRAM_QUESTION_FRAGMENTS,
       trackToText,
     ) ??
     findAnswer(
       sortedQuestions,
       answerByQuestionId,
-      [
-        "which track are you registering",
-        "track are you registering",
-      ],
+      LEGACY_TRACK_FRAGMENTS,
       trackToText,
     );
 
@@ -178,21 +226,49 @@ export function buildBillingApplicationDetails(
     schoolAddress: findAnswer(
       sortedQuestions,
       answerByQuestionId,
-      ["please provide the address below", "school address", "mailing address"],
+      SCHOOL_ADDRESS_FRAGMENTS,
       addressToText,
     ),
     schoolPhone: findAnswer(
       sortedQuestions,
       answerByQuestionId,
-      ["school phone number extension", "school phone", "main phone"],
+      SCHOOL_PHONE_FRAGMENTS,
     ),
     schoolType: findAnswer(
       sortedQuestions,
       answerByQuestionId,
-      ["acceptd_q_137656", "school type", "school_type"],
+      SCHOOL_TYPE_FRAGMENTS,
     ),
     selectedTrack,
   };
+}
+
+async function fetchPagedRows<Row>(
+  buildQuery: () => BillingFilteredQuery,
+) {
+  const rows: Row[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + BILLING_QUERY_PAGE_SIZE - 1;
+    const result = await buildQuery().range(from, to);
+    if (result.error) throw new Error(result.error.message);
+
+    const page = (result.data ?? []) as Row[];
+    rows.push(...page);
+    if (page.length < BILLING_QUERY_PAGE_SIZE) break;
+    from += BILLING_QUERY_PAGE_SIZE;
+  }
+
+  return rows;
+}
+
+function chunks<T>(items: T[], size: number) {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
 }
 
 export async function loadBillingApplicationDetails(
@@ -215,26 +291,48 @@ export async function loadBillingApplicationDetails(
     return new Map<string, BillingApplicationDetails>();
   }
 
-  const [questionResult, answerResult] = await Promise.all([
+  const questions = await fetchPagedRows<BillingQuestionRow>(() =>
     (supabase.from("application_questions") as BillingTableQuery)
       .select("id,form_version_id,question_key,label,source_label,sort_order")
-      .in("form_version_id", formVersionIds),
-    (supabase.from("application_answers") as BillingTableQuery)
-      .select("application_id,question_id,value")
-      .in("application_id", applications.map((application) => application.id)),
-  ]);
-  if (questionResult.error) throw new Error(questionResult.error.message);
-  if (answerResult.error) throw new Error(answerResult.error.message);
+      .in("form_version_id", formVersionIds)
+      .order("id", { ascending: true }),
+  );
+  const relevantQuestionIds = questions
+    .filter((question) =>
+      questionMatchesFragments(question, BILLING_DETAIL_FRAGMENTS),
+    )
+    .map((question) => question.id);
+
+  const applicationIds = applications.map((application) => application.id);
+  const applicationBatchSize = Math.max(
+    1,
+    Math.floor(BILLING_QUERY_PAGE_SIZE / Math.max(relevantQuestionIds.length, 1)),
+  );
+  const answers = relevantQuestionIds.length
+    ? (
+        await Promise.all(
+          chunks(applicationIds, applicationBatchSize).map((applicationBatch) =>
+            fetchPagedRows<BillingAnswerRow>(() =>
+              (supabase.from("application_answers") as BillingTableQuery)
+                .select("id,application_id,question_id,value")
+                .in("application_id", applicationBatch)
+                .in("question_id", relevantQuestionIds)
+                .order("id", { ascending: true }),
+            ),
+          ),
+        )
+      ).flat()
+    : [];
 
   const questionsByFormVersion = new Map<string, BillingQuestionRow[]>();
-  for (const question of (questionResult.data ?? []) as BillingQuestionRow[]) {
+  for (const question of questions) {
     const list = questionsByFormVersion.get(question.form_version_id) ?? [];
     list.push(question);
     questionsByFormVersion.set(question.form_version_id, list);
   }
 
   const answersByApplication = new Map<string, BillingAnswerRow[]>();
-  for (const answer of (answerResult.data ?? []) as BillingAnswerRow[]) {
+  for (const answer of answers) {
     const list = answersByApplication.get(answer.application_id) ?? [];
     list.push(answer);
     answersByApplication.set(answer.application_id, list);
