@@ -25,10 +25,12 @@ type ChatChannel = {
     | {
         school_name: string | null;
         production_title: string | null;
+        external_applicant_email: string | null;
       }
     | Array<{
         school_name: string | null;
         production_title: string | null;
+        external_applicant_email: string | null;
       }>
     | null;
 };
@@ -57,9 +59,7 @@ function truncate(value: string, maxLength: number) {
 }
 
 function channelLabel(channel: ChatChannel) {
-  const application = Array.isArray(channel.applications)
-    ? channel.applications[0]
-    : channel.applications;
+  const application = channelApplication(channel);
 
   if (channel.channel_type === "school_dm") {
     return application?.school_name
@@ -82,6 +82,12 @@ function channelLabel(channel: ChatChannel) {
   return channel.name || "Chat";
 }
 
+function channelApplication(channel: ChatChannel) {
+  return Array.isArray(channel.applications)
+    ? channel.applications[0]
+    : channel.applications;
+}
+
 export async function sendChatEmailNotifications({
   channelId,
   authorId,
@@ -97,12 +103,17 @@ export async function sendChatEmailNotifications({
 }) {
   const supabase = await createClient();
   const admin = createAdminClient();
-  const [{ data: members }, { data: channel }] = await Promise.all([
+  const [{ data: members }, { data: channel }, { data: author }] = await Promise.all([
     supabase.rpc("get_chat_channel_members", { p_channel_id: channelId }),
     admin
       .from("chat_channels")
-      .select("id,channel_type,name,application_id,applications(school_name,production_title)")
+      .select("id,channel_type,name,application_id,applications(school_name,production_title,external_applicant_email)")
       .eq("id", channelId)
+      .maybeSingle(),
+    admin
+      .from("profiles")
+      .select("email")
+      .eq("id", authorId)
       .maybeSingle(),
   ]);
 
@@ -129,10 +140,31 @@ export async function sendChatEmailNotifications({
     .filter((profile) => profile.notification_preferences?.email !== false)
     .map((profile) => profile.email as string);
 
-  if (recipients.length === 0) return;
-
   const safeChannel = channel as ChatChannel | null;
   const label = safeChannel ? channelLabel(safeChannel) : "Chat";
+  const application = safeChannel ? channelApplication(safeChannel) : null;
+  const externalApplicantEmail =
+    safeChannel?.channel_type &&
+    ["school_dm", "scholarship_dm"].includes(safeChannel.channel_type)
+      ? application?.external_applicant_email?.trim().toLowerCase() ?? ""
+      : "";
+  const recipientSet = new Set(
+    recipients
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const authorEmail = author?.email?.trim().toLowerCase();
+  if (
+    externalApplicantEmail &&
+    externalApplicantEmail !== authorEmail &&
+    !recipientSet.has(externalApplicantEmail)
+  ) {
+    recipientSet.add(externalApplicantEmail);
+  }
+  const finalRecipients = [...recipientSet];
+
+  if (finalRecipients.length === 0) return;
+
   const chatUrl = `${siteUrl()}/portal/chat?channel=${channelId}`;
   const preview = truncate(body.replace(/\s+/g, " ").trim(), 500);
   const emailSubject = `New chat message — ${label}`;
@@ -148,13 +180,22 @@ export async function sendChatEmailNotifications({
     </div>
   `;
 
-  const result = await sendSmtpEmail({
-    to: recipients,
-    subject: emailSubject,
-    text: emailText,
-    html: emailHtml,
-  });
-  if (!result.ok) {
-    throw new Error(`Chat email notification failed: ${result.detail}`);
+  const results = await Promise.all(
+    finalRecipients.map((recipient) =>
+      sendSmtpEmail({
+        to: [recipient],
+        subject: emailSubject,
+        text: emailText,
+        html: emailHtml,
+      }),
+    ),
+  );
+  const failures = results.filter((result) => !result.ok);
+  if (failures.length > 0) {
+    throw new Error(
+      `Chat email notification failed for ${failures.length} recipient(s): ${failures
+        .map((failure) => failure.detail)
+        .join("; ")}`,
+    );
   }
 }
