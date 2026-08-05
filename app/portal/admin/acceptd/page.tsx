@@ -3,8 +3,8 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 import {
-  mapAcceptdUser,
   refreshAcceptdQuestionSchema,
+  saveAllAcceptdUserMappings,
   saveAcceptdProgramMapping,
   syncAcceptdNow,
   unmapAcceptdUser,
@@ -222,11 +222,15 @@ async function AcceptdProgramStatus({
   }
   const snapshots = snapshotsResult.data ?? [];
   const runs = runsResult.data ?? [];
+  const mappedPortalProfileIds = new Set(
+    [...userMappingByAcceptdId.values()].map((mapping) => String(mapping.portal_profile_id)),
+  );
+  const availableProfiles = profiles.filter((profile) => !mappedPortalProfileIds.has(profile.id));
 
   return (
     <>
       <section className="panel">
-        <div className="panel-header">
+        <div className="panel-header acceptd-mapping-header">
           <div><span className="eyebrow">Identity reconciliation</span><h2>Acceptd users</h2><p>Map each source account once. The application then creates or links and continues syncing automatically.</p></div>
           <span className="badge">{snapshots.length} applications</span>
         </div>
@@ -234,40 +238,47 @@ async function AcceptdProgramStatus({
           {snapshots.length === 0 ? (
             <div className="empty-state"><h3>No Acceptd records staged yet.</h3><p>Run “Sync applications now” to load the current program roster.</p></div>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Acceptd applicant</th><th>Portal applicant</th><th>Status</th><th>Last sync</th><th>Action</th></tr></thead>
-                <tbody>
-                  {snapshots.map((snapshot) => {
-                    const acceptdUserId = Number(snapshot.acceptd_user_id);
-                    const userMapping = userMappingByAcceptdId.get(acceptdUserId);
-                    const mappedProfile = userMapping
-                      ? profileById.get(String(userMapping.portal_profile_id))
-                      : null;
-                    return (
-                      <tr key={snapshot.id}>
-                        <td><strong>{snapshot.acceptd_applicant_name || `Application ${snapshot.acceptd_application_id}`}</strong><small>{snapshot.acceptd_applicant_email ?? `Acceptd user ${snapshot.acceptd_user_id ?? "unknown"}`}</small></td>
-                        <td>{mappedProfile ? <><strong>{mappedProfile.full_name ?? mappedProfile.email}</strong><small>{mappedProfile.organization ?? mappedProfile.email}</small></> : "Not mapped"}</td>
-                        <td><span className="badge">{snapshot.mapping_status}</span>{snapshot.issue && <small>{snapshot.issue}</small>}</td>
-                        <td>{formatTimestamp(snapshot.last_synced_at ?? snapshot.last_seen_at)}</td>
-                        <td>
-                          {userMapping ? (
-                            <form action={unmapAcceptdUser.bind(null, String(userMapping.id))}><button className="text-button" type="submit">Remove mapping</button></form>
-                          ) : snapshot.acceptd_user_id ? (
-                            <form action={mapAcceptdUser.bind(null, mappingId)} className="form-stack">
-                              <input type="hidden" name="acceptd_user_id" value={snapshot.acceptd_user_id} />
-                              <input type="hidden" name="acceptd_name" value={snapshot.acceptd_applicant_name ?? ""} />
-                              <input type="hidden" name="acceptd_email" value={snapshot.acceptd_applicant_email ?? ""} />
-                              <select className="select" name="portal_profile_id" required><option value="">Choose portal user</option>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name ?? profile.email}{profile.organization ? ` — ${profile.organization}` : ""}</option>)}</select>
-                              <button className="button button-secondary" type="submit">Map and sync</button>
-                            </form>
-                          ) : "Acceptd user ID missing"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="acceptd-mapping-shell">
+              <form action={saveAllAcceptdUserMappings.bind(null, mappingId)} className="acceptd-bulk-save-bar" id={`acceptd_bulk_mapping_${mappingId}`}>
+                <div>
+                  <strong>Ready to map a batch?</strong>
+                  <small>Select portal applicants below, then save once to sync everyone together.</small>
+                </div>
+                <button className="button button-dark" type="submit">Save all mappings</button>
+              </form>
+              <div className="table-wrap acceptd-mapping-table-wrap">
+                <table className="data-table acceptd-mapping-table">
+                  <thead><tr><th>Acceptd applicant</th><th>Portal applicant</th><th>Status</th><th>Last sync</th><th>Mapping</th></tr></thead>
+                  <tbody>
+                    {snapshots.map((snapshot) => {
+                      const acceptdUserId = Number(snapshot.acceptd_user_id);
+                      const userMapping = userMappingByAcceptdId.get(acceptdUserId);
+                      const mappedProfile = userMapping
+                        ? profileById.get(String(userMapping.portal_profile_id))
+                        : null;
+                      return (
+                        <tr key={snapshot.id}>
+                          <td className="acceptd-person-cell"><strong>{snapshot.acceptd_applicant_name || `Application ${snapshot.acceptd_application_id}`}</strong><small>{snapshot.acceptd_applicant_email ?? `Acceptd user ${snapshot.acceptd_user_id ?? "unknown"}`}</small></td>
+                          <td className="acceptd-person-cell">{mappedProfile ? <><strong>{mappedProfile.full_name ?? mappedProfile.email}</strong><small>{mappedProfile.organization ?? mappedProfile.email}</small></> : <span className="muted-copy">Not mapped</span>}</td>
+                          <td className="acceptd-status-cell"><span className="badge">{snapshot.mapping_status}</span>{snapshot.issue && <small>{snapshot.issue}</small>}</td>
+                          <td className="acceptd-sync-cell">{formatTimestamp(snapshot.last_synced_at ?? snapshot.last_seen_at)}</td>
+                          <td>
+                            {userMapping ? (
+                              <form action={unmapAcceptdUser.bind(null, String(userMapping.id))}><button className="text-button" type="submit">Remove mapping</button></form>
+                            ) : snapshot.acceptd_user_id ? (
+                              <div className="acceptd-map-control">
+                                <input form={`acceptd_bulk_mapping_${mappingId}`} type="hidden" name={`acceptd_name:${acceptdUserId}`} value={snapshot.acceptd_applicant_name ?? ""} />
+                                <input form={`acceptd_bulk_mapping_${mappingId}`} type="hidden" name={`acceptd_email:${acceptdUserId}`} value={snapshot.acceptd_applicant_email ?? ""} />
+                                <select className="select" form={`acceptd_bulk_mapping_${mappingId}`} name={`portal_profile_id:${acceptdUserId}`}><option value="">Choose portal user</option>{availableProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name ?? profile.email}{profile.organization ? ` — ${profile.organization}` : ""}</option>)}</select>
+                              </div>
+                            ) : "Acceptd user ID missing"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -277,7 +288,7 @@ async function AcceptdProgramStatus({
         <div className="panel-header"><div><span className="eyebrow">Monitoring</span><h2>Sync history</h2></div><span className="badge">{questionCountResult.count ?? 0} known · ~688 expected</span></div>
         <div className="panel-body">
           {runs.length === 0 ? <div className="empty-state"><p>No sync runs yet.</p></div> : (
-            <div className="table-wrap"><table><thead><tr><th>Started</th><th>Trigger</th><th>Status</th><th>Applications</th><th>Questions added</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td>{formatTimestamp(run.started_at)}</td><td>{run.trigger_source}</td><td><span className="badge">{run.status}</span>{run.error && <small>{run.error}</small>}</td><td>{run.applications_synced} synced · {run.applications_unmapped} unmapped · {run.applications_failed} failed</td><td>{run.questions_discovered}</td></tr>)}</tbody></table></div>
+            <div className="table-wrap"><table className="data-table"><thead><tr><th>Started</th><th>Trigger</th><th>Status</th><th>Applications</th><th>Questions added</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td>{formatTimestamp(run.started_at)}</td><td>{run.trigger_source}</td><td><span className="badge">{run.status}</span>{run.error && <small>{run.error}</small>}</td><td>{run.applications_synced} synced · {run.applications_unmapped} unmapped · {run.applications_failed} failed</td><td>{run.questions_discovered}</td></tr>)}</tbody></table></div>
           )}
         </div>
       </section>

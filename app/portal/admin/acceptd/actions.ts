@@ -95,6 +95,69 @@ export async function mapAcceptdUser(programMappingId: string, formData: FormDat
   redirect(`${SETUP_PATH}&mapped=1`);
 }
 
+export async function saveAllAcceptdUserMappings(programMappingId: string, formData: FormData) {
+  const owner = await requireProfile(["owner"]);
+  const supabase = await createClient();
+  const requestedMappings = [...formData.entries()].flatMap(([key, value]) => {
+    if (!key.startsWith("portal_profile_id:")) return [];
+    const acceptdUserId = acceptdNumericId(key.slice("portal_profile_id:".length), "Acceptd user ID");
+    const profileId = String(value ?? "").trim();
+    if (!profileId) return [];
+    return [{
+      acceptd_user_id: acceptdUserId,
+      portal_profile_id: profileId,
+      acceptd_name: String(formData.get(`acceptd_name:${acceptdUserId}`) ?? "").trim() || null,
+      acceptd_email: String(formData.get(`acceptd_email:${acceptdUserId}`) ?? "").trim() || null,
+      mapped_by: owner.id,
+    }];
+  });
+
+  if (requestedMappings.length === 0) {
+    throw new Error("Choose at least one portal applicant before saving mappings.");
+  }
+
+  const profileIds = [...new Set(requestedMappings.map((mapping) => mapping.portal_profile_id))];
+  if (profileIds.length !== requestedMappings.length) {
+    throw new Error("Each Acceptd user must be mapped to a different portal applicant.");
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id,role,active")
+    .in("id", profileIds);
+  if (profilesError) throw new Error(profilesError.message);
+
+  const validProfileIds = new Set(
+    (profiles ?? [])
+      .filter((profile) => profile.role === "applicant" && profile.active)
+      .map((profile) => profile.id),
+  );
+  if (profileIds.some((profileId) => !validProfileIds.has(profileId))) {
+    throw new Error("All selected portal users must be active applicant accounts.");
+  }
+
+  const acceptdUserIds = requestedMappings.map((mapping) => mapping.acceptd_user_id);
+  const { data: existingMappings, error: existingError } = await supabase
+    .from("acceptd_user_mappings")
+    .select("acceptd_user_id,portal_profile_id")
+    .in("portal_profile_id", profileIds);
+  if (existingError) throw new Error(existingError.message);
+  const requestedAcceptdUserIds = new Set(acceptdUserIds.map(String));
+  if ((existingMappings ?? []).some((mapping) => !requestedAcceptdUserIds.has(String(mapping.acceptd_user_id)))) {
+    throw new Error("One of the selected portal applicants is already mapped to another Acceptd user.");
+  }
+
+  const { error } = await supabase
+    .from("acceptd_user_mappings")
+    .upsert(requestedMappings, { onConflict: "acceptd_user_id" });
+  if (error) throw new Error(error.message);
+
+  await syncAcceptdProgram(programMappingId, "manual");
+  revalidatePath("/portal/admin/setup");
+  revalidatePath("/portal/admin/applications");
+  redirect(`${SETUP_PATH}&mapped=1`);
+}
+
 export async function unmapAcceptdUser(mappingId: string) {
   await requireProfile(["owner"]);
   const supabase = await createClient();

@@ -535,19 +535,36 @@ async function syncOneApplication(
   const answersByQuestion = new Map(
     application.answers.map((answer) => [answer.question.id, answer]),
   );
-  const answerRows = [...answersByQuestion.values()]
-    .map((answer) => {
-      const questionId = questionMap.get(answer.question.id);
-      return questionId
-        ? {
-            application_id: link.applicationId,
-            question_id: questionId,
-            value: answerValue(answer),
-            updated_by: null,
-          }
-        : null;
-    })
-    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  const answerRows = [];
+  const blankAnswerQuestionIds = [];
+
+  for (const answer of answersByQuestion.values()) {
+    const questionId = questionMap.get(answer.question.id);
+    if (!questionId) continue;
+
+    const value = answerValue(answer);
+    if (value === null || value === undefined) {
+      blankAnswerQuestionIds.push(questionId);
+      continue;
+    }
+
+    answerRows.push({
+      application_id: link.applicationId,
+      question_id: questionId,
+      value,
+      updated_by: null,
+    });
+  }
+
+  if (blankAnswerQuestionIds.length > 0) {
+    const { error: deleteBlankError } = await admin
+      .from("application_answers")
+      .delete()
+      .eq("application_id", link.applicationId)
+      .in("question_id", blankAnswerQuestionIds);
+    if (deleteBlankError) throw new Error(deleteBlankError.message);
+  }
+
   if (answerRows.length > 0) {
     const { error: answerError } = await admin
       .from("application_answers")
