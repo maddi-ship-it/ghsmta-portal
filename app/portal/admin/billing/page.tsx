@@ -25,12 +25,73 @@ import {
   voidInvoice,
 } from "./actions";
 
-type BillingParams = { success?: string; error?: string };
+const INVOICE_STATUS_OPTIONS = ["draft", "sent", "paid", "void"] as const;
+const DOCUMENT_KIND_OPTIONS = ["invoice", "scholarship_confirmation"] as const;
+const DELIVERY_STATUS_OPTIONS = ["pending", "delivered", "partial", "failed"] as const;
+
+type BillingParams = {
+  success?: string;
+  error?: string;
+  q?: string;
+  invoice_status?: string;
+  cycle_id?: string;
+  document_kind?: string;
+  delivery_status?: string;
+};
+
+type InvoiceApplicationSummary = {
+  id: string;
+  school_name: string | null;
+  production_title: string | null;
+};
 
 function formatDate(value: string | null) {
   return value
     ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value))
     : "—";
+}
+
+function normalizeSearch(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
+function selectedOption<T extends string>(
+  value: string | undefined,
+  options: readonly T[],
+) {
+  return options.includes(value as T) ? (value as T) : "";
+}
+
+function displayDocumentKind(kind: SchoolInvoice["document_kind"]) {
+  return kind === "scholarship_confirmation"
+    ? "Scholarship confirmation"
+    : "Invoice";
+}
+
+function invoiceMatchesSearch(
+  invoice: SchoolInvoice,
+  application: InvoiceApplicationSummary | undefined,
+  search: string,
+) {
+  if (!search) return true;
+  return [
+    invoice.invoice_number,
+    invoice.billing_name,
+    invoice.billing_contact_name,
+    invoice.recipient_email,
+    invoice.description_snapshot,
+    invoice.payment_promo_code,
+    invoice.school_type_snapshot,
+    invoice.status,
+    invoice.delivery_status,
+    displayDocumentKind(invoice.document_kind),
+    application?.school_name,
+    application?.production_title,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase()
+    .includes(search);
 }
 
 export default async function BillingPage({
@@ -40,6 +101,19 @@ export default async function BillingPage({
 }) {
   await requireProfile(["owner"]);
   const params = await searchParams;
+  const invoiceSearch = normalizeSearch(params.q ?? "").slice(0, 120);
+  const selectedStatus = selectedOption(
+    params.invoice_status,
+    INVOICE_STATUS_OPTIONS,
+  );
+  const selectedDocumentKind = selectedOption(
+    params.document_kind,
+    DOCUMENT_KIND_OPTIONS,
+  );
+  const selectedDeliveryStatus = selectedOption(
+    params.delivery_status,
+    DELIVERY_STATUS_OPTIONS,
+  );
   const supabase = await createClient();
   const [
     cycleResult,
@@ -67,7 +141,7 @@ export default async function BillingPage({
       .from("school_invoices")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(500),
     supabase
       .from("school_invoices")
       .select("application_id,status"),
@@ -91,6 +165,9 @@ export default async function BillingPage({
   const options = (optionResult.data ?? []).filter((option) => !option.archived_at);
   const applications = applicationResult.data ?? [];
   const invoices = (invoiceResult.data ?? []) as SchoolInvoice[];
+  const selectedCycleId = cycles.some((cycle) => cycle.id === params.cycle_id)
+    ? params.cycle_id ?? ""
+    : "";
   const invoicedApplicationIds = activeInvoiceApplicationIds(
     (activeInvoiceResult.data ?? []) as Array<{
       application_id: string;
@@ -120,6 +197,31 @@ export default async function BillingPage({
   );
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const applicationMap = new Map(applications.map((application) => [application.id, application]));
+  const filteredInvoices = invoices.filter((invoice) => {
+    if (selectedStatus && invoice.status !== selectedStatus) return false;
+    if (selectedCycleId && invoice.cycle_id !== selectedCycleId) return false;
+    if (selectedDocumentKind && invoice.document_kind !== selectedDocumentKind) {
+      return false;
+    }
+    if (
+      selectedDeliveryStatus &&
+      invoice.delivery_status !== selectedDeliveryStatus
+    ) {
+      return false;
+    }
+    return invoiceMatchesSearch(
+      invoice,
+      applicationMap.get(invoice.application_id),
+      invoiceSearch,
+    );
+  });
+  const hasInvoiceFilters = Boolean(
+    invoiceSearch ||
+      selectedStatus ||
+      selectedCycleId ||
+      selectedDocumentKind ||
+      selectedDeliveryStatus,
+  );
   type MemberRow = {
     application_id: string;
     member_role: string;
@@ -393,10 +495,110 @@ export default async function BillingPage({
       </div>
 
       <section className="panel billing-history">
-        <div className="panel-header"><div><h2>Invoice history</h2><p>Latest 100 invoices and confirmations.</p></div></div>
+        <div className="panel-header">
+          <div>
+            <h2>Invoice history</h2>
+            <p>
+              Showing {filteredInvoices.length} of {invoices.length} latest invoices
+              and confirmations.
+            </p>
+          </div>
+        </div>
         <div className="panel-body billing-history-body">
           {invoices.length === 0 ? <p>No invoices have been created.</p> : (
             <>
+              <form className="billing-history-filters" method="get">
+                <div className="field billing-history-search">
+                  <label htmlFor="invoice_history_search">Search invoices</label>
+                  <input
+                    className="input"
+                    defaultValue={params.q ?? ""}
+                    id="invoice_history_search"
+                    name="q"
+                    placeholder="School, invoice #, email, description, promo code"
+                    type="search"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="invoice_history_status">Status</label>
+                  <select
+                    className="select"
+                    defaultValue={selectedStatus}
+                    id="invoice_history_status"
+                    name="invoice_status"
+                  >
+                    <option value="">All statuses</option>
+                    <option value="sent">Sent</option>
+                    <option value="paid">Paid</option>
+                    <option value="void">Void</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="invoice_history_cycle">Cycle</label>
+                  <select
+                    className="select"
+                    defaultValue={selectedCycleId}
+                    id="invoice_history_cycle"
+                    name="cycle_id"
+                  >
+                    <option value="">All cycles</option>
+                    {cycles.map((cycle) => (
+                      <option key={cycle.id} value={cycle.id}>
+                        {cycle.season_year} · {cycle.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="invoice_history_kind">Type</label>
+                  <select
+                    className="select"
+                    defaultValue={selectedDocumentKind}
+                    id="invoice_history_kind"
+                    name="document_kind"
+                  >
+                    <option value="">All types</option>
+                    <option value="invoice">Invoices</option>
+                    <option value="scholarship_confirmation">
+                      Scholarship confirmations
+                    </option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="invoice_history_delivery">Delivery</label>
+                  <select
+                    className="select"
+                    defaultValue={selectedDeliveryStatus}
+                    id="invoice_history_delivery"
+                    name="delivery_status"
+                  >
+                    <option value="">All delivery</option>
+                    <option value="pending">Pending</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="partial">Partial</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+                <button className="button button-dark billing-history-filter-submit" type="submit">
+                  Apply filters
+                </button>
+                {hasInvoiceFilters ? (
+                  <Link className="button button-secondary" href="/portal/admin/billing">
+                    Clear filters
+                  </Link>
+                ) : null}
+              </form>
+              {filteredInvoices.length === 0 ? (
+                <div className="empty-state compact-empty-state">
+                  <h3>No invoices match these filters.</h3>
+                  <p>Try a broader search or clear one of the filters.</p>
+                  <Link className="button button-secondary" href="/portal/admin/billing">
+                    Clear filters
+                  </Link>
+                </div>
+              ) : (
+                <>
               <form action={bulkUpdateInvoices} className="billing-bulk-toolbar" id="billing-bulk-actions">
                 <strong>Update selected</strong>
                 <select aria-label="Bulk invoice action" className="select" defaultValue="" name="operation" required>
@@ -417,12 +619,12 @@ export default async function BillingPage({
                 <table className="data-table">
                   <thead><tr><th><span className="sr-only">Select</span></th><th>Invoice</th><th>School</th><th>Description</th><th>Amount</th><th>Status</th><th>Delivery</th><th>Sent</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {invoices.map((invoice) => {
+                    {filteredInvoices.map((invoice) => {
                       const latestDelivery = latestDeliveryByInvoice.get(invoice.id);
                       return (
                       <tr key={invoice.id}>
                         <td><input aria-label={`Select invoice ${invoice.invoice_number}`} form="billing-bulk-actions" name="invoice_ids" type="checkbox" value={invoice.id} /></td>
-                        <td><strong>{invoice.invoice_number}</strong><br /><small>{invoice.document_kind.replaceAll("_", " ")}</small></td>
+                        <td><strong>{invoice.invoice_number}</strong><br /><small>{displayDocumentKind(invoice.document_kind)}</small></td>
                         <td>{applicationMap.get(invoice.application_id)?.school_name ?? invoice.billing_name}</td>
                         <td>{invoice.description_snapshot}</td>
                         <td>{formatInvoiceAmount(invoice.amount_cents)}</td>
@@ -466,6 +668,8 @@ export default async function BillingPage({
                   </tbody>
                 </table>
               </div>
+                </>
+              )}
             </>
           )}
         </div>

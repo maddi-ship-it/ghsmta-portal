@@ -10120,6 +10120,25 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
   margin-top: 1.25rem;
 }
 
+.billing-history-filters {
+  align-items: end;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(16rem, 1.6fr) repeat(4, minmax(8.75rem, 0.7fr)) auto auto;
+  padding: 0.9rem;
+  border: 1px solid var(--portal-line, var(--app-line));
+  border-radius: 1rem;
+  background: var(--portal-surface-2, var(--app-surface-2));
+}
+
+.billing-history-search {
+  min-width: 0;
+}
+
+.billing-history-filter-submit {
+  min-height: 48px;
+}
+
 .table-actions,
 .invoice-card-heading {
   align-items: center;
@@ -10203,6 +10222,14 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
 
   .billing-price-row {
     grid-template-columns: 1fr;
+  }
+
+  .billing-history-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .billing-history-search {
+    grid-column: 1 / -1;
   }
 }
 
@@ -10580,6 +10607,15 @@ html[data-theme="light"] .auth-method-tabs button:not(.active) {
 }
 
 @media (max-width: 650px) {
+  .billing-history-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-history-filter-submit,
+  .billing-history-filters .button {
+    width: 100%;
+  }
+
   .billing-bulk-toolbar {
     align-items: stretch;
     flex-direction: column;
