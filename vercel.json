@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/acceptd-sync",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/report-schedules",
+      "schedule": "0 * * * *"
     }
   ]
 }

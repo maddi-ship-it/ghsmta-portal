@@ -12,6 +12,12 @@ export function chatChannelDisplayName(
   if (channelType === "general") {
     return GENERAL_ANNOUNCEMENTS_LABEL;
   }
+  if (channelType === "direct_message") {
+    return storedName || "Direct Chat";
+  }
+  if (channelType === "group_direct_message") {
+    return storedName || "Group Chat";
+  }
   return storedName;
 }
 
@@ -21,6 +27,9 @@ export function chatChannelGroupLabel(
 ) {
   if (channelType === "general" || channelType === "networking") {
     return ADJUDICATOR_CHANNELS_LABEL;
+  }
+  if (channelType === "direct_message" || channelType === "group_direct_message") {
+    return "Direct Messages";
   }
   return storedLabel;
 }

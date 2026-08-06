@@ -12309,3 +12309,143 @@ html[data-theme="dark"] .public-home-role-marker {
     grid-template-columns: 1fr;
   }
 }
+
+.report-center-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.report-catalog-panel {
+  position: sticky;
+  top: 92px;
+}
+
+.report-catalog-filters,
+.report-save-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.report-catalog-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  max-height: 720px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.report-catalog-card {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  color: inherit;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  text-decoration: none;
+}
+
+.report-catalog-card:hover,
+.report-catalog-card.is-active {
+  border-color: rgba(212, 175, 55, 0.72);
+  box-shadow: 0 14px 34px rgba(5, 12, 30, 0.14);
+}
+
+.report-catalog-card span,
+.report-catalog-card small {
+  color: var(--muted);
+}
+
+.report-preview-stack {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.report-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.report-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.report-filter-grid .check-card {
+  min-height: 86px;
+}
+
+.report-warning-panel ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+.report-save-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.report-saved-lists {
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 18px 22px 22px;
+}
+
+.report-saved-card {
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.report-saved-card small {
+  color: var(--muted);
+  display: block;
+  margin-top: 4px;
+}
+
+.user-bulk-message {
+  min-width: min(420px, 100%);
+}
+
+@media (max-width: 1120px) {
+  .report-center-layout,
+  .report-save-grid,
+  .report-saved-lists {
+    grid-template-columns: 1fr;
+  }
+
+  .report-catalog-panel {
+    position: static;
+  }
+
+  .report-filter-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .report-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-download-actions {
+    justify-content: stretch;
+  }
+
+  .report-download-actions .button {
+    width: 100%;
+  }
+}

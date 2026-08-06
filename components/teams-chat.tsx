@@ -40,7 +40,9 @@ export type ChannelType =
   | "applicant_community"
   | "general"
   | "networking"
-  | "advisory_committee";
+  | "advisory_committee"
+  | "direct_message"
+  | "group_direct_message";
 
 export type ChatChannel = {
   channel_id: string;
@@ -297,6 +299,16 @@ const GROUP_FALLBACKS: Record<
     label: "School Messaging",
     order: 40,
   },
+  direct_message: {
+    key: "direct_messages",
+    label: "Direct Messages",
+    order: 41,
+  },
+  group_direct_message: {
+    key: "direct_messages",
+    label: "Direct Messages",
+    order: 42,
+  },
   school: {
     key: "school_staff",
     label: "Panel Channels",
@@ -335,6 +347,10 @@ function channelIcon(type: ChannelType) {
       return "NW";
     case "advisory_committee":
       return "AC";
+    case "direct_message":
+      return "DM";
+    case "group_direct_message":
+      return "GC";
   }
 }
 

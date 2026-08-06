@@ -74,6 +74,14 @@ function channelLabel(channel: ChatChannel) {
       : "Scholarship Requests";
   }
 
+  if (channel.channel_type === "direct_message") {
+    return channel.name || "Direct Chat";
+  }
+
+  if (channel.channel_type === "group_direct_message") {
+    return channel.name || "Group Chat";
+  }
+
   return channel.name || "Chat";
 }
 
@@ -217,11 +225,35 @@ async function addPanelRecipients(
   addIds(recipientIds, (slotStaff ?? []).map((staff) => staff.user_id));
 }
 
+async function addDirectRecipients(
+  admin: AdminClient,
+  recipientIds: Set<string>,
+  channelId: string,
+) {
+  const { data, error } = await admin
+    .from("chat_direct_participants")
+    .select("user_id")
+    .eq("channel_id", channelId);
+
+  if (error) {
+    throw new Error(
+      `Chat email direct-message participants could not be loaded: ${error.message}`,
+    );
+  }
+
+  addIds(recipientIds, (data ?? []).map((participant) => participant.user_id));
+}
+
 async function loadChannelRecipientIds(
   admin: AdminClient,
   channel: ChatChannel,
 ) {
   const recipientIds = new Set<string>();
+
+  if (["direct_message", "group_direct_message"].includes(channel.channel_type)) {
+    await addDirectRecipients(admin, recipientIds, channel.id);
+    return [...recipientIds];
+  }
 
   await addActiveRoleRecipients(admin, recipientIds, ["owner"]);
 

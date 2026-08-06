@@ -50,6 +50,9 @@ function fallbackChannelGroup(
       return { key: "committee", label: "Advisory Committee", order: 30 };
     case "school_dm":
       return { key: "direct_messages", label: "School Messaging", order: 40 };
+    case "direct_message":
+    case "group_direct_message":
+      return { key: "direct_messages", label: "Direct Messages", order: 41 };
     case "school":
       return {
         key: "school_staff",
@@ -72,6 +75,10 @@ function fallbackVisibilityLabel(channelType: ChatChannel["channel_type"]) {
       return "Advisory + Owners";
     case "school_dm":
       return "School + Owners";
+    case "direct_message":
+      return "Direct chat participants";
+    case "group_direct_message":
+      return "Group chat participants";
     case "school":
       return "Assigned panel + Owners";
   }

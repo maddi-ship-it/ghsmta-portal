@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { deliverSchoolInvoice } from "@/lib/billing/delivery";
+import { sendOwnerDigestEmail } from "@/lib/email/owner-digest";
 import { logEvent } from "@/lib/observability";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -277,6 +278,7 @@ async function processOwnerDigests() {
     .eq("enabled", true);
   if (error) throw new Error(error.message);
   let sent = 0;
+  let skipped = 0;
 
   for (const setting of settings ?? []) {
     const parts = localParts(now, setting.time_zone || "America/New_York");
@@ -287,32 +289,23 @@ async function processOwnerDigests() {
       if (`${lastParts.year}-${lastParts.month}-${lastParts.day}` === localDate) continue;
     }
 
-    const since = setting.last_sent_at ?? new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
-    const { data: activities } = await supabase
-      .from("owner_activity_log")
-      .select("title,detail,created_at")
-      .gt("created_at", since)
-      .order("created_at");
-    if (!setting.include_empty && !(activities ?? []).length) {
-      await supabase.from("owner_digest_settings").update({ last_sent_at: now.toISOString() }).eq("owner_user_id", setting.owner_user_id);
-      continue;
-    }
-
     const profile = Array.isArray(setting.profiles) ? setting.profiles[0] : setting.profiles;
-    const recipient = setting.recipient_email || profile?.email;
-    if (!recipient) continue;
-    const items = (activities ?? []).map((activity) => `<li><strong>${escapeHtml(activity.title)}</strong>${activity.detail ? `<br>${escapeHtml(activity.detail)}` : ""}<br><small>${escapeHtml(new Date(activity.created_at).toLocaleString("en-US"))}</small></li>`).join("");
-    const result = await sendEmail({
-      to: [recipient],
-      subject: `GHSMTA Owner daily review — ${localDate}`,
-      html: `<h2>GHSMTA Owner daily review</h2>${items ? `<ul>${items}</ul>` : "<p>No review items were recorded.</p>"}`,
+    const result = await sendOwnerDigestEmail({
+      id: setting.owner_user_id,
+      email: profile?.email ?? null,
+      full_name: profile?.full_name ?? null,
+    }, {
+      supabase,
+      activityType: "digest_sent_automatically",
+      respectIncludeEmpty: true,
     });
-    if (result.ok) {
-      await supabase.from("owner_digest_settings").update({ last_sent_at: now.toISOString() }).eq("owner_user_id", setting.owner_user_id);
+    if ("skipped" in result && result.skipped) {
+      skipped += 1;
+    } else {
       sent += 1;
     }
   }
-  return { sent };
+  return { sent, skipped };
 }
 
 export async function GET(request: Request) {

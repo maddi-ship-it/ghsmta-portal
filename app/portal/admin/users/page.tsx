@@ -51,6 +51,8 @@ type SearchParams = {
   updated?: string;
   reset_sent?: string;
   impersonation_ended?: string;
+  message_sent?: string;
+  message_mode?: string;
 };
 
 function compare(left: string | null | undefined, right: string | null | undefined) {
@@ -164,6 +166,11 @@ export default async function UsersPage({
       {params.updated && <div className="notice page-message">Updated {params.updated} user accounts.</div>}
       {params.reset_sent && <div className="notice page-message">Password-reset email sent and reset required at the next portal visit.</div>}
       {params.impersonation_ended && <div className="notice page-message">Applicant impersonation ended. Your Owner session has been restored.</div>}
+      {params.message_sent && (
+        <div className="notice page-message">
+          Sent {params.message_mode === "individual" ? "individual" : "group"} chat message to {params.message_sent} user{params.message_sent === "1" ? "" : "s"}.
+        </div>
+      )}
 
       <section className="panel user-admin-filter-panel">
         <div className="panel-body">
@@ -180,9 +187,16 @@ export default async function UsersPage({
 
       <form action={bulkUpdateUsers} className="panel user-bulk-toolbar" id="bulk-users-form">
         <div><strong>{profiles.length} users shown</strong><small>Select users in the table, then apply one action.</small></div>
-        <select className="select" name="bulk_operation" required><option value="">Bulk action</option><option value="role">Change role</option><option value="activate">Activate</option><option value="deactivate">Deactivate</option></select>
+        <select className="select" name="bulk_operation" required><option value="">Bulk action</option><option value="message_group">Send one group chat</option><option value="message_individual">Send individual chats</option><option value="role">Change role</option><option value="activate">Activate</option><option value="deactivate">Deactivate</option></select>
         <select className="select" name="bulk_role"><option value="applicant">Applicant</option><option value="adjudicator">Adjudicator</option><option value="advisory_member">Advisory Committee</option><option value="program_manager">Program Manager</option><option value="owner">Owner</option></select>
-        <button className="button button-dark button-compact" type="submit">Apply to selected</button>
+        <input className="input input-compact" maxLength={160} name="message_subject" placeholder="Chat subject for message actions" />
+        <textarea className="textarea user-bulk-message" maxLength={5000} name="message_body" placeholder="Message body for group or individual chat actions" rows={2} />
+        <ConfirmedSubmitButton
+          className="button button-dark button-compact"
+          description="This will apply the selected bulk action to every checked user. Message actions create chat threads and notify eligible recipients."
+          label="Apply to selected"
+          title="Apply this bulk user action?"
+        />
       </form>
 
       <section className="panel"><div className="table-wrap"><table className="data-table user-admin-table user-admin-table-compact"><thead><tr><th><span className="sr-only">Select</span></th><th>Status</th><th>Name</th><th>Phone</th><th>Role</th><th>School</th><th>Email</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>

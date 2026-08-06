@@ -1,83 +1,132 @@
 import { NextResponse } from "next/server";
 
 import { requireProfile } from "@/lib/auth";
-import {
-  buildOwnerReportPdf,
-  type OwnerReportName,
-} from "@/lib/reports/owner-report-pdf";
+import { buildReportCsv, buildReportPdf, reportFilename } from "@/lib/reports/report-export";
+import { loadReport, parseReportFilters } from "@/lib/reports/report-data";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+async function logReportRun({
+  supabase,
+  report,
+  ownerId,
+  filename,
+  byteSize,
+  mimeType,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  report: Awaited<ReturnType<typeof loadReport>>;
+  ownerId: string;
+  filename: string;
+  byteSize: number;
+  mimeType: string;
+}) {
+  try {
+    await supabase.from("report_runs").insert({
+      report_key: report.definition.id,
+      report_title: report.definition.title,
+      requested_format: report.filters.format,
+      variant: report.filters.variant,
+      status: "completed",
+      requested_by: ownerId,
+      filters: report.filters,
+      row_count: report.rows.length,
+      file_name: filename,
+      mime_type: mimeType,
+      byte_size: byteSize,
+      generated_at: report.generatedAt,
+    });
+  } catch {
+    // The report center migration may not have reached an environment yet.
+    // Downloads should continue to work even if audit persistence is pending.
+  }
+
+  try {
+    await supabase.from("owner_activity_log").insert({
+      activity_type: "report_generated",
+      title: `Generated ${report.definition.title}`,
+      detail: `${report.rows.length} row(s) exported as ${report.filters.format.toUpperCase()}.`,
+      actor_id: ownerId,
+      metadata: {
+        report_key: report.definition.id,
+        format: report.filters.format,
+        row_count: report.rows.length,
+        warnings: report.warnings,
+      },
+    });
+  } catch {
+    // Best-effort audit.
+  }
+}
+
 export async function GET(
-  _request: Request,
+  request: Request,
   context: {
     params: Promise<{ report: string }>;
   },
 ) {
-  await requireProfile(["owner"]);
-  const { report } = await context.params;
-  const selected = report as OwnerReportName;
-
-  const config = {
-    "missing-comments": {
-      view: "owner_report_missing_comments",
-      filename: "ghsmta-comments-missing.pdf",
-    },
-    "missing-scores": {
-      view: "owner_report_missing_scores",
-      filename: "ghsmta-scores-missing.pdf",
-    },
-    "specialty-awards": {
-      view: "owner_report_specialty_awards",
-      filename: "ghsmta-specialty-award-recommendations.pdf",
-    },
-  }[selected];
-
-  if (!config) {
-    return NextResponse.json(
-      { error: "Unknown report." },
-      { status: 404 },
-    );
-  }
-
+  const owner = await requireProfile(["owner"]);
+  const { report: reportId } = await context.params;
+  const url = new URL(request.url);
+  const filters = parseReportFilters(url.searchParams);
   const supabase = await createClient();
-  let query = supabase.from(config.view).select("*").limit(10000);
 
-  if (selected === "specialty-awards") {
-    query = query
-      .order("school_name")
-      .order("award_type")
-      .order("advisory_member_name");
-  } else {
-    query = query
-      .order("school_name")
-      .order("adjudicator_name")
-      .order("category_title")
-      .order("criterion_title");
-  }
+  try {
+    const report = await loadReport(supabase, reportId, filters);
 
-  const { data, error } = await query;
+    if (report.filters.format === "csv") {
+      const csv = buildReportCsv(report);
+      const body = Buffer.from(csv, "utf8");
+      const filename = reportFilename(report, "csv");
+      await logReportRun({
+        supabase,
+        report,
+        ownerId: owner.id,
+        filename,
+        byteSize: body.byteLength,
+        mimeType: "text/csv; charset=utf-8",
+      });
+      return new NextResponse(body, {
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Length": String(body.byteLength),
+          "Content-Type": "text/csv; charset=utf-8",
+        },
+      });
+    }
 
-  if (error) {
+    const pdfBytes = await buildReportPdf(report);
+    const body = Buffer.from(pdfBytes);
+    const filename = reportFilename(report, "pdf");
+    await logReportRun({
+      supabase,
+      report,
+      ownerId: owner.id,
+      filename,
+      byteSize: body.byteLength,
+      mimeType: "application/pdf",
+    });
+
+    return new NextResponse(body, {
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": String(body.byteLength),
+        "Content-Type": "application/pdf",
+      },
+    });
+  } catch (error) {
     return NextResponse.json(
-      { error: error.message },
-      { status: 500 },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "The report could not be generated.",
+      },
+      { status: error instanceof Error && error.message === "Unknown report." ? 404 : 500 },
     );
   }
-
-  const pdfBytes = await buildOwnerReportPdf(
-    selected,
-    (data ?? []) as Record<string, unknown>[],
-  );
-
-  return new NextResponse(Buffer.from(pdfBytes), {
-    headers: {
-      "Cache-Control": "no-store",
-      "Content-Disposition": `attachment; filename="${config.filename}"`,
-      "Content-Length": String(pdfBytes.byteLength),
-      "Content-Type": "application/pdf",
-    },
-  });
 }

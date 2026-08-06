@@ -28,6 +28,35 @@ import {
 const INVOICE_STATUS_OPTIONS = ["draft", "sent", "paid", "void"] as const;
 const DOCUMENT_KIND_OPTIONS = ["invoice", "scholarship_confirmation"] as const;
 const DELIVERY_STATUS_OPTIONS = ["pending", "delivered", "partial", "failed"] as const;
+const INVOICE_SCOPE_OPTIONS = [
+  "outstanding",
+  "overdue",
+  "paid",
+  "sent",
+  "draft",
+  "void",
+  "delivery_failed",
+] as const;
+const INVOICE_SORT_OPTIONS = [
+  "created_desc",
+  "created_asc",
+  "customer_asc",
+  "customer_desc",
+  "invoice_number_asc",
+  "invoice_number_desc",
+  "amount_asc",
+  "amount_desc",
+  "status_asc",
+  "status_desc",
+  "due_asc",
+  "due_desc",
+  "sent_desc",
+  "sent_asc",
+  "paid_desc",
+  "paid_asc",
+  "updated_desc",
+  "updated_asc",
+] as const;
 
 type BillingParams = {
   success?: string;
@@ -37,6 +66,8 @@ type BillingParams = {
   cycle_id?: string;
   document_kind?: string;
   delivery_status?: string;
+  invoice_scope?: string;
+  sort?: string;
 };
 
 type InvoiceApplicationSummary = {
@@ -94,6 +125,98 @@ function invoiceMatchesSearch(
     .includes(search);
 }
 
+function invoiceCustomerName(
+  invoice: SchoolInvoice,
+  application: InvoiceApplicationSummary | undefined,
+) {
+  return application?.school_name ?? invoice.billing_name ?? "";
+}
+
+function invoiceTimestamp(value: string | null | undefined) {
+  return value ? new Date(value).getTime() : 0;
+}
+
+function compareString(left: string, right: string) {
+  return left.localeCompare(right, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function isOutstandingInvoice(invoice: SchoolInvoice) {
+  return invoice.document_kind === "invoice" && invoice.amount_cents > 0 && invoice.status === "sent";
+}
+
+function isOverdueInvoice(invoice: SchoolInvoice) {
+  return Boolean(
+    isOutstandingInvoice(invoice) &&
+      invoice.due_at &&
+      new Date(invoice.due_at).getTime() < Date.now(),
+  );
+}
+
+function invoiceMatchesScope(
+  invoice: SchoolInvoice,
+  scope: string,
+) {
+  if (!scope) return true;
+  if (scope === "outstanding") return isOutstandingInvoice(invoice);
+  if (scope === "overdue") return isOverdueInvoice(invoice);
+  if (scope === "delivery_failed") return invoice.delivery_status === "failed" || invoice.delivery_status === "partial";
+  return invoice.status === scope;
+}
+
+function sortInvoices(
+  invoices: SchoolInvoice[],
+  sort: string,
+  applicationMap: Map<string, InvoiceApplicationSummary>,
+) {
+  return [...invoices].sort((left, right) => {
+    const leftApplication = applicationMap.get(left.application_id);
+    const rightApplication = applicationMap.get(right.application_id);
+
+    switch (sort) {
+      case "created_asc":
+        return invoiceTimestamp(left.created_at) - invoiceTimestamp(right.created_at);
+      case "customer_asc":
+        return compareString(invoiceCustomerName(left, leftApplication), invoiceCustomerName(right, rightApplication));
+      case "customer_desc":
+        return compareString(invoiceCustomerName(right, rightApplication), invoiceCustomerName(left, leftApplication));
+      case "invoice_number_asc":
+        return compareString(left.invoice_number, right.invoice_number);
+      case "invoice_number_desc":
+        return compareString(right.invoice_number, left.invoice_number);
+      case "amount_asc":
+        return left.amount_cents - right.amount_cents;
+      case "amount_desc":
+        return right.amount_cents - left.amount_cents;
+      case "status_asc":
+        return compareString(left.status, right.status);
+      case "status_desc":
+        return compareString(right.status, left.status);
+      case "due_asc":
+        return invoiceTimestamp(left.due_at) - invoiceTimestamp(right.due_at);
+      case "due_desc":
+        return invoiceTimestamp(right.due_at) - invoiceTimestamp(left.due_at);
+      case "sent_asc":
+        return invoiceTimestamp(left.sent_at) - invoiceTimestamp(right.sent_at);
+      case "sent_desc":
+        return invoiceTimestamp(right.sent_at) - invoiceTimestamp(left.sent_at);
+      case "paid_asc":
+        return invoiceTimestamp(left.paid_at) - invoiceTimestamp(right.paid_at);
+      case "paid_desc":
+        return invoiceTimestamp(right.paid_at) - invoiceTimestamp(left.paid_at);
+      case "updated_asc":
+        return invoiceTimestamp(left.updated_at) - invoiceTimestamp(right.updated_at);
+      case "updated_desc":
+        return invoiceTimestamp(right.updated_at) - invoiceTimestamp(left.updated_at);
+      case "created_desc":
+      default:
+        return invoiceTimestamp(right.created_at) - invoiceTimestamp(left.created_at);
+    }
+  });
+}
+
 export default async function BillingPage({
   searchParams,
 }: {
@@ -114,6 +237,12 @@ export default async function BillingPage({
     params.delivery_status,
     DELIVERY_STATUS_OPTIONS,
   );
+  const selectedInvoiceScope = selectedOption(
+    params.invoice_scope,
+    INVOICE_SCOPE_OPTIONS,
+  );
+  const selectedInvoiceSort =
+    selectedOption(params.sort, INVOICE_SORT_OPTIONS) || "created_desc";
   const supabase = await createClient();
   const [
     cycleResult,
@@ -209,18 +338,26 @@ export default async function BillingPage({
     ) {
       return false;
     }
+    if (!invoiceMatchesScope(invoice, selectedInvoiceScope)) return false;
     return invoiceMatchesSearch(
       invoice,
       applicationMap.get(invoice.application_id),
       invoiceSearch,
     );
   });
+  const sortedInvoices = sortInvoices(
+    filteredInvoices,
+    selectedInvoiceSort,
+    applicationMap,
+  );
   const hasInvoiceFilters = Boolean(
     invoiceSearch ||
       selectedStatus ||
       selectedCycleId ||
       selectedDocumentKind ||
-      selectedDeliveryStatus,
+      selectedDeliveryStatus ||
+      selectedInvoiceScope ||
+      selectedInvoiceSort !== "created_desc",
   );
   type MemberRow = {
     application_id: string;
@@ -580,6 +717,52 @@ export default async function BillingPage({
                     <option value="failed">Failed</option>
                   </select>
                 </div>
+                <div className="field">
+                  <label htmlFor="invoice_history_scope">Quick filter</label>
+                  <select
+                    className="select"
+                    defaultValue={selectedInvoiceScope}
+                    id="invoice_history_scope"
+                    name="invoice_scope"
+                  >
+                    <option value="">All invoices</option>
+                    <option value="outstanding">Outstanding balance</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="sent">Sent</option>
+                    <option value="paid">Paid</option>
+                    <option value="draft">Draft</option>
+                    <option value="void">Void</option>
+                    <option value="delivery_failed">Delivery failed/partial</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="invoice_history_sort">Sort</label>
+                  <select
+                    className="select"
+                    defaultValue={selectedInvoiceSort}
+                    id="invoice_history_sort"
+                    name="sort"
+                  >
+                    <option value="created_desc">Newest created</option>
+                    <option value="created_asc">Oldest created</option>
+                    <option value="customer_asc">School A to Z</option>
+                    <option value="customer_desc">School Z to A</option>
+                    <option value="invoice_number_asc">Invoice # A to Z</option>
+                    <option value="invoice_number_desc">Invoice # Z to A</option>
+                    <option value="amount_desc">Amount high to low</option>
+                    <option value="amount_asc">Amount low to high</option>
+                    <option value="status_asc">Status A to Z</option>
+                    <option value="status_desc">Status Z to A</option>
+                    <option value="due_asc">Due soonest</option>
+                    <option value="due_desc">Due latest</option>
+                    <option value="sent_desc">Sent newest</option>
+                    <option value="sent_asc">Sent oldest</option>
+                    <option value="paid_desc">Paid newest</option>
+                    <option value="paid_asc">Paid oldest</option>
+                    <option value="updated_desc">Recently updated</option>
+                    <option value="updated_asc">Least recently updated</option>
+                  </select>
+                </div>
                 <button className="button button-dark billing-history-filter-submit" type="submit">
                   Apply filters
                 </button>
@@ -619,7 +802,7 @@ export default async function BillingPage({
                 <table className="data-table">
                   <thead><tr><th><span className="sr-only">Select</span></th><th>Invoice</th><th>School</th><th>Description</th><th>Amount</th><th>Status</th><th>Delivery</th><th>Sent</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {filteredInvoices.map((invoice) => {
+                    {sortedInvoices.map((invoice) => {
                       const latestDelivery = latestDeliveryByInvoice.get(invoice.id);
                       return (
                       <tr key={invoice.id}>

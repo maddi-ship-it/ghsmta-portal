@@ -15,6 +15,15 @@ type DigestActivity = {
   created_at: string;
 };
 
+type DigestOptions = {
+  // The scheduled cron passes the service-role Supabase client, while manual
+  // sends use the request-bound server client. Both expose the same query API.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase?: any;
+  activityType?: string;
+  respectIncludeEmpty?: boolean;
+};
+
 function escapeHtml(value: unknown) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -84,6 +93,10 @@ function buildDigestHtml({
   missingScores,
   pendingBookings,
   waitlistEntries,
+  openAppeals,
+  failedDeliveries,
+  releaseBlockers,
+  actionCount,
 }: {
   ownerName: string;
   intro: string;
@@ -93,6 +106,10 @@ function buildDigestHtml({
   missingScores: number;
   pendingBookings: number;
   waitlistEntries: number;
+  openAppeals: number;
+  failedDeliveries: number;
+  releaseBlockers: number;
+  actionCount: number;
 }) {
   const activityMarkup =
     activities.length > 0
@@ -180,10 +197,22 @@ function buildDigestHtml({
               <td style="padding:24px 24px 8px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
+                    ${metricCard("Actions", actionCount)}
                     ${metricCard("Comments missing", missingComments)}
                     ${metricCard("Scores missing", missingScores)}
                     ${metricCard("Pending slots", pendingBookings)}
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
                     ${metricCard("Waitlist", waitlistEntries)}
+                    ${metricCard("Open appeals", openAppeals)}
+                    ${metricCard("Delivery failures", failedDeliveries)}
+                    ${metricCard("Release blockers", releaseBlockers)}
                   </tr>
                 </table>
               </td>
@@ -241,6 +270,10 @@ function buildDigestText({
   missingScores,
   pendingBookings,
   waitlistEntries,
+  openAppeals,
+  failedDeliveries,
+  releaseBlockers,
+  actionCount,
   reportUrl,
 }: {
   intro: string;
@@ -249,6 +282,10 @@ function buildDigestText({
   missingScores: number;
   pendingBookings: number;
   waitlistEntries: number;
+  openAppeals: number;
+  failedDeliveries: number;
+  releaseBlockers: number;
+  actionCount: number;
   reportUrl: string;
 }) {
   const lines = [
@@ -256,10 +293,14 @@ function buildDigestText({
     "",
     intro,
     "",
+    `Actions requiring review: ${actionCount}`,
     `Comments missing: ${missingComments}`,
     `Scores missing: ${missingScores}`,
     `Pending timeslot approvals: ${pendingBookings}`,
     `Active waitlist entries: ${waitlistEntries}`,
+    `Open appeals: ${openAppeals}`,
+    `Communication delivery failures: ${failedDeliveries}`,
+    `Results release blockers: ${releaseBlockers}`,
     "",
     "ACTIVITY FROM THE LAST 24 HOURS",
     "",
@@ -277,8 +318,11 @@ function buildDigestText({
   return lines.filter((line, index) => line || lines[index - 1] !== "").join("\n");
 }
 
-export async function sendOwnerDigestEmail(owner: OwnerProfile) {
-  const supabase = await createClient();
+export async function sendOwnerDigestEmail(
+  owner: OwnerProfile,
+  options: DigestOptions = {},
+) {
+  const supabase = options.supabase ?? (await createClient());
   const now = new Date();
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -290,11 +334,15 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
     scoresResult,
     bookingsResult,
     waitlistResult,
+    appealsResult,
+    releasesResult,
+    chatFailureResult,
+    invoiceFailureResult,
   ] = await Promise.all([
     supabase
       .from("owner_digest_settings")
       .select(
-        "enabled,recipient_email,delivery_hour,time_zone,last_sent_at",
+        "enabled,recipient_email,delivery_hour,time_zone,include_empty,last_sent_at",
       )
       .eq("owner_user_id", owner.id)
       .maybeSingle(),
@@ -323,6 +371,22 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
       .from("schedule_slot_waitlist")
       .select("id", { count: "exact", head: true })
       .in("status", ["waiting", "offered"]),
+    supabase
+      .from("appeals")
+      .select("id,status")
+      .limit(5000),
+    supabase
+      .from("adjudication_releases")
+      .select("id,scores_released_at,feedback_released_at")
+      .limit(5000),
+    supabase
+      .from("chat_email_delivery_log")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "failed"),
+    supabase
+      .from("invoice_delivery_log")
+      .select("id", { count: "exact", head: true })
+      .or("email_status.eq.failed,chat_status.eq.failed"),
   ]);
 
   for (const result of [
@@ -333,6 +397,10 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
     scoresResult,
     bookingsResult,
     waitlistResult,
+    appealsResult,
+    releasesResult,
+    chatFailureResult,
+    invoiceFailureResult,
   ]) {
     if (result.error) {
       throw new Error(result.error.message);
@@ -354,12 +422,6 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
     owner_name: owner.full_name?.trim() || "GHSMTA Owner",
   };
 
-  const subject = renderTemplate(
-    templateResult.data?.subject_template ||
-      "GHSMTA Owner daily review - {{digest_date}}",
-    variables,
-  );
-
   const intro = renderTemplate(
     templateResult.data?.body_template ||
       "Your GHSMTA Owner daily review is ready.",
@@ -377,6 +439,49 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
   const missingScores = scoresResult.count ?? 0;
   const pendingBookings = bookingsResult.count ?? 0;
   const waitlistEntries = waitlistResult.count ?? 0;
+  const openAppeals = ((appealsResult.data ?? []) as Array<{ status: string | null }>).filter(
+    (appeal) =>
+      !["approved", "denied", "resolved", "withdrawn"].includes(
+        String(appeal.status ?? "").toLowerCase(),
+      ),
+  ).length;
+  const releaseBlockers = ((releasesResult.data ?? []) as Array<{
+    scores_released_at: string | null;
+    feedback_released_at: string | null;
+  }>).filter(
+    (release) => !release.scores_released_at || !release.feedback_released_at,
+  ).length;
+  const failedDeliveries =
+    (chatFailureResult.count ?? 0) + (invoiceFailureResult.count ?? 0);
+  const actionCount =
+    missingComments +
+    missingScores +
+    pendingBookings +
+    waitlistEntries +
+    openAppeals +
+    releaseBlockers +
+    failedDeliveries;
+  const subject = `GHSMTA Daily Digest — ${actionCount} Action${actionCount === 1 ? "" : "s"} Required — ${digestDate}`;
+
+  if (
+    options.respectIncludeEmpty &&
+    !settingResult.data?.include_empty &&
+    actionCount === 0 &&
+    activities.length === 0
+  ) {
+    const skippedAt = now.toISOString();
+    await supabase
+      .from("owner_digest_settings")
+      .update({ last_sent_at: skippedAt })
+      .eq("owner_user_id", owner.id);
+    return {
+      recipient,
+      sentAt: skippedAt,
+      activityCount: 0,
+      actionCount: 0,
+      skipped: true,
+    };
+  }
 
   const result = await sendSmtpEmail({
     to: [recipient],
@@ -388,6 +493,10 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
       missingScores,
       pendingBookings,
       waitlistEntries,
+      openAppeals,
+      failedDeliveries,
+      releaseBlockers,
+      actionCount,
       reportUrl,
     }),
     html: buildDigestHtml({
@@ -399,6 +508,10 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
       missingScores,
       pendingBookings,
       waitlistEntries,
+      openAppeals,
+      failedDeliveries,
+      releaseBlockers,
+      actionCount,
     }),
   });
 
@@ -419,15 +532,29 @@ export async function sendOwnerDigestEmail(owner: OwnerProfile) {
   }
 
   await supabase.from("owner_activity_log").insert({
-    activity_type: "digest_sent_manually",
-    title: "Owner daily digest sent manually",
+    activity_type: options.activityType ?? "digest_sent_manually",
+    title:
+      options.activityType === "digest_sent_automatically"
+        ? "Owner daily digest sent automatically"
+        : "Owner daily digest sent manually",
     detail: `Sent the branded HTML digest to ${recipient}.`,
     actor_id: owner.id,
+    metadata: {
+      action_count: actionCount,
+      missing_comments: missingComments,
+      missing_scores: missingScores,
+      pending_bookings: pendingBookings,
+      waitlist_entries: waitlistEntries,
+      open_appeals: openAppeals,
+      failed_deliveries: failedDeliveries,
+      release_blockers: releaseBlockers,
+    },
   });
 
   return {
     recipient,
     sentAt,
     activityCount: activities.length,
+    actionCount,
   };
 }
