@@ -9,6 +9,38 @@ import { startApplicantImpersonation } from "@/app/portal/impersonation/actions"
 
 type UserSort = "name" | "email" | "role" | "status";
 type Direction = "asc" | "desc";
+type SchoolTeamMembership = {
+  applicationId: string;
+  schoolName: string;
+  productionTitle: string | null;
+  applicationArchived: boolean;
+  memberRole: "primary" | "collaborator";
+  canEditApplication: boolean;
+  active: boolean;
+};
+type UserProfileRow = Profile & {
+  schoolTeams: SchoolTeamMembership[];
+};
+type ApplicationMemberRow = {
+  user_id: string;
+  member_role: "primary" | "collaborator";
+  can_edit_application: boolean;
+  active: boolean;
+  applications:
+    | {
+        id: string;
+        school_name: string | null;
+        production_title: string | null;
+        is_archived: boolean | null;
+      }
+    | {
+        id: string;
+        school_name: string | null;
+        production_title: string | null;
+        is_archived: boolean | null;
+      }[]
+    | null;
+};
 
 type SearchParams = {
   q?: string;
@@ -25,6 +57,18 @@ function compare(left: string | null | undefined, right: string | null | undefin
   return (left ?? "").localeCompare(right ?? "", undefined, { numeric: true, sensitivity: "base" });
 }
 
+function teamAccessLabel(team: SchoolTeamMembership) {
+  if (team.memberRole === "primary") return "Primary";
+  return team.canEditApplication ? "Sub-user · Editor" : "Sub-user · View only";
+}
+
+function teamStatusLabel(team: SchoolTeamMembership) {
+  const labels = [teamAccessLabel(team)];
+  if (!team.active) labels.push("removed");
+  if (team.applicationArchived) labels.push("archived");
+  return labels.join(" · ");
+}
+
 export default async function UsersPage({
   searchParams,
 }: {
@@ -33,11 +77,47 @@ export default async function UsersPage({
   const owner = await requireProfile(["owner"]);
   const params = await searchParams;
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id,email,full_name,preferred_name,phone_e164,phone_verified_at,role,active,mfa_required,mfa_grace_until,force_password_reset,password_reset_requested_at");
+  const [profileResult, membershipResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id,email,full_name,preferred_name,phone_e164,phone_verified_at,role,active,mfa_required,mfa_grace_until,force_password_reset,password_reset_requested_at"),
+    supabase
+      .from("application_members")
+      .select("user_id,member_role,can_edit_application,active,applications!application_members_application_id_fkey(id,school_name,production_title,is_archived)"),
+  ]);
 
-  if (error) throw new Error(error.message);
+  if (profileResult.error) throw new Error(profileResult.error.message);
+  if (membershipResult.error) throw new Error(membershipResult.error.message);
+
+  const schoolTeamsByUserId = new Map<string, SchoolTeamMembership[]>();
+
+  for (const row of (membershipResult.data ?? []) as ApplicationMemberRow[]) {
+    const application = Array.isArray(row.applications)
+      ? row.applications[0]
+      : row.applications;
+
+    if (!application) continue;
+
+    const memberships = schoolTeamsByUserId.get(row.user_id) ?? [];
+    memberships.push({
+      applicationId: application.id,
+      schoolName: application.school_name ?? "Unnamed school",
+      productionTitle: application.production_title,
+      applicationArchived: Boolean(application.is_archived),
+      memberRole: row.member_role,
+      canEditApplication: row.can_edit_application,
+      active: row.active,
+    });
+    schoolTeamsByUserId.set(row.user_id, memberships);
+  }
+
+  for (const memberships of schoolTeamsByUserId.values()) {
+    memberships.sort((left, right) => {
+      if (left.active !== right.active) return Number(right.active) - Number(left.active);
+      if (left.memberRole !== right.memberRole) return left.memberRole === "primary" ? -1 : 1;
+      return compare(left.schoolName, right.schoolName);
+    });
+  }
 
   const search = params.q?.trim().toLowerCase() ?? "";
   const selectedRole = params.role ?? "";
@@ -45,9 +125,16 @@ export default async function UsersPage({
   const sort = params.sort ?? "name";
   const direction = params.direction ?? "asc";
 
-  const profiles = ((data ?? []) as Profile[])
+  const profiles = ((profileResult.data ?? []) as Profile[])
+    .map((profile): UserProfileRow => ({
+      ...profile,
+      schoolTeams: schoolTeamsByUserId.get(profile.id) ?? [],
+    }))
     .filter((profile) => {
-      if (search && !`${profile.full_name ?? ""} ${profile.email ?? ""}`.toLowerCase().includes(search)) return false;
+      const schoolSearchText = profile.schoolTeams
+        .map((team) => `${team.schoolName} ${team.productionTitle ?? ""} ${teamStatusLabel(team)}`)
+        .join(" ");
+      if (search && !`${profile.full_name ?? ""} ${profile.email ?? ""} ${schoolSearchText}`.toLowerCase().includes(search)) return false;
       if (selectedRole && profile.role !== selectedRole) return false;
       if (selectedStatus === "active" && !profile.active) return false;
       if (selectedStatus === "inactive" && profile.active) return false;
@@ -98,17 +185,54 @@ export default async function UsersPage({
         <button className="button button-dark button-compact" type="submit">Apply to selected</button>
       </form>
 
-      <section className="panel"><div className="table-wrap"><table className="data-table user-admin-table"><thead><tr><th><span className="sr-only">Select</span></th><th>User</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th><th>Password</th><th>Support view</th><th>Change access</th></tr></thead><tbody>
+      <section className="panel"><div className="table-wrap"><table className="data-table user-admin-table user-admin-table-compact"><thead><tr><th><span className="sr-only">Select</span></th><th>Status</th><th>Name</th><th>Phone</th><th>Role</th><th>School</th><th>Email</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
         {profiles.map((profile) => (
           <tr key={profile.id}>
             <td><input aria-label={`Select ${profile.full_name ?? profile.email}`} form="bulk-users-form" name="user_ids" type="checkbox" value={profile.id} /></td>
-            <td><strong>{profile.full_name ?? "Unnamed user"}</strong></td>
-            <td>{profile.email}</td>
-            <td><span>{profile.phone_e164 ?? "Not entered"}</span><small>{profile.phone_verified_at ? "Verified" : "Unverified"}</small></td>
-            <td><span className="badge">{roleLabel(profile.role)}</span></td>
-            <td><span className={`badge ${profile.active ? "badge-complete" : "badge-warning"}`}>{profile.active ? "Active" : "Inactive"}</span></td>
-            <td>{profile.force_password_reset ? <span className="badge badge-warning">Reset required</span> : "Current"}</td>
             <td>
+              <div className="user-status-stack">
+                <span className={`badge ${profile.active ? "badge-complete" : "badge-warning"}`}>{profile.active ? "Active" : "Inactive"}</span>
+                {profile.force_password_reset && <span className="badge badge-warning">Reset required</span>}
+                {profile.mfa_required && <span className="badge">MFA</span>}
+              </div>
+            </td>
+            <td>
+              <div className="user-name-cell">
+                <strong>{profile.full_name ?? "Unnamed user"}</strong>
+                {profile.preferred_name && <small>Preferred: {profile.preferred_name}</small>}
+              </div>
+            </td>
+            <td>
+              <div className="user-phone-cell">
+                <span>{profile.phone_e164 ?? "Not entered"}</span>
+                <small>{profile.phone_e164 ? profile.phone_verified_at ? "Verified" : "Unverified" : "—"}</small>
+              </div>
+            </td>
+            <td><span className="badge">{roleLabel(profile.role)}</span></td>
+            <td>
+              {profile.schoolTeams.length > 0 ? (
+                <div className="user-school-list">
+                  {profile.schoolTeams.map((team) => (
+                    <span
+                      className={
+                        team.active && !team.applicationArchived
+                          ? "user-school-chip"
+                          : "user-school-chip user-school-chip-muted"
+                      }
+                      key={`${profile.id}-${team.applicationId}`}
+                    >
+                      <strong>{team.schoolName}</strong>
+                      <small>{teamStatusLabel(team)}</small>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <small className="muted-text">No school team</small>
+              )}
+            </td>
+            <td><span className="user-email-cell">{profile.email ?? "No email"}</span></td>
+            <td>
+              <div className="user-row-action-stack">
               {profile.role === "applicant" &&
               profile.active &&
               profile.email &&
@@ -129,22 +253,31 @@ export default async function UsersPage({
               ) : (
                 <small>Applicant only</small>
               )}
-            </td>
-            <td>
-              <div className="user-row-actions">
-                <form action={updateUserAccess.bind(null, profile.id)} className="user-inline-access-form">
-                  <input className="input input-compact" name="phone_e164" defaultValue={profile.phone_e164 ?? ""} placeholder="+14045551234" aria-label="Mobile number" />
-                  <select className="select" defaultValue={profile.role} name="role">{roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}</select>
-                  <label className="inline-check"><input defaultChecked={profile.active} name="active" type="checkbox" /> Active</label>
-                  <label className="inline-check"><input defaultChecked={profile.mfa_required} name="mfa_required" type="checkbox" /> Require MFA</label>
-                  <button className="button button-secondary button-compact" type="submit">Save</button>
-                </form>
-                <form action={forcePasswordReset.bind(null, profile.id)}><button className="text-button" type="submit">Force reset</button></form>
+
+                <details className="user-edit-details">
+                  <summary>Edit user</summary>
+                  <div className="user-edit-panel">
+                    <form action={updateUserAccess.bind(null, profile.id)} className="user-edit-form">
+                      <div className="field">
+                        <label htmlFor={`phone-${profile.id}`}>Phone</label>
+                        <input className="input input-compact" id={`phone-${profile.id}`} name="phone_e164" defaultValue={profile.phone_e164 ?? ""} placeholder="+14045551234" />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`role-${profile.id}`}>Role</label>
+                        <select className="select" defaultValue={profile.role} id={`role-${profile.id}`} name="role">{roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}</select>
+                      </div>
+                      <label className="inline-check"><input defaultChecked={profile.active} name="active" type="checkbox" /> Active</label>
+                      <label className="inline-check"><input defaultChecked={profile.mfa_required} name="mfa_required" type="checkbox" /> Require MFA</label>
+                      <button className="button button-secondary button-compact" type="submit">Save user</button>
+                    </form>
+                    <form action={forcePasswordReset.bind(null, profile.id)}><button className="text-button" type="submit">Force password reset</button></form>
+                  </div>
+                </details>
               </div>
             </td>
           </tr>
         ))}
-        {profiles.length === 0 && <tr><td colSpan={9}>No users match these filters.</td></tr>}
+        {profiles.length === 0 && <tr><td colSpan={8}>No users match these filters.</td></tr>}
       </tbody></table></div></section>
     </>
   );
