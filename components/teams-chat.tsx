@@ -67,6 +67,25 @@ export type ChatMember = {
   user_role: AppRole;
 };
 
+type MentionSuggestion =
+  | {
+      kind: "channel";
+      id: "channel";
+      label: "@channel";
+      description: string;
+      insertion: "@channel";
+    }
+  | {
+      kind: "member";
+      id: string;
+      label: string;
+      description: string;
+      insertion: string;
+      member: ChatMember;
+    };
+
+const EMPTY_THREAD_IDS = new Set<string>();
+
 export type ChatReply = {
   id: string;
   body: string;
@@ -427,13 +446,13 @@ function MentionedMessage({
     .map((member) => member.display_name.trim())
     .filter(Boolean)
     .sort((left, right) => right.length - left.length);
-
-  if (mentionNames.length === 0) {
-    return <>{body}</>;
-  }
+  const mentionTokens = [
+    "channel",
+    ...mentionNames.filter((name) => name.toLowerCase() !== "channel"),
+  ];
 
   const pattern = new RegExp(
-    `(@(?:${mentionNames.map(escapeRegularExpression).join("|")}))`,
+    `(@(?:${mentionTokens.map(escapeRegularExpression).join("|")}))`,
     "gi",
   );
 
@@ -447,6 +466,17 @@ function MentionedMessage({
   return (
     <>
       {body.split(pattern).map((part, index) => {
+        if (part.toLowerCase() === "@channel") {
+          return (
+            <span
+              className={`${styles.mention} ${styles.channelMention}`}
+              key={`channel-${index}`}
+            >
+              {part}
+            </span>
+          );
+        }
+
         const member = memberByMention.get(part.toLowerCase());
 
         if (!member) {
@@ -499,12 +529,34 @@ function MentionTextarea({
     }
 
     const normalized = query.trim().toLowerCase();
+    const nextSuggestions: MentionSuggestion[] = [];
 
-    return members
-      .filter((member) =>
-        member.display_name.toLowerCase().includes(normalized),
-      )
-      .slice(0, 8);
+    if ("channel".includes(normalized)) {
+      nextSuggestions.push({
+        kind: "channel",
+        id: "channel",
+        label: "@channel",
+        description: "Tag everyone in this chat",
+        insertion: "@channel",
+      });
+    }
+
+    nextSuggestions.push(
+      ...members
+        .filter((member) =>
+          member.display_name.toLowerCase().includes(normalized),
+        )
+        .map((member) => ({
+          kind: "member" as const,
+          id: member.user_id,
+          label: `@${member.display_name}`,
+          description: roleName(member.user_role),
+          insertion: `@${member.display_name}`,
+          member,
+        })),
+    );
+
+    return nextSuggestions.slice(0, 8);
   }, [members, query]);
 
   useEffect(() => {
@@ -540,7 +592,7 @@ function MentionTextarea({
     setActiveIndex(0);
   };
 
-  const selectMention = (member: ChatMember) => {
+  const selectMention = (suggestion: MentionSuggestion) => {
     const textarea = textareaRef.current;
 
     if (!textarea || mentionStart === null) {
@@ -548,7 +600,7 @@ function MentionTextarea({
     }
 
     const cursor = textarea.selectionStart;
-    const insertion = `@${member.display_name} `;
+    const insertion = `${suggestion.insertion} `;
     const nextValue =
       value.slice(0, mentionStart) + insertion + value.slice(cursor);
     const nextCursor = mentionStart + insertion.length;
@@ -632,7 +684,7 @@ function MentionTextarea({
 
       {suggestions.length > 0 && (
         <div className={styles.mentionSuggestions} role="listbox">
-          {suggestions.map((member, index) => (
+          {suggestions.map((suggestion, index) => (
             <button
               aria-selected={index === activeIndex}
               className={
@@ -640,18 +692,26 @@ function MentionTextarea({
                   ? `${styles.mentionSuggestion} ${styles.mentionSuggestionActive}`
                   : styles.mentionSuggestion
               }
-              key={member.user_id}
-              onClick={() => selectMention(member)}
+              key={suggestion.id}
+              onClick={() => selectMention(suggestion)}
               onMouseDown={(event) => event.preventDefault()}
               role="option"
               type="button"
             >
-              <span className={`${styles.avatar} ${styles.avatarSmall}`}>
-                {initials(member.display_name)}
+              <span
+                className={
+                  suggestion.kind === "channel"
+                    ? `${styles.avatar} ${styles.avatarSmall} ${styles.channelMentionAvatar}`
+                    : `${styles.avatar} ${styles.avatarSmall}`
+                }
+              >
+                {suggestion.kind === "channel"
+                  ? "@"
+                  : initials(suggestion.member.display_name)}
               </span>
               <span>
-                <strong>{member.display_name}</strong>
-                <small>{roleName(member.user_role)}</small>
+                <strong>{suggestion.label}</strong>
+                <small>{suggestion.description}</small>
               </span>
             </button>
           ))}
@@ -659,7 +719,7 @@ function MentionTextarea({
       )}
 
       <small className={styles.mentionHelp}>
-        Type @ to tag someone. Press Enter to send; Shift+Enter adds a line.
+        Type @ to tag someone or @channel. Press Enter to send; Shift+Enter adds a line.
       </small>
     </div>
   );
@@ -959,6 +1019,10 @@ export function TeamsChat({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [channelSearch, setChannelSearch] = useState("");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [openThreadState, setOpenThreadState] = useState<{
+    channelId: string | null;
+    ids: Set<string>;
+  }>(() => ({ channelId: selectedChannelId, ids: new Set() }));
   const [showArchived, setShowArchived] = useState(() =>
     initialChannels.some(
       (channel) =>
@@ -979,6 +1043,28 @@ export function TeamsChat({
     (channel) => channel.channel_id === selectedChannelId,
   );
   const isThreaded = activeChannel?.channel_type === "applicant_community";
+  const openThreadIds =
+    openThreadState.channelId === selectedChannelId
+      ? openThreadState.ids
+      : EMPTY_THREAD_IDS;
+
+  const toggleThreadOpen = useCallback((postId: string) => {
+    setOpenThreadState((current) => {
+      const currentIds =
+        current.channelId === selectedChannelId
+          ? current.ids
+          : EMPTY_THREAD_IDS;
+      const next = new Set(currentIds);
+
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+
+      return { channelId: selectedChannelId, ids: next };
+    });
+  }, [selectedChannelId]);
 
   const archivedChannelCount = useMemo(
     () => channels.filter((channel) => channel.application_archived).length,
@@ -1377,6 +1463,7 @@ export function TeamsChat({
     }
     formData.delete("attachments");
     const channelId = String(formData.get("channel_id") ?? selectedChannelId ?? "");
+    const threadPostId = String(formData.get("post_id") ?? "");
     setStatus(null);
 
     startTransition(async () => {
@@ -1402,6 +1489,25 @@ export function TeamsChat({
           await loadChannel();
           return;
         }
+      }
+      if (isThreaded && result.messageKind === "post" && result.messageId) {
+        setOpenThreadState({
+          channelId: selectedChannelId,
+          ids: new Set([result.messageId]),
+        });
+      }
+      if (isThreaded && result.messageKind === "reply" && threadPostId) {
+        setOpenThreadState((current) => {
+          const currentIds =
+            current.channelId === selectedChannelId
+              ? current.ids
+              : EMPTY_THREAD_IDS;
+
+          return {
+            channelId: selectedChannelId,
+            ids: new Set(currentIds).add(threadPostId),
+          };
+        });
       }
       form.reset();
       setStatus(files.length > 0 ? `${successMessage} Files attached.` : successMessage);
@@ -1767,205 +1873,282 @@ export function TeamsChat({
                   <p>Start the first {SCHOOL_COMMUNITY_CHAT_LABEL} topic.</p>
                 </div>
               ) : (
-                threads.map((thread) => (
-                  <article
-                    className={
-                      thread.post_deleted_at
-                        ? `${styles.threadCard} ${styles.deletedMessage}`
-                        : styles.threadCard
-                    }
-                    key={thread.post_id}
-                  >
-                    <div className={styles.threadRoot}>
-                      <span className={styles.avatar}>
-                        {initials(thread.author_name)}
-                      </span>
-                      <div className={styles.threadContent}>
-                        <div className={styles.messageMeta}>
-                          <strong>{thread.author_name}</strong>
-                          <span>{roleName(thread.author_role)}</span>
-                          <time dateTime={thread.created_at}>
-                            {formatFullTimestamp(thread.created_at)}
-                          </time>
-                        </div>
+                threads.map((thread) => {
+                  const isThreadOpen = openThreadIds.has(thread.post_id);
+                  const latestReply = thread.replies[thread.replies.length - 1];
+                  const replyTotal = thread.reply_count ?? thread.replies.length;
+                  const replyLabel =
+                    replyTotal === 1 ? "1 reply" : `${replyTotal} replies`;
+                  const threadClassName = [
+                    styles.threadCard,
+                    isThreadOpen ? styles.threadCardOpen : "",
+                    thread.post_deleted_at ? styles.deletedMessage : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
 
-                        <div className={styles.threadTitleRow}>
-                          <h2>{thread.subject}</h2>
-                          <div className={styles.threadBadges}>
-                            {thread.pinned && <span>Pinned</span>}
-                            {thread.locked && <span>Locked</span>}
+                  return (
+                    <article className={threadClassName} key={thread.post_id}>
+                      <div className={styles.threadRoot}>
+                        <span className={styles.avatar}>
+                          {initials(thread.author_name)}
+                        </span>
+                        <div className={styles.threadContent}>
+                          <div className={styles.messageMeta}>
+                            <strong>{thread.author_name}</strong>
+                            <span>{roleName(thread.author_role)}</span>
+                            <time dateTime={thread.created_at}>
+                              {formatFullTimestamp(thread.created_at)}
+                            </time>
                           </div>
-                        </div>
 
-                        <p className={styles.messageBody}>
-                          <MentionedMessage
-                            body={thread.body}
-                            currentUserId={profile.id}
-                            members={members}
-                          />
-                        </p>
-                        <AttachmentList
-                          attachments={attachments.filter(
-                            (attachment) => attachment.message_kind === "post" && attachment.message_id === thread.post_id,
-                          )}
-                        />
-                        {!thread.post_deleted_at && (
-                          <ReactionBar
-                            currentUserId={profile.id}
-                            onToggle={(emoji) => void toggleReaction(thread.post_id, "post", emoji)}
-                            reactions={reactions.filter(
-                              (reaction) => reaction.message_kind === "post" && reaction.message_id === thread.post_id,
-                            )}
-                          />
-                        )}
-
-                        {profile.role === "owner" && (
-                          <div className={styles.ownerControls}>
-                            {!thread.post_deleted_at && (
-                              <>
-                                <button
-                                  className="button button-secondary button-compact"
-                                  disabled={isPending}
-                                  onClick={() => moderate(thread.post_id, "pin")}
-                                  type="button"
-                                >
-                                  {thread.pinned ? "Unpin" : "Pin"}
-                                </button>
-                                <button
-                                  className="button button-secondary button-compact"
-                                  disabled={isPending}
-                                  onClick={() => moderate(thread.post_id, "lock")}
-                                  type="button"
-                                >
-                                  {thread.locked ? "Unlock replies" : "Lock replies"}
-                                </button>
-                                <button
-                                  className="button button-secondary button-compact danger-text"
-                                  disabled={isPending}
-                                  onClick={() => deleteMessage(thread.post_id, "post")}
-                                  type="button"
-                                >
-                                  Delete message
-                                </button>
-                              </>
-                            )}
-                            {thread.post_deleted_at && thread.post_deletion_reason && (
-                              <small>Reason: {thread.post_deletion_reason}</small>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className={styles.replyThread}>
-                      {thread.replies.map((reply) => (
-                        <div
-                          className={
-                            reply.deleted_at
-                              ? `${styles.reply} ${styles.deletedMessage}`
-                              : styles.reply
-                          }
-                          key={reply.id}
-                        >
-                          <span
-                            className={`${styles.avatar} ${styles.avatarSmall}`}
-                          >
-                            {initials(reply.author_name)}
-                          </span>
-                          <div>
-                            <div className={styles.messageMeta}>
-                              <strong>{reply.author_name}</strong>
-                              <span>{roleName(reply.author_role)}</span>
-                              <time dateTime={reply.created_at}>
-                                {formatFullTimestamp(reply.created_at)}
-                              </time>
+                          <div className={styles.threadTitleRow}>
+                            <div>
+                              <h2>{thread.subject}</h2>
+                              <small className={styles.threadSummary}>
+                                {replyTotal > 0
+                                  ? `${replyLabel}${
+                                      latestReply
+                                        ? ` · latest from ${latestReply.author_name}`
+                                        : ""
+                                    }`
+                                  : "No replies yet"}
+                              </small>
                             </div>
-                            <p className={styles.messageBody}>
-                              <MentionedMessage
-                                body={reply.body}
-                                currentUserId={profile.id}
-                                members={members}
-                              />
-                            </p>
-                            <AttachmentList
-                              attachments={attachments.filter(
-                                (attachment) => attachment.message_kind === "reply" && attachment.message_id === reply.id,
+                            <div className={styles.threadTitleActions}>
+                              {(thread.pinned || thread.locked) && (
+                                <div className={styles.threadBadges}>
+                                  {thread.pinned && <span>Pinned</span>}
+                                  {thread.locked && <span>Locked</span>}
+                                </div>
                               )}
-                            />
-                            {!reply.deleted_at && (
-                              <ReactionBar
-                                currentUserId={profile.id}
-                                onToggle={(emoji) => void toggleReaction(reply.id, "reply", emoji)}
-                                reactions={reactions.filter(
-                                  (reaction) => reaction.message_kind === "reply" && reaction.message_id === reply.id,
-                                )}
-                              />
-                            )}
-                            {profile.role === "owner" && !reply.deleted_at && (
                               <button
-                                className={`${styles.messageDeleteButton} danger-text`}
-                                disabled={isPending}
-                                onClick={() => deleteMessage(reply.id, "reply")}
+                                aria-controls={`thread-replies-${thread.post_id}`}
+                                aria-expanded={isThreadOpen}
+                                className={styles.threadToggleButton}
+                                onClick={() => toggleThreadOpen(thread.post_id)}
                                 type="button"
                               >
-                                Delete
+                                <span aria-hidden="true">
+                                  {isThreadOpen ? "−" : "+"}
+                                </span>
+                                {isThreadOpen ? "Collapse" : "Open thread"}
                               </button>
-                            )}
-                            {profile.role === "owner" && reply.deletion_reason && (
-                              <small className={styles.deletionReason}>
-                                Reason: {reply.deletion_reason}
-                              </small>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
 
-                      {!thread.locked ? (
-                        <form
-                          className={styles.replyForm}
-                          onSubmit={submitReply}
-                        >
-                          <input
-                            name="channel_id"
-                            type="hidden"
-                            value={activeChannel.channel_id}
-                          />
-                          <input
-                            name="post_id"
-                            type="hidden"
-                            value={thread.post_id}
-                          />
-                          <label
-                            className="sr-only"
-                            htmlFor={`reply-${thread.post_id}`}
+                          <p
+                            className={
+                              isThreadOpen
+                                ? styles.messageBody
+                                : `${styles.messageBody} ${styles.threadPreviewBody}`
+                            }
                           >
-                            Reply to {thread.subject}
-                          </label>
-                          <MentionTextarea
-                            id={`reply-${thread.post_id}`}
-                            members={members}
-                            name="body"
-                            placeholder="Reply to this conversation"
-                            rows={2}
-                            submitOnEnter
+                            <MentionedMessage
+                              body={thread.body}
+                              currentUserId={profile.id}
+                              members={members}
+                            />
+                          </p>
+                          <AttachmentList
+                            attachments={attachments.filter(
+                              (attachment) =>
+                                attachment.message_kind === "post" &&
+                                attachment.message_id === thread.post_id,
+                            )}
                           />
-                          <ChatFilePicker />
+                          {!thread.post_deleted_at && (
+                            <ReactionBar
+                              currentUserId={profile.id}
+                              onToggle={(emoji) =>
+                                void toggleReaction(thread.post_id, "post", emoji)
+                              }
+                              reactions={reactions.filter(
+                                (reaction) =>
+                                  reaction.message_kind === "post" &&
+                                  reaction.message_id === thread.post_id,
+                              )}
+                            />
+                          )}
+
+                          {profile.role === "owner" && (
+                            <div className={styles.ownerControls}>
+                              {!thread.post_deleted_at && (
+                                <>
+                                  <button
+                                    className="button button-secondary button-compact"
+                                    disabled={isPending}
+                                    onClick={() => moderate(thread.post_id, "pin")}
+                                    type="button"
+                                  >
+                                    {thread.pinned ? "Unpin" : "Pin"}
+                                  </button>
+                                  <button
+                                    className="button button-secondary button-compact"
+                                    disabled={isPending}
+                                    onClick={() => moderate(thread.post_id, "lock")}
+                                    type="button"
+                                  >
+                                    {thread.locked ? "Unlock replies" : "Lock replies"}
+                                  </button>
+                                  <button
+                                    className="button button-secondary button-compact danger-text"
+                                    disabled={isPending}
+                                    onClick={() => deleteMessage(thread.post_id, "post")}
+                                    type="button"
+                                  >
+                                    Delete message
+                                  </button>
+                                </>
+                              )}
+                              {thread.post_deleted_at &&
+                                thread.post_deletion_reason && (
+                                  <small>
+                                    Reason: {thread.post_deletion_reason}
+                                  </small>
+                                )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {isThreadOpen ? (
+                        <div
+                          className={styles.replyThread}
+                          id={`thread-replies-${thread.post_id}`}
+                        >
+                          {thread.replies.map((reply) => (
+                            <div
+                              className={
+                                reply.deleted_at
+                                  ? `${styles.reply} ${styles.deletedMessage}`
+                                  : styles.reply
+                              }
+                              key={reply.id}
+                            >
+                              <span
+                                className={`${styles.avatar} ${styles.avatarSmall}`}
+                              >
+                                {initials(reply.author_name)}
+                              </span>
+                              <div>
+                                <div className={styles.messageMeta}>
+                                  <strong>{reply.author_name}</strong>
+                                  <span>{roleName(reply.author_role)}</span>
+                                  <time dateTime={reply.created_at}>
+                                    {formatFullTimestamp(reply.created_at)}
+                                  </time>
+                                </div>
+                                <p className={styles.messageBody}>
+                                  <MentionedMessage
+                                    body={reply.body}
+                                    currentUserId={profile.id}
+                                    members={members}
+                                  />
+                                </p>
+                                <AttachmentList
+                                  attachments={attachments.filter(
+                                    (attachment) =>
+                                      attachment.message_kind === "reply" &&
+                                      attachment.message_id === reply.id,
+                                  )}
+                                />
+                                {!reply.deleted_at && (
+                                  <ReactionBar
+                                    currentUserId={profile.id}
+                                    onToggle={(emoji) =>
+                                      void toggleReaction(reply.id, "reply", emoji)
+                                    }
+                                    reactions={reactions.filter(
+                                      (reaction) =>
+                                        reaction.message_kind === "reply" &&
+                                        reaction.message_id === reply.id,
+                                    )}
+                                  />
+                                )}
+                                {profile.role === "owner" && !reply.deleted_at && (
+                                  <button
+                                    className={`${styles.messageDeleteButton} danger-text`}
+                                    disabled={isPending}
+                                    onClick={() => deleteMessage(reply.id, "reply")}
+                                    type="button"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                                {profile.role === "owner" &&
+                                  reply.deletion_reason && (
+                                    <small className={styles.deletionReason}>
+                                      Reason: {reply.deletion_reason}
+                                    </small>
+                                  )}
+                              </div>
+                            </div>
+                          ))}
+
+                          {!thread.locked ? (
+                            <form
+                              className={styles.replyForm}
+                              onSubmit={submitReply}
+                            >
+                              <input
+                                name="channel_id"
+                                type="hidden"
+                                value={activeChannel.channel_id}
+                              />
+                              <input
+                                name="post_id"
+                                type="hidden"
+                                value={thread.post_id}
+                              />
+                              <label
+                                className="sr-only"
+                                htmlFor={`reply-${thread.post_id}`}
+                              >
+                                Reply to {thread.subject}
+                              </label>
+                              <MentionTextarea
+                                id={`reply-${thread.post_id}`}
+                                members={members}
+                                name="body"
+                                placeholder="Reply to this conversation"
+                                rows={2}
+                                submitOnEnter
+                              />
+                              <ChatFilePicker />
+                              <button
+                                className="button button-secondary button-compact"
+                                disabled={isPending}
+                                type="submit"
+                              >
+                                Reply
+                              </button>
+                            </form>
+                          ) : (
+                            <p className={styles.lockedNote}>
+                              Replies are closed for this conversation.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className={styles.threadCollapsedMeta}>
+                          <span>
+                            {latestReply
+                              ? `${replyLabel} · latest reply from ${latestReply.author_name}`
+                              : "No replies yet"}
+                          </span>
                           <button
                             className="button button-secondary button-compact"
-                            disabled={isPending}
-                            type="submit"
+                            onClick={() => toggleThreadOpen(thread.post_id)}
+                            type="button"
                           >
-                            Reply
+                            {replyTotal > 0 ? "View replies" : "Reply"}
                           </button>
-                        </form>
-                      ) : (
-                        <p className={styles.lockedNote}>
-                          Replies are closed for this conversation.
-                        </p>
+                        </div>
                       )}
-                    </div>
-                  </article>
-                ))
+                    </article>
+                  );
+                })
               )}
             </div>
           </div>
