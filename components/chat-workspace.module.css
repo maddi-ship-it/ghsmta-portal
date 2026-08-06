@@ -671,7 +671,7 @@
 
 .threadFeed {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   padding: 0 22px 26px;
 }
 
@@ -686,6 +686,113 @@
 .threadCardOpen {
   border-color: rgba(213, 177, 79, .42);
   box-shadow: 0 14px 36px rgba(7, 20, 47, .09);
+}
+
+.threadCardCompact {
+  transition:
+    border-color .15s ease,
+    box-shadow .15s ease,
+    transform .15s ease;
+}
+
+.threadCardCompact:hover {
+  border-color: rgba(213, 177, 79, .38);
+  box-shadow: 0 12px 30px rgba(7, 20, 47, .09);
+  transform: translateY(-1px);
+}
+
+.threadCardButton {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 31px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.threadCardButton:focus-visible {
+  outline: 3px solid rgba(213, 177, 79, .42);
+  outline-offset: -3px;
+}
+
+.threadCardMain {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.threadCardKicker {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: .66rem;
+  font-weight: 750;
+}
+
+.threadCardKicker strong {
+  color: inherit;
+}
+
+.threadCardTitle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: #26324e;
+  font-size: .9rem;
+  font-weight: 950;
+}
+
+.threadCardTitle > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadCardPreview {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .73rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadCardMeta {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  color: var(--muted);
+  font-size: .66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.threadCardReplyCount {
+  color: #26324e;
+  font-weight: 950;
+}
+
+.threadCardOpenCue {
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #071328;
+  background: #d5b14f;
+  font-size: .62rem;
+  font-weight: 950;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
 .threadRoot {
@@ -1539,6 +1646,15 @@
     justify-content: flex-start;
   }
 
+  .threadCardButton {
+    grid-template-columns: 31px minmax(0, 1fr);
+  }
+
+  .threadCardMeta {
+    grid-column: 2;
+    justify-items: start;
+  }
+
   .threadCollapsedMeta {
     align-items: stretch;
     padding-left: 16px;
@@ -1996,6 +2112,31 @@
 .threadCardOpen {
   border-color: color-mix(in srgb, var(--portal-gold, #d5b14f) 42%, transparent);
   box-shadow: 0 18px 54px rgba(0, 0, 0, 0.28);
+}
+
+.threadCardCompact:hover {
+  border-color: color-mix(in srgb, var(--portal-gold, #d5b14f) 38%, transparent);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.threadCardButton:focus-visible {
+  outline-color: color-mix(in srgb, var(--portal-gold, #d5b14f) 44%, transparent);
+}
+
+.threadCardTitle,
+.threadCardReplyCount {
+  color: var(--portal-text, #e7ecf5);
+}
+
+.threadCardKicker,
+.threadCardPreview,
+.threadCardMeta {
+  color: var(--portal-muted, #9ca9be);
+}
+
+.threadCardOpenCue {
+  color: #071328;
+  background: var(--portal-gold, #d5b14f);
 }
 
 .threadSummary,

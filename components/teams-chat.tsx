@@ -1887,6 +1887,67 @@ export function TeamsChat({
                     .filter(Boolean)
                     .join(" ");
 
+                  if (!isThreadOpen) {
+                    return (
+                      <article
+                        className={`${threadClassName} ${styles.threadCardCompact}`}
+                        key={thread.post_id}
+                      >
+                        <button
+                          aria-controls={`thread-replies-${thread.post_id}`}
+                          aria-expanded={false}
+                          className={styles.threadCardButton}
+                          onClick={() => toggleThreadOpen(thread.post_id)}
+                          type="button"
+                        >
+                          <span
+                            className={`${styles.avatar} ${styles.avatarSmall}`}
+                          >
+                            {initials(thread.author_name)}
+                          </span>
+                          <span className={styles.threadCardMain}>
+                            <span className={styles.threadCardKicker}>
+                              <strong>{thread.author_name}</strong>
+                              <span>{roleName(thread.author_role)}</span>
+                              <time dateTime={thread.created_at}>
+                                {formatChannelActivity(thread.created_at)}
+                              </time>
+                            </span>
+                            <span className={styles.threadCardTitle}>
+                              <span>{thread.subject}</span>
+                              {(thread.pinned || thread.locked) && (
+                                <span className={styles.threadBadges}>
+                                  {thread.pinned && <span>Pinned</span>}
+                                  {thread.locked && <span>Locked</span>}
+                                </span>
+                              )}
+                            </span>
+                            <span className={styles.threadCardPreview}>
+                              <MentionedMessage
+                                body={thread.body}
+                                currentUserId={profile.id}
+                                members={members}
+                              />
+                            </span>
+                          </span>
+                          <span className={styles.threadCardMeta}>
+                            <span className={styles.threadCardReplyCount}>
+                              {replyLabel}
+                            </span>
+                            <span>
+                              {latestReply
+                                ? `Latest: ${latestReply.author_name}`
+                                : "Open to reply"}
+                            </span>
+                            <span className={styles.threadCardOpenCue}>
+                              Open
+                            </span>
+                          </span>
+                        </button>
+                      </article>
+                    );
+                  }
+
                   return (
                     <article className={threadClassName} key={thread.post_id}>
                       <div className={styles.threadRoot}>
@@ -1937,13 +1998,7 @@ export function TeamsChat({
                             </div>
                           </div>
 
-                          <p
-                            className={
-                              isThreadOpen
-                                ? styles.messageBody
-                                : `${styles.messageBody} ${styles.threadPreviewBody}`
-                            }
-                          >
+                          <p className={styles.messageBody}>
                             <MentionedMessage
                               body={thread.body}
                               currentUserId={profile.id}
@@ -2012,11 +2067,10 @@ export function TeamsChat({
                         </div>
                       </div>
 
-                      {isThreadOpen ? (
-                        <div
-                          className={styles.replyThread}
-                          id={`thread-replies-${thread.post_id}`}
-                        >
+                      <div
+                        className={styles.replyThread}
+                        id={`thread-replies-${thread.post_id}`}
+                      >
                           {thread.replies.map((reply) => (
                             <div
                               className={
@@ -2129,23 +2183,7 @@ export function TeamsChat({
                               Replies are closed for this conversation.
                             </p>
                           )}
-                        </div>
-                      ) : (
-                        <div className={styles.threadCollapsedMeta}>
-                          <span>
-                            {latestReply
-                              ? `${replyLabel} · latest reply from ${latestReply.author_name}`
-                              : "No replies yet"}
-                          </span>
-                          <button
-                            className="button button-secondary button-compact"
-                            onClick={() => toggleThreadOpen(thread.post_id)}
-                            type="button"
-                          >
-                            {replyTotal > 0 ? "View replies" : "Reply"}
-                          </button>
-                        </div>
-                      )}
+                      </div>
                     </article>
                   );
                 })
