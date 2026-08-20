@@ -11,6 +11,7 @@ export type ReportCategory =
   | "Secondary process"
   | "Results"
   | "Appeals"
+  | "Billing"
   | "Users"
   | "Communications"
   | "Documents"
@@ -36,6 +37,7 @@ export type ReportSource =
   | "secondary"
   | "results"
   | "appeals"
+  | "billing"
   | "users"
   | "notifications"
   | "chat"
@@ -165,6 +167,39 @@ const userColumns: ReportColumn[] = [
   { key: "digest_preferences", label: "Digest Preferences" },
 ];
 
+const billingColumns: ReportColumn[] = [
+  { key: "invoice_number", label: "Invoice #" },
+  { key: "cycle", label: "Award Cycle" },
+  { key: "school", label: "School" },
+  { key: "school_type", label: "School Type" },
+  { key: "selected_track", label: "Selected Track" },
+  { key: "production", label: "Production" },
+  { key: "document_kind", label: "Document Type" },
+  { key: "description", label: "Description" },
+  { key: "amount", label: "Amount" },
+  { key: "outstanding_balance", label: "Outstanding Balance" },
+  { key: "status", label: "Invoice Status" },
+  { key: "delivery_status", label: "Delivery Status" },
+  { key: "issued_at", label: "Issued" },
+  { key: "due_at", label: "Due" },
+  { key: "days_overdue", label: "Days Overdue" },
+  { key: "sent_at", label: "Sent" },
+  { key: "paid_at", label: "Paid" },
+  { key: "recipient_email", label: "Recipient Email", contactInfo: true },
+  { key: "billing_name", label: "Bill To", contactInfo: true },
+  { key: "billing_contact_name", label: "Billing Contact", contactInfo: true },
+  { key: "billing_contact_phone", label: "Billing Phone", contactInfo: true },
+  { key: "billing_address", label: "Billing Address", contactInfo: true },
+  { key: "promo_code", label: "Promo Code" },
+  { key: "payment_url", label: "Payment Link", internalOnly: true },
+  { key: "last_delivery_at", label: "Last Delivery" },
+  { key: "last_reminder_at", label: "Last Reminder" },
+  { key: "next_reminder_at", label: "Next Reminder" },
+  { key: "reminder_count", label: "Reminder Count" },
+  { key: "invoice_pdf", label: "Invoice PDF" },
+  { key: "application_link", label: "Application Link" },
+];
+
 function report(
   id: string,
   title: string,
@@ -264,6 +299,10 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   report("results-master-export", "Results Master Export", "Results", "results", scoringColumns, "Master results CSV with stable IDs, ranks, statuses, release dates, and pronunciation fields.", { formats: ["csv"] }),
   report("appeals-register", "Appeals Register", "Appeals", "appeals", appealColumns, "Appeal register with review status, decisions, notification status, and audit trail."),
   report("appeal-case-packet", "Appeal Case Packet", "Appeals", "appeals", appealColumns, "One packet per appeal with narrative, evidence, timeline, review notes, and decision.", { formats: ["pdf"], supportsBatch: true }),
+  report("billing-invoice-report", "Billing & Invoice Report", "Billing", "billing", billingColumns, "Owner-only invoice ledger with amounts, status, delivery, school type, Acceptd track, billing contacts, and direct invoice/application links.", {
+    supportsExternalVariant: false,
+    confidentialityNote: "Owner-only. Contains payment, billing contact, and delivery information.",
+  }),
   report("user-access", "User and Access Report", "Users", "users", userColumns, "User access, school-team membership, MFA/reset state, duplicate indicators, and digest preferences."),
   report("notification-communication-log", "Notification and Communication Log", "Communications", "notifications", [
     { key: "notification_id", label: "Notification ID" },

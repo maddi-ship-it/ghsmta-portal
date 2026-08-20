@@ -7,7 +7,10 @@ import {
   DEFAULT_INVOICE_PAYMENT_URL,
   loadBillingApplicationDetails,
 } from "@/lib/billing/application-details";
-import { activeInvoiceApplicationIds } from "@/lib/billing/eligibility";
+import {
+  activeInvoiceApplicationIds,
+  loadInvoiceableAcceptdApplicationIds,
+} from "@/lib/billing/eligibility";
 import { formatInvoiceAmount, type SchoolInvoice } from "@/lib/billing/types";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -292,7 +295,7 @@ export default async function BillingPage({
   }
   const cycles = cycleResult.data ?? [];
   const options = (optionResult.data ?? []).filter((option) => !option.archived_at);
-  const applications = applicationResult.data ?? [];
+  const allApplications = applicationResult.data ?? [];
   const invoices = (invoiceResult.data ?? []) as SchoolInvoice[];
   const selectedCycleId = cycles.some((cycle) => cycle.id === params.cycle_id)
     ? params.cycle_id ?? ""
@@ -312,6 +315,13 @@ export default async function BillingPage({
       latestDeliveryByInvoice.set(delivery.invoice_id, delivery);
     }
   }
+  const invoiceableApplicationIds = await loadInvoiceableAcceptdApplicationIds(
+    supabase,
+    allApplications.map((application) => application.id),
+  );
+  const applications = allApplications.filter((application) =>
+    invoiceableApplicationIds.has(application.id),
+  );
   const memberResult = applications.length
     ? await supabase
         .from("application_members")
@@ -325,7 +335,9 @@ export default async function BillingPage({
     applications,
   );
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
-  const applicationMap = new Map(applications.map((application) => [application.id, application]));
+  const applicationMap = new Map(
+    allApplications.map((application) => [application.id, application]),
+  );
   const filteredInvoices = invoices.filter((invoice) => {
     if (selectedStatus && invoice.status !== selectedStatus) return false;
     if (selectedCycleId && invoice.cycle_id !== selectedCycleId) return false;
@@ -390,7 +402,7 @@ export default async function BillingPage({
         <div>
           <span className="eyebrow">Owner workspace</span>
           <h1>Billing &amp; invoices</h1>
-          <p>Set cycle prices, send payment links, record payments, and monitor reminders.</p>
+          <p>Set cycle prices, send payment links, record payments, and monitor reminders. Only applications synced to Acceptd can be invoiced.</p>
         </div>
       </div>
 
@@ -467,8 +479,8 @@ export default async function BillingPage({
                     <div className="billing-school-grid">
                       {cycleApplications.length === 0 ? (
                         <div className="empty-state billing-school-empty">
-                          <h3>Every school has an active invoice</h3>
-                          <p>Void an invoice to return that school to this list.</p>
+                          <h3>No synced school is available</h3>
+                          <p>Every Acceptd-synced school has an active invoice, or the cycle has no synced applications yet.</p>
                         </div>
                       ) : cycleApplications.map((application) => {
                         const contact = contactByApplication.get(application.id);

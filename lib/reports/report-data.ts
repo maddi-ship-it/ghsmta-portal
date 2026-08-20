@@ -91,6 +91,43 @@ type ApplicationMemberRow = {
   active: boolean | null;
 };
 
+type SchoolInvoiceRow = {
+  id: string;
+  invoice_number: string;
+  cycle_id: string | null;
+  application_id: string | null;
+  option_key: string | null;
+  description_snapshot: string | null;
+  amount_cents: number | null;
+  currency: string | null;
+  document_kind: string | null;
+  payment_url: string | null;
+  recipient_email: string | null;
+  billing_name: string | null;
+  billing_address: string | null;
+  status: string | null;
+  issued_at: string | null;
+  due_at: string | null;
+  sent_at: string | null;
+  paid_at: string | null;
+  paid_by?: string | null;
+  next_reminder_at: string | null;
+  last_reminder_at: string | null;
+  reminder_count: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  delivery_status: string | null;
+  last_delivery_at: string | null;
+  payment_promo_code: string | null;
+  billing_contact_name: string | null;
+  billing_contact_phone: string | null;
+  school_address_snapshot: string | null;
+  school_phone_snapshot: string | null;
+  school_type_snapshot: string | null;
+  voided_at?: string | null;
+  void_reason?: string | null;
+};
+
 type BillingQuestionRow = {
   id: string;
   form_version_id: string;
@@ -180,6 +217,33 @@ function formatDateTime(value: string | null | undefined) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatCurrencyCents(value: number | null | undefined) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format((value ?? 0) / 100);
+}
+
+function outstandingInvoiceBalance(invoice: SchoolInvoiceRow) {
+  if (
+    invoice.document_kind !== "invoice" ||
+    invoice.amount_cents == null ||
+    invoice.amount_cents <= 0 ||
+    invoice.status !== "sent"
+  ) {
+    return 0;
+  }
+  return invoice.amount_cents;
+}
+
+function overdueDays(value: string | null | undefined, outstandingCents: number) {
+  if (!value || outstandingCents <= 0) return "";
+  const dueTime = new Date(value).getTime();
+  if (!Number.isFinite(dueTime)) return "";
+  const days = Math.floor((Date.now() - dueTime) / (24 * 60 * 60 * 1000));
+  return days > 0 ? String(days) : "";
 }
 
 function dayName(value: string | null | undefined) {
@@ -986,6 +1050,140 @@ async function loadAppealsReport(
   });
 }
 
+async function loadBillingReport(
+  supabase: SupabaseLike,
+  filters: ReportFilters,
+  warnings: string[],
+) {
+  const applicationFilters: ReportFilters = {
+    ...filters,
+    status: "",
+  };
+  const maps = await loadBaseMaps(supabase, applicationFilters, warnings);
+  const applicationById = new Map(
+    maps.applications.map((application) => [application.id, application]),
+  );
+
+  const invoiceQuery = () => {
+    let query = supabase
+      .from("school_invoices")
+      .select("id,invoice_number,cycle_id,application_id,option_key,description_snapshot,amount_cents,currency,document_kind,payment_url,recipient_email,billing_name,billing_address,status,issued_at,due_at,sent_at,paid_at,paid_by,next_reminder_at,last_reminder_at,reminder_count,created_at,updated_at,delivery_status,last_delivery_at,payment_promo_code,billing_contact_name,billing_contact_phone,school_address_snapshot,school_phone_snapshot,school_type_snapshot,voided_at,void_reason")
+      .order("created_at", { ascending: false });
+
+    if (filters.cycleId) query = query.eq("cycle_id", filters.cycleId);
+    if (filters.status) query = query.eq("status", filters.status);
+    if (filters.dateFrom) query = query.gte("created_at", `${filters.dateFrom}T00:00:00`);
+    if (filters.dateTo) query = query.lte("created_at", `${filters.dateTo}T23:59:59`);
+    return query;
+  };
+
+  const [invoices, deliveryLogs] = await Promise.all([
+    safeFetchPaged<SchoolInvoiceRow>(warnings, "School invoices", invoiceQuery),
+    safeFetchPaged<{
+      invoice_id: string;
+      email_status: string | null;
+      chat_status: string | null;
+      detail: string | null;
+      created_at: string | null;
+    }>(warnings, "Invoice delivery log", () =>
+      supabase
+        .from("invoice_delivery_log")
+        .select("invoice_id,email_status,chat_status,detail,created_at")
+        .order("created_at", { ascending: false }),
+    ),
+  ]);
+
+  const latestDeliveryByInvoice = new Map<
+    string,
+    {
+      email_status: string | null;
+      chat_status: string | null;
+      detail: string | null;
+      created_at: string | null;
+    }
+  >();
+  for (const delivery of deliveryLogs) {
+    if (!latestDeliveryByInvoice.has(delivery.invoice_id)) {
+      latestDeliveryByInvoice.set(delivery.invoice_id, delivery);
+    }
+  }
+
+  if (filters.dateFrom || filters.dateTo) {
+    warnings.push("Billing report date filters use invoice created date.");
+  }
+
+  return invoices.flatMap((invoice) => {
+    const application = invoice.application_id
+      ? applicationById.get(invoice.application_id)
+      : undefined;
+    if (!application) return [];
+    const base = baseApplicationRow(application, maps);
+    const meta = applicationMeta(application, maps);
+    const searchableSchool = normalize(
+      [
+        application.school_name,
+        invoice.billing_name,
+        invoice.recipient_email,
+        invoice.invoice_number,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    );
+    if (filters.school && !searchableSchool.includes(normalize(filters.school))) {
+      return [];
+    }
+    const outstandingCents = outstandingInvoiceBalance(invoice);
+    const latestDelivery = latestDeliveryByInvoice.get(invoice.id);
+
+    return [
+      {
+        invoice_number: invoice.invoice_number,
+        cycle: base.cycle,
+        school: base.school,
+        school_type: invoice.school_type_snapshot || meta.schoolType,
+        selected_track: meta.selectedTrack || invoice.description_snapshot || "",
+        production: base.production,
+        document_kind:
+          invoice.document_kind === "scholarship_confirmation"
+            ? "Scholarship confirmation"
+            : "Invoice",
+        description: invoice.description_snapshot ?? "",
+        amount: formatCurrencyCents(invoice.amount_cents),
+        outstanding_balance: formatCurrencyCents(outstandingCents),
+        status: invoice.status ?? "",
+        delivery_status: [
+          invoice.delivery_status,
+          latestDelivery
+            ? `Email ${latestDelivery.email_status ?? "—"} / Chat ${latestDelivery.chat_status ?? "—"}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        issued_at: formatDateTime(invoice.issued_at),
+        due_at: formatDate(invoice.due_at),
+        days_overdue: overdueDays(invoice.due_at, outstandingCents),
+        sent_at: formatDateTime(invoice.sent_at),
+        paid_at: formatDateTime(invoice.paid_at),
+        recipient_email: invoice.recipient_email ?? "",
+        billing_name: invoice.billing_name ?? "",
+        billing_contact_name: invoice.billing_contact_name ?? "",
+        billing_contact_phone:
+          invoice.billing_contact_phone ?? invoice.school_phone_snapshot ?? "",
+        billing_address:
+          invoice.billing_address ?? invoice.school_address_snapshot ?? "",
+        promo_code: invoice.payment_promo_code ?? "",
+        payment_url: invoice.payment_url ?? "",
+        last_delivery_at: formatDateTime(invoice.last_delivery_at ?? latestDelivery?.created_at),
+        last_reminder_at: formatDateTime(invoice.last_reminder_at),
+        next_reminder_at: formatDateTime(invoice.next_reminder_at),
+        reminder_count: invoice.reminder_count ?? 0,
+        invoice_pdf: portalLink(`/portal/invoices/${invoice.id}/pdf`),
+        application_link: portalLink(`/portal/applications/${application.id}`),
+      },
+    ];
+  });
+}
+
 async function loadUsersReport(
   supabase: SupabaseLike,
   _filters: ReportFilters,
@@ -1423,6 +1621,9 @@ export async function loadReport(
       break;
     case "appeals":
       rows = await loadAppealsReport(supabase, filters, warnings);
+      break;
+    case "billing":
+      rows = await loadBillingReport(supabase, filters, warnings);
       break;
     case "users":
       rows = await loadUsersReport(supabase, filters, warnings);

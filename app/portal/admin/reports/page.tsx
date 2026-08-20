@@ -294,9 +294,8 @@ export default async function OwnerReportsPage({
           <span className="eyebrow">Owner administration</span>
           <h1>Reports Center</h1>
           <p>
-            Generate operational, scoring, scheduling, user, billing-adjacent,
-            audit, and release reports with internal/external visibility
-            controls.
+            Generate operational, scoring, scheduling, billing, user, audit,
+            and release reports with internal/external visibility controls.
           </p>
         </div>
       </div>

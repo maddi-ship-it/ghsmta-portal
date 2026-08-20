@@ -9,6 +9,10 @@ import {
   DEFAULT_INVOICE_PAYMENT_URL,
   loadBillingApplicationDetails,
 } from "@/lib/billing/application-details";
+import {
+  ACCEPTD_INVOICE_ELIGIBILITY_MESSAGE,
+  loadInvoiceableAcceptdApplicationIds,
+} from "@/lib/billing/eligibility";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -242,6 +246,13 @@ export async function createAndSendInvoice(formData: FormData) {
   if (!application || !option || application.cycle_id !== option.cycle_id || !option.active) {
     billingRedirect("error", "That school and pricing option do not belong to the same active cycle.");
   }
+  const invoiceableApplicationIds = await loadInvoiceableAcceptdApplicationIds(
+    supabase,
+    [application.id],
+  );
+  if (!invoiceableApplicationIds.has(application.id)) {
+    billingRedirect("error", ACCEPTD_INVOICE_ELIGIBILITY_MESSAGE);
+  }
   const resolvedPaymentUrl = paymentUrl || option.payment_url || DEFAULT_INVOICE_PAYMENT_URL;
   if (option.amount_cents > 0 && !validHttpsUrl(resolvedPaymentUrl)) {
     billingRedirect("error", "Paid invoices require a secure https payment link.");
@@ -372,6 +383,24 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
   if (memberResult.error) billingRedirect("error", memberResult.error.message);
 
   const option = optionResult.data;
+  const selectedApplications = applicationResult.data ?? [];
+  if (selectedApplications.length !== applicationIds.length) {
+    billingRedirect("error", "One or more selected schools are no longer available.");
+  }
+  if (selectedApplications.some((application) => application.cycle_id !== option.cycle_id)) {
+    billingRedirect("error", "Every selected school must belong to the pricing option's cycle.");
+  }
+  const invoiceableApplicationIds = await loadInvoiceableAcceptdApplicationIds(
+    supabase,
+    selectedApplications.map((application) => application.id),
+  );
+  if (
+    selectedApplications.some(
+      (application) => !invoiceableApplicationIds.has(application.id),
+    )
+  ) {
+    billingRedirect("error", ACCEPTD_INVOICE_ELIGIBILITY_MESSAGE);
+  }
   const resolvedPaymentUrl = paymentUrl || option.payment_url || DEFAULT_INVOICE_PAYMENT_URL;
   if (option.amount_cents > 0 && !validHttpsUrl(resolvedPaymentUrl)) {
     billingRedirect("error", "Paid invoices require a secure https payment link.");
@@ -395,9 +424,7 @@ export async function bulkCreateAndSendInvoices(formData: FormData) {
       if (profile?.email) contactByApplication.set(member.application_id, profile.email.toLowerCase());
     });
 
-  const cycleApplications = (applicationResult.data ?? []).filter(
-    (application) => application.cycle_id === option.cycle_id,
-  );
+  const cycleApplications = selectedApplications;
   const detailsByApplication = await loadBillingApplicationDetails(
     supabase,
     cycleApplications,

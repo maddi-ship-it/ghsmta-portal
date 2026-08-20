@@ -8,6 +8,10 @@ import {
   DEFAULT_INVOICE_PAYMENT_URL,
   loadBillingApplicationDetails,
 } from "@/lib/billing/application-details";
+import {
+  ACCEPTD_INVOICE_ELIGIBILITY_MESSAGE,
+  loadInvoiceableAcceptdApplicationIds,
+} from "@/lib/billing/eligibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +81,13 @@ export async function POST(request: Request) {
     application.cycle_id !== option.cycle_id
   ) {
     return previewError("The school and pricing option must be in the same active cycle.");
+  }
+  const invoiceableApplicationIds = await loadInvoiceableAcceptdApplicationIds(
+    supabase,
+    [application.id],
+  );
+  if (!invoiceableApplicationIds.has(application.id)) {
+    return previewError(ACCEPTD_INVOICE_ELIGIBILITY_MESSAGE);
   }
 
   const { data: cycle } = await supabase
