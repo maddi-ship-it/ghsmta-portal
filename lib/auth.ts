@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
+import {
+  isMfaEnforcementActive,
+  PHONE_VERIFICATION_ENABLED,
+} from "@/lib/security-features";
 import type { AppRole, Profile } from "@/lib/types";
 
 const PROFILE_COLUMNS = [
@@ -63,7 +66,7 @@ export async function requireProfile(
       redirect("/verify-phone");
     }
 
-    if (typedProfile.mfa_required) {
+    if (isMfaEnforcementActive() && typedProfile.mfa_required) {
       const graceDeadline = typedProfile.mfa_grace_until
         ? new Date(typedProfile.mfa_grace_until).getTime()
         : 0;

@@ -18,8 +18,8 @@
 6. Run `supabase/migrations/20260803152247_invoice_message_templates.sql`.
 7. Run `supabase/migrations/20260803173346_add_program_manager_role.sql`.
 8. Run `supabase/migrations/20260803173350_program_manager_scholarship_access.sql`.
-9. Run every remaining migration in filename order through `supabase/migrations/20260804205013_schedule_broadcast_auth_audit_hardening.sql`.
-10. Run verification scripts `030` through `039`; require passing results from all ten.
+9. Run every remaining migration in filename order through `supabase/migrations/20260822231739_pause_mfa_for_two_months.sql`.
+10. Run verification scripts `030` through `040`; require passing results from all eleven.
 11. Review the Supabase Security and Performance Advisors before deployment.
 
 ## Application rollout

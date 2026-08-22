@@ -8,6 +8,7 @@ import { requireProfile } from "@/lib/auth";
 import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import { mfaGraceDeadline } from "@/lib/security-features";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/types";
@@ -264,20 +265,30 @@ export async function updateUserAccess(userId: string, formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { data: existing } = await supabase.from("profiles").select("phone_e164").eq("id", userId).single();
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("phone_e164,mfa_required,mfa_grace_until")
+    .eq("id", userId)
+    .single();
   const phoneChanged = (existing?.phone_e164 ?? null) !== phone;
+  const nextMfaRequired =
+    role === "owner" ||
+    role === "advisory_member" ||
+    role === "program_manager"
+      ? true
+      : mfaRequired;
+  const mfaWasEnabled = existing?.mfa_required === true;
   const { error } = await supabase.from("profiles").update({
     role,
     active,
     phone_e164: phone,
     phone_verified_at: phoneChanged ? null : undefined,
     phone_required_at: phoneChanged && phone ? new Date().toISOString() : undefined,
-    mfa_required:
-      role === "owner" ||
-      role === "advisory_member" ||
-      role === "program_manager"
-        ? true
-        : mfaRequired,
+    mfa_required: nextMfaRequired,
+    mfa_grace_until:
+      nextMfaRequired && !mfaWasEnabled
+        ? mfaGraceDeadline().toISOString()
+        : undefined,
   }).eq("id", userId);
   if (error) throw new Error(error.message);
   revalidateUsers();
@@ -306,9 +317,7 @@ export async function bulkUpdateUsers(formData: FormData) {
     updates.role = role;
     if (["advisory_member", "program_manager", "owner"].includes(role)) {
       updates.mfa_required = true;
-      updates.mfa_grace_until = new Date(
-        Date.now() + 14 * 24 * 60 * 60 * 1000,
-      ).toISOString();
+      updates.mfa_grace_until = mfaGraceDeadline().toISOString();
     }
   } else if (operation === "activate") {
     updates.active = true;
