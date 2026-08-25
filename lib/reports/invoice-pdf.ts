@@ -10,6 +10,44 @@ const NAVY = rgb(0.08, 0.16, 0.3);
 const MUTED = rgb(0.38, 0.42, 0.5);
 const LIGHT = rgb(0.82, 0.82, 0.82);
 
+type InvoiceBillToFields = Pick<
+  InvoiceContext,
+  | "billing_name"
+  | "billing_address"
+  | "billing_contact_name"
+  | "billing_contact_phone"
+  | "school_address_snapshot"
+  | "school_phone_snapshot"
+  | "recipient_email"
+>;
+
+function normalizedLines(value: string | null | undefined) {
+  return (value ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+export function buildInvoiceBillToLines(invoice: InvoiceBillToFields) {
+  const billingAddress = invoice.billing_address?.trim();
+  const billingPhone = invoice.billing_contact_phone?.trim();
+  const schoolAddress = invoice.school_address_snapshot?.trim();
+  const schoolPhone = invoice.school_phone_snapshot?.trim();
+  const resolvedPhone = billingPhone || schoolPhone;
+
+  return [
+    ...normalizedLines(invoice.billing_name),
+    ...(invoice.billing_contact_name?.trim()
+      ? [`Contact: ${invoice.billing_contact_name.trim()}`]
+      : []),
+    ...normalizedLines(billingAddress || schoolAddress),
+    ...(resolvedPhone
+      ? [`${billingPhone ? "Billing" : "School"} phone: ${resolvedPhone}`]
+      : []),
+    ...normalizedLines(invoice.recipient_email),
+  ];
+}
+
 function wrapText(
   value: string,
   maxWidth: number,
@@ -147,29 +185,46 @@ export async function createInvoicePdf(
     font: bold,
     color: NAVY,
   });
-  const billTo = [
-    invoice.billing_name,
-    invoice.billing_contact_name ? `Contact: ${invoice.billing_contact_name}` : null,
-    invoice.billing_address || invoice.school_address_snapshot,
-    invoice.school_phone_snapshot ? `School phone: ${invoice.school_phone_snapshot}` : null,
-    invoice.billing_contact_phone && invoice.billing_contact_phone !== invoice.school_phone_snapshot
-      ? `Billing phone: ${invoice.billing_contact_phone}`
-      : null,
-    invoice.school_type_snapshot ? `School type: ${invoice.school_type_snapshot}` : null,
-    invoice.recipient_email,
-  ]
-    .filter(Boolean)
-    .join("\n");
-  page.drawText(billTo, {
-    x: MARGIN,
-    y: 556,
-    size: 10,
-    lineHeight: 14,
-    font: regular,
-    color: NAVY,
+  const billToSourceLines = buildInvoiceBillToLines(invoice);
+  const billToTop = 556;
+  const billToWidth = PAGE_WIDTH - MARGIN * 2;
+  const billToLayouts = [
+    { fontSize: 10, lineHeight: 14 },
+    { fontSize: 9, lineHeight: 11.5 },
+    { fontSize: 8, lineHeight: 10 },
+    { fontSize: 7.5, lineHeight: 9 },
+  ];
+  const minimumTableTop = 414;
+  let billToFontSize = billToLayouts[0].fontSize;
+  let billToLineHeight = billToLayouts[0].lineHeight;
+  let billToLines: string[] = [];
+  let tableTop = 456;
+
+  for (const layout of billToLayouts) {
+    const candidateLines = billToSourceLines.flatMap((line) =>
+      wrapText(line, billToWidth, regular, layout.fontSize),
+    );
+    const lastLineY =
+      billToTop - Math.max(candidateLines.length - 1, 0) * layout.lineHeight;
+    const candidateTableTop = Math.min(456, lastLineY - 38);
+
+    billToFontSize = layout.fontSize;
+    billToLineHeight = layout.lineHeight;
+    billToLines = candidateLines;
+    tableTop = Math.max(minimumTableTop, candidateTableTop);
+    if (candidateTableTop >= minimumTableTop) break;
+  }
+
+  billToLines.forEach((line, index) => {
+    page.drawText(line, {
+      x: MARGIN,
+      y: billToTop - index * billToLineHeight,
+      size: billToFontSize,
+      font: regular,
+      color: NAVY,
+    });
   });
 
-  const tableTop = 456;
   page.drawRectangle({
     x: MARGIN,
     y: tableTop,
@@ -192,44 +247,45 @@ export async function createInvoicePdf(
     color: rgb(1, 1, 1),
   });
 
+  const tableBottom = tableTop - 84;
   page.drawRectangle({
     x: MARGIN,
-    y: 372,
+    y: tableBottom,
     width: PAGE_WIDTH - MARGIN * 2,
     height: 84,
     borderColor: rgb(0.08, 0.08, 0.08),
     borderWidth: 1.5,
   });
   page.drawLine({
-    start: { x: 468, y: 372 },
+    start: { x: 468, y: tableBottom },
     end: { x: 468, y: tableTop + 27 },
     thickness: 1.5,
     color: rgb(0.08, 0.08, 0.08),
   });
   page.drawText("Registration Fee", {
     x: MARGIN + 10,
-    y: 428,
+    y: tableTop - 28,
     size: 11,
     font: bold,
     color: NAVY,
   });
   page.drawText(invoice.description_snapshot, {
     x: MARGIN + 10,
-    y: 408,
+    y: tableTop - 48,
     size: 9.5,
     font: regular,
     color: NAVY,
   });
   page.drawText(`${invoice.season_year} ${invoice.cycle_name}`, {
     x: MARGIN + 10,
-    y: 389,
+    y: tableTop - 67,
     size: 9,
     font: regular,
     color: MUTED,
   });
   page.drawText(formatInvoiceAmount(invoice.amount_cents), {
     x: 481,
-    y: 426,
+    y: tableTop - 30,
     size: 11,
     font: bold,
     color: NAVY,
