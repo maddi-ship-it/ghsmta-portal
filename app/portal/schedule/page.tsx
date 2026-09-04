@@ -1258,26 +1258,35 @@ export default async function SchedulePage({
                                         </select>
                                         <button className="text-button" type="submit">Update</button>
                                       </form>
-                                      {profile.role === "owner" &&
-                                        participant.role === "advisory_member" &&
-                                        booking && (
+                                      {profile.role === "owner" && (
                                           <form
                                             action={ownerAddStaff.bind(null, slot.id)}
                                             aria-label={`Scoring permissions for ${personName(participant)}`}
                                             className="schedule-participant-permissions-form"
+                                            title={booking ? undefined : "Assign a school before changing scoring permissions."}
                                           >
                                             <input name="user_id" type="hidden" value={participant.user_id} />
                                             <input name="participation_mode" type="hidden" value={participant.participation_mode} />
                                             <input name="override_scoring_permissions" type="hidden" value="true" />
                                             <label className="schedule-participant-permission">
-                                              <input defaultChecked={scoringPermission?.can_score ?? false} name="can_score" type="checkbox" />
+                                              <input
+                                                defaultChecked={scoringPermission?.can_score ?? participant.participation_mode === "panel"}
+                                                disabled={!booking}
+                                                name="can_score"
+                                                type="checkbox"
+                                              />
                                               <span>Allow scoring</span>
                                             </label>
                                             <label className="schedule-participant-permission">
-                                              <input defaultChecked={scoringPermission?.can_comment ?? false} name="can_comment" type="checkbox" />
+                                              <input
+                                                defaultChecked={scoringPermission?.can_comment ?? participant.participation_mode === "panel"}
+                                                disabled={!booking}
+                                                name="can_comment"
+                                                type="checkbox"
+                                              />
                                               <span>Allow comments</span>
                                             </label>
-                                            <button className="text-button" type="submit">Save</button>
+                                            <button className="text-button" disabled={!booking} type="submit">Save</button>
                                           </form>
                                         )}
                                       <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
@@ -1527,14 +1536,14 @@ export default async function SchedulePage({
                                   </div>
                                   <div className="field"><label htmlFor={`owner_mode_${slot.id}`}>Participation type</label><select className="select" defaultValue="panel" id={`owner_mode_${slot.id}`} name="participation_mode"><option value="panel">Panel</option><option value="understudy">Understudy</option><option value="shadow">Shadow</option></select></div>
                                   <fieldset className="form-stack compact-form">
-                                    <legend>Advisory scoring override</legend>
+                                    <legend>Scoring permissions</legend>
                                     <input name="override_scoring_permissions" type="hidden" value="true" />
                                     <label className="check-card compact-check-card">
-                                      <input defaultChecked name="can_score" type="checkbox" />
-                                      <span><strong>Allow scoring</strong><small>Applies when the selected reviewer is an Advisory Committee member.</small></span>
+                                      <input defaultChecked disabled={!booking} name="can_score" type="checkbox" />
+                                      <span><strong>Allow scoring</strong><small>Applies to the selected reviewer after a school is assigned.</small></span>
                                     </label>
                                     <label className="check-card compact-check-card">
-                                      <input defaultChecked name="can_comment" type="checkbox" />
+                                      <input defaultChecked disabled={!booking} name="can_comment" type="checkbox" />
                                       <span><strong>Allow comments</strong><small>Allows panel and criterion comments for this school.</small></span>
                                     </label>
                                   </fieldset>

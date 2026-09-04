@@ -808,11 +808,6 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
   const ownerContextPromise = actor.role === "owner"
     ? Promise.all([
         supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", userId)
-          .maybeSingle(),
-        supabase
           .from("schedule_school_bookings")
           .select("application_id")
           .eq("slot_id", slotId)
@@ -837,24 +832,19 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
   if (error) scheduleRedirect("error", error.message);
 
   if (actor.role === "owner") {
-    const [selectedUserResult, bookingResult, existingPermissionResult] =
+    const [bookingResult, existingPermissionResult] =
       await ownerContextPromise!;
-    if (selectedUserResult.error) {
-      scheduleRedirect("error", selectedUserResult.error.message);
-    }
     if (bookingResult.error) scheduleRedirect("error", bookingResult.error.message);
     if (existingPermissionResult.error) {
       scheduleRedirect("error", existingPermissionResult.error.message);
     }
 
-    const selectedUser = selectedUserResult.data;
     const booking = bookingResult.data;
     const existingPermission = existingPermissionResult.data;
     const overrideRequested =
       formData.get("override_scoring_permissions") === "true";
 
     if (
-      selectedUser?.role === "advisory_member" &&
       booking?.application_id &&
       (overrideRequested || existingPermission)
     ) {
@@ -877,7 +867,7 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
   }
 
   revalidateSchedule();
-  scheduleRedirect("success", "Staff member added to the slot. Owners will see the change in their daily review.");
+  scheduleRedirect("success", "Reviewer assignment updated. Owners will see the change in their daily review.");
 }
 
 export async function removeScheduleSchoolBooking(bookingId: string) {
