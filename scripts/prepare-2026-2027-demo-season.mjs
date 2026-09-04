@@ -1495,7 +1495,12 @@ async function preview(supabase, sourceCycle) {
   console.log("Run again with --apply to perform the rollover.\n");
 }
 
-async function previewDemoOnly(supabase, targetCycle, targetFormSelection) {
+async function previewDemoOnly(
+  supabase,
+  targetCycle,
+  targetFormSelection,
+  withSchedule,
+) {
   const existingDemoCount = await countRows(
     supabase,
     "applications",
@@ -1509,7 +1514,12 @@ async function previewDemoOnly(supabase, targetCycle, targetFormSelection) {
   console.log(`Application stages: ${targetFormSelection.stageCount}`);
   console.log(`Existing demo applications to refresh: ${existingDemoCount}`);
   console.log("Demo applicant accounts/applications after refresh: 10");
-  console.log("Season programs, forms, rubrics, and schedules changed: 0");
+  console.log("Season programs, forms, and rubrics changed: 0");
+  console.log(
+    withSchedule
+      ? "Demo scheduling slots: verified or created as needed"
+      : "Demo scheduling slots: unchanged (--no-schedule)",
+  );
   console.log("\nNo database changes were made.");
   console.log("Run again with --demo-only --apply to refresh the demo schools.\n");
 }
@@ -1556,7 +1566,12 @@ async function main() {
     );
 
     if (!apply) {
-      await previewDemoOnly(supabase, targetCycle, targetFormSelection);
+      await previewDemoOnly(
+        supabase,
+        targetCycle,
+        targetFormSelection,
+        withSchedule,
+      );
       return;
     }
 
@@ -1569,11 +1584,21 @@ async function main() {
       password,
     });
 
+    let scheduleSlotCount = 0;
+    if (withSchedule) {
+      scheduleSlotCount = await ensureScheduleSlots(supabase, targetCycle.id);
+    }
+
     console.log("\nTraining demo schools are ready.\n");
     console.log(`Program: ${targetCycle.name}`);
     console.log(`Training form: ${targetFormSelection.form.name}`);
     console.log(`Complete Acceptd-style answers per record: ${createdSchools[0]?.answerCount ?? 0}`);
     console.log(`Visible demo applications: ${liveApplications}`);
+    console.log(
+      withSchedule
+        ? `Assignable demo scheduling slots: ${scheduleSlotCount}`
+        : "Demo scheduling slots: unchanged",
+    );
     console.log(`Shared demo password: ${password}`);
     console.log("\nLogin accounts:");
     for (const school of createdSchools) {

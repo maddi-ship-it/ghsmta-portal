@@ -14,11 +14,15 @@ export default async function PortalDashboard() {
     .eq("is_archived", false)
     .neq("award_cycles.status", "archived")
     .order("updated_at", { ascending: false });
-  const applications = (data ?? []).filter(
-    (item) =>
-      item.source_system === DEMO_SOURCE_SYSTEM ||
-      item.award_cycles.some((cycle) => cycle.is_active),
-  ) as unknown as Application[];
+  const applications = (data ?? []).filter((item) => {
+    if (item.source_system === DEMO_SOURCE_SYSTEM) return true;
+
+    const relatedCycles = Array.isArray(item.award_cycles)
+      ? item.award_cycles
+      : [item.award_cycles];
+
+    return relatedCycles.some((cycle) => cycle?.is_active);
+  }) as unknown as Application[];
 
   const counts = {
     total: applications.length,
