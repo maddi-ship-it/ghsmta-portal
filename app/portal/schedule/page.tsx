@@ -28,6 +28,7 @@ type ScheduleSlotStatus = "draft" | "open" | "closed" | "cancelled";
 
 const SCHEDULE_APPLICATION_COLUMNS =
   "id,cycle_id,applicant_user_id,school_name,production_title,status";
+const OWNER_SLOTS_PER_PAGE = 24;
 
 type ScheduleSlot = {
   id: string;
@@ -101,6 +102,13 @@ type StaffEnrollment = {
   joined_at: string;
 };
 
+type ScoringPermission = {
+  schedule_slot_id: string | null;
+  adjudicator_user_id: string;
+  can_score: boolean;
+  can_comment: boolean;
+};
+
 type ScheduleSort =
   | "date_asc"
   | "date_desc"
@@ -148,6 +156,7 @@ type ScheduleSearchParams = {
   filter?: ScheduleFilter;
   q?: string;
   section?: OwnerScheduleSection;
+  page?: string;
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -281,22 +290,30 @@ export default async function SchedulePage({
     : "overview";
   const supabase = await createClient();
 
+  const cycleQuery = supabase
+    .from("award_cycles")
+    .select(
+      "id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at",
+    )
+    .neq("status", "archived")
+    .order("season_year", { ascending: false })
+    .order("name");
+  const cycleResultPromise = profile.role === "owner"
+    ? cycleQuery
+    : cycleQuery.eq("is_active", true);
   const [{ data: cycleData }, { data: serverTimeData }] = await Promise.all([
-    supabase
-      .from("award_cycles")
-      .select(
-        "id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at",
-      )
-      .eq("is_active", true)
-      .neq("status", "archived")
-      .order("season_year", { ascending: false })
-      .order("name"),
+    cycleResultPromise,
     supabase.rpc("get_schedule_server_time"),
   ]);
 
   const cycles = (cycleData ?? []) as AwardCycle[];
   const activeCycleIds = cycles.map((cycle) => cycle.id);
-  const slotResult = activeCycleIds.length
+  const ownerShowsSlotCards =
+    profile.role === "owner" &&
+    ["overview", "timeslots", "staffing"].includes(ownerSection);
+  const shouldLoadSlots =
+    profile.role !== "owner" || ownerSection !== "messages";
+  const slotResult = activeCycleIds.length && shouldLoadSlots
     ? await supabase
         .from("schedule_slots")
         .select(
@@ -307,7 +324,8 @@ export default async function SchedulePage({
     : { data: [], error: null };
   const { data: slotData, error: slotError } = slotResult;
   const slots = (slotData ?? []) as ScheduleSlot[];
-  const schoolDetailsPromise = slots.length
+  const shouldLoadSlotCards = profile.role !== "owner" || ownerShowsSlotCards;
+  const schoolDetailsPromise = slots.length && shouldLoadSlotCards
     ? supabase
         .from("schedule_slot_school_details")
         .select("slot_id,venue_name,venue_address,arrival_entrance,parking_instructions,accessibility_notes,wifi_network,wifi_password,day_of_contact_name,day_of_contact_phone,edit_deadline,updated_at")
@@ -315,7 +333,7 @@ export default async function SchedulePage({
     : { data: [], error: null };
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const serverTime = new Date(String(serverTimeData)).getTime();
-  const waitlistPromise = activeCycleIds.length
+  const waitlistPromise = activeCycleIds.length && shouldLoadSlots
     ? supabase
         .from("schedule_slot_waitlist")
         .select(
@@ -334,6 +352,7 @@ export default async function SchedulePage({
   let ownerApplications: Application[] = [];
   let ownerStaff: Profile[] = [];
   let bookingApprovals: BookingApproval[] = [];
+  let scoringPermissions: ScoringPermission[] = [];
   let messageTemplates: Array<{ template_key: string; name: string; subject_template: string; body_template: string; send_in_app: boolean; send_school_messaging: boolean; send_email: boolean; active: boolean }> = [];
   let digestSettings: { enabled: boolean; recipient_email: string | null; delivery_hour: number; time_zone: string; last_sent_at: string | null } | null = null;
 
@@ -351,8 +370,12 @@ export default async function SchedulePage({
     applicantApplications = (applicationData ?? []) as Application[];
     availability = (availabilityData ?? []) as SlotAvailability[];
   } else {
+    const shouldLoadStaffDirectory =
+      profile.role !== "owner" || ownerShowsSlotCards;
+    const shouldLoadBookings =
+      profile.role !== "owner" || ownerSection !== "messages";
     const staffResultPromise =
-      profile.role === "owner" || profile.role === "advisory_member"
+      profile.role === "advisory_member" || ownerShowsSlotCards
         ? supabase
             .from("profiles")
             .select("id,email,full_name,role,active")
@@ -361,7 +384,7 @@ export default async function SchedulePage({
             .order("full_name")
         : Promise.resolve({ data: [], error: null });
     const applicationResultPromise =
-      profile.role === "owner"
+      profile.role === "owner" && ownerSection !== "messages"
         ? supabase
             .from("applications")
             .select(SCHEDULE_APPLICATION_COLUMNS)
@@ -369,41 +392,61 @@ export default async function SchedulePage({
             .eq("is_archived", false)
             .order("school_name")
         : Promise.resolve({ data: [], error: null });
-    const approvalResultPromise = profile.role === "owner"
+    const approvalResultPromise = ownerShowsSlotCards
       ? supabase.from("schedule_school_bookings").select("id,slot_id,application_id,approval_status,selected_at,approved_at,approval_notes")
       : Promise.resolve({ data: [], error: null });
-    const templateResultPromise = profile.role === "owner"
+    const templateResultPromise = profile.role === "owner" && ownerSection === "messages"
       ? supabase.from("portal_message_templates").select("template_key,name,subject_template,body_template,send_in_app,send_school_messaging,send_email,active").order("name")
       : Promise.resolve({ data: [], error: null });
-    const digestResultPromise = profile.role === "owner"
+    const digestResultPromise = profile.role === "owner" && ownerSection === "messages"
       ? supabase.from("owner_digest_settings").select("enabled,recipient_email,delivery_hour,time_zone,last_sent_at").eq("owner_user_id", profile.id).maybeSingle()
       : Promise.resolve({ data: null, error: null });
+    const scoringPermissionResultPromise = ownerShowsSlotCards && slots.length
+      ? supabase
+          .from("adjudicator_assignments")
+          .select("schedule_slot_id,adjudicator_user_id,can_score,can_comment")
+          .in("schedule_slot_id", slots.map((slot) => slot.id))
+          .is("removed_at", null)
+      : Promise.resolve({ data: [], error: null });
 
     const [
-      { data: bookingData },
-      { data: directoryData },
+      bookingResult,
+      directoryResult,
       profileResult,
       applicationResult,
       approvalResult,
       templateResult,
       digestResult,
+      scoringPermissionResult,
     ] = await Promise.all([
-      supabase.rpc("get_schedule_bookings_for_staff"),
-      supabase.rpc("get_schedule_staff_directory"),
+      shouldLoadBookings
+        ? supabase.rpc("get_schedule_bookings_for_staff")
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadStaffDirectory
+        ? supabase.rpc("get_schedule_staff_directory")
+        : Promise.resolve({ data: [], error: null }),
       staffResultPromise,
       applicationResultPromise,
       approvalResultPromise,
       templateResultPromise,
       digestResultPromise,
+      scoringPermissionResultPromise,
     ]);
 
+    if (bookingResult.error) throw new Error(bookingResult.error.message);
+    if (directoryResult.error) throw new Error(directoryResult.error.message);
+    if (scoringPermissionResult.error) {
+      throw new Error(scoringPermissionResult.error.message);
+    }
+
     const activeSlotIds = new Set(slots.map((slot) => slot.id));
-    staffBookings = ((bookingData ?? []) as StaffBooking[]).filter(
+    staffBookings = ((bookingResult.data ?? []) as StaffBooking[]).filter(
       (booking) => activeSlotIds.has(booking.slot_id),
     );
-    staffDirectory = ((directoryData ?? []) as StaffEnrollment[]).filter(
+    staffDirectory = ((directoryResult.data ?? []) as StaffEnrollment[]).filter(
       (enrollment) => activeSlotIds.has(enrollment.slot_id),
     );
+    scoringPermissions = (scoringPermissionResult.data ?? []) as ScoringPermission[];
 
     if (profileResult.error) throw new Error(profileResult.error.message);
     ownerStaff = (profileResult.data ?? []) as Profile[];
@@ -443,6 +486,15 @@ export default async function SchedulePage({
     staffBookings.map((booking) => [booking.slot_id, booking]),
   );
   const staffBySlot = new Map<string, StaffEnrollment[]>();
+  const scoringPermissionMap = new Map(
+    scoringPermissions.map((permission) => [
+      `${permission.schedule_slot_id}:${permission.adjudicator_user_id}`,
+      permission,
+    ]),
+  );
+  const bookedApplicationIds = new Set(
+    staffBookings.map((booking) => booking.application_id),
+  );
 
   for (const enrollment of staffDirectory) {
     const existing = staffBySlot.get(enrollment.slot_id) ?? [];
@@ -541,6 +593,28 @@ export default async function SchedulePage({
         new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime();
       return selectedSort === 'date_desc' ? -dateResult : dateResult;
     });
+
+  const requestedOwnerPage = Number.parseInt(params.page ?? "1", 10);
+  const ownerPage = Number.isFinite(requestedOwnerPage) && requestedOwnerPage > 0
+    ? requestedOwnerPage
+    : 1;
+  const ownerPageCount = profile.role === "owner"
+    ? Math.max(1, Math.ceil(displaySlots.length / OWNER_SLOTS_PER_PAGE))
+    : 1;
+  const currentOwnerPage = Math.min(ownerPage, ownerPageCount);
+  const visibleDisplaySlots = profile.role === "owner"
+    ? displaySlots.slice(
+        (currentOwnerPage - 1) * OWNER_SLOTS_PER_PAGE,
+        currentOwnerPage * OWNER_SLOTS_PER_PAGE,
+      )
+    : displaySlots;
+  const ownerPageQuery = {
+    section: ownerSection,
+    view: selectedView,
+    sort: selectedSort,
+    filter: selectedFilter,
+    ...(scheduleSearch ? { q: scheduleSearch } : {}),
+  };
 
   const applicantBooking = availability.find((item) => item.is_mine);
   const bookedSlot = applicantBooking
@@ -928,7 +1002,12 @@ export default async function SchedulePage({
         />
       ) : (
         <section className={`schedule-slot-grid schedule-slot-grid-${selectedView}`}>
-          {displaySlots.length === 0 ? (
+          {profile.role === "owner" && displaySlots.length > 0 && (
+            <div className="schedule-results-summary">
+              Showing {(currentOwnerPage - 1) * OWNER_SLOTS_PER_PAGE + 1}–{Math.min(currentOwnerPage * OWNER_SLOTS_PER_PAGE, displaySlots.length)} of {displaySlots.length} slots
+            </div>
+          )}
+          {visibleDisplaySlots.length === 0 ? (
             <div className="panel empty-state schedule-empty-state">
               <h3>
                 {(profile.role as AppRole) === "applicant"
@@ -942,7 +1021,7 @@ export default async function SchedulePage({
               </p>
             </div>
           ) : (
-            displaySlots.map((slot) => {
+            visibleDisplaySlots.map((slot) => {
               const cycle = cycleMap.get(slot.cycle_id);
               const slotAvailability = availabilityMap.get(slot.id);
               const booking = bookingMap.get(slot.id);
@@ -961,7 +1040,9 @@ export default async function SchedulePage({
                     )
                   : [];
               const ownerSlotApplications = ownerApplications.filter(
-                (application) => application.cycle_id === slot.cycle_id,
+                (application) =>
+                  application.cycle_id === slot.cycle_id &&
+                  !bookedApplicationIds.has(application.id),
               );
               const ownerAvailableStaff = ownerStaff.filter(
                 (person) =>
@@ -1153,7 +1234,11 @@ export default async function SchedulePage({
                             <p className="muted-copy">No reviewers have joined this slot.</p>
                           ) : (
                             <div className="schedule-participant-list">
-                              {participants.map((participant) => (
+                              {participants.map((participant) => {
+                                const scoringPermission = scoringPermissionMap.get(
+                                  `${slot.id}:${participant.user_id}`,
+                                );
+                                return (
                                 <div className="schedule-participant" key={participant.enrollment_id}>
                                   <span className="user-avatar">
                                     {personName(participant).slice(0, 1).toUpperCase()}
@@ -1176,25 +1261,24 @@ export default async function SchedulePage({
                                       {profile.role === "owner" &&
                                         participant.role === "advisory_member" &&
                                         booking && (
-                                          <details>
-                                            <summary>Scoring override</summary>
-                                            <form action={ownerAddStaff.bind(null, slot.id)} className="form-stack compact-form">
-                                              <input name="user_id" type="hidden" value={participant.user_id} />
-                                              <input name="participation_mode" type="hidden" value={participant.participation_mode} />
-                                              <input name="override_scoring_permissions" type="hidden" value="true" />
-                                              <label className="check-card compact-check-card">
-                                                <input defaultChecked name="can_score" type="checkbox" />
-                                                <span><strong>Allow scoring</strong></span>
-                                              </label>
-                                              <label className="check-card compact-check-card">
-                                                <input defaultChecked name="can_comment" type="checkbox" />
-                                                <span><strong>Allow comments</strong></span>
-                                              </label>
-                                              <button className="button button-secondary button-compact" type="submit">
-                                                Save override
-                                              </button>
-                                            </form>
-                                          </details>
+                                          <form
+                                            action={ownerAddStaff.bind(null, slot.id)}
+                                            aria-label={`Scoring permissions for ${personName(participant)}`}
+                                            className="schedule-participant-permissions-form"
+                                          >
+                                            <input name="user_id" type="hidden" value={participant.user_id} />
+                                            <input name="participation_mode" type="hidden" value={participant.participation_mode} />
+                                            <input name="override_scoring_permissions" type="hidden" value="true" />
+                                            <label className="schedule-participant-permission">
+                                              <input defaultChecked={scoringPermission?.can_score ?? false} name="can_score" type="checkbox" />
+                                              <span>Allow scoring</span>
+                                            </label>
+                                            <label className="schedule-participant-permission">
+                                              <input defaultChecked={scoringPermission?.can_comment ?? false} name="can_comment" type="checkbox" />
+                                              <span>Allow comments</span>
+                                            </label>
+                                            <button className="text-button" type="submit">Save</button>
+                                          </form>
                                         )}
                                       <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
                                         {profile.role === "advisory_member" && (
@@ -1205,7 +1289,8 @@ export default async function SchedulePage({
                                     </div>
                                   )}
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -1469,6 +1554,17 @@ export default async function SchedulePage({
                 </article>
               );
             })
+          )}
+          {profile.role === "owner" && ownerPageCount > 1 && (
+            <nav className="schedule-pagination" aria-label="Schedule pages">
+              {currentOwnerPage > 1 ? (
+                <Link href={{ pathname: "/portal/schedule", query: { ...ownerPageQuery, page: currentOwnerPage - 1 } }}>Previous</Link>
+              ) : <span />}
+              <span>Page {currentOwnerPage} of {ownerPageCount}</span>
+              {currentOwnerPage < ownerPageCount ? (
+                <Link href={{ pathname: "/portal/schedule", query: { ...ownerPageQuery, page: currentOwnerPage + 1 } }}>Next</Link>
+              ) : <span />}
+            </nav>
           )}
         </section>
       ))}

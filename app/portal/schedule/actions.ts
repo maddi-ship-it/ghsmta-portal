@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -116,6 +117,33 @@ async function deliverScheduleTemplate(
       });
     }
   }
+}
+
+function queueScheduleTemplateDelivery(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string,
+  templateKey: ScheduleTemplateKey,
+  applicationId: string,
+  slotId: string,
+) {
+  after(async () => {
+    try {
+      await deliverScheduleTemplate(
+        supabase,
+        actorId,
+        templateKey,
+        applicationId,
+        slotId,
+      );
+    } catch (error) {
+      console.error("[schedule] Deferred notification delivery failed", {
+        applicationId,
+        error,
+        slotId,
+        templateKey,
+      });
+    }
+  });
 }
 
 
@@ -697,7 +725,7 @@ export async function bookOwnScheduleSlot(formData: FormData) {
 
   if (pendingError) scheduleRedirect("error", pendingError.message);
 
-  await deliverScheduleTemplate(
+  queueScheduleTemplateDelivery(
     supabase,
     profile.id,
     "timeslot_selected",
@@ -747,7 +775,7 @@ export async function ownerAssignSchool(slotId: string, formData: FormData) {
 
   if (error) scheduleRedirect("error", error.message);
 
-  await supabase
+  const { error: confirmationError } = await supabase
     .from("schedule_school_bookings")
     .update({
       approval_status: "confirmed",
@@ -756,8 +784,9 @@ export async function ownerAssignSchool(slotId: string, formData: FormData) {
     })
     .eq("slot_id", slotId)
     .eq("application_id", applicationId);
+  if (confirmationError) scheduleRedirect("error", confirmationError.message);
 
-  await deliverScheduleTemplate(
+  queueScheduleTemplateDelivery(
     supabase,
     owner.id,
     "timeslot_confirmed",
@@ -766,7 +795,7 @@ export async function ownerAssignSchool(slotId: string, formData: FormData) {
   );
 
   revalidateSchedule();
-  scheduleRedirect("success", "School assigned and confirmation sent.");
+  scheduleRedirect("success", "School assigned. The confirmation is being sent.");
 }
 
 export async function ownerAddStaff(slotId: string, formData: FormData) {
@@ -776,6 +805,27 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
   if (!userId) scheduleRedirect("error", "Choose an adjudicator or advisory member.");
 
   const supabase = await createClient();
+  const ownerContextPromise = actor.role === "owner"
+    ? Promise.all([
+        supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle(),
+        supabase
+          .from("schedule_school_bookings")
+          .select("application_id")
+          .eq("slot_id", slotId)
+          .maybeSingle(),
+        supabase
+          .from("adjudicator_assignments")
+          .select("can_score,can_comment")
+          .eq("schedule_slot_id", slotId)
+          .eq("adjudicator_user_id", userId)
+          .is("removed_at", null)
+          .maybeSingle(),
+      ])
+    : null;
   const { error } = await supabase.rpc("manage_schedule_staff", {
     p_slot_id: slotId,
     p_user_id: userId,
@@ -787,31 +837,38 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
   if (error) scheduleRedirect("error", error.message);
 
   if (actor.role === "owner") {
-    const [{ data: selectedUser }, { data: booking }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .maybeSingle(),
-      supabase
-        .from("schedule_school_bookings")
-        .select("application_id")
-        .eq("slot_id", slotId)
-        .maybeSingle(),
-    ]);
+    const [selectedUserResult, bookingResult, existingPermissionResult] =
+      await ownerContextPromise!;
+    if (selectedUserResult.error) {
+      scheduleRedirect("error", selectedUserResult.error.message);
+    }
+    if (bookingResult.error) scheduleRedirect("error", bookingResult.error.message);
+    if (existingPermissionResult.error) {
+      scheduleRedirect("error", existingPermissionResult.error.message);
+    }
+
+    const selectedUser = selectedUserResult.data;
+    const booking = bookingResult.data;
+    const existingPermission = existingPermissionResult.data;
+    const overrideRequested =
+      formData.get("override_scoring_permissions") === "true";
 
     if (
-      formData.get("override_scoring_permissions") === "true" &&
       selectedUser?.role === "advisory_member" &&
-      booking?.application_id
+      booking?.application_id &&
+      (overrideRequested || existingPermission)
     ) {
       const { error: permissionError } = await supabase.rpc(
         "owner_set_scoring_participant",
         {
           p_application_id: booking.application_id,
           p_user_id: userId,
-          p_can_score: formData.get("can_score") === "on",
-          p_can_comment: formData.get("can_comment") === "on",
+          p_can_score: overrideRequested
+            ? formData.get("can_score") === "on"
+            : Boolean(existingPermission?.can_score),
+          p_can_comment: overrideRequested
+            ? formData.get("can_comment") === "on"
+            : Boolean(existingPermission?.can_comment),
         },
       );
 
@@ -990,7 +1047,7 @@ export async function ownerConfirmScheduleBooking(
   if (error) scheduleRedirect("error", error.message);
   const row = Array.isArray(data) ? data[0] : data;
   if (row) {
-    await deliverScheduleTemplate(
+    queueScheduleTemplateDelivery(
       supabase,
       owner.id,
       "timeslot_confirmed",
@@ -1002,7 +1059,7 @@ export async function ownerConfirmScheduleBooking(
   revalidateSchedule();
   scheduleRedirect(
     "success",
-    "Timeslot approved and final confirmation sent.",
+    "Timeslot approved. The final confirmation is being sent.",
   );
 }
 
