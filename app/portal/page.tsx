@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
+import { DEMO_SOURCE_SYSTEM } from "@/lib/demo-schools";
 import { createClient } from "@/lib/supabase/server";
 import { roleLabel, statusLabel } from "@/lib/format";
 import type { Application } from "@/lib/types";
@@ -9,12 +10,15 @@ export default async function PortalDashboard() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("applications")
-    .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,form_data,owner_notes,created_at,updated_at,award_cycles!inner(is_active,status)")
+    .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,form_data,owner_notes,source_system,created_at,updated_at,award_cycles!inner(is_active,status)")
     .eq("is_archived", false)
-    .eq("award_cycles.is_active", true)
     .neq("award_cycles.status", "archived")
     .order("updated_at", { ascending: false });
-  const applications = (data ?? []) as unknown as Application[];
+  const applications = (data ?? []).filter(
+    (item) =>
+      item.source_system === DEMO_SOURCE_SYSTEM ||
+      item.award_cycles.some((cycle) => cycle.is_active),
+  ) as unknown as Application[];
 
   const counts = {
     total: applications.length,

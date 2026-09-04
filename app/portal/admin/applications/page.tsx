@@ -1,11 +1,19 @@
 import Link from "next/link";
 
 import { requireProfile } from "@/lib/auth";
+import {
+  DEMO_SOURCE_SYSTEM,
+  EXPECTED_DEMO_SCHOOL_COUNT,
+} from "@/lib/demo-schools";
 import { statusLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { Application, AwardCycle } from "@/lib/types";
 
-import { setApplicationArchiveState, startApplication } from "./actions";
+import {
+  setApplicationArchiveState,
+  setDemoApplicationsVisible,
+  startApplication,
+} from "./actions";
 
 type ApplicationSort =
   | "updated"
@@ -28,6 +36,8 @@ type ApplicationSearchParams = {
   direction?: SortDirection;
   archived?: string;
   restored?: string;
+  demo_visibility?: "shown" | "hidden";
+  demo_count?: string;
 };
 
 function textCompare(left: string | null | undefined, right: string | null | undefined) {
@@ -62,7 +72,11 @@ export default async function ApplicationsPage({
   const params = await searchParams;
   const supabase = await createClient();
 
-  const [{ data, error }, { data: cycleData }] = await Promise.all([
+  const [
+    { data, error },
+    { data: cycleData },
+    { data: demoApplicationData, error: demoApplicationError },
+  ] = await Promise.all([
     supabase
       .from("applications")
       .select(
@@ -77,7 +91,13 @@ export default async function ApplicationsPage({
       .neq("status", "archived")
       .order("season_year", { ascending: false })
       .order("name"),
+    supabase
+      .from("applications")
+      .select("id,is_archived")
+      .eq("source_system", DEMO_SOURCE_SYSTEM),
   ]);
+
+  if (demoApplicationError) throw new Error(demoApplicationError.message);
 
   const cycles = (cycleData ?? []) as AwardCycle[];
   const activeCycleIds = new Set(cycles.map((cycle) => cycle.id));
@@ -145,6 +165,12 @@ export default async function ApplicationsPage({
   const hasFilters = Boolean(
     search || selectedCycle || selectedProgram || selectedStatus,
   );
+  const demoApplications = demoApplicationData ?? [];
+  const visibleDemoCount = demoApplications.filter(
+    (application) => !application.is_archived,
+  ).length;
+  const allDemoApplicationsVisible =
+    demoApplications.length > 0 && visibleDemoCount === demoApplications.length;
 
   return (
     <>
@@ -171,6 +197,44 @@ export default async function ApplicationsPage({
       )}
       {params.archived && <div className="notice page-message">Archived {params.archived} application record{params.archived === "1" ? "" : "s"}.</div>}
       {params.restored && <div className="notice page-message">Restored {params.restored} application record{params.restored === "1" ? "" : "s"}.</div>}
+      {params.demo_visibility && (
+        <div className="notice page-message">
+          Demo schools are now {params.demo_visibility === "shown" ? "shown in" : "hidden from"} active listings
+          {params.demo_count ? ` (${params.demo_count} records updated)` : ""}.
+        </div>
+      )}
+
+      {profile.role === "owner" && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Training demo schools</h2>
+              <p>
+                {demoApplications.length === 0
+                  ? "No training demo schools are loaded yet."
+                  : `${visibleDemoCount} of ${demoApplications.length} demo schools are currently shown in active listings.`}
+                {demoApplications.length > 0 && demoApplications.length !== EXPECTED_DEMO_SCHOOL_COUNT
+                  ? ` Expected ${EXPECTED_DEMO_SCHOOL_COUNT}.`
+                  : ""}
+              </p>
+            </div>
+            {demoApplications.length > 0 && (
+              <form action={setDemoApplicationsVisible}>
+                <input
+                  name="visible"
+                  type="hidden"
+                  value={allDemoApplicationsVisible ? "false" : "true"}
+                />
+                <button className="button button-secondary" type="submit">
+                  {allDemoApplicationsVisible
+                    ? "Hide demo schools from listings"
+                    : "Show demo schools in listings"}
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+      )}
 
       {profile.role === "applicant" && openPrograms.length > 0 && (
         <section className="panel start-application-panel">
@@ -365,7 +429,11 @@ export default async function ApplicationsPage({
                         </span>
                       </td>
                       <td>
-                        {application.source_system ? "Imported" : "Portal"}
+                        {application.source_system === DEMO_SOURCE_SYSTEM
+                          ? "Demo"
+                          : application.source_system
+                            ? "Imported"
+                            : "Portal"}
                       </td>
                       <td>
                         <span className="table-date">

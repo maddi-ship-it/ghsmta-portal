@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
+import { DEMO_SOURCE_SYSTEM } from "@/lib/demo-schools";
 import { createClient } from "@/lib/supabase/server";
 
 export async function startApplication(formData: FormData) {
@@ -97,4 +98,40 @@ export async function setApplicationArchiveState(formData: FormData) {
     ? "/portal/admin/archive"
     : "/portal/admin/applications";
   redirect(`${targetPath}?${archived ? "archived" : "restored"}=${Number(data ?? applicationIds.length)}`);
+}
+
+export async function setDemoApplicationsVisible(formData: FormData) {
+  await requireProfile(["owner"]);
+
+  const visible = String(formData.get("visible") ?? "") === "true";
+  const supabase = await createClient();
+  const { data: demoApplications, error: demoError } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("source_system", DEMO_SOURCE_SYSTEM);
+
+  if (demoError) throw new Error(demoError.message);
+  const applicationIds = (demoApplications ?? []).map((application) => application.id);
+  if (applicationIds.length === 0) {
+    throw new Error("No training demo applications were found.");
+  }
+
+  const { data, error } = await supabase.rpc("set_application_archive_state", {
+    p_application_ids: applicationIds,
+    p_archived: !visible,
+    p_reason: visible ? null : "Hidden from active listings by a site administrator.",
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/portal");
+  revalidatePath("/portal/admin/applications");
+  revalidatePath("/portal/admin/archive");
+  revalidatePath("/portal/adjudication");
+  revalidatePath("/portal/admin/billing");
+  revalidatePath("/portal/admin/scoring");
+  revalidatePath("/portal/schedule");
+  revalidatePath("/portal/results");
+  redirect(
+    `/portal/admin/applications?demo_visibility=${visible ? "shown" : "hidden"}&demo_count=${Number(data ?? applicationIds.length)}`,
+  );
 }

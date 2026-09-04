@@ -21,6 +21,9 @@
  * Apply:
  *   node scripts/prepare-2026-2027-demo-season.mjs --apply
  *
+ * Safely refresh only the ten demo schools (no season rollover):
+ *   node scripts/prepare-2026-2027-demo-season.mjs --demo-only --apply
+ *
  * Optional:
  *   --password 'Different-Demo-Password!'
  *   --source-cycle-key 2025-2026-directors
@@ -45,7 +48,7 @@ const ARCHIVE_REASON =
 const DEMO_SCHOOLS = [
   {
     "index": 1,
-    "school": "Peachtree Arts Academy (DEMO)",
+    "school": "Demo School 01",
     "production": "Moonlight Over Georgia",
     "first": "Jordan",
     "last": "Ellis",
@@ -56,7 +59,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 2,
-    "school": "Magnolia Ridge High School (DEMO)",
+    "school": "Demo School 02",
     "production": "Bright Star",
     "first": "Taylor",
     "last": "Morgan",
@@ -67,7 +70,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 3,
-    "school": "North Fulton Performing Arts High (DEMO)",
+    "school": "Demo School 03",
     "production": "The Drowsy Chaperone",
     "first": "Avery",
     "last": "Brooks",
@@ -78,7 +81,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 4,
-    "school": "Lakeview Fine Arts Academy (DEMO)",
+    "school": "Demo School 04",
     "production": "Once on This Island",
     "first": "Cameron",
     "last": "Reed",
@@ -89,7 +92,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 5,
-    "school": "Red Clay High School (DEMO)",
+    "school": "Demo School 05",
     "production": "Newsies",
     "first": "Morgan",
     "last": "Hayes",
@@ -100,7 +103,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 6,
-    "school": "Blue Ridge Performing Arts Academy (DEMO)",
+    "school": "Demo School 06",
     "production": "Into the Woods",
     "first": "Riley",
     "last": "Parker",
@@ -111,7 +114,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 7,
-    "school": "South Metro Arts High School (DEMO)",
+    "school": "Demo School 07",
     "production": "Sister Act",
     "first": "Casey",
     "last": "Bennett",
@@ -122,7 +125,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 8,
-    "school": "Georgia Coastal Arts School (DEMO)",
+    "school": "Demo School 08",
     "production": "The Addams Family",
     "first": "Jamie",
     "last": "Collins",
@@ -133,7 +136,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 9,
-    "school": "Pinecrest High School (DEMO)",
+    "school": "Demo School 09",
     "production": "Something Rotten!",
     "first": "Drew",
     "last": "Sullivan",
@@ -144,7 +147,7 @@ const DEMO_SCHOOLS = [
   },
   {
     "index": 10,
-    "school": "Chattahoochee Valley Academy (DEMO)",
+    "school": "Demo School 10",
     "production": "Little Shop of Horrors",
     "first": "Alex",
     "last": "Ramirez",
@@ -445,6 +448,69 @@ async function findSourceCycle(supabase, requestedCycleKey) {
   }
 
   return fallbackData;
+}
+
+async function findDemoTargetCycle(supabase) {
+  const result = await supabase
+    .from("award_cycles")
+    .select("*")
+    .eq("cycle_key", TARGET_CYCLE_KEY)
+    .maybeSingle();
+
+  const cycle = throwIfError(result, "Find demo target cycle");
+  if (!cycle) {
+    throw new Error(
+      `The ${TARGET_CYCLE_KEY} program does not exist. Run the season rollover before using --demo-only.`,
+    );
+  }
+
+  return cycle;
+}
+
+async function findFullDemoTargetForm(supabase, targetCycleId) {
+  const result = await supabase
+    .from("application_form_versions")
+    .select("*")
+    .eq("cycle_id", targetCycleId)
+    .neq("status", "archived")
+    .order("version_number", { ascending: false });
+
+  const forms = throwIfError(result, "Find demo target forms");
+  if (forms.length === 0) {
+    throw new Error("The target program does not have a non-archived application form.");
+  }
+
+  const candidates = [];
+  for (const form of forms) {
+    const questionCount = await countRows(
+      supabase,
+      "application_questions",
+      (query) => query.eq("form_version_id", form.id).eq("active", true),
+    );
+    const stageCount = await countRows(
+      supabase,
+      "application_stages",
+      (query) => query.eq("form_version_id", form.id),
+    );
+    candidates.push({ form, questionCount, stageCount });
+  }
+
+  candidates.sort(
+    (left, right) =>
+      right.questionCount - left.questionCount ||
+      right.stageCount - left.stageCount ||
+      Number(right.form.version_number) - Number(left.form.version_number),
+  );
+
+  const selected = candidates[0];
+  if (selected.questionCount < 100 || selected.stageCount < 2) {
+    throw new Error(
+      `The most complete target form has only ${selected.questionCount} active question(s) and ${selected.stageCount} stage(s). ` +
+        "The demo refresh stopped to avoid creating incomplete training records.",
+    );
+  }
+
+  return selected;
 }
 
 async function findSourceForm(supabase, sourceCycleId) {
@@ -1085,7 +1151,7 @@ async function ensureDemoApplication({
     school_id: schoolRecord.id,
     school_name: school.school,
     production_title: school.production,
-    status: "submitted",
+    status: "complete",
     submitted_at: now,
     form_data: {
       demo_seed: true,
@@ -1099,7 +1165,7 @@ async function ensureDemoApplication({
     external_applicant_email: email,
     source_system: DEMO_SOURCE_SYSTEM,
     source_record_id: sourceRecordId,
-    source_stage: "Submitted Demo Application",
+    source_stage: "Accepted Demo Application",
     is_archived: false,
     archived_at: null,
     archived_by: null,
@@ -1236,6 +1302,115 @@ async function completeStages(supabase, applicationId, stages) {
   );
 }
 
+async function seedDemoSchools({
+  supabase,
+  targetCycle,
+  targetForm,
+  templateFile,
+  password,
+}) {
+  const { headers, row: templateRow } = readSingleRowCsv(templateFile);
+  const stages = throwIfError(
+    await supabase
+      .from("application_stages")
+      .select("id,title,sort_order,applicant_visible")
+      .eq("form_version_id", targetForm.id)
+      .order("sort_order"),
+    "Read target application stages",
+  );
+
+  if (stages.length === 0) {
+    throw new Error("The selected demo application form has no stages.");
+  }
+
+  const allUsers = await listAllAuthUsers(supabase);
+  const createdSchools = [];
+
+  for (const school of DEMO_SCHOOLS) {
+    const customized = customizeTemplateRow(headers, templateRow, school);
+    const fullName = `${school.first} ${school.last}`;
+
+    const user = await findOrCreateAuthUser(
+      supabase,
+      allUsers,
+      customized.email,
+      password,
+      fullName,
+    );
+    const schoolRecord = await ensureSchool(
+      supabase,
+      school,
+      customized.schoolCode,
+    );
+    const application = await ensureDemoApplication({
+      supabase,
+      targetCycle,
+      targetForm,
+      user,
+      schoolRecord,
+      school,
+      schoolCode: customized.schoolCode,
+      email: customized.email,
+      headers,
+      row: customized.row,
+      stages,
+    });
+
+    throwIfError(
+      await supabase
+        .from("application_answers")
+        .delete()
+        .eq("application_id", application.id),
+      `Clear prior demo answers for ${school.school}`,
+    );
+    throwIfError(
+      await supabase
+        .from("application_stage_progress")
+        .delete()
+        .eq("application_id", application.id),
+      `Clear prior demo stage progress for ${school.school}`,
+    );
+
+    const answerCount = await importAnswers({
+      supabase,
+      formId: targetForm.id,
+      applicationId: application.id,
+      row: customized.row,
+    });
+    await completeStages(supabase, application.id, stages);
+
+    createdSchools.push({
+      school: school.school,
+      production: school.production,
+      email: customized.email,
+      applicationId: application.id,
+      answerCount,
+    });
+
+    console.log(
+      `  ✓ ${school.school} — ${customized.email} (${answerCount} answers)`,
+    );
+  }
+
+  const liveApplications = await countRows(
+    supabase,
+    "applications",
+    (query) =>
+      query
+        .eq("cycle_id", targetCycle.id)
+        .eq("is_archived", false)
+        .eq("source_system", DEMO_SOURCE_SYSTEM),
+  );
+
+  if (liveApplications !== DEMO_SCHOOLS.length) {
+    throw new Error(
+      `Expected ${DEMO_SCHOOLS.length} visible demo applications; found ${liveApplications}.`,
+    );
+  }
+
+  return { createdSchools, liveApplications };
+}
+
 async function ensureScheduleSlots(supabase, targetCycleId) {
   const existing = await supabase
     .from("schedule_slots")
@@ -1320,9 +1495,29 @@ async function preview(supabase, sourceCycle) {
   console.log("Run again with --apply to perform the rollover.\n");
 }
 
+async function previewDemoOnly(supabase, targetCycle, targetFormSelection) {
+  const existingDemoCount = await countRows(
+    supabase,
+    "applications",
+    (query) => query.eq("source_system", DEMO_SOURCE_SYSTEM),
+  );
+
+  console.log("\nDemo-school-only refresh preview\n");
+  console.log(`Program: ${targetCycle.name} (${targetCycle.cycle_key})`);
+  console.log(`Training form: ${targetFormSelection.form.name}`);
+  console.log(`Active questions: ${targetFormSelection.questionCount}`);
+  console.log(`Application stages: ${targetFormSelection.stageCount}`);
+  console.log(`Existing demo applications to refresh: ${existingDemoCount}`);
+  console.log("Demo applicant accounts/applications after refresh: 10");
+  console.log("Season programs, forms, rubrics, and schedules changed: 0");
+  console.log("\nNo database changes were made.");
+  console.log("Run again with --demo-only --apply to refresh the demo schools.\n");
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const apply = Boolean(args.apply);
+  const demoOnly = Boolean(args["demo-only"]);
   const withSchedule = !args["no-schedule"];
   const password = String(args.password ?? DEFAULT_PASSWORD);
   const sourceCycleKey = args["source-cycle-key"]
@@ -1351,6 +1546,43 @@ async function main() {
   );
   if (!fs.existsSync(templateFile)) {
     throw new Error(`Demo application template not found: ${templateFile}`);
+  }
+
+  if (demoOnly) {
+    const targetCycle = await findDemoTargetCycle(supabase);
+    const targetFormSelection = await findFullDemoTargetForm(
+      supabase,
+      targetCycle.id,
+    );
+
+    if (!apply) {
+      await previewDemoOnly(supabase, targetCycle, targetFormSelection);
+      return;
+    }
+
+    console.log("\nRefreshing the ten training demo schools only…\n");
+    const { createdSchools, liveApplications } = await seedDemoSchools({
+      supabase,
+      targetCycle,
+      targetForm: targetFormSelection.form,
+      templateFile,
+      password,
+    });
+
+    console.log("\nTraining demo schools are ready.\n");
+    console.log(`Program: ${targetCycle.name}`);
+    console.log(`Training form: ${targetFormSelection.form.name}`);
+    console.log(`Complete Acceptd-style answers per record: ${createdSchools[0]?.answerCount ?? 0}`);
+    console.log(`Visible demo applications: ${liveApplications}`);
+    console.log(`Shared demo password: ${password}`);
+    console.log("\nLogin accounts:");
+    for (const school of createdSchools) {
+      console.log(`  ${school.email} — ${school.school}`);
+    }
+    console.log(
+      "\nThe credential sheet is data/2026-2027-demo-school-logins.csv\n",
+    );
+    return;
   }
 
   const sourceCycle = await findSourceCycle(supabase, sourceCycleKey);
@@ -1387,77 +1619,14 @@ async function main() {
   console.log("4/7 Archiving prior applications, programs, forms, and schedules…");
   await archiveExistingSeasonData(supabase, targetCycle.id);
 
-  const { headers, row: templateRow } = readSingleRowCsv(templateFile);
-  const stages = throwIfError(
-    await supabase
-      .from("application_stages")
-      .select("id,title,sort_order,applicant_visible")
-      .eq("form_version_id", targetForm.id)
-      .order("sort_order"),
-    "Read target application stages",
-  );
-
-  if (stages.length === 0) {
-    throw new Error("The cloned 2026–2027 application form has no stages.");
-  }
-
   console.log("5/7 Creating ten demo school accounts and applications…");
-  const allUsers = await listAllAuthUsers(supabase);
-  const createdSchools = [];
-
-  for (const school of DEMO_SCHOOLS) {
-    const customized = customizeTemplateRow(headers, templateRow, school);
-    const fullName = `${school.first} ${school.last}`;
-
-    const user = await findOrCreateAuthUser(
-      supabase,
-      allUsers,
-      customized.email,
-      password,
-      fullName,
-    );
-
-    const schoolRecord = await ensureSchool(
-      supabase,
-      school,
-      customized.schoolCode,
-    );
-
-    const application = await ensureDemoApplication({
-      supabase,
-      targetCycle,
-      targetForm,
-      user,
-      schoolRecord,
-      school,
-      schoolCode: customized.schoolCode,
-      email: customized.email,
-      headers,
-      row: customized.row,
-      stages,
-    });
-
-    const answerCount = await importAnswers({
-      supabase,
-      formId: targetForm.id,
-      applicationId: application.id,
-      row: customized.row,
-    });
-
-    await completeStages(supabase, application.id, stages);
-
-    createdSchools.push({
-      school: school.school,
-      production: school.production,
-      email: customized.email,
-      applicationId: application.id,
-      answerCount,
-    });
-
-    console.log(
-      `  ✓ ${school.school} — ${customized.email} (${answerCount} answers)`,
-    );
-  }
+  const { createdSchools, liveApplications } = await seedDemoSchools({
+    supabase,
+    targetCycle,
+    targetForm,
+    templateFile,
+    password,
+  });
 
   let scheduleSlotCount = 0;
   if (withSchedule) {
@@ -1468,16 +1637,6 @@ async function main() {
   }
 
   console.log("7/7 Verifying the live season…");
-  const liveApplications = await countRows(
-    supabase,
-    "applications",
-    (query) =>
-      query
-        .eq("cycle_id", targetCycle.id)
-        .eq("is_archived", false)
-        .eq("source_system", DEMO_SOURCE_SYSTEM),
-  );
-
   console.log("\n2026–2027 demo season is ready.\n");
   console.log(`Program: ${targetCycle.name}`);
   console.log(`Cycle key: ${targetCycle.cycle_key}`);
