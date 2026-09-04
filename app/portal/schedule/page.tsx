@@ -26,6 +26,9 @@ import {
 
 type ScheduleSlotStatus = "draft" | "open" | "closed" | "cancelled";
 
+const SCHEDULE_APPLICATION_COLUMNS =
+  "id,cycle_id,applicant_user_id,school_name,production_title,status";
+
 type ScheduleSlot = {
   id: string;
   cycle_id: string;
@@ -304,17 +307,25 @@ export default async function SchedulePage({
     : { data: [], error: null };
   const { data: slotData, error: slotError } = slotResult;
   const slots = (slotData ?? []) as ScheduleSlot[];
-  const { data: schoolDetailsData, error: schoolDetailsError } = slots.length
-    ? await supabase
+  const schoolDetailsPromise = slots.length
+    ? supabase
         .from("schedule_slot_school_details")
         .select("slot_id,venue_name,venue_address,arrival_entrance,parking_instructions,accessibility_notes,wifi_network,wifi_password,day_of_contact_name,day_of_contact_phone,edit_deadline,updated_at")
         .in("slot_id", slots.map((slot) => slot.id))
     : { data: [], error: null };
-  if (schoolDetailsError) throw new Error(schoolDetailsError.message);
-  const schoolDetails = (schoolDetailsData ?? []) as ScheduleSlotSchoolDetails[];
-  const schoolDetailsMap = new Map(schoolDetails.map((details) => [details.slot_id, details]));
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const serverTime = new Date(String(serverTimeData)).getTime();
+  const waitlistPromise = activeCycleIds.length
+    ? supabase
+        .from("schedule_slot_waitlist")
+        .select(
+          "id,slot_id,cycle_id,application_id,status,queue_rank,offer_expires_at,applicant_notes,alternate_date_1,alternate_date_2,alternate_date_3,applicant_reason,owner_notes,created_at,updated_at",
+        )
+        .in("cycle_id", activeCycleIds)
+        .in("status", ["waiting", "offered", "accepted"])
+        .order("slot_id", { ascending: true })
+        .order("queue_rank", { ascending: true })
+    : { data: [], error: null };
 
   let applicantApplications: Application[] = [];
   let availability: SlotAvailability[] = [];
@@ -331,9 +342,7 @@ export default async function SchedulePage({
       await Promise.all([
         supabase
           .from("applications")
-          .select(
-            "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_payload,cloned_from_application_id,created_at,updated_at",
-          )
+          .select(SCHEDULE_APPLICATION_COLUMNS)
           .eq("is_archived", false)
           .order("updated_at", { ascending: false }),
         supabase.rpc("get_schedule_slot_availability"),
@@ -342,9 +351,50 @@ export default async function SchedulePage({
     applicantApplications = (applicationData ?? []) as Application[];
     availability = (availabilityData ?? []) as SlotAvailability[];
   } else {
-    const [{ data: bookingData }, { data: directoryData }] = await Promise.all([
+    const staffResultPromise =
+      profile.role === "owner" || profile.role === "advisory_member"
+        ? supabase
+            .from("profiles")
+            .select("id,email,full_name,role,active")
+            .in("role", ["adjudicator", "advisory_member"])
+            .eq("active", true)
+            .order("full_name")
+        : Promise.resolve({ data: [], error: null });
+    const applicationResultPromise =
+      profile.role === "owner"
+        ? supabase
+            .from("applications")
+            .select(SCHEDULE_APPLICATION_COLUMNS)
+            .in("cycle_id", activeCycleIds)
+            .eq("is_archived", false)
+            .order("school_name")
+        : Promise.resolve({ data: [], error: null });
+    const approvalResultPromise = profile.role === "owner"
+      ? supabase.from("schedule_school_bookings").select("id,slot_id,application_id,approval_status,selected_at,approved_at,approval_notes")
+      : Promise.resolve({ data: [], error: null });
+    const templateResultPromise = profile.role === "owner"
+      ? supabase.from("portal_message_templates").select("template_key,name,subject_template,body_template,send_in_app,send_school_messaging,send_email,active").order("name")
+      : Promise.resolve({ data: [], error: null });
+    const digestResultPromise = profile.role === "owner"
+      ? supabase.from("owner_digest_settings").select("enabled,recipient_email,delivery_hour,time_zone,last_sent_at").eq("owner_user_id", profile.id).maybeSingle()
+      : Promise.resolve({ data: null, error: null });
+
+    const [
+      { data: bookingData },
+      { data: directoryData },
+      profileResult,
+      applicationResult,
+      approvalResult,
+      templateResult,
+      digestResult,
+    ] = await Promise.all([
       supabase.rpc("get_schedule_bookings_for_staff"),
       supabase.rpc("get_schedule_staff_directory"),
+      staffResultPromise,
+      applicationResultPromise,
+      approvalResultPromise,
+      templateResultPromise,
+      digestResultPromise,
     ]);
 
     const activeSlotIds = new Set(slots.map((slot) => slot.id));
@@ -355,53 +405,29 @@ export default async function SchedulePage({
       (enrollment) => activeSlotIds.has(enrollment.slot_id),
     );
 
-    if (profile.role === "owner" || profile.role === "advisory_member") {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id,email,full_name,role,active")
-        .in("role", ["adjudicator", "advisory_member"])
-        .eq("active", true)
-        .order("full_name");
-
-      ownerStaff = (profileData ?? []) as Profile[];
-    }
+    if (profileResult.error) throw new Error(profileResult.error.message);
+    ownerStaff = (profileResult.data ?? []) as Profile[];
 
     if (profile.role === "owner") {
-      const { data: applicationData } = await supabase
-        .from("applications")
-        .select(
-          "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,submitted_at,form_version,form_data,owner_notes,current_stage_id,external_applicant_name,external_applicant_email,source_system,source_record_id,source_stage,is_archived,archived_payload,cloned_from_application_id,created_at,updated_at",
-        )
-        .eq("is_archived", false)
-        .order("school_name");
-
-      ownerApplications = (applicationData ?? []) as Application[];
-
-      const [approvalResult, templateResult, digestResult] = await Promise.all([
-        supabase.from("schedule_school_bookings").select("id,slot_id,application_id,approval_status,selected_at,approved_at,approval_notes"),
-        supabase.from("portal_message_templates").select("template_key,name,subject_template,body_template,send_in_app,send_school_messaging,send_email,active").order("name"),
-        supabase.from("owner_digest_settings").select("enabled,recipient_email,delivery_hour,time_zone,last_sent_at").eq("owner_user_id", profile.id).maybeSingle(),
-      ]);
+      if (applicationResult.error) throw new Error(applicationResult.error.message);
       if (approvalResult.error) throw new Error(approvalResult.error.message);
       if (templateResult.error) throw new Error(templateResult.error.message);
       if (digestResult.error) throw new Error(digestResult.error.message);
+      ownerApplications = (applicationResult.data ?? []) as Application[];
       bookingApprovals = (approvalResult.data ?? []) as BookingApproval[];
       messageTemplates = templateResult.data ?? [];
       digestSettings = digestResult.data;
     }
   }
 
-  const waitlistResult = activeCycleIds.length
-    ? await supabase
-        .from("schedule_slot_waitlist")
-        .select(
-          "id,slot_id,cycle_id,application_id,status,queue_rank,offer_expires_at,applicant_notes,alternate_date_1,alternate_date_2,alternate_date_3,applicant_reason,owner_notes,created_at,updated_at",
-        )
-        .in("cycle_id", activeCycleIds)
-        .in("status", ["waiting", "offered", "accepted"])
-        .order("slot_id", { ascending: true })
-        .order("queue_rank", { ascending: true })
-    : { data: [], error: null };
+  const [schoolDetailsResult, waitlistResult] = await Promise.all([
+    schoolDetailsPromise,
+    waitlistPromise,
+  ]);
+  const { data: schoolDetailsData, error: schoolDetailsError } = schoolDetailsResult;
+  if (schoolDetailsError) throw new Error(schoolDetailsError.message);
+  const schoolDetails = (schoolDetailsData ?? []) as ScheduleSlotSchoolDetails[];
+  const schoolDetailsMap = new Map(schoolDetails.map((details) => [details.slot_id, details]));
   const { data: waitlistData, error: waitlistError } = waitlistResult;
 
   if (waitlistError) {
@@ -1147,6 +1173,29 @@ export default async function SchedulePage({
                                         </select>
                                         <button className="text-button" type="submit">Update</button>
                                       </form>
+                                      {profile.role === "owner" &&
+                                        participant.role === "advisory_member" &&
+                                        booking && (
+                                          <details>
+                                            <summary>Scoring override</summary>
+                                            <form action={ownerAddStaff.bind(null, slot.id)} className="form-stack compact-form">
+                                              <input name="user_id" type="hidden" value={participant.user_id} />
+                                              <input name="participation_mode" type="hidden" value={participant.participation_mode} />
+                                              <input name="override_scoring_permissions" type="hidden" value="true" />
+                                              <label className="check-card compact-check-card">
+                                                <input defaultChecked name="can_score" type="checkbox" />
+                                                <span><strong>Allow scoring</strong></span>
+                                              </label>
+                                              <label className="check-card compact-check-card">
+                                                <input defaultChecked name="can_comment" type="checkbox" />
+                                                <span><strong>Allow comments</strong></span>
+                                              </label>
+                                              <button className="button button-secondary button-compact" type="submit">
+                                                Save override
+                                              </button>
+                                            </form>
+                                          </details>
+                                        )}
                                       <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
                                         {profile.role === "advisory_member" && (
                                           <input className="input input-compact" name="reason" placeholder="Removal reason" required />
@@ -1392,6 +1441,18 @@ export default async function SchedulePage({
                                     </select>
                                   </div>
                                   <div className="field"><label htmlFor={`owner_mode_${slot.id}`}>Participation type</label><select className="select" defaultValue="panel" id={`owner_mode_${slot.id}`} name="participation_mode"><option value="panel">Panel</option><option value="understudy">Understudy</option><option value="shadow">Shadow</option></select></div>
+                                  <fieldset className="form-stack compact-form">
+                                    <legend>Advisory scoring override</legend>
+                                    <input name="override_scoring_permissions" type="hidden" value="true" />
+                                    <label className="check-card compact-check-card">
+                                      <input defaultChecked name="can_score" type="checkbox" />
+                                      <span><strong>Allow scoring</strong><small>Applies when the selected reviewer is an Advisory Committee member.</small></span>
+                                    </label>
+                                    <label className="check-card compact-check-card">
+                                      <input defaultChecked name="can_comment" type="checkbox" />
+                                      <span><strong>Allow comments</strong><small>Allows panel and criterion comments for this school.</small></span>
+                                    </label>
+                                  </fieldset>
                                   <button className="button button-secondary button-compact" type="submit">
                                     Add reviewer
                                   </button>

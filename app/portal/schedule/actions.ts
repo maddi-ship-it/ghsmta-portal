@@ -770,7 +770,7 @@ export async function ownerAssignSchool(slotId: string, formData: FormData) {
 }
 
 export async function ownerAddStaff(slotId: string, formData: FormData) {
-  await requireProfile(["advisory_member", "owner"]);
+  const actor = await requireProfile(["advisory_member", "owner"]);
 
   const userId = text(formData, "user_id");
   if (!userId) scheduleRedirect("error", "Choose an adjudicator or advisory member.");
@@ -785,6 +785,39 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
   });
 
   if (error) scheduleRedirect("error", error.message);
+
+  if (actor.role === "owner") {
+    const [{ data: selectedUser }, { data: booking }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("schedule_school_bookings")
+        .select("application_id")
+        .eq("slot_id", slotId)
+        .maybeSingle(),
+    ]);
+
+    if (
+      formData.get("override_scoring_permissions") === "true" &&
+      selectedUser?.role === "advisory_member" &&
+      booking?.application_id
+    ) {
+      const { error: permissionError } = await supabase.rpc(
+        "owner_set_scoring_participant",
+        {
+          p_application_id: booking.application_id,
+          p_user_id: userId,
+          p_can_score: formData.get("can_score") === "on",
+          p_can_comment: formData.get("can_comment") === "on",
+        },
+      );
+
+      if (permissionError) scheduleRedirect("error", permissionError.message);
+    }
+  }
 
   revalidateSchedule();
   scheduleRedirect("success", "Staff member added to the slot. Owners will see the change in their daily review.");
