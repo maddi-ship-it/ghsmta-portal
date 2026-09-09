@@ -290,6 +290,17 @@ export default async function SchedulePage({
     : "overview";
   const supabase = await createClient();
 
+  const applicantApplicationResultPromise = profile.role === "applicant"
+    ? supabase
+        .from("applications")
+        .select(SCHEDULE_APPLICATION_COLUMNS)
+        .eq("is_archived", false)
+        .order("updated_at", { ascending: false })
+    : Promise.resolve({ data: [], error: null });
+  const applicantAvailabilityResultPromise = profile.role === "applicant"
+    ? supabase.rpc("get_schedule_slot_availability")
+    : Promise.resolve({ data: [], error: null });
+
   const cycleQuery = supabase
     .from("award_cycles")
     .select(
@@ -298,15 +309,38 @@ export default async function SchedulePage({
     .neq("status", "archived")
     .order("season_year", { ascending: false })
     .order("name");
-  const cycleResultPromise = profile.role === "owner"
+  const cycleResultPromise = profile.role === "owner" || profile.role === "applicant"
     ? cycleQuery
     : cycleQuery.eq("is_active", true);
-  const [{ data: cycleData }, { data: serverTimeData }] = await Promise.all([
+  const [
+    cycleResult,
+    serverTimeResult,
+    applicantApplicationResult,
+    applicantAvailabilityResult,
+  ] = await Promise.all([
     cycleResultPromise,
     supabase.rpc("get_schedule_server_time"),
+    applicantApplicationResultPromise,
+    applicantAvailabilityResultPromise,
   ]);
 
-  const cycles = (cycleData ?? []) as AwardCycle[];
+  if (cycleResult.error) throw new Error(cycleResult.error.message);
+  if (serverTimeResult.error) throw new Error(serverTimeResult.error.message);
+  if (applicantApplicationResult.error) {
+    throw new Error(applicantApplicationResult.error.message);
+  }
+  if (applicantAvailabilityResult.error) {
+    throw new Error(applicantAvailabilityResult.error.message);
+  }
+
+  const applicantApplications = (applicantApplicationResult.data ?? []) as Application[];
+  const availability = (applicantAvailabilityResult.data ?? []) as SlotAvailability[];
+  const applicationCycleIds = new Set(
+    applicantApplications.map((application) => application.cycle_id),
+  );
+  const cycles = ((cycleResult.data ?? []) as AwardCycle[]).filter(
+    (cycle) => profile.role !== "applicant" || applicationCycleIds.has(cycle.id),
+  );
   const activeCycleIds = cycles.map((cycle) => cycle.id);
   const ownerShowsSlotCards =
     profile.role === "owner" &&
@@ -332,7 +366,7 @@ export default async function SchedulePage({
         .in("slot_id", slots.map((slot) => slot.id))
     : { data: [], error: null };
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
-  const serverTime = new Date(String(serverTimeData)).getTime();
+  const serverTime = new Date(String(serverTimeResult.data)).getTime();
   const waitlistPromise = activeCycleIds.length && shouldLoadSlots
     ? supabase
         .from("schedule_slot_waitlist")
@@ -345,8 +379,6 @@ export default async function SchedulePage({
         .order("queue_rank", { ascending: true })
     : { data: [], error: null };
 
-  let applicantApplications: Application[] = [];
-  let availability: SlotAvailability[] = [];
   let staffBookings: StaffBooking[] = [];
   let staffDirectory: StaffEnrollment[] = [];
   let ownerApplications: Application[] = [];
@@ -356,20 +388,7 @@ export default async function SchedulePage({
   let messageTemplates: Array<{ template_key: string; name: string; subject_template: string; body_template: string; send_in_app: boolean; send_school_messaging: boolean; send_email: boolean; active: boolean }> = [];
   let digestSettings: { enabled: boolean; recipient_email: string | null; delivery_hour: number; time_zone: string; last_sent_at: string | null } | null = null;
 
-  if (profile.role === "applicant") {
-    const [{ data: applicationData }, { data: availabilityData }] =
-      await Promise.all([
-        supabase
-          .from("applications")
-          .select(SCHEDULE_APPLICATION_COLUMNS)
-          .eq("is_archived", false)
-          .order("updated_at", { ascending: false }),
-        supabase.rpc("get_schedule_slot_availability"),
-      ]);
-
-    applicantApplications = (applicationData ?? []) as Application[];
-    availability = (availabilityData ?? []) as SlotAvailability[];
-  } else {
+  if (profile.role !== "applicant") {
     const shouldLoadStaffDirectory =
       profile.role !== "owner" || ownerShowsSlotCards;
     const shouldLoadBookings =
@@ -720,7 +739,9 @@ export default async function SchedulePage({
           <h1>Scheduling</h1>
           <p>
             {profile.role === "applicant"
-              ? "Choose one available GHSMTA schedule slot for your school."
+              ? applicantBooking
+                ? "Review your school’s selected timeslot and complete the visit details below."
+                : "Choose one available GHSMTA schedule slot for your school."
               : profile.role === "owner"
                 ? "Build active schedule slots, manage school reservations, and coordinate adjudicators and advisory members."
                 : "Join the active schedule slots you can attend and see the other participating reviewers."}
@@ -873,7 +894,8 @@ export default async function SchedulePage({
         />
       )}
 
-      {(profile.role !== "owner" || ["overview", "timeslots", "staffing"].includes(ownerSection)) && (
+      {(profile.role !== "owner" || ["overview", "timeslots", "staffing"].includes(ownerSection)) &&
+        !(profile.role === "applicant" && applicantBooking) && (
       <section className="schedule-workspace-toolbar">
         <div className="schedule-view-toggle" aria-label="Schedule view">
           <Link
@@ -960,7 +982,7 @@ export default async function SchedulePage({
       )}
 
       {(profile.role !== "owner" || ["overview", "timeslots", "staffing"].includes(ownerSection)) && (profile.role === "applicant" && bookedSlot && bookedApplication ? (
-        <section className="panel schedule-locked-booking">
+        <section className="panel schedule-locked-booking" id="selected-timeslot">
           <div className="panel-header">
             <div>
               <span className="eyebrow">Registered</span>

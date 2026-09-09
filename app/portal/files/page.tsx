@@ -46,9 +46,11 @@ export default async function SchoolFilesPage() {
       <div className="page-heading">
         <div>
           <span className="eyebrow">Documents</span>
-          <h1>School files</h1>
+          <h1>{profile.role === "applicant" ? "Your school files" : "School files"}</h1>
           <p>
-            Upload playbills, logos, scenic materials, name pronunciations, headshots, and résumés for the school team and assigned GHSMTA reviewers.
+            {profile.role === "applicant"
+              ? "Upload and view your school’s playbills, logos, scenic materials, name pronunciations, headshots, and résumés."
+              : "View playbills, logos, scenic materials, name pronunciations, headshots, and résumés shared by school teams."}
           </p>
         </div>
       </div>
