@@ -10,15 +10,47 @@ export default async function SchoolFilesPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
 
-  const { data: applicationData, error: applicationError } = await supabase.rpc(
-    "get_my_school_file_applications",
-  );
+  let applications: SchoolFileApplication[];
 
-  if (applicationError) {
-    throw new Error(`School file access could not be loaded: ${applicationError.message}`);
+  if (profile.role === "applicant") {
+    const { data: applicationData, error: applicationError } = await supabase
+      .from("applications")
+      .select(
+        "id,cycle_id,school_name,production_title,award_cycles(season_year,name)",
+      )
+      .order("updated_at", { ascending: false });
+
+    if (applicationError) {
+      throw new Error(`School file access could not be loaded: ${applicationError.message}`);
+    }
+
+    applications = (applicationData ?? []).map((application) => {
+      const cycle = Array.isArray(application.award_cycles)
+        ? application.award_cycles[0]
+        : application.award_cycles;
+
+      return {
+        application_id: application.id,
+        cycle_id: application.cycle_id,
+        school_name: application.school_name,
+        production_title: application.production_title,
+        season_year: cycle?.season_year ?? "",
+        program_name: cycle?.name ?? "School application",
+        can_upload: true,
+      };
+    });
+  } else {
+    const { data: applicationData, error: applicationError } = await supabase.rpc(
+      "get_my_school_file_applications",
+    );
+
+    if (applicationError) {
+      throw new Error(`School file access could not be loaded: ${applicationError.message}`);
+    }
+
+    applications = (applicationData ?? []) as SchoolFileApplication[];
   }
 
-  const applications = (applicationData ?? []) as SchoolFileApplication[];
   const applicationIds = applications.map((application) => application.application_id);
 
   let files: SchoolFileRecord[] = [];

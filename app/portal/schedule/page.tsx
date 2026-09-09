@@ -294,7 +294,6 @@ export default async function SchedulePage({
     ? supabase
         .from("applications")
         .select(SCHEDULE_APPLICATION_COLUMNS)
-        .eq("is_archived", false)
         .order("updated_at", { ascending: false })
     : Promise.resolve({ data: [], error: null });
   const applicantAvailabilityResultPromise = profile.role === "applicant"
@@ -306,12 +305,13 @@ export default async function SchedulePage({
     .select(
       "id,cycle_key,name,season_year,program_type,description,status,opens_at,closes_at,is_active,cloned_from_cycle_id,created_at,updated_at",
     )
-    .neq("status", "archived")
     .order("season_year", { ascending: false })
     .order("name");
-  const cycleResultPromise = profile.role === "owner" || profile.role === "applicant"
+  const cycleResultPromise = profile.role === "applicant"
     ? cycleQuery
-    : cycleQuery.eq("is_active", true);
+    : profile.role === "owner"
+      ? cycleQuery.neq("status", "archived")
+      : cycleQuery.neq("status", "archived").eq("is_active", true);
   const [
     cycleResult,
     serverTimeResult,
