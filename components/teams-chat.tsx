@@ -22,6 +22,7 @@ import {
   markChatChannelUnread,
   moderateChatPost,
   ownerDeleteChatMessage,
+  startChatDirectMessage,
 } from "@/app/portal/chat/actions";
 import styles from "@/components/chat-workspace.module.css";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
@@ -361,6 +362,170 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function MemberDirectoryDialog({
+  channel,
+  currentUserId,
+  error,
+  members,
+  pending,
+  onClose,
+  onMessage,
+}: {
+  channel: ChatChannel;
+  currentUserId: string;
+  error: string | null;
+  members: ChatMember[];
+  pending: boolean;
+  onClose: () => void;
+  onMessage: (member: ChatMember) => void;
+}) {
+  return (
+    <div
+      aria-labelledby="chat-members-title"
+      aria-modal="true"
+      className={styles.modalBackdrop}
+      role="dialog"
+    >
+      <section className={`${styles.broadcastModal} ${styles.memberModal}`}>
+        <div className={styles.broadcastModalHeader}>
+          <div>
+            <span className="eyebrow">Chat members</span>
+            <h2 id="chat-members-title">People in {channel.channel_name}</h2>
+            <p>
+              {members.length} {members.length === 1 ? "person has" : "people have"} access to this chat.
+            </p>
+          </div>
+          <button
+            aria-label="Close member list"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        {error && <div className={styles.directoryError} role="alert">{error}</div>}
+        <div className={styles.memberList}>
+          {members.map((member) => (
+            <div className={styles.memberListRow} key={member.user_id}>
+              <span className={styles.memberListAvatar} aria-hidden="true">
+                {initials(member.display_name)}
+              </span>
+              <span className={styles.memberListIdentity}>
+                <strong>{member.display_name}</strong>
+                <small>{roleName(member.user_role)}</small>
+              </span>
+              {member.user_id === currentUserId ? (
+                <span className={styles.memberSelfLabel}>You</span>
+              ) : (
+                <button
+                  className="button button-secondary button-compact"
+                  disabled={pending}
+                  onClick={() => onMessage(member)}
+                  type="button"
+                >
+                  Message
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DirectMessageDialog({
+  contacts,
+  error,
+  loading,
+  pending,
+  search,
+  onClose,
+  onMessage,
+  onSearchChange,
+}: {
+  contacts: ChatMember[];
+  error: string | null;
+  loading: boolean;
+  pending: boolean;
+  search: string;
+  onClose: () => void;
+  onMessage: (member: ChatMember) => void;
+  onSearchChange: (value: string) => void;
+}) {
+  return (
+    <div
+      aria-labelledby="direct-message-title"
+      aria-modal="true"
+      className={styles.modalBackdrop}
+      role="dialog"
+    >
+      <section className={`${styles.broadcastModal} ${styles.memberModal}`}>
+        <div className={styles.broadcastModalHeader}>
+          <div>
+            <span className="eyebrow">Direct messages</span>
+            <h2 id="direct-message-title">Start a private conversation</h2>
+            <p>Choose someone who shares a portal chat with you.</p>
+          </div>
+          <button
+            aria-label="Close direct message picker"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <label className="sr-only" htmlFor="direct-message-search">
+          Search people
+        </label>
+        <input
+          autoFocus
+          className={`input ${styles.memberSearch}`}
+          id="direct-message-search"
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Search by name or role"
+          type="search"
+          value={search}
+        />
+
+        {error && <div className={styles.directoryError} role="alert">{error}</div>}
+        {loading ? (
+          <div className={styles.memberListEmpty}>Loading people…</div>
+        ) : contacts.length === 0 ? (
+          <div className={styles.memberListEmpty}>
+            No matching people are available to message.
+          </div>
+        ) : (
+          <div className={styles.memberList}>
+            {contacts.map((member) => (
+              <button
+                className={styles.contactListRow}
+                disabled={pending}
+                key={member.user_id}
+                onClick={() => onMessage(member)}
+                type="button"
+              >
+                <span className={styles.memberListAvatar} aria-hidden="true">
+                  {initials(member.display_name)}
+                </span>
+                <span className={styles.memberListIdentity}>
+                  <strong>{member.display_name}</strong>
+                  <small>{roleName(member.user_role)}</small>
+                </span>
+                <span className={styles.contactListAction}>Message</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
 function escapeRegularExpression(value: string) {
@@ -1046,6 +1211,13 @@ export function TeamsChat({
     ),
   );
   const [showBroadcastComposer, setShowBroadcastComposer] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
+  const [showDirectMessagePicker, setShowDirectMessagePicker] = useState(false);
+  const [directMessageContacts, setDirectMessageContacts] = useState<ChatMember[]>([]);
+  const [directMessageContactsLoaded, setDirectMessageContactsLoaded] = useState(false);
+  const [directMessageSearch, setDirectMessageSearch] = useState("");
+  const [directMessageError, setDirectMessageError] = useState<string | null>(null);
+  const [loadingDirectMessageContacts, setLoadingDirectMessageContacts] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<{
     messageId: string;
@@ -1096,6 +1268,17 @@ export function TeamsChat({
       ).length,
     [channels],
   );
+
+  const filteredDirectMessageContacts = useMemo(() => {
+    const query = directMessageSearch.trim().toLowerCase();
+    if (!query) return directMessageContacts;
+
+    return directMessageContacts.filter((member) =>
+      `${member.display_name} ${roleName(member.user_role)}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [directMessageContacts, directMessageSearch]);
 
   const totalUnread = useMemo(
     () =>
@@ -1233,6 +1416,18 @@ export function TeamsChat({
   }, [threads]);
 
   const reloadChannels = useCallback(async () => {
+    const personalizedResult = await supabase.rpc("get_my_chat_channels_v4");
+
+    if (!personalizedResult.error) {
+      setChannels(
+        ((personalizedResult.data ?? []) as Array<
+          Partial<ChatChannel> &
+            Pick<ChatChannel, "channel_id" | "channel_type" | "channel_name">
+        >).map(normalizeChannel),
+      );
+      return;
+    }
+
     const richResult = await supabase.rpc("get_my_chat_channels_v3");
 
     if (!richResult.error) {
@@ -1639,6 +1834,57 @@ export function TeamsChat({
     });
   };
 
+  const openDirectMessagePicker = async () => {
+    setShowMembers(false);
+    setShowDirectMessagePicker(true);
+    setDirectMessageError(null);
+
+    if (directMessageContactsLoaded) return;
+
+    setLoadingDirectMessageContacts(true);
+    const { data, error } = await supabase.rpc(
+      "get_chat_direct_message_contacts",
+    );
+    setLoadingDirectMessageContacts(false);
+
+    if (error) {
+      setDirectMessageError(error.message);
+      return;
+    }
+
+    setDirectMessageContacts((data ?? []) as ChatMember[]);
+    setDirectMessageContactsLoaded(true);
+  };
+
+  const openMemberDirectory = () => {
+    setDirectMessageError(null);
+    setShowDirectMessagePicker(false);
+    setShowMembers(true);
+  };
+
+  const beginDirectMessage = (member: ChatMember) => {
+    const formData = new FormData();
+    formData.set("user_id", member.user_id);
+    setDirectMessageError(null);
+
+    startTransition(async () => {
+      const result = await startChatDirectMessage(formData);
+
+      if (!result.ok || !result.channelId) {
+        setDirectMessageError(
+          result.error ?? "The direct message could not be opened.",
+        );
+        return;
+      }
+
+      setShowMembers(false);
+      setShowDirectMessagePicker(false);
+      setDirectMessageSearch("");
+      router.push(`/portal/chat?channel=${result.channelId}`);
+      router.refresh();
+    });
+  };
+
   if (!activeChannel) {
     return (
       <section className={`panel ${styles.emptyPanel}`}>
@@ -1709,6 +1955,15 @@ export function TeamsChat({
             )}
           </div>
           <button
+            className={styles.newMessageButton}
+            disabled={isPending}
+            onClick={() => void openDirectMessagePicker()}
+            type="button"
+          >
+            <span aria-hidden="true">＋</span>
+            New direct message
+          </button>
+          <button
             className={styles.broadcastButton}
             disabled={isPending}
             onClick={markActiveChannelUnread}
@@ -1775,7 +2030,12 @@ export function TeamsChat({
             >
               Mark unread
             </button>
-            <div className={styles.memberSummary}>
+            <button
+              aria-haspopup="dialog"
+              className={styles.memberSummary}
+              onClick={openMemberDirectory}
+              type="button"
+            >
               <div className={styles.memberAvatars} aria-hidden="true">
                 {members.slice(0, 4).map((member) => (
                   <span className={styles.memberAvatar} key={member.user_id}>
@@ -1786,7 +2046,7 @@ export function TeamsChat({
               <span>
                 {members.length} {members.length === 1 ? "member" : "members"}
               </span>
-            </div>
+            </button>
           </div>
 
           <div className={styles.mobilePicker}>
@@ -1819,6 +2079,14 @@ export function TeamsChat({
               type="button"
             >
               Mark current chat unread
+            </button>
+            <button
+              aria-haspopup="dialog"
+              className="button button-secondary button-compact"
+              onClick={openMemberDirectory}
+              type="button"
+            >
+              View {members.length} {members.length === 1 ? "member" : "members"}
             </button>
           </div>
         </header>
@@ -2332,6 +2600,35 @@ export function TeamsChat({
           </div>
         )}
       </section>
+
+      {showMembers && (
+        <MemberDirectoryDialog
+          channel={activeChannel}
+          currentUserId={profile.id}
+          error={directMessageError}
+          members={members}
+          onClose={() => setShowMembers(false)}
+          onMessage={beginDirectMessage}
+          pending={isPending}
+        />
+      )}
+
+      {showDirectMessagePicker && (
+        <DirectMessageDialog
+          contacts={filteredDirectMessageContacts}
+          error={directMessageError}
+          loading={loadingDirectMessageContacts}
+          onClose={() => {
+            setShowDirectMessagePicker(false);
+            setDirectMessageError(null);
+            setDirectMessageSearch("");
+          }}
+          onMessage={beginDirectMessage}
+          onSearchChange={setDirectMessageSearch}
+          pending={isPending}
+          search={directMessageSearch}
+        />
+      )}
 
       {showBroadcastComposer && profile.role === "owner" && (
         <div

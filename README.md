@@ -65,6 +65,8 @@ For the complete production release, also configure these server-only values:
 - `OPENAI_API_KEY` — voice dictation and handwritten-note scanning
 - `OPENAI_TRANSCRIBE_MODEL` (optional; defaults to `gpt-4o-mini-transcribe`)
 - `OPENAI_HANDWRITING_MODEL` (optional; defaults to `gpt-5.6-sol`)
+- `ADOBE_SIGN_ADJUDICATOR_EMBED_URL` — adjudicator Adobe Sign Web Form URL
+- `ADOBE_SIGN_ADVISORY_MEMBER_EMBED_URL` — Advisory Committee Adobe Sign Web Form URL
 
 Before deploying the release:
 
@@ -72,7 +74,8 @@ Before deploying the release:
 2. In Supabase Storage settings, set the project-wide maximum file size to at least 200 MB. The migration sets the private `reference-documents` bucket to 200 MB and the private `chat-files` bucket to 25 MB, but bucket limits cannot exceed the project-wide limit.
 3. Keep both Storage buckets private and verify their RLS policies after migration.
 4. Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS production URL so invoice, receipt, and payment emails contain production links.
-5. Run `npm run lint` and `npm run build` before promoting the deployment.
+5. Confirm both Adobe Sign Web Form URLs use the Adobe-provided `esignWidget` HTTPS URL.
+6. Run `npm run lint` and `npm run build` before promoting the deployment.
 
 ## Mobile direction
 

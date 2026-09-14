@@ -62,6 +62,18 @@ function buildNavigation(
           },
         ];
 
+  if (
+    profile.role === "adjudicator" ||
+    profile.role === "advisory_member"
+  ) {
+    resources.splice(2, 0, {
+      href: "/portal/digital-signing",
+      label: "Digital signing",
+      shortLabel: "Sign",
+      icon: "✎",
+    });
+  }
+
   const management: NavItem[] = [];
 
   if (profile.role === "applicant") {

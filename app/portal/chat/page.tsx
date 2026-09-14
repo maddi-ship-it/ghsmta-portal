@@ -128,12 +128,18 @@ export default async function ChatPage({
   const supabase = await createClient();
   const params = await searchParams;
 
-  const richChannelResult = await supabase.rpc("get_my_chat_channels_v3");
-  let channelRows = richChannelResult.data as RawChannel[] | null;
-  let channelError = richChannelResult.error;
+  const personalizedChannelResult = await supabase.rpc("get_my_chat_channels_v4");
+  let channelRows = personalizedChannelResult.data as RawChannel[] | null;
+  let channelError = personalizedChannelResult.error;
+
+  if (channelError) {
+    const richChannelResult = await supabase.rpc("get_my_chat_channels_v3");
+    channelRows = richChannelResult.data as RawChannel[] | null;
+    channelError = richChannelResult.error;
+  }
 
   // This fallback keeps the chat page usable if the code deploy reaches Vercel
-  // a few minutes before migration 018 is run.
+  // a few minutes before the newest chat migrations are run.
   if (channelError) {
     const legacyResult = await supabase.rpc("get_my_chat_channels");
     channelRows = legacyResult.data as RawChannel[] | null;

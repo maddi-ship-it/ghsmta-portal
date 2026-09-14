@@ -9583,6 +9583,11 @@ html[data-theme="light"] .theme-setting-icon {
   font-size: 0.85rem;
 }
 
+.portal-shell .portal-main .digital-signing-panel .application-adobe-sign-block {
+  padding: 0;
+  border-bottom: 0;
+}
+
 /* Application reference dialog had light-only inner panels. */
 .portal-shell :where(
   .application-reference-modal,

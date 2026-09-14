@@ -11,6 +11,7 @@ type ChatActionResult = {
   ok: boolean;
   error?: string;
   count?: number;
+  channelId?: string;
   messageId?: string;
   messageKind?: "post" | "reply";
 };
@@ -32,6 +33,34 @@ function formText(formData: FormData, name: string) {
 
 function profileDisplayName(profile: { full_name?: string | null; email?: string | null }) {
   return profile.full_name?.trim() || profile.email || "Someone";
+}
+
+export async function startChatDirectMessage(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  await requireProfile();
+  const otherUserId = formText(formData, "user_id");
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(otherUserId)) {
+    return { ok: false, error: "Choose a portal user to message." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "start_or_get_chat_direct_message",
+    { p_other_user_id: otherUserId },
+  );
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error?.message ?? "The direct message could not be opened.",
+    };
+  }
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+  return { ok: true, channelId: String(data) };
 }
 
 async function readChannelMode(channelId: string) {
