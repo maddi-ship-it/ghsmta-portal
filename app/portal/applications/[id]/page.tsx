@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ApplicationQuestionField } from "@/components/application-question-field";
+import { ApplicationReferenceBar } from "@/components/application-reference-bar";
+import { buildApplicationReferencePanels } from "@/lib/application-reference-panels";
 import { requireProfile } from "@/lib/auth";
 import { formatDate, statusLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -127,6 +129,11 @@ export default async function ApplicationDetailPage({
   const cycles = (cyclesResult.data ?? []) as AwardCycle[];
   const answerMap = new Map(answers.map((answer) => [answer.question_id, answer.value]));
   const progressMap = new Map(progress.map((item) => [item.stage_id, item]));
+  const applicationReferencePanels = buildApplicationReferencePanels({
+    application,
+    questions,
+    answers,
+  });
 
   const selectedStage =
     stages.find((stage) => stage.id === query.stage) ??
@@ -193,6 +200,8 @@ export default async function ApplicationDetailPage({
         <article className="metric-card"><span className="metric-label">Submitted</span><strong className="metric-text">{formatDate(application.submitted_at)}</strong></article>
         <article className="metric-card"><span className="metric-label">Form</span><strong className="metric-text">{formVersion?.name ?? "Legacy form"}</strong></article>
       </section>
+
+      <ApplicationReferenceBar panels={applicationReferencePanels} />
 
       {stages.length > 0 && (
         <nav className="stage-tabs" aria-label="Application stages">

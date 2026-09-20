@@ -49,7 +49,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 1,
     "school": "Demo School 01",
-    "production": "Moonlight Over Georgia",
+    "production": "Newsies",
     "first": "Jordan",
     "last": "Ellis",
     "city": "Brookhaven",
@@ -60,7 +60,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 2,
     "school": "Demo School 02",
-    "production": "Bright Star",
+    "production": "Newsies",
     "first": "Taylor",
     "last": "Morgan",
     "city": "Marietta",
@@ -71,7 +71,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 3,
     "school": "Demo School 03",
-    "production": "The Drowsy Chaperone",
+    "production": "Newsies",
     "first": "Avery",
     "last": "Brooks",
     "city": "Roswell",
@@ -82,7 +82,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 4,
     "school": "Demo School 04",
-    "production": "Once on This Island",
+    "production": "Newsies",
     "first": "Cameron",
     "last": "Reed",
     "city": "Gainesville",
@@ -104,7 +104,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 6,
     "school": "Demo School 06",
-    "production": "Into the Woods",
+    "production": "Newsies",
     "first": "Riley",
     "last": "Parker",
     "city": "Blue Ridge",
@@ -115,7 +115,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 7,
     "school": "Demo School 07",
-    "production": "Sister Act",
+    "production": "Newsies",
     "first": "Casey",
     "last": "Bennett",
     "city": "McDonough",
@@ -126,7 +126,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 8,
     "school": "Demo School 08",
-    "production": "The Addams Family",
+    "production": "Newsies",
     "first": "Jamie",
     "last": "Collins",
     "city": "Savannah",
@@ -137,7 +137,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 9,
     "school": "Demo School 09",
-    "production": "Something Rotten!",
+    "production": "Newsies",
     "first": "Drew",
     "last": "Sullivan",
     "city": "Douglasville",
@@ -148,7 +148,7 @@ const DEMO_SCHOOLS = [
   {
     "index": 10,
     "school": "Demo School 10",
-    "production": "Little Shop of Horrors",
+    "production": "Newsies",
     "first": "Alex",
     "last": "Ramirez",
     "city": "Columbus",
@@ -156,6 +156,91 @@ const DEMO_SCHOOLS = [
     "street": "1010 Riverfront Theatre Road",
     "zip": "31901"
   }
+];
+
+const NEWSIES_APPLICATION_DETAILS = [
+  ["Licensing Company", "Music Theatre International (MTI)"],
+  ["Are you using the school edition?", "No"],
+  ["Estimated run time?", "Approximately 2 hours 15 minutes, including intermission"],
+  ["Leading Actress Role", "Katherine Plumber"],
+  ["Leading Actor Role", "Jack Kelly"],
+  ["Supporting Performer [A] Role", "Davey Jacobs"],
+  ["Supporting Performer [B] Role", "Medda Larkin"],
+  ["Featured Performer Role", "Joseph Pulitzer"],
+  [
+    "Why did you choose this musical?",
+    "We chose Newsies because its story of young people organizing for fair treatment gives students a powerful way to explore courage, community, and collective action through acting, singing, and athletic dance.",
+  ],
+  [
+    "Director's Vision",
+    "Our production places the newsies inside a student-built, turn-of-the-century New York of scaffolding, rolling printing tables, newspaper bundles, and hand-painted headlines. The visual world begins in muted newsprint tones and gains color as the young workers find their collective voice.",
+  ],
+  [
+    "Written Response",
+    "The production centers the newsies' solidarity and makes their fight for dignity clear while balancing the show's humor, romance, and high-energy ensemble storytelling.",
+  ],
+  [
+    "Explain any challenges involved when mounting a musical at your school (e.g. space/facility, equipment/resources, student involvement, administration support, etc.).",
+    "Newsies requires a large ensemble, sustained athletic choreography, quick scenic shifts, and safe multi-level staging. We addressed those demands with progressive dance conditioning, fight and lift calls, modular scenery, and student-led backstage traffic plans.",
+  ],
+  [
+    "What else should we know about your production, program, vision, students, community, etc.?",
+    "Our students researched the 1899 newsboys' strike and the role of newspapers in turn-of-the-century New York. Student dramaturgs share that context in the lobby, while student designers and crew lead the production's newspaper, scenic, costume, lighting, and projection work.",
+  ],
+  ["Leading Actress Self Tape Song #1 Title", "Watch What Happens"],
+  ["Leading Actress Self Tape Song #1 Musical", "Newsies"],
+  ["Leading Actress Self Tape Song #2 Title", "Something to Believe In"],
+  ["Leading Actress Self Tape Song #2 Musical", "Newsies"],
+  ["Leading Actor Self Tape Song #1 Title", "Santa Fe"],
+  ["Leading Actor Self Tape Song #1 Musical", "Newsies"],
+  ["Leading Actor Self Tape Song #2 Title", "The World Will Know"],
+  ["Leading Actor Self Tape Song #2 Musical", "Newsies"],
+];
+
+const NEWSIES_ARCHIVE_DETAILS = [
+  [
+    "Please check all events your students will participate in this year.",
+    "One-Act Play Competition|Thespian Conference|GHSA Literary Competition",
+  ],
+  [
+    "Is this your school's first time participating in the Georgia High School Musical Theatre Awards?",
+    "No",
+  ],
+  ["Do the performances take place at your school?", "Yes"],
+  ["Broadway League Statement on Equity and Inclusion", "Yes"],
+  [
+    "I acknowledge that my musical is on the Broadway League's Qualifying Shows list.",
+    "Yes",
+  ],
+  ["Overall Production - Award Eligible", "Yes"],
+  ["Total number of high school students involved?", "60"],
+  ["Total number of parents involved?", "20"],
+  ["Total number of school faculty and/or staff involved?", "5"],
+  ["Total number of guests/teaching artists involved?", "1"],
+  [
+    "Total number of non-parent and non-guest artist volunteers involved?",
+    "0",
+  ],
+  ["Total number of K-8 students in the production?", "1"],
+  [
+    "Total number of other people (not named above in any other category) involved?",
+    "0",
+  ],
+  ["Total number of people involved in your Shuler production?", "87"],
+  ["How many years has your school produced a full musical?", "10"],
+  [
+    "Of the total number of participating students, how many have TWO OR MORE YEARS of experience in your school's theatre program?",
+    "20",
+  ],
+  [
+    "Of the total number of participating students, how many have ONE YEAR of experience in your school's theatre program?",
+    "16",
+  ],
+  [
+    "Of the total number of participating students, how many are within their FIRST YEAR in your school's theatre program?",
+    "12",
+  ],
+  ["How many weeks did you rehearse for this production?", "13"],
 ];
 
 function loadEnvFile(filename) {
@@ -325,6 +410,14 @@ function customizeTemplateRow(headers, templateRow, school) {
   ];
 
   replacements.forEach(([label, value]) => {
+    replaceAllByLabel(headers, row, label, value);
+  });
+
+  NEWSIES_APPLICATION_DETAILS.forEach(([label, value]) => {
+    replaceAllByLabel(headers, row, label, value);
+  });
+
+  NEWSIES_ARCHIVE_DETAILS.forEach(([label, value]) => {
     replaceAllByLabel(headers, row, label, value);
   });
 
@@ -1175,7 +1268,7 @@ async function ensureDemoApplication({
 
   const existingBySource = await supabase
     .from("applications")
-    .select("id")
+    .select("id,archived_payload")
     .eq("source_system", DEMO_SOURCE_SYSTEM)
     .eq("source_record_id", sourceRecordId)
     .maybeSingle();
@@ -1186,6 +1279,13 @@ async function ensureDemoApplication({
   );
 
   if (existing) {
+    const supplementalArchiveExport =
+      existing.archived_payload?.supplemental_archive_export;
+    if (supplementalArchiveExport) {
+      payload.archived_payload.supplemental_archive_export =
+        supplementalArchiveExport;
+    }
+
     return throwIfError(
       await supabase
         .from("applications")

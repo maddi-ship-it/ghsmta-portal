@@ -223,6 +223,34 @@ function candidateGroup(
   );
 }
 
+function buildSupplementalArchiveItems(
+  application: Pick<Application, "archived_payload">,
+): ApplicationReferenceItem[] {
+  const archive = application.archived_payload?.supplemental_archive_export;
+  if (!archive || typeof archive !== "object" || Array.isArray(archive)) {
+    return [];
+  }
+
+  const fields = (archive as Record<string, unknown>).fields;
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
+    return [];
+  }
+
+  return Object.entries(fields as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .flatMap(([, rawField]) => {
+      if (!rawField || typeof rawField !== "object" || Array.isArray(rawField)) {
+        return [];
+      }
+
+      const field = rawField as Record<string, unknown>;
+      const label = typeof field.label === "string" ? field.label.trim() : "";
+      if (!label) return [];
+
+      return [{ label, value: displayValue(field.value) }];
+    });
+}
+
 export function buildApplicationReferencePanels(
   input: ReferenceInput,
 ): ApplicationReferencePanel[] {
@@ -340,7 +368,7 @@ export function buildApplicationReferencePanels(
     ]),
   );
 
-  return [
+  const panels: ApplicationReferencePanel[] = [
     {
       key: "eligibility",
       title: "Category Eligibility View",
@@ -383,4 +411,25 @@ export function buildApplicationReferencePanels(
       ].filter((section) => section.items.length > 0),
     },
   ];
+
+  const supplementalArchiveItems = buildSupplementalArchiveItems(
+    input.application,
+  );
+  if (supplementalArchiveItems.length > 0) {
+    panels.push({
+      key: "archive-export",
+      title: "Complete Archive Export",
+      shortTitle: "Archive Export",
+      description:
+        "Every populated field supplied in the imported Acceptd archive record, including legacy fields that are not part of the current form.",
+      groups: [
+        {
+          title: "Imported archive fields",
+          items: supplementalArchiveItems,
+        },
+      ],
+    });
+  }
+
+  return panels;
 }
