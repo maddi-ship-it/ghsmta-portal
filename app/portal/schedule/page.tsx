@@ -1280,6 +1280,12 @@ export default async function SchedulePage({
                                         </select>
                                         <button className="text-button" type="submit">Update</button>
                                       </form>
+                                      <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
+                                        {profile.role === "advisory_member" && (
+                                          <input className="input input-compact" name="reason" placeholder="Removal reason" required />
+                                        )}
+                                        <button className="button button-danger button-compact" type="submit">Remove</button>
+                                      </form>
                                       {profile.role === "owner" && (
                                           <form
                                             action={ownerAddStaff.bind(null, slot.id)}
@@ -1311,12 +1317,6 @@ export default async function SchedulePage({
                                             <button className="text-button" disabled={!booking} type="submit">Save</button>
                                           </form>
                                         )}
-                                      <form action={removeScheduleStaff.bind(null, participant.enrollment_id)} className="schedule-remove-participant-form">
-                                        {profile.role === "advisory_member" && (
-                                          <input className="input input-compact" name="reason" placeholder="Removal reason" required />
-                                        )}
-                                        <button className="text-button danger-text" type="submit">Remove</button>
-                                      </form>
                                     </div>
                                   )}
                                 </div>

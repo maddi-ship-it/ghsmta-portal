@@ -4029,7 +4029,13 @@ body.modal-open {
 }
 .compact-check-card { min-height: 0; padding: 12px; }
 .input-compact { min-height: 32px; padding: 6px 8px; font-size: .8rem; }
-.schedule-remove-participant-form { display: flex; align-items: center; gap: 8px; }
+.schedule-remove-participant-form {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: 0 !important;
+}
 .schedule-remove-participant-form .input { width: 150px; }
 
 .adjudication-consensus-bar {
@@ -10389,8 +10395,13 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
 }
 
 .schedule-participant-actions {
+  flex: 1 1 620px;
   justify-content: flex-end;
   margin-left: auto;
+}
+
+.schedule-participant-actions > form {
+  margin-left: 0;
 }
 
 .schedule-participant-permissions-form,

@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 
 import { requireProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { sendSmtpEmail } from "@/lib/email/smtp";
 
@@ -889,12 +890,17 @@ export async function removeScheduleStaff(
   enrollmentId: string,
   formData: FormData,
 ) {
-  await requireProfile(["advisory_member", "owner"]);
+  const actor = await requireProfile(["advisory_member", "owner"]);
+  const reason = text(formData, "reason");
 
-  const supabase = await createClient();
-  const { data: enrollment, error: readError } = await supabase
+  if (actor.role === "advisory_member" && !reason) {
+    scheduleRedirect("error", "Enter a reason when removing a participant.");
+  }
+
+  const admin = createAdminClient();
+  const { data: enrollment, error: readError } = await admin
     .from("schedule_slot_staff")
-    .select("slot_id,user_id")
+    .select("id,slot_id,user_id,joined_as,participation_mode")
     .eq("id", enrollmentId)
     .single();
 
@@ -902,15 +908,54 @@ export async function removeScheduleStaff(
     scheduleRedirect("error", readError?.message ?? "Schedule participant not found.");
   }
 
-  const { error } = await supabase.rpc("manage_schedule_staff", {
-    p_slot_id: enrollment.slot_id,
-    p_user_id: enrollment.user_id,
-    p_action: "remove",
-    p_reason: text(formData, "reason") || null,
-    p_participation_mode: "panel",
-  });
+  const [participantResult, slotResult, bookingResult] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("full_name,email")
+      .eq("id", enrollment.user_id)
+      .maybeSingle(),
+    admin
+      .from("schedule_slots")
+      .select("title")
+      .eq("id", enrollment.slot_id)
+      .maybeSingle(),
+    admin
+      .from("schedule_school_bookings")
+      .select("application_id")
+      .eq("slot_id", enrollment.slot_id)
+      .maybeSingle(),
+  ]);
 
-  if (error) scheduleRedirect("error", error.message);
+  const { data: removed, error } = await admin
+    .from("schedule_slot_staff")
+    .delete()
+    .eq("id", enrollment.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !removed) {
+    scheduleRedirect("error", error?.message ?? "Schedule participant not found.");
+  }
+
+  const participantName =
+    participantResult.data?.full_name ??
+    participantResult.data?.email ??
+    "Portal user";
+  const actorName = actor.full_name ?? actor.email ?? "Portal user";
+  await admin.from("owner_activity_log").insert({
+    activity_type: "schedule_participant_remove",
+    title: `${actorName} removed ${participantName}`,
+    detail: reason || slotResult.data?.title || "Schedule participant removed",
+    actor_id: actor.id,
+    application_id: bookingResult.data?.application_id ?? null,
+    slot_id: enrollment.slot_id,
+    metadata: {
+      participant_id: enrollment.user_id,
+      participant_role: enrollment.joined_as,
+      participation_mode: enrollment.participation_mode,
+      reason: reason || null,
+    },
+  });
 
   revalidateSchedule();
   scheduleRedirect("success", "Staff member removed. Owners will see the change in their daily review.");
