@@ -383,14 +383,20 @@ async function persistAdjudicatorScorecard(
     .eq("adjudicator_user_id", adjudicator.id);
   if (cardUpdateError) throw new Error(cardUpdateError.message);
 
-  const { error: assignmentError } = await supabase.rpc(
-    "update_own_assignment_status",
-    {
-      p_assignment_id: scorecard.assignment_id,
-      p_status: shouldSubmit ? "submitted" : "in_progress",
-    },
-  );
-  if (assignmentError) throw new Error(assignmentError.message);
+  const admin = createAdminClient();
+  const { data: updatedAssignment, error: assignmentError } = await admin
+    .from("adjudicator_assignments")
+    .update({ status: shouldSubmit ? "submitted" : "in_progress" })
+    .eq("id", assignment.id)
+    .eq("adjudicator_user_id", adjudicator.id)
+    .is("removed_at", null)
+    .select("id")
+    .maybeSingle();
+  if (assignmentError || !updatedAssignment) {
+    throw new Error(
+      assignmentError?.message ?? "Unable to update your assignment workflow.",
+    );
+  }
 
   return {
     missing,
