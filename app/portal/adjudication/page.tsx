@@ -9,17 +9,32 @@ import type {
   AwardCycle,
 } from "@/lib/types";
 
-export default async function AdjudicationDashboard() {
+type AdjudicationSearchParams = {
+  q?: string;
+};
+
+function normalizeSearch(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
+export default async function AdjudicationDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<AdjudicationSearchParams>;
+}) {
   const profile = await requireProfile(["adjudicator", "advisory_member", "owner"]);
+  const params = await searchParams;
+  const searchQuery = String(params.q ?? "").trim();
+  const normalizedSearchQuery = normalizeSearch(searchQuery);
   const supabase = await createClient();
 
   const cyclesResult = await supabase
     .from("award_cycles")
     .select("*")
-    .eq("is_active", true)
     .neq("status", "archived");
+  if (cyclesResult.error) throw new Error(cyclesResult.error.message);
   const cycles = (cyclesResult.data ?? []) as AwardCycle[];
-  const activeCycleIds = cycles.map((cycle) => cycle.id);
+  const adjudicationCycleIds = cycles.map((cycle) => cycle.id);
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
 
   let applications: Application[] = [];
@@ -37,12 +52,12 @@ export default async function AdjudicationDashboard() {
     const applicationIds = candidateAssignments.map(
       (assignment) => assignment.application_id,
     );
-    if (applicationIds.length > 0 && activeCycleIds.length > 0) {
+    if (applicationIds.length > 0 && adjudicationCycleIds.length > 0) {
       const { data, error } = await supabase
         .from("applications")
         .select("*")
         .in("id", applicationIds)
-        .in("cycle_id", activeCycleIds)
+        .in("cycle_id", adjudicationCycleIds)
         .eq("is_archived", false)
         .order("school_name");
       if (error) throw new Error(error.message);
@@ -55,12 +70,12 @@ export default async function AdjudicationDashboard() {
     assignments = candidateAssignments.filter((assignment) =>
       activeApplicationIds.has(assignment.application_id),
     );
-  } else if (activeCycleIds.length > 0) {
+  } else if (adjudicationCycleIds.length > 0) {
     const [{ data: applicationData, error: applicationError }, { data: assignmentData, error: assignmentError }] = await Promise.all([
       supabase
         .from("applications")
         .select("*")
-        .in("cycle_id", activeCycleIds)
+        .in("cycle_id", adjudicationCycleIds)
         .eq("is_archived", false)
         .in("status", ["submitted", "under_review", "complete"])
         .order("school_name"),
@@ -110,6 +125,23 @@ export default async function AdjudicationDashboard() {
 
   const submittedCards = scorecards.filter((card) => card.status === "submitted" || card.status === "locked").length;
 
+  const matchesSearch = (application: Application | undefined) => {
+    if (!application) return false;
+    if (!normalizedSearchQuery) return true;
+
+    const cycle = cycleMap.get(application.cycle_id);
+    return normalizeSearch([
+      application.school_name,
+      application.production_title ?? "",
+      cycle?.season_year ?? "",
+      cycle?.name ?? "",
+    ].join(" ")).includes(normalizedSearchQuery);
+  };
+
+  const visibleRows = relevantRows.filter((row) =>
+    matchesSearch(row.application),
+  );
+
   let advisoryQueue: Array<{
     application: Application;
     unresolved: number;
@@ -154,6 +186,10 @@ export default async function AdjudicationDashboard() {
     });
   }
 
+  const visibleAdvisoryQueue = advisoryQueue.filter((row) =>
+    matchesSearch(row.application),
+  );
+
   return (
     <>
       <div className="page-heading">
@@ -176,6 +212,31 @@ export default async function AdjudicationDashboard() {
         <article className="metric-card"><span className="metric-label">Pending</span><strong className="metric-value">{Math.max(assignments.length - submittedCards, 0)}</strong></article>
       </section>
 
+      <section className="panel adjudication-search-panel">
+        <form action="/portal/adjudication" className="panel-body adjudication-search-form" method="get">
+          <div className="field adjudication-search-field">
+            <label htmlFor="adjudication_search">Search adjudication applications</label>
+            <div className="adjudication-search-row">
+              <input
+                className="input"
+                defaultValue={searchQuery}
+                id="adjudication_search"
+                name="q"
+                placeholder="Search school, production, season, or program"
+                type="search"
+              />
+              <button className="button button-dark" type="submit">Search</button>
+              {searchQuery && <Link className="button button-secondary" href="/portal/adjudication">Clear</Link>}
+            </div>
+            <small className="field-help" aria-live="polite">
+              {searchQuery
+                ? `Showing ${visibleRows.length} of ${relevantRows.length} available productions.`
+                : `${relevantRows.length} productions are available.`}
+            </small>
+          </div>
+        </form>
+      </section>
+
 
       {profile.role === "advisory_member" && (
         <>
@@ -188,19 +249,22 @@ export default async function AdjudicationDashboard() {
           <section className="panel advisory-review-queue">
             <div className="panel-header"><div><h2>Advisory Committee review queue</h2><p>Schools are sorted by disputes, unresolved eligibility/ranges, and missing scorecards.</p></div></div>
             <div className="advisory-queue-grid">
-              {advisoryQueue.map((row) => {
+              {visibleAdvisoryQueue.map((row) => {
                 const cycle = cycleMap.get(row.application.cycle_id);
                 return <Link className="advisory-queue-card" href={`/portal/adjudication/${row.application.id}`} key={row.application.id}><div><span className="eyebrow">{cycle ? `${cycle.season_year} · ${cycle.name}` : "Adjudication"}</span><h3>{row.application.school_name}</h3><p>{row.application.production_title ?? "Untitled production"}</p></div><div className="advisory-queue-status-grid"><span><strong>{row.unresolved}</strong> unresolved</span><span className={row.disputed ? "is-alert" : ""}><strong>{row.disputed}</strong> disputed</span><span><strong>{row.submitted}/{row.assigned}</strong> scorecards</span><span><strong>{row.reviewStatus.replaceAll("_", " ")}</strong></span></div></Link>;
               })}
+              {visibleAdvisoryQueue.length === 0 && searchQuery && (
+                <div className="empty-state"><h3>No review schools match that search.</h3><p>Try another school, production, season, or program name.</p></div>
+              )}
             </div>
           </section>
         </>
       )}
       <section className="panel">
-        <div className="panel-header"><div><h2>{profile.role === "adjudicator" ? "Assigned productions" : profile.role === "advisory_member" ? "All active applications" : "Productions under review"}</h2>{profile.role === "advisory_member" && <p>Every active application is available to read. Review tools activate only for schools whose timeslot you selected or were assigned.</p>}</div></div>
+        <div className="panel-header"><div><h2>{profile.role === "adjudicator" ? "Assigned productions" : profile.role === "advisory_member" ? "All available applications" : "Productions under review"}</h2>{profile.role === "advisory_member" && <p>Every available adjudication application is available to read. Review tools activate only for schools whose timeslot you selected or were assigned.</p>}</div></div>
         <div className="adjudication-card-list">
           {profile.role === "adjudicator" ? (
-            relevantRows.map((row) => {
+            visibleRows.map((row) => {
               if (!("assignment" in row) || !row.application) return null;
               const cycle = cycleMap.get(row.application.cycle_id);
               const card = scorecards.find((item) => item.assignment_id === row.assignment.id);
@@ -220,7 +284,7 @@ export default async function AdjudicationDashboard() {
               );
             })
           ) : (
-            relevantRows.map((row) => {
+            visibleRows.map((row) => {
               if (!("assignments" in row)) return null;
               const cycle = cycleMap.get(row.application.cycle_id);
               const cards = scorecards.filter((card) => card.application_id === row.application.id);
@@ -253,8 +317,11 @@ export default async function AdjudicationDashboard() {
               );
             })
           )}
-          {relevantRows.length === 0 && (
-            <div className="empty-state"><h3>No adjudication work is available yet.</h3><p>{profile.role === "adjudicator" ? "An owner must assign a production to you." : "Submitted applications will appear here once adjudicators are assigned."}</p></div>
+          {visibleRows.length === 0 && (
+            <div className="empty-state">
+              <h3>{searchQuery ? "No productions match that search." : "No adjudication work is available yet."}</h3>
+              <p>{searchQuery ? "Try another school, production, season, or program name." : profile.role === "adjudicator" ? "An owner must assign a production to you." : "Submitted applications will appear here once adjudicators are assigned."}</p>
+            </div>
           )}
         </div>
       </section>

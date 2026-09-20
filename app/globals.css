@@ -572,6 +572,21 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 .adjudication-card p { margin: 0; color: var(--muted); }
 .adjudication-card-meta { display: grid; justify-items: end; gap: 8px; text-align: right; }
 .adjudication-card-meta small { color: var(--muted); }
+.adjudication-search-panel { margin-bottom: 22px; }
+.adjudication-search-form { padding-bottom: 14px; }
+.adjudication-search-field { margin: 0; }
+.adjudication-search-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+.adjudication-search-row .button { min-height: 48px; }
+
+@media (max-width: 620px) {
+  .adjudication-search-row { grid-template-columns: 1fr; }
+  .adjudication-search-row .button { width: 100%; }
+}
 
 .badge-scorecard-draft,
 .badge-scorecard-assigned,
@@ -2996,12 +3011,18 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   padding: 24px;
   background: rgba(5, 15, 36, .66);
   backdrop-filter: blur(5px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .score-range-modal {
   width: min(760px, 100%);
   max-height: min(82vh, 820px);
-  overflow: auto;
+  max-height: min(82dvh, 820px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid #f5b7b1;
   border-radius: 18px;
   background: white;
@@ -3242,12 +3263,16 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   padding: 22px;
   background: rgba(7, 20, 47, .6);
   backdrop-filter: blur(8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .application-reference-modal {
   display: flex;
   width: min(1080px, 100%);
   max-height: min(86vh, 900px);
+  max-height: min(86dvh, 900px);
+  min-height: 0;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, .2);
@@ -3258,6 +3283,7 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 
 .application-reference-modal-header {
   display: flex;
+  flex: 0 0 auto;
   align-items: flex-start;
   justify-content: space-between;
   gap: 22px;
@@ -3297,9 +3323,14 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 
 .application-reference-modal-body {
   display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
   gap: 18px;
   padding: 22px 24px 28px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
   background: #f7f8fb;
 }
 
@@ -3534,13 +3565,19 @@ body.modal-open {
   padding: 28px;
   background: rgba(4, 13, 33, .68);
   backdrop-filter: blur(8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .schedule-tool-modal {
   position: relative;
   width: min(1120px, 96vw);
   max-height: 92vh;
-  overflow: auto;
+  max-height: 92dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
   border-radius: 22px;
   background: var(--page-bg, #f6f7fa);
   box-shadow: 0 30px 90px rgba(0, 0, 0, .34);
@@ -3824,12 +3861,18 @@ body.modal-open {
   padding: 24px;
   background: rgba(6, 15, 35, .62);
   backdrop-filter: blur(6px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .modal-card {
   width: min(760px, 100%);
   max-height: calc(100vh - 48px);
-  overflow: auto;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
   padding: 24px;
   border: 1px solid rgba(255,255,255,.3);
   border-radius: 22px;
@@ -7797,10 +7840,14 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   padding: 24px;
   background: rgba(2, 5, 12, 0.78);
   backdrop-filter: blur(12px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .regal-dialog-card {
   width: min(100%, 520px);
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 18px;
@@ -7811,11 +7858,16 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   background:
     linear-gradient(145deg, rgba(20, 31, 54, 0.99), rgba(8, 14, 27, 0.99));
   box-shadow: 0 32px 100px rgba(0, 0, 0, 0.56);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
 }
 
 .regal-dialog-card-wide {
   width: min(100%, 1120px);
   max-height: calc(100svh - 48px);
+  max-height: calc(100dvh - 48px);
 }
 
 .regal-dialog-card-wide .regal-dialog-copy {
