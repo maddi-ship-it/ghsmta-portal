@@ -133,13 +133,13 @@ export function AdjudicatorAutosave({
       inFlightRef.current = true;
       queuedRef.current = false;
       setState("saving");
-      setMessage("Syncing comments…");
+      setMessage("Syncing scorecard…");
 
       if (!navigator.onLine) {
         writeOfflineDraft(applicationId, form);
         inFlightRef.current = false;
         setState("offline");
-        setMessage("Offline — comments saved on this device.");
+        setMessage("Offline — scorecard saved on this device.");
         return;
       }
 
@@ -156,9 +156,9 @@ export function AdjudicatorAutosave({
         setMessage(
           navigator.onLine
             ? error instanceof Error
-              ? `Server sync failed — comments are saved on this device. ${error.message}`
-              : "Server sync failed — comments are saved on this device."
-            : "Offline — comments saved on this device.",
+              ? `Server sync failed — scorecard changes are saved on this device. ${error.message}`
+              : "Server sync failed — scorecard changes are saved on this device."
+            : "Offline — scorecard saved on this device.",
         );
         return;
       }
@@ -170,7 +170,7 @@ export function AdjudicatorAutosave({
         clearOfflineDraft(applicationId);
         setState("saved");
         setMessage(
-          `All comments synced ${new Date(result.savedAt).toLocaleTimeString([], {
+          `Scorecard synced ${new Date(result.savedAt).toLocaleTimeString([], {
             hour: "numeric",
             minute: "2-digit",
             second: "2-digit",
@@ -179,7 +179,7 @@ export function AdjudicatorAutosave({
       } else {
         writeOfflineDraft(applicationId, form);
         setState("error");
-        setMessage(result.error ? `Comments saved on this device. ${result.error}` : "Comments saved on this device. Autosave failed.");
+        setMessage(result.error ? `Scorecard saved on this device. ${result.error}` : "Scorecard saved on this device. Autosave failed.");
       }
 
       if (queuedRef.current) {
@@ -194,7 +194,7 @@ export function AdjudicatorAutosave({
       setMessage(
         navigator.onLine
           ? "Unsaved changes — local safety copy created."
-          : "Offline — comments saved on this device.",
+          : "Offline — scorecard saved on this device.",
       );
       timerRef.current = setTimeout(() => void runSave(), 900);
     };
@@ -206,8 +206,8 @@ export function AdjudicatorAutosave({
       setState(navigator.onLine ? "saving" : "offline");
       setMessage(
         navigator.onLine
-          ? "Back online — syncing saved comments…"
-          : "Offline — comments saved on this device.",
+          ? "Back online — syncing saved scorecard…"
+          : "Offline — scorecard saved on this device.",
       );
       if (navigator.onLine) {
         timerRef.current = setTimeout(() => void runSave(), 250);
@@ -217,7 +217,7 @@ export function AdjudicatorAutosave({
     const markOffline = () => {
       writeOfflineDraft(applicationId, form);
       setState("offline");
-      setMessage("Offline — comments saved on this device.");
+      setMessage("Offline — scorecard saved on this device.");
     };
 
     if (!restoredRef.current) {
@@ -230,8 +230,8 @@ export function AdjudicatorAutosave({
           setState(navigator.onLine ? "pending" : "offline");
           setMessage(
             navigator.onLine
-              ? "Restored unsynced comments — syncing now…"
-              : "Restored offline comments saved on this device.",
+              ? "Restored unsynced scorecard — syncing now…"
+              : "Restored offline scorecard saved on this device.",
           );
         }, 0);
         timerRef.current = setTimeout(() => void runSave(), navigator.onLine ? 350 : 900);

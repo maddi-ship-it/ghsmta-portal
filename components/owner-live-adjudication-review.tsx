@@ -304,11 +304,15 @@ function LivePanelFeedbackEditor({
     <div className="panel-feedback-editor">
       <div className="panel-feedback-heading">
         <div>
-          <h3>School-facing panel narrative</h3>
+          <div className="panel-feedback-title-row">
+            <h3>Owner review of panel narrative</h3>
+            {feedback?.status === "approved" && (
+              <span className="badge badge-complete">Panel approved</span>
+            )}
+          </div>
           <p>
-            This box follows live criterion observations and adjudicator comments
-            until you begin editing. ChatGPT can turn the collected notes into a
-            polished narrative.
+            Panel-approved comments arrive here for final Owner review. You can
+            edit the wording before releasing a separate snapshot to the school.
           </p>
         </div>
         <form action={generatePanelComment.bind(null, applicationId, category.id)}>
@@ -374,10 +378,10 @@ function LivePanelFeedbackEditor({
             defaultChecked={feedback?.status === "approved"}
             onChange={(event) => writeLocalDraft(value, event.currentTarget.checked)}
           />
-          Approved for school release
+          Approved and ready for school release
         </label>
         <button className="button button-dark" disabled={!online} type="submit">
-          {online ? "Save panel narrative" : "Save when online"}
+          {online ? "Save Owner review" : "Save when online"}
         </button>
       </form>
     </div>

@@ -20,6 +20,7 @@ function evaluateCompletion(
   form: HTMLFormElement,
   categories: ScoringCategory[],
   criteria: ScoringCriterion[],
+  requireComments: boolean,
 ): CompletionState {
   const formData = new FormData(form);
   let missingCount = 0;
@@ -68,6 +69,7 @@ function evaluateCompletion(
       }
 
       if (
+        requireComments &&
         !richTextHasContent(
           formText(formData, `observation_${criterion.id}`),
         )
@@ -108,10 +110,12 @@ export function ScorecardSubmitControls({
   applicationId,
   categories,
   criteria,
+  requireComments = true,
 }: {
   applicationId: string;
   categories: ScoringCategory[];
   criteria: ScoringCriterion[];
+  requireComments?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [completion, setCompletion] = useState<CompletionState>({
@@ -124,8 +128,8 @@ export function ScorecardSubmitControls({
   const updateCompletion = useCallback(() => {
     const form = hostRef.current?.closest("form");
     if (!form) return;
-    setCompletion(evaluateCompletion(form, categories, criteria));
-  }, [categories, criteria]);
+    setCompletion(evaluateCompletion(form, categories, criteria, requireComments));
+  }, [categories, criteria, requireComments]);
 
   useEffect(() => {
     const form = hostRef.current?.closest("form");
@@ -196,7 +200,7 @@ export function ScorecardSubmitControls({
         {!online
           ? "Final submission is available once you are back online."
           : hasOfflineDraft
-            ? "Final submission unlocks after saved comments finish syncing."
+            ? "Final submission unlocks after the saved scorecard finishes syncing."
             : completion.complete
           ? "All required fields are complete."
           : `${completion.missingCount} required field${

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AuthSignInPanel } from "@/components/auth-sign-in-panel";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
 
 export default async function LoginPage({
@@ -31,6 +32,10 @@ export default async function LoginPage({
         </div>
       </section>
       <section className="auth-panel">
+        <div className="auth-theme-control">
+          <span>Appearance</span>
+          <ThemeToggle />
+        </div>
         <AuthSignInPanel
           initialError={params.error}
           initialMessage={params.message}

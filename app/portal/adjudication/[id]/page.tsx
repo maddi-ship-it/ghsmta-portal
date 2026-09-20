@@ -18,6 +18,7 @@ import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudicatio
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdjudicationCategoryComment,
@@ -39,8 +40,10 @@ import type {
 } from "@/lib/types";
 
 import {
+  generatePanelComment,
   releaseAdjudicationResults,
   saveAdjudicatorScorecard,
+  savePanelFeedback,
 } from "./actions";
 
 
@@ -108,6 +111,133 @@ function scorecardStatusLabel(status: string) {
   return status.replaceAll("_", " ");
 }
 
+function PanelNarrativeWorkflow({
+  applicationId,
+  canComment,
+  categories,
+  feedback,
+  reviewStatus,
+}: {
+  applicationId: string;
+  canComment: boolean;
+  categories: ScoringCategory[];
+  feedback: AdjudicationPanelFeedback[];
+  reviewStatus: string;
+}) {
+  const feedbackByCategory = new Map(
+    feedback.map((item) => [item.category_id, item]),
+  );
+  const sentToOwners = ["ready_for_owner", "owner_review", "released"].includes(
+    reviewStatus,
+  );
+
+  return (
+    <section className="panel panel-narrative-workflow">
+      <div className="panel-header">
+        <div>
+          <span className="eyebrow">Panel narrative</span>
+          <h2>Review the school-facing final comments</h2>
+          <p>
+            After every scorecard is submitted, the first draft is generated
+            automatically from the panel&apos;s observations. A permitted panel
+            member reviews it, approves it, and sends it to Owners.
+          </p>
+        </div>
+        <span className={`badge ${sentToOwners ? "badge-complete" : "badge-warning"}`}>
+          {sentToOwners ? "Sent to Owners for review" : "Panel approval in progress"}
+        </span>
+      </div>
+      <div className="panel-body panel-narrative-list">
+        {categories.map((category) => {
+          const categoryFeedback = feedbackByCategory.get(category.id);
+          const finalComment = categoryFeedback?.final_comment?.trim() ?? "";
+          const approved = categoryFeedback?.status === "approved";
+
+          return (
+            <article className="panel-narrative-card" key={category.id}>
+              <div className="panel-narrative-card-heading">
+                <div>
+                  <span className="section-order">Final comment</span>
+                  <h3>{category.title}</h3>
+                </div>
+                <span className={`badge ${approved ? "badge-complete" : "badge-warning"}`}>
+                  {approved ? "Panel approved" : finalComment ? "Panel draft" : "Waiting for draft"}
+                </span>
+              </div>
+
+              {finalComment ? (
+                canComment ? (
+                  <form
+                    action={savePanelFeedback.bind(null, applicationId, category.id)}
+                    className="form-stack"
+                  >
+                    <div className="field">
+                      <label htmlFor={`panel_final_comment_${category.id}`}>
+                        School-facing final comment
+                      </label>
+                      <textarea
+                        className="textarea narrative-textarea"
+                        defaultValue={finalComment}
+                        id={`panel_final_comment_${category.id}`}
+                        name="final_comment"
+                        rows={8}
+                      />
+                    </div>
+                    <label className="check-row panel-narrative-approval">
+                      <input defaultChecked={approved} name="approved" type="checkbox" />
+                      <span>
+                        <strong>Approve final comment</strong>
+                        <small>
+                          When every final comment and required review item is approved,
+                          the package is sent to Owners automatically.
+                        </small>
+                      </span>
+                    </label>
+                    <div className="button-row panel-narrative-actions">
+                      <button className="button button-dark" type="submit">
+                        Save panel narrative
+                      </button>
+                      <button
+                        className="button button-secondary"
+                        formAction={generatePanelComment.bind(null, applicationId, category.id)}
+                        type="submit"
+                      >
+                        Regenerate initial draft
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="comment-readonly-surface panel-narrative-preview">
+                    {finalComment}
+                  </div>
+                )
+              ) : canComment ? (
+                <div className="panel-narrative-empty">
+                  <p>
+                    The automatic draft will appear after all assigned
+                    scorecards are submitted. You can also prepare it now from
+                    the observations currently saved.
+                  </p>
+                  <form action={generatePanelComment.bind(null, applicationId, category.id)}>
+                    <button className="button button-secondary" type="submit">
+                      Generate initial draft
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div className="comment-readonly-surface">
+                  No final comment has been prepared yet. Commenting is disabled
+                  for this assignment.
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default async function AdjudicationApplicationPage({
   params,
   searchParams,
@@ -126,6 +256,7 @@ export default async function AdjudicationApplicationPage({
   const { id } = await params;
   const query = await searchParams;
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const { data: applicationData, error: applicationError } = await supabase
     .from("applications")
@@ -267,9 +398,7 @@ export default async function AdjudicationApplicationPage({
     isScoringParticipant
       ? supabase.from("adjudication_scorecards").select("*").eq("application_id", id).eq("adjudicator_user_id", profile.id)
       : supabase.from("adjudication_scorecards").select("*").eq("application_id", id).order("created_at"),
-    isScoringParticipant
-      ? Promise.resolve({ data: [], error: null })
-      : supabase.from("adjudication_panel_feedback").select("*").eq("application_id", id),
+    admin.from("adjudication_panel_feedback").select("*").eq("application_id", id),
     isScoringParticipant
       ? Promise.resolve({ data: null, error: null })
       : supabase.from("adjudication_releases").select("*").eq("application_id", id).maybeSingle(),
@@ -522,6 +651,7 @@ export default async function AdjudicationApplicationPage({
   }
   const ownScorecard = isScoringParticipant ? scorecards[0] ?? null : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
+  const canComment = Boolean(ownParticipantResult.data?.can_comment);
 
   return (
     <>
@@ -541,7 +671,17 @@ export default async function AdjudicationApplicationPage({
       {query.submitted && <div className="notice page-message">Your scorecard was submitted and is now read-only.</div>}
       {query.generated && <div className="notice page-message">The AI narrative draft was generated. Review and edit it before approval.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
-      {query.error === "required" && <div className="form-error page-message">Complete every required subject field, score, and criterion comment before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
+      {query.error === "required" && <div className="form-error page-message">Complete every required subject field and score{canComment ? ", including criterion comments," : ""} before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
+
+      {isScoringParticipant && !canComment && (
+        <div className="comment-permission-banner" role="status">
+          <span aria-hidden="true">◇</span>
+          <div>
+            <strong>Commenting is off for this assignment</strong>
+            <p>You can enter scores, but observation and private-note fields are read-only.</p>
+          </div>
+        </div>
+      )}
 
       <ApplicationReferenceBar panels={referencePanels} />
 
@@ -557,6 +697,18 @@ export default async function AdjudicationApplicationPage({
         }>}
         categories={categories}
         currentUserId={profile.id}
+        narrativesReady={
+          categories.length > 0 &&
+          categories.every((category) => {
+            const categoryFeedback = feedback.find(
+              (item) => item.category_id === category.id,
+            );
+            return (
+              categoryFeedback?.status === "approved" &&
+              Boolean(categoryFeedback.final_comment?.trim())
+            );
+          })
+        }
         proposals={(proposalResult.data ?? []) as Array<{
           id: string;
           application_id: string;
@@ -600,6 +752,7 @@ export default async function AdjudicationApplicationPage({
 
         <div className="adjudication-score-content">
       {isScoringParticipant ? (
+        <>
         <form className="scorecard-form">
           <AdjudicatorAutosave
             applicationId={id}
@@ -648,11 +801,25 @@ export default async function AdjudicationApplicationPage({
             ownScores={scores.filter(
               (score) => score.scorecard_id === ownScorecard?.id,
             )}
+            canComment={canComment}
             readOnly={readOnly}
             scoreOptions={scoreChoices}
           />
 
-          <section className="panel"><div className="panel-body"><div className="field"><label htmlFor="scorecard_internal_notes">Overall private notes</label><textarea className="textarea" id="scorecard_internal_notes" name="scorecard_internal_notes" defaultValue={ownScorecard?.internal_notes ?? ""} disabled={readOnly} /></div></div></section>
+          <section className="panel">
+            <div className="panel-body">
+              <div className="field">
+                <label htmlFor={canComment ? "scorecard_internal_notes" : undefined}>Overall private notes</label>
+                {canComment ? (
+                  <textarea className="textarea" id="scorecard_internal_notes" name="scorecard_internal_notes" defaultValue={ownScorecard?.internal_notes ?? ""} disabled={readOnly} />
+                ) : (
+                  <div className="comment-readonly-surface">
+                    {ownScorecard?.internal_notes || "No private notes were entered before commenting was disabled."}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
 
           {!readOnly && (
             <div className="application-action-bar scorecard-action-bar">
@@ -666,11 +833,20 @@ export default async function AdjudicationApplicationPage({
               <ScorecardSubmitControls
                 applicationId={id}
                 categories={categories}
+                requireComments={canComment}
                 criteria={criteria}
               />
             </div>
           )}
         </form>
+        <PanelNarrativeWorkflow
+          applicationId={id}
+          canComment={canComment}
+          categories={categories}
+          feedback={feedback}
+          reviewStatus={reviewResult.data?.status ?? "draft"}
+        />
+        </>
       ) : profile.role === "advisory_member" && !canPanelReview ? (
         <section className="panel advisory-read-only-panel">
           <div className="panel-header">
@@ -693,6 +869,16 @@ export default async function AdjudicationApplicationPage({
         </section>
       ) : (
         <>
+          {profile.role === "advisory_member" && (
+            <PanelNarrativeWorkflow
+              applicationId={id}
+              canComment={canComment}
+              categories={categories}
+              feedback={feedback}
+              reviewStatus={reviewResult.data?.status ?? "draft"}
+            />
+          )}
+
           <SpecialtyAwardWorkspace
             applicationId={id}
             currentUserId={profile.id}

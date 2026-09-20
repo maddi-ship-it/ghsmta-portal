@@ -12578,3 +12578,696 @@ html[data-theme="dark"] .public-home-role-marker {
     width: 100%;
   }
 }
+
+/* ========================================================================== */
+/* Unified portal appearance                                                   */
+/* One final semantic layer keeps light and dark mode visually consistent.     */
+/* ========================================================================== */
+
+html[data-theme="dark"] {
+  --app-bg: #070d18;
+  --app-surface: #101929;
+  --app-surface-2: #162237;
+  --app-text: #eef2f8;
+  --app-muted: #a8b3c4;
+  --app-line: rgba(196, 209, 231, 0.16);
+  --app-focus: #f1d77f;
+}
+
+html[data-theme="light"] {
+  --app-bg: #f4f6f8;
+  --app-surface: #ffffff;
+  --app-surface-2: #f7f9fc;
+  --app-text: #172237;
+  --app-muted: #5d6a7e;
+  --app-line: rgba(29, 45, 69, 0.14);
+  --app-focus: #2857bd;
+}
+
+html[data-theme] body {
+  color: var(--app-text);
+  background: var(--app-bg);
+}
+
+html[data-theme="dark"] .portal-shell {
+  --portal-bg-deep: #050a13;
+  --portal-bg: #08101e;
+  --portal-surface: #111b2d;
+  --portal-surface-2: #162238;
+  --portal-surface-3: #1b2942;
+  --portal-surface-hover: #213250;
+  --portal-input: #0b1424;
+  --portal-line: rgba(196, 209, 231, 0.16);
+  --portal-line-strong: rgba(226, 191, 91, 0.38);
+  --portal-ivory: #f7f4eb;
+  --portal-text: #e4eaf3;
+  --portal-muted: #a3afc1;
+  --portal-gold: #c9a84d;
+  --portal-gold-bright: #f0d67d;
+  --portal-blue: #7fa5ff;
+  --portal-blue-deep: #2349a4;
+  --portal-success: #65c997;
+  --portal-warning: #f2bd66;
+  --portal-danger: #ff9aa5;
+  --portal-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+  color-scheme: dark;
+}
+
+html[data-theme="light"] .portal-shell {
+  --portal-bg-deep: #e8edf3;
+  --portal-bg: #f4f6f8;
+  --portal-surface: #ffffff;
+  --portal-surface-2: #f7f9fc;
+  --portal-surface-3: #edf1f6;
+  --portal-surface-hover: #e7edf5;
+  --portal-input: #ffffff;
+  --portal-line: rgba(29, 45, 69, 0.14);
+  --portal-line-strong: rgba(153, 111, 18, 0.36);
+  --portal-ivory: #142039;
+  --portal-text: #263248;
+  --portal-muted: #627086;
+  --portal-gold: #a57916;
+  --portal-gold-bright: #76530c;
+  --portal-blue: #2857bd;
+  --portal-blue-deep: #183a87;
+  --portal-success: #147547;
+  --portal-warning: #925600;
+  --portal-danger: #b4232d;
+  --portal-shadow: 0 14px 38px rgba(26, 40, 62, 0.09);
+  color-scheme: light;
+}
+
+.portal-shell {
+  color: var(--portal-text);
+  background: var(--portal-bg);
+}
+
+.portal-shell .portal-main {
+  color: var(--portal-text);
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--portal-gold) 8%, transparent), transparent 30rem),
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--portal-blue) 7%, transparent), transparent 28rem),
+    var(--portal-bg) !important;
+}
+
+.portal-shell .portal-main > .container {
+  width: min(1240px, calc(100% - 40px));
+}
+
+.portal-shell .portal-header {
+  color: #f5f7fb;
+  border-bottom: 1px solid rgba(214, 225, 244, 0.12);
+  background: rgba(6, 14, 29, 0.94);
+  box-shadow: 0 8px 30px rgba(2, 7, 16, 0.2);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.portal-shell .portal-header :where(.portal-desktop-link, .portal-nav-menu > summary) {
+  color: #c8d2e2;
+}
+
+.portal-shell .portal-header :where(.portal-desktop-link, .portal-nav-menu > summary):hover,
+.portal-shell .portal-header :where(.portal-desktop-link, .portal-nav-menu > summary):focus-visible {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.portal-shell .portal-header .portal-utility-link,
+html[data-theme="light"] .portal-shell .portal-header .portal-utility-link {
+  color: #f0d67d !important;
+  border-color: rgba(226, 210, 164, 0.24) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  box-shadow: none;
+}
+
+.portal-shell .portal-header .portal-utility-link:hover,
+.portal-shell .portal-header .portal-utility-link:focus-visible,
+html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:hover,
+html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus-visible {
+  color: #ffffff !important;
+  border-color: rgba(240, 214, 125, 0.48) !important;
+  background: rgba(240, 214, 125, 0.12) !important;
+}
+
+.portal-shell .portal-header :is(.portal-nav-menu-popover, .portal-account-popover) {
+  color: var(--portal-text);
+  border: 1px solid var(--portal-line-strong);
+  background: var(--portal-surface) !important;
+  box-shadow: 0 22px 68px rgba(2, 7, 16, 0.34);
+}
+
+.portal-shell .portal-header :is(.portal-nav-menu-popover, .portal-account-popover) :where(a, button, strong) {
+  color: var(--portal-ivory);
+}
+
+.portal-shell .portal-header :is(.portal-nav-menu-popover, .portal-account-popover) :where(span, small) {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--portal-ivory) !important;
+}
+
+.portal-shell .portal-main :where(p, li, dd, .field-help, .panel-comment-empty, .release-date) {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main :where(label, dt, .metric-label, .section-order) {
+  color: color-mix(in srgb, var(--portal-text) 88%, var(--portal-muted));
+}
+
+.portal-shell .portal-main .eyebrow {
+  color: var(--portal-gold-bright) !important;
+}
+
+.portal-shell .portal-main :where(
+  .panel,
+  .metric-card,
+  .settings-section,
+  .detail-item,
+  .adjudication-card,
+  .application-section,
+  .application-filter-panel,
+  .archive-source-panel,
+  .builder-section,
+  .builder-stage,
+  .check-card,
+  .compact-check-card,
+  .cycle-card,
+  .feedback-request-card,
+  .notification-center,
+  .notification-row,
+  .owner-controls-panel,
+  .panelist-card,
+  .question-admin-card,
+  .question-editor,
+  .raw-comment-card,
+  .reference-document-card,
+  .reference-library-panel,
+  .reference-upload-panel,
+  .released-results-panel,
+  .rubric-category-editor,
+  .schedule-create-panel,
+  .schedule-school-card,
+  .schedule-slot-card,
+  .schedule-tool-panel,
+  .schedule-visit-detail-card,
+  .school-file-row,
+  .school-files-main,
+  .school-files-sidebar,
+  .school-team-panel,
+  .school-team-member,
+  .score-category-panel,
+  .score-guide-panel,
+  .scoring-admin-section,
+  .specialty-award-card,
+  .specialty-owner-group,
+  .specialty-summary-card,
+  .workflow-feedback-card,
+  .workflow-feedback-panel,
+  .workflow-notification-builder,
+  .workflow-rule-card
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: var(--portal-surface) !important;
+  box-shadow: var(--portal-shadow);
+}
+
+.portal-shell .portal-main :where(
+  .panel-body,
+  .application-answer,
+  .builder-question-card,
+  .criterion-copy,
+  .criterion-score-cell,
+  .inline-category-decision,
+  .live-score-observation,
+  .panel-criterion-comment,
+  .panel-feedback-editor,
+  .panel-review-category,
+  .private-category-notes,
+  .raw-comment-grid,
+  .reference-audience-option,
+  .released-feedback-section,
+  .reply-composer,
+  .reply-thread,
+  .schedule-booking-summary,
+  .schedule-owner-controls,
+  .school-file-upload-panel,
+  .specialty-action-bar
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: var(--portal-surface-2) !important;
+}
+
+.portal-shell .portal-main :where(
+  .panel-header,
+  .application-section-header,
+  .application-action-bar,
+  .application-archive-toolbar,
+  .application-reference-bar,
+  .owner-application-tools,
+  .schedule-live-strip,
+  .schedule-owner-tool-bar,
+  .schedule-workspace-toolbar,
+  .schedule-workspace-filters,
+  .scorecard-action-bar,
+  .scoring-category-header,
+  .user-bulk-toolbar,
+  .workflow-builder-header
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: color-mix(in srgb, var(--portal-surface-2) 94%, transparent) !important;
+  box-shadow: none;
+  backdrop-filter: blur(14px);
+}
+
+.portal-shell .portal-main :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea,
+  .input,
+  .select,
+  .textarea,
+  .file-input,
+  .input-static,
+  .rich-text-shell,
+  .rich-text-toolbar,
+  .rich-text-editor,
+  [contenteditable="true"]
+) {
+  color: var(--portal-ivory) !important;
+  border-color: var(--portal-line) !important;
+  background: var(--portal-input) !important;
+  box-shadow: none !important;
+}
+
+.portal-shell .portal-main :where(input, textarea, [contenteditable="true"])::placeholder {
+  color: color-mix(in srgb, var(--portal-muted) 78%, transparent) !important;
+}
+
+.portal-shell .portal-main :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea,
+  .input,
+  .select,
+  .textarea,
+  .rich-text-shell,
+  [contenteditable="true"]
+):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--portal-blue) 46%, var(--portal-line)) !important;
+}
+
+.portal-shell .portal-main :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea,
+  .input,
+  .select,
+  .textarea,
+  .rich-text-shell,
+  [contenteditable="true"]
+):focus,
+.portal-shell .portal-main .rich-text-shell:focus-within {
+  outline: none;
+  border-color: var(--portal-blue) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-blue) 18%, transparent) !important;
+}
+
+.portal-shell .portal-main :where(input, select, textarea, button):disabled,
+.portal-shell .portal-main :where(.input-static, [aria-disabled="true"]) {
+  color: var(--portal-muted) !important;
+  border-color: var(--portal-line) !important;
+  background: var(--portal-surface-3) !important;
+  opacity: 0.72;
+}
+
+.portal-shell .portal-main .button {
+  border-radius: 0.75rem;
+  box-shadow: none;
+}
+
+.portal-shell .portal-main :where(.button.button-primary, .button.button-gold) {
+  color: #101725 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: linear-gradient(135deg, #f2dc91, #d1ad4c) !important;
+  box-shadow: 0 9px 24px rgba(177, 132, 25, 0.18) !important;
+}
+
+.portal-shell .portal-main .button.button-dark {
+  color: #ffffff !important;
+  border-color: #224898 !important;
+  background: linear-gradient(135deg, #2857bd, #173a7d) !important;
+}
+
+.portal-shell .portal-main :where(.button.button-danger, .button.danger-button) {
+  color: #ffffff !important;
+  border-color: #a92535 !important;
+  background: #a92535 !important;
+}
+
+.portal-shell .portal-main :where(.button.button-secondary, .button.button-secondary-light, .button.button-ghost) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: var(--portal-surface-2) !important;
+}
+
+.portal-shell .portal-main :where(.button.button-secondary, .button.button-secondary-light, .button.button-ghost):hover {
+  color: var(--portal-ivory) !important;
+  border-color: var(--portal-line-strong) !important;
+  background: var(--portal-surface-hover) !important;
+}
+
+.portal-shell .portal-main .text-button {
+  color: var(--portal-blue) !important;
+  background: transparent !important;
+}
+
+.portal-shell .portal-main :where(.table-wrap, .criterion-score-table, .consensus-matrix-table-wrap, .report-table-wrap) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface);
+  box-shadow: none;
+}
+
+.portal-shell .portal-main :where(.data-table th, .user-admin-table th, .criterion-score-table th, .consensus-matrix-table th) {
+  color: color-mix(in srgb, var(--portal-text) 78%, var(--portal-gold-bright)) !important;
+  border-color: var(--portal-line) !important;
+  background: var(--portal-surface-3) !important;
+}
+
+.portal-shell .portal-main :where(.data-table td, .user-admin-table td, .criterion-score-table td, .consensus-matrix-table td) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: transparent !important;
+}
+
+.portal-shell .portal-main :where(.data-table tbody tr:nth-child(even), .user-admin-table tbody tr:nth-child(even), .criterion-score-table tbody tr:nth-child(even), .collaborative-criterion-row:nth-child(odd)) {
+  background: color-mix(in srgb, var(--portal-surface-2) 72%, transparent) !important;
+}
+
+.portal-shell .portal-main :where(.data-table tbody tr:hover, .user-admin-table tbody tr:hover, .criterion-score-table tbody tr:hover) {
+  background: var(--portal-surface-hover) !important;
+}
+
+.portal-shell :where(
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .feedback-modal,
+  .regal-dialog-card,
+  .schedule-tool-modal,
+  .score-range-modal,
+  .modal-card
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line-strong) !important;
+  background: var(--portal-surface) !important;
+  box-shadow: 0 28px 90px rgba(2, 7, 16, 0.38) !important;
+}
+
+.portal-shell :where(
+  .application-reference-modal-backdrop,
+  .consensus-matrix-modal-backdrop,
+  .feedback-modal-backdrop,
+  .regal-dialog-backdrop,
+  .schedule-tool-modal-backdrop,
+  .score-range-modal-backdrop,
+  .modal-backdrop
+) {
+  background: rgba(4, 9, 18, 0.66) !important;
+  backdrop-filter: blur(6px);
+}
+
+.portal-shell .portal-main :where(.notice, .notice-banner, .info-banner, .page-message, .form-builder-notice) {
+  color: var(--portal-blue) !important;
+  border-color: color-mix(in srgb, var(--portal-blue) 28%, transparent) !important;
+  background: color-mix(in srgb, var(--portal-blue) 10%, var(--portal-surface)) !important;
+}
+
+.portal-shell .portal-main :where(.success-banner, .badge-complete, .badge-submitted) {
+  color: var(--portal-success) !important;
+  border-color: color-mix(in srgb, var(--portal-success) 30%, transparent) !important;
+  background: color-mix(in srgb, var(--portal-success) 11%, var(--portal-surface)) !important;
+}
+
+.portal-shell .portal-main :where(.form-error, .error-banner) {
+  color: var(--portal-danger) !important;
+  border-color: color-mix(in srgb, var(--portal-danger) 28%, transparent) !important;
+  background: color-mix(in srgb, var(--portal-danger) 10%, var(--portal-surface)) !important;
+}
+
+.comment-permission-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--portal-warning) 34%, var(--portal-line));
+  border-radius: 0.9rem;
+  color: var(--portal-text);
+  background: color-mix(in srgb, var(--portal-warning) 9%, var(--portal-surface));
+}
+
+.comment-permission-banner > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--portal-warning);
+  background: color-mix(in srgb, var(--portal-warning) 15%, transparent);
+  font-weight: 900;
+}
+
+.comment-permission-banner strong {
+  color: var(--portal-ivory);
+}
+
+.comment-permission-banner p {
+  margin: 0.2rem 0 0;
+  color: var(--portal-muted);
+}
+
+.comment-readonly-surface {
+  min-height: 3.25rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--portal-line);
+  border-radius: 0.75rem;
+  color: var(--portal-muted);
+  background: var(--portal-surface-3);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.comment-readonly-observation {
+  display: grid;
+  gap: 0.45rem;
+  min-height: 100%;
+}
+
+.comment-readonly-observation small {
+  color: var(--portal-warning);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.panel-narrative-workflow {
+  margin-top: 1rem;
+}
+
+.panel-narrative-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.panel-narrative-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--portal-line);
+  border-radius: 0.95rem;
+  background: var(--portal-surface-2);
+}
+
+.panel-narrative-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel-narrative-card-heading h3 {
+  margin: 0.25rem 0 0;
+}
+
+.panel-narrative-preview {
+  color: var(--portal-text);
+}
+
+.panel-narrative-approval {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px solid var(--portal-line);
+  border-radius: 0.8rem;
+  background: var(--portal-surface-3);
+}
+
+.panel-narrative-approval span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.panel-narrative-approval small {
+  color: var(--portal-muted);
+}
+
+.panel-narrative-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem;
+  border: 1px dashed var(--portal-line-strong);
+  border-radius: 0.8rem;
+  background: var(--portal-surface-3);
+}
+
+.panel-narrative-empty p {
+  max-width: 50rem;
+  margin: 0;
+}
+
+.panel-narrative-actions {
+  justify-content: flex-start;
+}
+
+.panel-feedback-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.panel-feedback-title-row h3 {
+  margin: 0;
+}
+
+.portal-shell * {
+  scrollbar-color: color-mix(in srgb, var(--portal-gold) 46%, transparent) var(--portal-surface-2);
+}
+
+.portal-shell *::-webkit-scrollbar-track {
+  background: var(--portal-surface-2);
+}
+
+.portal-shell *::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--portal-gold) 48%, transparent);
+  background-clip: padding-box;
+}
+
+/* Authentication pages use the same resolved theme instead of a permanent
+   dark card placed on an unrelated page color. */
+.auth-panel {
+  position: relative;
+  color: var(--app-text);
+  background: var(--app-bg) !important;
+}
+
+.auth-card,
+.auth-card-regal {
+  color: var(--app-text) !important;
+  border: 1px solid var(--app-line) !important;
+  background: var(--app-surface) !important;
+  box-shadow: 0 24px 70px color-mix(in srgb, #020713 18%, transparent) !important;
+}
+
+.auth-card :where(h1, h2, h3, label, strong) {
+  color: var(--app-text) !important;
+}
+
+.auth-card :where(p, small) {
+  color: var(--app-muted) !important;
+}
+
+.auth-card :where(.input, .select, .textarea) {
+  color: var(--app-text);
+  border-color: var(--app-line);
+  background: var(--app-surface-2);
+}
+
+.auth-method-tabs {
+  border-color: var(--app-line) !important;
+  background: var(--app-surface-2) !important;
+}
+
+.auth-method-tabs button:not(.active) {
+  color: var(--app-muted) !important;
+}
+
+.auth-theme-control {
+  position: absolute;
+  z-index: 2;
+  top: max(1rem, env(safe-area-inset-top));
+  right: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.auth-theme-control .portal-utility-link {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--app-line);
+  border-radius: 50%;
+  color: var(--app-text);
+  background: var(--app-surface);
+}
+
+.auth-theme-control .portal-utility-link:hover {
+  color: var(--portal-gold-bright, #a57916);
+  border-color: color-mix(in srgb, var(--app-focus) 44%, var(--app-line));
+}
+
+@media (max-width: 760px) {
+  .portal-shell .portal-main > .container {
+    width: min(100% - 28px, 1240px);
+  }
+
+  .portal-shell .portal-main {
+    padding-top: 1.5rem;
+  }
+
+  .portal-shell .portal-main :where(.panel, .metric-card, .settings-section, .schedule-slot-card) {
+    border-radius: 0.9rem;
+  }
+
+  .auth-theme-control > span {
+    display: none;
+  }
+
+  .panel-narrative-card-heading,
+  .panel-narrative-empty {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .panel-narrative-actions > *,
+  .panel-narrative-empty .button {
+    width: 100%;
+  }
+}

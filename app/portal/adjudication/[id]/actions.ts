@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import {
   applyPromptTemplate,
@@ -10,8 +11,10 @@ import {
   isQuarterPointScore,
 } from "@/lib/adjudication";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
+import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
 import { requireProfile } from "@/lib/auth";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdjudicationCategoryComment,
@@ -46,6 +49,23 @@ async function persistAdjudicatorScorecard(
 ): Promise<PersistScorecardResult> {
   const adjudicator = await requireProfile(["adjudicator", "advisory_member"]);
   const supabase = await createClient();
+
+  const { data: assignment, error: assignmentReadError } = await supabase
+    .from("adjudicator_assignments")
+    .select("id,can_score,can_comment,removed_at")
+    .eq("application_id", applicationId)
+    .eq("adjudicator_user_id", adjudicator.id)
+    .is("removed_at", null)
+    .maybeSingle();
+
+  if (assignmentReadError) {
+    throw new Error(assignmentReadError.message);
+  }
+  if (!assignment?.can_score) {
+    throw new Error("You are not assigned as a scoring participant for this application.");
+  }
+
+  const canComment = Boolean(assignment.can_comment);
 
   const { data: scorecardId, error: scorecardError } = await supabase.rpc(
     "ensure_adjudication_scorecard",
@@ -230,7 +250,7 @@ async function persistAdjudicatorScorecard(
       missing.push(`${category.title}: ${category.subject_label}`);
     }
 
-    commentRows.push({
+    const commentRow: Record<string, unknown> = {
       scorecard_id: scorecard.id,
       category_id: category.id,
       subject_name: isEligible
@@ -243,8 +263,12 @@ async function persistAdjudicatorScorecard(
       not_applicable_reason: null,
       score_range_min: isEligible && validRange ? rangeMinimum : null,
       score_range_max: isEligible && validRange ? rangeMaximum : null,
-      private_notes: formText(formData, `private_notes_${category.id}`) || null,
-    });
+    };
+    if (canComment) {
+      commentRow.private_notes =
+        formText(formData, `private_notes_${category.id}`) || null;
+    }
+    commentRows.push(commentRow);
 
     const categoryCriteria = criteria.filter(
       (item) => item.category_id === category.id,
@@ -277,18 +301,22 @@ async function persistAdjudicatorScorecard(
 
       if (
         submit &&
+        canComment &&
         isEligible &&
         !richTextHasContent(observation)
       ) {
         missing.push(`${category.title}: ${criterion.title} observation`);
       }
 
-      scoreRows.push({
+      const scoreRow: Record<string, unknown> = {
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
         score: isEligible && validScore ? numericScore : null,
-        observation: isEligible ? observation || null : null,
-      });
+      };
+      if (canComment) {
+        scoreRow.observation = isEligible ? observation || null : null;
+      }
+      scoreRows.push(scoreRow);
     }
 
     if (
@@ -338,13 +366,18 @@ async function persistAdjudicatorScorecard(
       ? "reopened"
       : "draft";
 
+  const scorecardUpdate: Record<string, unknown> = {
+    status: nextStatus,
+    submitted_at: shouldSubmit ? now : null,
+  };
+  if (canComment) {
+    scorecardUpdate.internal_notes =
+      formText(formData, "scorecard_internal_notes") || null;
+  }
+
   const { error: cardUpdateError } = await supabase
     .from("adjudication_scorecards")
-    .update({
-      status: nextStatus,
-      submitted_at: shouldSubmit ? now : null,
-      internal_notes: formText(formData, "scorecard_internal_notes") || null,
-    })
+    .update(scorecardUpdate)
     .eq("id", scorecard.id)
     .eq("adjudicator_user_id", adjudicator.id);
   if (cardUpdateError) throw new Error(cardUpdateError.message);
@@ -384,6 +417,16 @@ export async function saveAdjudicatorScorecard(
 ) {
   const result = await persistAdjudicatorScorecard(applicationId, submit, formData);
 
+  if (result.submitted) {
+    after(async () => {
+      try {
+        await ensureInitialPanelNarratives(applicationId);
+      } catch (error) {
+        console.error("Unable to prepare the initial panel narratives.", error);
+      }
+    });
+  }
+
   if (result.missing.length > 0) {
     revalidatePath(`/portal/adjudication/${applicationId}`);
     redirect(`/portal/adjudication/${applicationId}?error=required&missing=${result.missing.length}`);
@@ -420,16 +463,42 @@ export async function reopenAdjudicatorScorecard(
   revalidatePath("/portal/adjudication");
 }
 
-export async function generatePanelComment(
+async function requirePanelNarrativeEditor(applicationId: string) {
+  const profile = await requireProfile([
+    "adjudicator",
+    "advisory_member",
+    "owner",
+  ]);
+
+  if (profile.role === "owner") return profile;
+
+  const supabase = await createClient();
+  const { data: assignment, error } = await supabase
+    .from("adjudicator_assignments")
+    .select("can_comment")
+    .eq("application_id", applicationId)
+    .eq("adjudicator_user_id", profile.id)
+    .is("removed_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!assignment?.can_comment) {
+    throw new Error("Commenting is disabled for this assignment.");
+  }
+
+  return profile;
+}
+
+async function generatePanelCommentDraft(
   applicationId: string,
   categoryId: string,
+  generatedBy: string,
 ) {
-  const owner = await requireProfile(["owner"]);
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured in Vercel.");
 
-  const supabase = await createClient();
-  const { data: applicationData, error: applicationError } = await supabase
+  const admin = createAdminClient();
+  const { data: applicationData, error: applicationError } = await admin
     .from("applications")
     .select("*")
     .eq("id", applicationId)
@@ -438,13 +507,21 @@ export async function generatePanelComment(
   const application = applicationData as Application;
 
   const [{ data: categoryData }, { data: criteriaData }, { data: cardsData }] = await Promise.all([
-    supabase.from("scoring_categories").select("*").eq("id", categoryId).single(),
-    supabase.from("scoring_criteria").select("*").eq("category_id", categoryId).eq("active", true).order("sort_order"),
-    supabase.from("adjudication_scorecards").select("*").eq("application_id", applicationId).in("status", ["draft", "reopened", "submitted", "locked"]),
+    admin.from("scoring_categories").select("*").eq("id", categoryId).single(),
+    admin.from("scoring_criteria").select("*").eq("category_id", categoryId).eq("active", true).order("sort_order"),
+    admin.from("adjudication_scorecards").select("*").eq("application_id", applicationId).in("status", ["draft", "reopened", "submitted", "locked"]),
   ]);
 
   if (!categoryData) throw new Error("Scoring category not found.");
   const category = categoryData as ScoringCategory;
+  const { data: categoryRubric, error: categoryRubricError } = await admin
+    .from("scoring_rubrics")
+    .select("cycle_id")
+    .eq("id", category.rubric_id)
+    .single();
+  if (categoryRubricError || categoryRubric?.cycle_id !== application.cycle_id) {
+    throw new Error("This scoring category does not belong to the application.");
+  }
   const criteria = (criteriaData ?? []) as ScoringCriterion[];
   const scorecards = (cardsData ?? []) as AdjudicationScorecard[];
   if (scorecards.length === 0) throw new Error("No adjudicator scorecards are available.");
@@ -453,13 +530,13 @@ export async function generatePanelComment(
   const criterionIds = criteria.map((criterion) => criterion.id);
 
   const [commentsResult, scoresResult] = await Promise.all([
-    supabase
+    admin
       .from("adjudication_category_comments")
       .select("*")
       .eq("category_id", categoryId)
       .in("scorecard_id", scorecardIds),
     criterionIds.length
-      ? supabase
+      ? admin
           .from("adjudication_scores")
           .select("*")
           .in("scorecard_id", scorecardIds)
@@ -488,7 +565,7 @@ export async function generatePanelComment(
     );
   }
 
-  const { data: cyclePromptData } = await supabase
+  const { data: cyclePromptData } = await admin
     .from("ai_prompt_templates")
     .select("*")
     .eq("template_key", "panel_category_comment")
@@ -500,7 +577,7 @@ export async function generatePanelComment(
 
   let prompt = cyclePromptData as AiPromptTemplate | null;
   if (!prompt) {
-    const { data: globalPromptData, error: globalPromptError } = await supabase
+    const { data: globalPromptData, error: globalPromptError } = await admin
       .from("ai_prompt_templates")
       .select("*")
       .eq("template_key", "panel_category_comment")
@@ -549,7 +626,7 @@ export async function generatePanelComment(
   if (!generatedComment) throw new Error("OpenAI returned an empty narrative.");
 
   const requestId = response.headers.get("x-request-id");
-  const { error: saveError } = await supabase.from("adjudication_panel_feedback").upsert(
+  const { error: saveError } = await admin.from("adjudication_panel_feedback").upsert(
     {
       application_id: applicationId,
       category_id: categoryId,
@@ -560,7 +637,7 @@ export async function generatePanelComment(
       prompt_snapshot: `${prompt.system_prompt}\n\n${userPrompt}`,
       model,
       openai_request_id: requestId,
-      generated_by: owner.id,
+      generated_by: generatedBy,
       generated_at: new Date().toISOString(),
       approved_by: null,
       approved_at: null,
@@ -568,6 +645,96 @@ export async function generatePanelComment(
     { onConflict: "application_id,category_id" },
   );
   if (saveError) throw new Error(saveError.message);
+
+  const { error: reviewResetError } = await admin
+    .from("adjudication_reviews")
+    .update({ status: "advisory_review" })
+    .eq("application_id", applicationId)
+    .eq("status", "ready_for_owner");
+  if (reviewResetError) throw new Error(reviewResetError.message);
+}
+
+async function ensureInitialPanelNarratives(applicationId: string) {
+  const admin = createAdminClient();
+  const [{ data: assignments, error: assignmentError }, { data: scorecards, error: scorecardError }] =
+    await Promise.all([
+      admin
+        .from("adjudicator_assignments")
+        .select("id,adjudicator_user_id")
+        .eq("application_id", applicationId)
+        .eq("can_score", true)
+        .is("removed_at", null),
+      admin
+        .from("adjudication_scorecards")
+        .select("assignment_id,rubric_id,status,adjudicator_user_id")
+        .eq("application_id", applicationId),
+    ]);
+
+  if (assignmentError) throw new Error(assignmentError.message);
+  if (scorecardError) throw new Error(scorecardError.message);
+  if (!assignments?.length || !scorecards?.length) return;
+
+  const submittedAssignments = new Set(
+    scorecards
+      .filter((card) => ["submitted", "locked"].includes(card.status))
+      .map((card) => card.assignment_id),
+  );
+  if (assignments.some((assignment) => !submittedAssignments.has(assignment.id))) {
+    return;
+  }
+
+  const rubricId = scorecards[0]?.rubric_id;
+  if (!rubricId) return;
+
+  const [{ data: categories, error: categoryError }, { data: existing, error: feedbackError }] =
+    await Promise.all([
+      admin
+        .from("scoring_categories")
+        .select("id")
+        .eq("rubric_id", rubricId)
+        .eq("active", true)
+        .order("sort_order"),
+      admin
+        .from("adjudication_panel_feedback")
+        .select("category_id,final_comment")
+        .eq("application_id", applicationId),
+    ]);
+
+  if (categoryError) throw new Error(categoryError.message);
+  if (feedbackError) throw new Error(feedbackError.message);
+
+  const preparedCategories = new Set(
+    (existing ?? [])
+      .filter((item) => item.final_comment?.trim())
+      .map((item) => item.category_id),
+  );
+  const generatedBy = scorecards.at(-1)?.adjudicator_user_id;
+  if (!generatedBy) return;
+
+  const missingCategories = (categories ?? []).filter(
+    (category) => !preparedCategories.has(category.id),
+  );
+  const generationBatchSize = 3;
+  for (let index = 0; index < missingCategories.length; index += generationBatchSize) {
+    const batch = missingCategories.slice(index, index + generationBatchSize);
+    await Promise.all(
+      batch.map((category) =>
+        generatePanelCommentDraft(applicationId, category.id, generatedBy),
+      ),
+    );
+  }
+
+  await queuePanelReviewForOwnersIfReady(applicationId, generatedBy);
+
+  revalidatePath(`/portal/adjudication/${applicationId}`);
+}
+
+export async function generatePanelComment(
+  applicationId: string,
+  categoryId: string,
+) {
+  const editor = await requirePanelNarrativeEditor(applicationId);
+  await generatePanelCommentDraft(applicationId, categoryId, editor.id);
 
   revalidatePath(`/portal/adjudication/${applicationId}`);
   redirect(`/portal/adjudication/${applicationId}?generated=${categoryId}`);
@@ -578,24 +745,71 @@ export async function savePanelFeedback(
   categoryId: string,
   formData: FormData,
 ) {
-  const owner = await requireProfile(["owner"]);
+  const editor = await requirePanelNarrativeEditor(applicationId);
   const finalComment = formText(formData, "final_comment");
   const approved = formData.get("approved") === "on";
   if (!finalComment) throw new Error("The final panel comment cannot be blank.");
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("adjudication_panel_feedback").upsert(
+  const admin = createAdminClient();
+  const { data: category, error: categoryError } = await admin
+    .from("scoring_categories")
+    .select("rubric_id")
+    .eq("id", categoryId)
+    .single();
+  const { data: application, error: applicationError } = await admin
+    .from("applications")
+    .select("cycle_id")
+    .eq("id", applicationId)
+    .single();
+  const { data: rubric, error: rubricError } = category?.rubric_id
+    ? await admin
+        .from("scoring_rubrics")
+        .select("cycle_id")
+        .eq("id", category.rubric_id)
+        .single()
+    : { data: null, error: null };
+
+  if (
+    categoryError ||
+    applicationError ||
+    rubricError ||
+    !application ||
+    !rubric ||
+    rubric.cycle_id !== application.cycle_id
+  ) {
+    throw new Error("This scoring category does not belong to the application.");
+  }
+
+  const { error } = await admin.from("adjudication_panel_feedback").upsert(
     {
       application_id: applicationId,
       category_id: categoryId,
       final_comment: finalComment,
       status: approved ? "approved" : "generated",
-      approved_by: approved ? owner.id : null,
+      approved_by: approved ? editor.id : null,
       approved_at: approved ? new Date().toISOString() : null,
     },
     { onConflict: "application_id,category_id" },
   );
   if (error) throw new Error(error.message);
+
+  if (approved) {
+    await queuePanelReviewForOwnersIfReady(applicationId, editor.id);
+  } else {
+    const { data: review } = await admin
+      .from("adjudication_reviews")
+      .select("status")
+      .eq("application_id", applicationId)
+      .maybeSingle();
+
+    if (review?.status === "ready_for_owner") {
+      const { error: reviewError } = await admin
+        .from("adjudication_reviews")
+        .update({ status: "advisory_review" })
+        .eq("application_id", applicationId);
+      if (reviewError) throw new Error(reviewError.message);
+    }
+  }
 
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }

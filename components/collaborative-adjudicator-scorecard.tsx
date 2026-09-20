@@ -200,6 +200,7 @@ function CategoryScoreSection({
   observationMap,
   ownScoreMap,
   scoreOptions,
+  canComment,
   readOnly,
   currentUserId,
   commentColumnsStyle,
@@ -216,6 +217,7 @@ function CategoryScoreSection({
   observationMap: Map<string, string | null>;
   ownScoreMap: Map<string, AdjudicationScore>;
   scoreOptions: ScoreOption[];
+  canComment: boolean;
   readOnly: boolean;
   currentUserId: string;
   commentColumnsStyle: CSSProperties;
@@ -454,16 +456,18 @@ function CategoryScoreSection({
                     >
                       Approve
                     </button>
-                    <button
-                      aria-expanded={disputeOpen}
-                      className="button button-danger button-compact"
-                      onClick={() =>
-                        setDisputeOpen((current) => !current)
-                      }
-                      type="button"
-                    >
-                      Dispute
-                    </button>
+                    {canComment && (
+                      <button
+                        aria-expanded={disputeOpen}
+                        className="button button-danger button-compact"
+                        onClick={() =>
+                          setDisputeOpen((current) => !current)
+                        }
+                        type="button"
+                      >
+                        Dispute
+                      </button>
+                    )}
                   </div>
                 )}
             </div>
@@ -472,7 +476,8 @@ function CategoryScoreSection({
       </div>
 
       <div className="panel-body" hidden={!expanded}>
-        {officialProposal &&
+        {canComment &&
+          officialProposal &&
           officialProposal.status !== "overridden" &&
           disputeOpen && (
             <section className="category-dispute-editor">
@@ -604,7 +609,7 @@ function CategoryScoreSection({
                           .join(" ")}
                         key={member.userId}
                       >
-                        {isCurrentUser ? (
+                        {isCurrentUser && canComment ? (
                           <RichTextField
                             defaultValue={savedScore?.observation}
                             disabled={readOnly}
@@ -613,6 +618,14 @@ function CategoryScoreSection({
                             name={`observation_${criterion.id}`}
                             placeholder="Enter your observable notes for this criterion"
                           />
+                        ) : isCurrentUser ? (
+                          <div className="comment-readonly-surface comment-readonly-observation">
+                            <strong className="mobile-panel-comment-label">
+                              {member.name} · You
+                            </strong>
+                            <RichTextPreview value={savedScore?.observation} />
+                            <small>Commenting is disabled for this assignment.</small>
+                          </div>
                         ) : (
                           <>
                             <strong className="mobile-panel-comment-label">
@@ -659,13 +672,19 @@ function CategoryScoreSection({
             <label htmlFor={`private_notes_${category.id}`}>
               Private adjudicator notes
             </label>
-            <textarea
-              className="textarea compact-textarea"
-              defaultValue={categoryComment?.private_notes ?? ""}
-              disabled={readOnly}
-              id={`private_notes_${category.id}`}
-              name={`private_notes_${category.id}`}
-            />
+            {canComment ? (
+              <textarea
+                className="textarea compact-textarea"
+                defaultValue={categoryComment?.private_notes ?? ""}
+                disabled={readOnly}
+                id={`private_notes_${category.id}`}
+                name={`private_notes_${category.id}`}
+              />
+            ) : (
+              <div className="comment-readonly-surface">
+                {categoryComment?.private_notes || "No private notes were entered before commenting was disabled."}
+              </div>
+            )}
             <small className="field-help">
               Private notes are never included in the school release or sent to
               OpenAI.
@@ -785,6 +804,7 @@ export function CollaborativeAdjudicatorScorecard({
   categoryApprovals,
   initialPanelRows,
   scoreOptions,
+  canComment,
   readOnly,
 }: {
   applicationId: string;
@@ -799,6 +819,7 @@ export function CollaborativeAdjudicatorScorecard({
   categoryApprovals: CategoryApproval[];
   initialPanelRows: PanelObservationRow[];
   scoreOptions: ScoreOption[];
+  canComment: boolean;
   readOnly: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -927,6 +948,7 @@ export function CollaborativeAdjudicatorScorecard({
           observationMap={observationMap}
           ownScoreMap={ownScoreMap}
           panelMembers={panelMembers}
+          canComment={canComment}
           readOnly={readOnly}
           scoreOptions={scoreOptions}
         />

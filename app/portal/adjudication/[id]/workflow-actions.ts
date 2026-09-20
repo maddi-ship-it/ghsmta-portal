@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,7 +14,7 @@ export async function saveAllCategoryProposals(
   applicationId: string,
   formData: FormData,
 ) {
-  await requireProfile(["advisory_member", "owner"]);
+  const profile = await requireProfile(["advisory_member", "owner"]);
   const categoryIds = formData
     .getAll("category_id")
     .map(String)
@@ -58,6 +59,7 @@ export async function saveAllCategoryProposals(
   );
 
   if (error) throw new Error(error.message);
+  await queuePanelReviewForOwnersIfReady(applicationId, profile.id);
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }
 
@@ -79,6 +81,21 @@ export async function respondCategoryProposal(
   }
 
   const supabase = await createClient();
+  if (response === "disputed") {
+    const { data: assignment, error: assignmentError } = await supabase
+      .from("adjudicator_assignments")
+      .select("can_comment")
+      .eq("application_id", applicationId)
+      .eq("adjudicator_user_id", profile.id)
+      .is("removed_at", null)
+      .maybeSingle();
+
+    if (assignmentError) throw new Error(assignmentError.message);
+    if (!assignment?.can_comment) {
+      throw new Error("Commenting is disabled for this assignment.");
+    }
+  }
+
   const { error } = await supabase
     .from("adjudication_category_approvals")
     .upsert(
@@ -117,16 +134,22 @@ export async function respondCategoryProposal(
     }
   }
 
+  await queuePanelReviewForOwnersIfReady(applicationId, profile.id);
+
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }
 
 export async function submitPanelForOwnerReview(applicationId: string) {
-  await requireProfile(["advisory_member", "owner"]);
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("submit_adjudication_for_owner", {
-    p_application_id: applicationId,
-  });
-  if (error) throw new Error(error.message);
+  const profile = await requireProfile(["advisory_member", "owner"]);
+  const result = await queuePanelReviewForOwnersIfReady(
+    applicationId,
+    profile.id,
+  );
+  if (result === "not_ready") {
+    throw new Error(
+      "Submit every scorecard and approve every category decision and final comment before sending this review to Owners.",
+    );
+  }
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }
 

@@ -12,8 +12,8 @@ const STORAGE_KEY = "ghsmta-theme-preference";
 const THEME_EVENT = "ghsmta-theme-preference-change";
 const PREFERENCES: ThemePreference[] = ["system", "light", "dark"];
 const THEME_COLORS: Record<ThemeName, string> = {
-  dark: "#070b18",
-  light: "#fffdf7",
+  dark: "#070d18",
+  light: "#f4f6f8",
 };
 
 function resolveTheme(preference: ThemePreference): ThemeName {
