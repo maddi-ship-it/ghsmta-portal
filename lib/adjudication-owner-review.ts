@@ -48,9 +48,8 @@ export async function queuePanelReviewForOwnersIfReady(
       .eq("active", true),
     admin
       .from("adjudicator_assignments")
-      .select("id")
+      .select("id,adjudicator_user_id,can_score,can_comment")
       .eq("application_id", applicationId)
-      .eq("can_score", true)
       .is("removed_at", null),
     admin
       .from("adjudication_scorecards")
@@ -62,7 +61,7 @@ export async function queuePanelReviewForOwnersIfReady(
       .eq("application_id", applicationId),
     admin
       .from("adjudication_panel_feedback")
-      .select("category_id,status,final_comment")
+      .select("category_id,status,final_comment,approved_by")
       .eq("application_id", applicationId),
     admin
       .from("adjudication_reviews")
@@ -83,14 +82,28 @@ export async function queuePanelReviewForOwnersIfReady(
 
   const categories = categoriesResult.data ?? [];
   const assignments = assignmentsResult.data ?? [];
-  if (categories.length === 0 || assignments.length === 0) return "not_ready";
+  const scoringAssignments = assignments.filter(
+    (assignment) => assignment.can_score,
+  );
+  const panelReviewerIds = new Set(
+    assignments
+      .filter((assignment) => assignment.can_comment)
+      .map((assignment) => assignment.adjudicator_user_id),
+  );
+  if (categories.length === 0 || scoringAssignments.length === 0) {
+    return "not_ready";
+  }
 
   const submittedAssignments = new Set(
     (scorecardsResult.data ?? [])
       .filter((scorecard) => ["submitted", "locked"].includes(scorecard.status))
       .map((scorecard) => scorecard.assignment_id),
   );
-  if (assignments.some((assignment) => !submittedAssignments.has(assignment.id))) {
+  if (
+    scoringAssignments.some(
+      (assignment) => !submittedAssignments.has(assignment.id),
+    )
+  ) {
     return "not_ready";
   }
 
@@ -114,7 +127,9 @@ export async function queuePanelReviewForOwnersIfReady(
       const feedback = feedbackByCategory.get(category.id);
       return (
         feedback?.status !== "approved" ||
-        !feedback.final_comment?.trim()
+        !feedback.final_comment?.trim() ||
+        !feedback.approved_by ||
+        !panelReviewerIds.has(feedback.approved_by)
       );
     })
   ) {

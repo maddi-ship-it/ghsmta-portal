@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  generatePanelComment,
   reopenAdjudicatorScorecard,
   savePanelFeedback,
 } from "@/app/portal/adjudication/[id]/actions";
@@ -147,11 +146,13 @@ function LivePanelFeedbackEditor({
   category,
   feedback,
   liveDraft,
+  panelApproved,
 }: {
   applicationId: string;
   category: ScoringCategory;
   feedback: AdjudicationPanelFeedback | undefined;
   liveDraft: string;
+  panelApproved: boolean;
 }) {
   const router = useRouter();
   const storedComment = feedback?.final_comment?.trim() ?? "";
@@ -306,20 +307,22 @@ function LivePanelFeedbackEditor({
         <div>
           <div className="panel-feedback-title-row">
             <h3>Owner review of panel narrative</h3>
-            {feedback?.status === "approved" && (
-              <span className="badge badge-complete">Panel approved</span>
-            )}
+            <span
+              className={`badge ${panelApproved ? "badge-complete" : "badge-warning"}`}
+            >
+              {panelApproved
+                ? "Panel approved"
+                : feedback?.status === "approved"
+                  ? "Sent to panel"
+                  : "Owner draft"}
+            </span>
           </div>
           <p>
-            Panel-approved comments arrive here for final Owner review. You can
-            edit the wording before releasing a separate snapshot to the school.
+            This draft updates automatically from the live saved comments—no
+            generation step is required. Review it here, then send it to the
+            panel when it is ready.
           </p>
         </div>
-        <form action={generatePanelComment.bind(null, applicationId, category.id)}>
-          <button className="button button-secondary" type="submit">
-            Generate with ChatGPT
-          </button>
-        </form>
       </div>
 
       <form
@@ -378,7 +381,9 @@ function LivePanelFeedbackEditor({
             defaultChecked={feedback?.status === "approved"}
             onChange={(event) => writeLocalDraft(value, event.currentTarget.checked)}
           />
-          Approved and ready for school release
+          {panelApproved
+            ? "Keep panel approval and prepare for school release"
+            : "Send this final comment to the panel for review"}
         </label>
         <button className="button button-dark" disabled={!online} type="submit">
           {online ? "Save Owner review" : "Save when online"}
@@ -846,6 +851,12 @@ export function OwnerLiveAdjudicationReview({
                   category={category}
                   feedback={categoryFeedback}
                   liveDraft={liveDraft}
+                  panelApproved={Boolean(
+                    categoryFeedback?.approved_by &&
+                      ["adjudicator", "advisory_member"].includes(
+                        profileMap.get(categoryFeedback.approved_by)?.role ?? "",
+                      ),
+                  )}
                 />
               ) : (
                 <div className="narrative-preview">

@@ -36,6 +36,7 @@ type PersistScorecardResult = {
   missing: string[];
   submitted: boolean;
   savedAt: string;
+  savedBy: string;
 };
 
 function errorMessage(error: unknown) {
@@ -395,6 +396,7 @@ async function persistAdjudicatorScorecard(
     missing,
     submitted: shouldSubmit,
     savedAt: now,
+    savedBy: adjudicator.id,
   };
 }
 
@@ -404,6 +406,13 @@ export async function autosaveAdjudicatorScorecard(
 ) {
   try {
     const result = await persistAdjudicatorScorecard(applicationId, false, formData);
+    after(async () => {
+      try {
+        await refreshLivePanelNarratives(applicationId, result.savedBy);
+      } catch (error) {
+        console.error("Unable to refresh the live panel narratives.", error);
+      }
+    });
     return { ok: true as const, savedAt: result.savedAt };
   } catch (error) {
     return { ok: false as const, error: errorMessage(error) };
@@ -417,15 +426,13 @@ export async function saveAdjudicatorScorecard(
 ) {
   const result = await persistAdjudicatorScorecard(applicationId, submit, formData);
 
-  if (result.submitted) {
-    after(async () => {
-      try {
-        await ensureInitialPanelNarratives(applicationId);
-      } catch (error) {
-        console.error("Unable to prepare the initial panel narratives.", error);
-      }
-    });
-  }
+  after(async () => {
+    try {
+      await refreshLivePanelNarratives(applicationId, result.savedBy);
+    } catch (error) {
+      console.error("Unable to refresh the live panel narratives.", error);
+    }
+  });
 
   if (result.missing.length > 0) {
     revalidatePath(`/portal/adjudication/${applicationId}`);
@@ -493,6 +500,7 @@ async function generatePanelCommentDraft(
   applicationId: string,
   categoryId: string,
   generatedBy: string,
+  expectedClaimedAt: string,
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured in Vercel.");
@@ -612,7 +620,6 @@ async function generatePanelCommentDraft(
         { role: "system", content: prompt.system_prompt },
         { role: "user", content: userPrompt },
       ],
-      max_output_tokens: 1200,
     }),
   });
 
@@ -626,8 +633,9 @@ async function generatePanelCommentDraft(
   if (!generatedComment) throw new Error("OpenAI returned an empty narrative.");
 
   const requestId = response.headers.get("x-request-id");
-  const { error: saveError } = await admin.from("adjudication_panel_feedback").upsert(
-    {
+  const { data: savedFeedback, error: saveError } = await admin
+    .from("adjudication_panel_feedback")
+    .update({
       application_id: applicationId,
       category_id: categoryId,
       status: "generated",
@@ -641,10 +649,15 @@ async function generatePanelCommentDraft(
       generated_at: new Date().toISOString(),
       approved_by: null,
       approved_at: null,
-    },
-    { onConflict: "application_id,category_id" },
-  );
+    })
+    .eq("application_id", applicationId)
+    .eq("category_id", categoryId)
+    .eq("status", "draft")
+    .eq("generated_at", expectedClaimedAt)
+    .select("id")
+    .maybeSingle();
   if (saveError) throw new Error(saveError.message);
+  if (!savedFeedback) return;
 
   const { error: reviewResetError } = await admin
     .from("adjudication_reviews")
@@ -654,39 +667,23 @@ async function generatePanelCommentDraft(
   if (reviewResetError) throw new Error(reviewResetError.message);
 }
 
-async function ensureInitialPanelNarratives(applicationId: string) {
+async function refreshLivePanelNarratives(
+  applicationId: string,
+  generatedBy: string,
+) {
   const admin = createAdminClient();
-  const [{ data: assignments, error: assignmentError }, { data: scorecards, error: scorecardError }] =
-    await Promise.all([
-      admin
-        .from("adjudicator_assignments")
-        .select("id,adjudicator_user_id")
-        .eq("application_id", applicationId)
-        .eq("can_score", true)
-        .is("removed_at", null),
-      admin
-        .from("adjudication_scorecards")
-        .select("assignment_id,rubric_id,status,adjudicator_user_id")
-        .eq("application_id", applicationId),
-    ]);
-
-  if (assignmentError) throw new Error(assignmentError.message);
+  const { data: scorecards, error: scorecardError } = await admin
+    .from("adjudication_scorecards")
+    .select("id,rubric_id")
+    .eq("application_id", applicationId);
   if (scorecardError) throw new Error(scorecardError.message);
-  if (!assignments?.length || !scorecards?.length) return;
-
-  const submittedAssignments = new Set(
-    scorecards
-      .filter((card) => ["submitted", "locked"].includes(card.status))
-      .map((card) => card.assignment_id),
-  );
-  if (assignments.some((assignment) => !submittedAssignments.has(assignment.id))) {
-    return;
-  }
+  if (!scorecards?.length) return;
 
   const rubricId = scorecards[0]?.rubric_id;
   if (!rubricId) return;
 
-  const [{ data: categories, error: categoryError }, { data: existing, error: feedbackError }] =
+  const scorecardIds = scorecards.map((scorecard) => scorecard.id);
+  const [categoriesResult, commentsResult, feedbackResult] =
     await Promise.all([
       admin
         .from("scoring_categories")
@@ -695,49 +692,168 @@ async function ensureInitialPanelNarratives(applicationId: string) {
         .eq("active", true)
         .order("sort_order"),
       admin
+        .from("adjudication_category_comments")
+        .select(
+          "category_id,successes,success_examples,growth_areas,growth_examples,updated_at",
+        )
+        .in("scorecard_id", scorecardIds),
+      admin
         .from("adjudication_panel_feedback")
-        .select("category_id,final_comment")
+        .select(
+          "category_id,status,generated_comment,final_comment,generated_at,updated_at",
+        )
         .eq("application_id", applicationId),
     ]);
+  const firstError = [
+    categoriesResult.error,
+    commentsResult.error,
+    feedbackResult.error,
+  ].find(Boolean);
+  if (firstError) throw new Error(firstError.message);
 
-  if (categoryError) throw new Error(categoryError.message);
-  if (feedbackError) throw new Error(feedbackError.message);
+  const categories = categoriesResult.data ?? [];
+  const categoryIds = categories.map((category) => category.id);
+  const { data: criteria, error: criteriaError } = categoryIds.length
+    ? await admin
+        .from("scoring_criteria")
+        .select("id,category_id")
+        .in("category_id", categoryIds)
+        .eq("active", true)
+    : { data: [], error: null };
+  if (criteriaError) throw new Error(criteriaError.message);
+  const criterionIds = criteria.map((criterion) => criterion.id);
+  const { data: scores, error: scoreError } = criterionIds.length
+    ? await admin
+        .from("adjudication_scores")
+        .select("criterion_id,observation,updated_at")
+        .in("scorecard_id", scorecardIds)
+        .in("criterion_id", criterionIds)
+    : { data: [], error: null };
+  if (scoreError) throw new Error(scoreError.message);
 
-  const preparedCategories = new Set(
-    (existing ?? [])
-      .filter((item) => item.final_comment?.trim())
-      .map((item) => item.category_id),
+  const feedbackByCategory = new Map(
+    (feedbackResult.data ?? []).map((item) => [item.category_id, item]),
   );
-  const generatedBy = scorecards.at(-1)?.adjudicator_user_id;
-  if (!generatedBy) return;
+  const now = Date.now();
+  const generationCooldownMs = 90_000;
+  const categoriesToRefresh = categories.filter((category) => {
+    const categoryCriterionIds = new Set(
+      criteria
+        .filter((criterion) => criterion.category_id === category.id)
+        .map((criterion) => criterion.id),
+    );
+    const sourceTimestamps = [
+      ...(commentsResult.data ?? [])
+        .filter(
+          (comment) =>
+            comment.category_id === category.id &&
+            [
+              comment.successes,
+              comment.success_examples,
+              comment.growth_areas,
+              comment.growth_examples,
+            ].some(richTextHasContent),
+        )
+        .map((comment) => Date.parse(comment.updated_at)),
+      ...(scores ?? [])
+        .filter(
+          (score) =>
+            categoryCriterionIds.has(score.criterion_id) &&
+            richTextHasContent(score.observation),
+        )
+        .map((score) => Date.parse(score.updated_at)),
+    ].filter(Number.isFinite);
+    if (sourceTimestamps.length === 0) return false;
 
-  const missingCategories = (categories ?? []).filter(
-    (category) => !preparedCategories.has(category.id),
+    const latestSourceUpdate = Math.max(...sourceTimestamps);
+    const feedback = feedbackByCategory.get(category.id);
+    if (feedback?.status === "approved") return false;
+    if (
+      feedback?.status === "generated" &&
+      feedback.final_comment !== feedback.generated_comment
+    ) {
+      return false;
+    }
+
+    const generatedAt = feedback?.generated_at
+      ? Date.parse(feedback.generated_at)
+      : 0;
+    if (generatedAt && now - generatedAt < generationCooldownMs) return false;
+    return !generatedAt || latestSourceUpdate > generatedAt;
+  });
+
+  if (categoriesToRefresh.length === 0) return;
+
+  const claimedAt = new Date().toISOString();
+  const claimResults = await Promise.all(
+    categoriesToRefresh.map(async (category) => {
+      const existingFeedback = feedbackByCategory.get(category.id);
+      if (existingFeedback) {
+        const { data, error } = await admin
+          .from("adjudication_panel_feedback")
+          .update({
+            status: "draft",
+            generated_by: generatedBy,
+            generated_at: claimedAt,
+          })
+          .eq("application_id", applicationId)
+          .eq("category_id", category.id)
+          .eq("updated_at", existingFeedback.updated_at)
+          .in("status", ["draft", "generated"])
+          .select("category_id")
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        return data?.category_id ?? null;
+      }
+
+      const { data, error } = await admin
+        .from("adjudication_panel_feedback")
+        .insert({
+          application_id: applicationId,
+          category_id: category.id,
+          status: "draft",
+          generated_by: generatedBy,
+          generated_at: claimedAt,
+        })
+        .select("category_id")
+        .maybeSingle();
+      if (error?.code === "23505") return null;
+      if (error) throw new Error(error.message);
+      return data?.category_id ?? null;
+    }),
   );
+  const claimedCategoryIds = new Set(
+    claimResults.filter((categoryId): categoryId is string => Boolean(categoryId)),
+  );
+  const claimedCategories = categoriesToRefresh.filter((category) =>
+    claimedCategoryIds.has(category.id),
+  );
+  if (claimedCategories.length === 0) return;
+
   const generationBatchSize = 3;
-  for (let index = 0; index < missingCategories.length; index += generationBatchSize) {
-    const batch = missingCategories.slice(index, index + generationBatchSize);
-    await Promise.all(
+  for (let index = 0; index < claimedCategories.length; index += generationBatchSize) {
+    const batch = claimedCategories.slice(index, index + generationBatchSize);
+    const results = await Promise.allSettled(
       batch.map((category) =>
-        generatePanelCommentDraft(applicationId, category.id, generatedBy),
+        generatePanelCommentDraft(
+          applicationId,
+          category.id,
+          generatedBy,
+          claimedAt,
+        ),
       ),
     );
+    results.forEach((result, resultIndex) => {
+      if (result.status === "rejected") {
+        console.error(
+          `Unable to generate the live narrative for category ${batch[resultIndex]?.id}.`,
+          result.reason,
+        );
+      }
+    });
   }
 
-  await queuePanelReviewForOwnersIfReady(applicationId, generatedBy);
-
   revalidatePath(`/portal/adjudication/${applicationId}`);
-}
-
-export async function generatePanelComment(
-  applicationId: string,
-  categoryId: string,
-) {
-  const editor = await requirePanelNarrativeEditor(applicationId);
-  await generatePanelCommentDraft(applicationId, categoryId, editor.id);
-
-  revalidatePath(`/portal/adjudication/${applicationId}`);
-  redirect(`/portal/adjudication/${applicationId}?generated=${categoryId}`);
 }
 
 export async function savePanelFeedback(
@@ -747,20 +863,34 @@ export async function savePanelFeedback(
 ) {
   const editor = await requirePanelNarrativeEditor(applicationId);
   const finalComment = formText(formData, "final_comment");
-  const approved = formData.get("approved") === "on";
+  const ownerRequestedPanelReview = formData.get("approved") === "on";
   if (!finalComment) throw new Error("The final panel comment cannot be blank.");
 
   const admin = createAdminClient();
-  const { data: category, error: categoryError } = await admin
-    .from("scoring_categories")
-    .select("rubric_id")
-    .eq("id", categoryId)
-    .single();
-  const { data: application, error: applicationError } = await admin
-    .from("applications")
-    .select("cycle_id")
-    .eq("id", applicationId)
-    .single();
+  const [categoryResult, applicationResult, existingFeedbackResult] =
+    await Promise.all([
+      admin
+        .from("scoring_categories")
+        .select("rubric_id")
+        .eq("id", categoryId)
+        .single(),
+      admin
+        .from("applications")
+        .select("cycle_id,school_name,production_title")
+        .eq("id", applicationId)
+        .single(),
+      admin
+        .from("adjudication_panel_feedback")
+        .select("status,approved_by,approved_at")
+        .eq("application_id", applicationId)
+        .eq("category_id", categoryId)
+        .maybeSingle(),
+    ]);
+
+  const { data: category, error: categoryError } = categoryResult;
+  const { data: application, error: applicationError } = applicationResult;
+  const { data: existingFeedback, error: existingFeedbackError } =
+    existingFeedbackResult;
   const { data: rubric, error: rubricError } = category?.rubric_id
     ? await admin
         .from("scoring_rubrics")
@@ -772,6 +902,7 @@ export async function savePanelFeedback(
   if (
     categoryError ||
     applicationError ||
+    existingFeedbackError ||
     rubricError ||
     !application ||
     !rubric ||
@@ -780,22 +911,94 @@ export async function savePanelFeedback(
     throw new Error("This scoring category does not belong to the application.");
   }
 
+  const { data: existingApprover } = existingFeedback?.approved_by
+    ? await admin
+        .from("profiles")
+        .select("role")
+        .eq("id", existingFeedback.approved_by)
+        .maybeSingle()
+    : { data: null };
+  const panelAlreadyApproved = ["adjudicator", "advisory_member"].includes(
+    existingApprover?.role ?? "",
+  );
+
+  if (editor.role !== "owner") {
+    if (
+      existingFeedback?.status !== "approved" ||
+      existingApprover?.role !== "owner"
+    ) {
+      throw new Error(
+        "The Owner has not sent this final comment to the panel, or it has already been panel-approved.",
+      );
+    }
+  }
+
+  const approved = editor.role === "owner" ? ownerRequestedPanelReview : true;
+  const approvedBy = approved
+    ? editor.role === "owner" && panelAlreadyApproved
+      ? existingFeedback?.approved_by ?? editor.id
+      : editor.id
+    : null;
+  const approvedAt = approved
+    ? editor.role === "owner" && panelAlreadyApproved
+      ? existingFeedback?.approved_at ?? new Date().toISOString()
+      : new Date().toISOString()
+    : null;
+
   const { error } = await admin.from("adjudication_panel_feedback").upsert(
     {
       application_id: applicationId,
       category_id: categoryId,
       final_comment: finalComment,
       status: approved ? "approved" : "generated",
-      approved_by: approved ? editor.id : null,
-      approved_at: approved ? new Date().toISOString() : null,
+      approved_by: approvedBy,
+      approved_at: approvedAt,
     },
     { onConflict: "application_id,category_id" },
   );
   if (error) throw new Error(error.message);
 
-  if (approved) {
+  const sentToPanel =
+    editor.role === "owner" &&
+    approved &&
+    existingFeedback?.status !== "approved";
+
+  if (sentToPanel) {
+    const { data: panelAssignments, error: panelAssignmentError } = await admin
+      .from("adjudicator_assignments")
+      .select("adjudicator_user_id")
+      .eq("application_id", applicationId)
+      .eq("can_comment", true)
+      .is("removed_at", null);
+    if (panelAssignmentError) throw new Error(panelAssignmentError.message);
+
+    const panelUserIds = [
+      ...new Set(
+        (panelAssignments ?? []).map(
+          (assignment) => assignment.adjudicator_user_id,
+        ),
+      ),
+    ];
+    if (panelUserIds.length > 0) {
+      const { error: notificationError } = await admin
+        .from("user_notifications")
+        .insert(
+          panelUserIds.map((userId) => ({
+            user_id: userId,
+            notification_type: "panel_narrative_ready",
+            title: "Final comment ready for panel review",
+            body: `${application.school_name} — ${application.production_title ?? "Untitled production"}`,
+            href: `/portal/adjudication/${applicationId}`,
+            related_application_id: applicationId,
+          })),
+        );
+      if (notificationError) throw new Error(notificationError.message);
+    }
+  }
+
+  if (approved && editor.role !== "owner") {
     await queuePanelReviewForOwnersIfReady(applicationId, editor.id);
-  } else {
+  } else if (!approved) {
     const { data: review } = await admin
       .from("adjudication_reviews")
       .select("status")
@@ -818,11 +1021,23 @@ export async function releaseAdjudicationResults(
   applicationId: string,
   formData: FormData,
 ) {
-  await requireProfile(["owner"]);
+  const owner = await requireProfile(["owner"]);
   const releaseScores = formData.get("release_scores") === "on";
   const releaseFeedback = formData.get("release_feedback") === "on";
   const releaseNotes = formText(formData, "release_notes");
   if (!releaseScores && !releaseFeedback) throw new Error("Choose scores, feedback, or both.");
+
+  if (releaseFeedback) {
+    const readiness = await queuePanelReviewForOwnersIfReady(
+      applicationId,
+      owner.id,
+    );
+    if (readiness === "not_ready") {
+      throw new Error(
+        "Every final comment must be approved by the panel before it can be released to the school.",
+      );
+    }
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("release_adjudication", {

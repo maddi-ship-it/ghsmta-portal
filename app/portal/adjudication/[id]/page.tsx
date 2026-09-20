@@ -40,7 +40,6 @@ import type {
 } from "@/lib/types";
 
 import {
-  generatePanelComment,
   releaseAdjudicationResults,
   saveAdjudicatorScorecard,
   savePanelFeedback,
@@ -116,12 +115,14 @@ function PanelNarrativeWorkflow({
   canComment,
   categories,
   feedback,
+  panelApprovedCategoryIds,
   reviewStatus,
 }: {
   applicationId: string;
   canComment: boolean;
   categories: ScoringCategory[];
   feedback: AdjudicationPanelFeedback[];
+  panelApprovedCategoryIds: string[];
   reviewStatus: string;
 }) {
   const feedbackByCategory = new Map(
@@ -130,6 +131,10 @@ function PanelNarrativeWorkflow({
   const sentToOwners = ["ready_for_owner", "owner_review", "released"].includes(
     reviewStatus,
   );
+  const panelApprovedCategories = new Set(panelApprovedCategoryIds);
+  const availableCount = feedback.filter((item) =>
+    Boolean(item.final_comment?.trim()),
+  ).length;
 
   return (
     <section className="panel panel-narrative-workflow">
@@ -138,20 +143,26 @@ function PanelNarrativeWorkflow({
           <span className="eyebrow">Panel narrative</span>
           <h2>Review the school-facing final comments</h2>
           <p>
-            After every scorecard is submitted, the first draft is generated
-            automatically from the panel&apos;s observations. A permitted panel
-            member reviews it, approves it, and sends it to Owners.
+            Drafts are generated automatically from the live comments and go
+            to the Owners first. The panel can see a final comment only after
+            an Owner sends it for panel review.
           </p>
         </div>
         <span className={`badge ${sentToOwners ? "badge-complete" : "badge-warning"}`}>
-          {sentToOwners ? "Sent to Owners for review" : "Panel approval in progress"}
+          {sentToOwners
+            ? "Returned to Owners"
+            : availableCount > 0
+              ? "Panel review in progress"
+              : "Waiting for Owner"}
         </span>
       </div>
       <div className="panel-body panel-narrative-list">
         {categories.map((category) => {
           const categoryFeedback = feedbackByCategory.get(category.id);
           const finalComment = categoryFeedback?.final_comment?.trim() ?? "";
-          const approved = categoryFeedback?.status === "approved";
+          const panelApproved = panelApprovedCategories.has(category.id);
+          const canEdit =
+            canComment && finalComment && !panelApproved && !sentToOwners;
 
           return (
             <article className="panel-narrative-card" key={category.id}>
@@ -160,13 +171,17 @@ function PanelNarrativeWorkflow({
                   <span className="section-order">Final comment</span>
                   <h3>{category.title}</h3>
                 </div>
-                <span className={`badge ${approved ? "badge-complete" : "badge-warning"}`}>
-                  {approved ? "Panel approved" : finalComment ? "Panel draft" : "Waiting for draft"}
+                <span className={`badge ${panelApproved ? "badge-complete" : "badge-warning"}`}>
+                  {panelApproved
+                    ? "Panel approved"
+                    : finalComment
+                      ? "Ready for panel review"
+                      : "With Owner"}
                 </span>
               </div>
 
               {finalComment ? (
-                canComment ? (
+                canEdit ? (
                   <form
                     action={savePanelFeedback.bind(null, applicationId, category.id)}
                     className="form-stack"
@@ -183,26 +198,15 @@ function PanelNarrativeWorkflow({
                         rows={8}
                       />
                     </div>
-                    <label className="check-row panel-narrative-approval">
-                      <input defaultChecked={approved} name="approved" type="checkbox" />
-                      <span>
-                        <strong>Approve final comment</strong>
-                        <small>
-                          When every final comment and required review item is approved,
-                          the package is sent to Owners automatically.
-                        </small>
-                      </span>
-                    </label>
+                    <input name="approved" type="hidden" value="on" />
+                    <p className="field-help">
+                      Approving returns this comment to the Owners. When every
+                      final comment is approved, the full package moves to
+                      Owner review automatically.
+                    </p>
                     <div className="button-row panel-narrative-actions">
                       <button className="button button-dark" type="submit">
-                        Save panel narrative
-                      </button>
-                      <button
-                        className="button button-secondary"
-                        formAction={generatePanelComment.bind(null, applicationId, category.id)}
-                        type="submit"
-                      >
-                        Regenerate initial draft
+                        Approve and return to Owners
                       </button>
                     </div>
                   </form>
@@ -211,23 +215,10 @@ function PanelNarrativeWorkflow({
                     {finalComment}
                   </div>
                 )
-              ) : canComment ? (
-                <div className="panel-narrative-empty">
-                  <p>
-                    The automatic draft will appear after all assigned
-                    scorecards are submitted. You can also prepare it now from
-                    the observations currently saved.
-                  </p>
-                  <form action={generatePanelComment.bind(null, applicationId, category.id)}>
-                    <button className="button button-secondary" type="submit">
-                      Generate initial draft
-                    </button>
-                  </form>
-                </div>
               ) : (
                 <div className="comment-readonly-surface">
-                  No final comment has been prepared yet. Commenting is disabled
-                  for this assignment.
+                  The live draft is with the Owners. It will appear here after
+                  an Owner sends it to the panel.
                 </div>
               )}
             </article>
@@ -246,7 +237,6 @@ export default async function AdjudicationApplicationPage({
   searchParams: Promise<{
     saved?: string;
     submitted?: string;
-    generated?: string;
     released?: string;
     error?: string;
     missing?: string;
@@ -423,6 +413,43 @@ export default async function AdjudicationApplicationPage({
   const scorecards = (scorecardsResult.data ?? []) as AdjudicationScorecard[];
   const feedback = (feedbackResult.data ?? []) as AdjudicationPanelFeedback[];
   const release = releaseResult.data as AdjudicationRelease | null;
+
+  if (feedbackResult.error) throw new Error(feedbackResult.error.message);
+
+  const feedbackApproverIds = [
+    ...new Set(
+      feedback
+        .map((item) => item.approved_by)
+        .filter((userId): userId is string => Boolean(userId)),
+    ),
+  ];
+  const feedbackApproverResult = feedbackApproverIds.length
+    ? await admin
+        .from("profiles")
+        .select("id,role")
+        .in("id", feedbackApproverIds)
+    : { data: [], error: null };
+  if (feedbackApproverResult.error) {
+    throw new Error(feedbackApproverResult.error.message);
+  }
+  const panelApproverIds = new Set(
+    (feedbackApproverResult.data ?? [])
+      .filter((approver) =>
+        ["adjudicator", "advisory_member"].includes(approver.role),
+      )
+      .map((approver) => approver.id),
+  );
+  const panelApprovedCategoryIds = feedback
+    .filter(
+      (item) =>
+        item.status === "approved" &&
+        item.approved_by &&
+        panelApproverIds.has(item.approved_by),
+    )
+    .map((item) => item.category_id);
+  const panelVisibleFeedback = feedback.filter(
+    (item) => item.status === "approved",
+  );
 
   if (scheduleBookingsResult.error) {
     throw new Error(scheduleBookingsResult.error.message);
@@ -669,7 +696,6 @@ export default async function AdjudicationApplicationPage({
 
       {query.saved && <div className="notice page-message">Your scorecard draft was saved.</div>}
       {query.submitted && <div className="notice page-message">Your scorecard was submitted and is now read-only.</div>}
-      {query.generated && <div className="notice page-message">The AI narrative draft was generated. Review and edit it before approval.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field and score{canComment ? ", including criterion comments," : ""} before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
 
@@ -699,15 +725,9 @@ export default async function AdjudicationApplicationPage({
         currentUserId={profile.id}
         narrativesReady={
           categories.length > 0 &&
-          categories.every((category) => {
-            const categoryFeedback = feedback.find(
-              (item) => item.category_id === category.id,
-            );
-            return (
-              categoryFeedback?.status === "approved" &&
-              Boolean(categoryFeedback.final_comment?.trim())
-            );
-          })
+          categories.every((category) =>
+            panelApprovedCategoryIds.includes(category.id),
+          )
         }
         proposals={(proposalResult.data ?? []) as Array<{
           id: string;
@@ -843,7 +863,8 @@ export default async function AdjudicationApplicationPage({
           applicationId={id}
           canComment={canComment}
           categories={categories}
-          feedback={feedback}
+          feedback={panelVisibleFeedback}
+          panelApprovedCategoryIds={panelApprovedCategoryIds}
           reviewStatus={reviewResult.data?.status ?? "draft"}
         />
         </>
@@ -874,7 +895,8 @@ export default async function AdjudicationApplicationPage({
               applicationId={id}
               canComment={canComment}
               categories={categories}
-              feedback={feedback}
+              feedback={panelVisibleFeedback}
+              panelApprovedCategoryIds={panelApprovedCategoryIds}
               reviewStatus={reviewResult.data?.status ?? "draft"}
             />
           )}
@@ -900,7 +922,9 @@ export default async function AdjudicationApplicationPage({
             initialScorecards={scorecards}
             initialScores={scores}
             initialComments={comments}
-            initialFeedback={feedback}
+            initialFeedback={
+              profile.role === "owner" ? feedback : panelVisibleFeedback
+            }
             release={release}
           />
 
