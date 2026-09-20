@@ -3324,9 +3324,11 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 }
 
 .application-reference-modal-body {
-  display: grid;
+  display: flex;
   min-height: 0;
   flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
   gap: 18px;
   padding: 22px 24px 28px;
   overflow-y: auto;
@@ -3339,6 +3341,7 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 }
 
 .application-reference-group {
+  flex: 0 0 auto;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
