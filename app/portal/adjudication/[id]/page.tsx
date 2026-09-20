@@ -16,6 +16,7 @@ import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-ad
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
+import { ScorecardDraftButton } from "@/components/scorecard-draft-button";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -41,7 +42,6 @@ import type {
 
 import {
   releaseAdjudicationResults,
-  saveAdjudicatorScorecard,
   savePanelFeedback,
 } from "./actions";
 
@@ -843,13 +843,7 @@ export default async function AdjudicationApplicationPage({
 
           {!readOnly && (
             <div className="application-action-bar scorecard-action-bar">
-              <button
-                className="button button-secondary"
-                formAction={saveAdjudicatorScorecard.bind(null, id, false)}
-                type="submit"
-              >
-                Save draft
-              </button>
+              <ScorecardDraftButton applicationId={id} />
               <ScorecardSubmitControls
                 applicationId={id}
                 categories={categories}

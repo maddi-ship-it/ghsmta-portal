@@ -16,6 +16,9 @@ export function offlineScorecardDraftKey(applicationId: string) {
   return `ghsmta:offline-scorecard-draft:${applicationId}`;
 }
 
+export const SCORECARD_SAVE_REQUEST_EVENT =
+  "ghsmta:scorecard-save-request";
+
 function broadcastOfflineDraftChange(applicationId: string, hasDraft: boolean) {
   window.dispatchEvent(
     new CustomEvent("ghsmta:offline-scorecard-draft-changed", {
@@ -220,6 +223,16 @@ export function AdjudicatorAutosave({
       setMessage("Offline — scorecard saved on this device.");
     };
 
+    const saveNow = (event: Event) => {
+      const requestedApplicationId = (
+        event as CustomEvent<{ applicationId?: string }>
+      ).detail?.applicationId;
+
+      if (requestedApplicationId !== applicationId) return;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      void runSave();
+    };
+
     if (!restoredRef.current) {
       const draft = readOfflineDraft(applicationId);
       if (draft) {
@@ -242,6 +255,7 @@ export function AdjudicatorAutosave({
     form.addEventListener("change", scheduleSave);
     window.addEventListener("online", syncStoredDraft);
     window.addEventListener("offline", markOffline);
+    window.addEventListener(SCORECARD_SAVE_REQUEST_EVENT, saveNow);
 
     return () => {
       disposed = true;
@@ -250,6 +264,7 @@ export function AdjudicatorAutosave({
       form.removeEventListener("change", scheduleSave);
       window.removeEventListener("online", syncStoredDraft);
       window.removeEventListener("offline", markOffline);
+      window.removeEventListener(SCORECARD_SAVE_REQUEST_EVENT, saveNow);
     };
   }, [applicationId, disabled]);
 

@@ -415,6 +415,10 @@ export async function autosaveAdjudicatorScorecard(
     });
     return { ok: true as const, savedAt: result.savedAt };
   } catch (error) {
+    console.error("[adjudication:autosave] Unable to save scorecard draft.", {
+      applicationId,
+      error: errorMessage(error),
+    });
     return { ok: false as const, error: errorMessage(error) };
   }
 }
