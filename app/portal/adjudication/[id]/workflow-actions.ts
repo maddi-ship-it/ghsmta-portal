@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
+import { twoPointRangeFromStart } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,21 +28,17 @@ export async function saveAllCategoryProposals(
   const decisions = categoryIds.map((categoryId) => {
     const eligible = formData.get(`eligible_${categoryId}`) === "on";
     const rangeText = text(formData, `range_${categoryId}`);
-    const rangeMin = eligible && rangeText ? Number(rangeText) : null;
-    const rangeMax = rangeMin == null ? null : Number((rangeMin + 2).toFixed(2));
+    const range = eligible ? twoPointRangeFromStart(rangeText) : null;
 
-    if (
-      eligible &&
-      (!Number.isFinite(rangeMin) || rangeMin! < 1 || rangeMax! > 10)
-    ) {
+    if (eligible && !range) {
       throw new Error("Every eligible category needs a valid two-point range.");
     }
 
     return {
       category_id: categoryId,
       is_eligible: eligible,
-      range_min: rangeMin,
-      range_max: rangeMax,
+      range_min: range?.rangeMinimum ?? null,
+      range_max: range?.rangeMaximum ?? null,
       advisory_note: text(formData, `note_${categoryId}`) || null,
       owner_override: formData.get(`override_${categoryId}`) === "on",
       owner_override_note:
