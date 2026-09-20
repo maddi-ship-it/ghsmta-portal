@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
+  generatePanelNarrativeNow,
   reopenAdjudicatorScorecard,
   savePanelFeedback,
 } from "@/app/portal/adjudication/[id]/actions";
@@ -164,6 +165,8 @@ function LivePanelFeedbackEditor({
   const [online, setOnline] = useState(true);
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+  const [generationMessage, setGenerationMessage] = useState("");
+  const [isGenerating, startGeneration] = useTransition();
   const value = followingLiveDraft ? liveDraft : manualValue;
 
   const readLocalDraft = useCallback(() => {
@@ -342,16 +345,52 @@ function LivePanelFeedbackEditor({
         <div className="field">
           <div className="field-label-row">
             <label htmlFor={`final_comment_${category.id}`}>Final panel comment</label>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => {
-                setFollowingLiveDraft(true);
-                setManualValue("");
-              }}
-            >
-              Refresh from live notes
-            </button>
+            <div className="button-row">
+              <button
+                className="text-button"
+                disabled={
+                  !online ||
+                  hasLocalDraft ||
+                  isGenerating ||
+                  feedback?.status === "approved"
+                }
+                type="button"
+                onClick={() => {
+                  setGenerationMessage("Generating Owner draft…");
+                  startGeneration(async () => {
+                    try {
+                      const result = await generatePanelNarrativeNow(
+                        applicationId,
+                        category.id,
+                      );
+                      setFollowingLiveDraft(false);
+                      setManualValue(result.generatedComment);
+                      setGenerationMessage("Owner draft generated from the latest saved comments.");
+                      router.refresh();
+                    } catch (error) {
+                      setGenerationMessage(
+                        error instanceof Error
+                          ? error.message
+                          : "Unable to generate the Owner draft.",
+                      );
+                    }
+                  });
+                }}
+              >
+                {isGenerating ? "Generating…" : "Generate/refresh draft"}
+              </button>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => {
+                  setFollowingLiveDraft(true);
+                  setManualValue("");
+                  setGenerationMessage("");
+                }}
+              >
+                Refresh from live notes
+              </button>
+            </div>
           </div>
           <textarea
             className="textarea narrative-textarea"
@@ -373,6 +412,11 @@ function LivePanelFeedbackEditor({
               ? "Following live observations and comments. Typing here will preserve your manual edit."
               : "Manual edit preserved. Use Refresh from live notes to replace it."}
           </small>
+          {generationMessage && (
+            <small aria-live="polite" className="field-help">
+              {generationMessage}
+            </small>
+          )}
         </div>
         <label className="check-row">
           <input

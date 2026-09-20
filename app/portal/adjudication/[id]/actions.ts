@@ -13,6 +13,10 @@ import {
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
 import { requireProfile } from "@/lib/auth";
+import {
+  resolveGeneratedNarrativeFinal,
+  shouldRefreshGeneratedNarrative,
+} from "@/lib/panel-narrative";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -511,6 +515,7 @@ async function generatePanelCommentDraft(
   categoryId: string,
   generatedBy: string,
   expectedClaimedAt: string,
+  replaceOwnerDraft = false,
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured in Vercel.");
@@ -583,6 +588,23 @@ async function generatePanelCommentDraft(
     );
   }
 
+  const { data: claimedFeedback, error: claimedFeedbackError } = await admin
+    .from("adjudication_panel_feedback")
+    .select("generated_comment,final_comment")
+    .eq("application_id", applicationId)
+    .eq("category_id", categoryId)
+    .eq("status", "draft")
+    .eq("generated_at", expectedClaimedAt)
+    .maybeSingle();
+  if (claimedFeedbackError) throw new Error(claimedFeedbackError.message);
+  if (!claimedFeedback) {
+    return {
+      generated: false as const,
+      generatedComment: "",
+      preservedOwnerDraft: false,
+    };
+  }
+
   const { data: cyclePromptData } = await admin
     .from("ai_prompt_templates")
     .select("*")
@@ -642,6 +664,13 @@ async function generatePanelCommentDraft(
   const generatedComment = extractOpenAIText(payload);
   if (!generatedComment) throw new Error("OpenAI returned an empty narrative.");
 
+  const resolvedNarrative = resolveGeneratedNarrativeFinal({
+    currentGeneratedComment: claimedFeedback.generated_comment,
+    currentFinalComment: claimedFeedback.final_comment,
+    nextGeneratedComment: generatedComment,
+    replaceOwnerDraft,
+  });
+
   const requestId = response.headers.get("x-request-id");
   const { data: savedFeedback, error: saveError } = await admin
     .from("adjudication_panel_feedback")
@@ -650,7 +679,7 @@ async function generatePanelCommentDraft(
       category_id: categoryId,
       status: "generated",
       generated_comment: generatedComment,
-      final_comment: generatedComment,
+      final_comment: resolvedNarrative.finalComment,
       prompt_template_id: prompt.id,
       prompt_snapshot: `${prompt.system_prompt}\n\n${userPrompt}`,
       model,
@@ -667,7 +696,13 @@ async function generatePanelCommentDraft(
     .select("id")
     .maybeSingle();
   if (saveError) throw new Error(saveError.message);
-  if (!savedFeedback) return;
+  if (!savedFeedback) {
+    return {
+      generated: false as const,
+      generatedComment: "",
+      preservedOwnerDraft: false,
+    };
+  }
 
   const { error: reviewResetError } = await admin
     .from("adjudication_reviews")
@@ -675,6 +710,12 @@ async function generatePanelCommentDraft(
     .eq("application_id", applicationId)
     .eq("status", "ready_for_owner");
   if (reviewResetError) throw new Error(reviewResetError.message);
+
+  return {
+    generated: true as const,
+    generatedComment,
+    preservedOwnerDraft: resolvedNarrative.preservedOwnerDraft,
+  };
 }
 
 async function refreshLivePanelNarratives(
@@ -778,18 +819,13 @@ async function refreshLivePanelNarratives(
     const latestSourceUpdate = Math.max(...sourceTimestamps);
     const feedback = feedbackByCategory.get(category.id);
     if (feedback?.status === "approved") return false;
-    if (
-      feedback?.status === "generated" &&
-      feedback.final_comment !== feedback.generated_comment
-    ) {
-      return false;
-    }
-
-    const generatedAt = feedback?.generated_at
-      ? Date.parse(feedback.generated_at)
-      : 0;
-    if (generatedAt && now - generatedAt < generationCooldownMs) return false;
-    return !generatedAt || latestSourceUpdate > generatedAt;
+    return shouldRefreshGeneratedNarrative({
+      status: feedback?.status,
+      generatedAt: feedback?.generated_at,
+      latestSourceUpdate,
+      now,
+      cooldownMs: generationCooldownMs,
+    });
   });
 
   if (categoriesToRefresh.length === 0) return;
@@ -864,6 +900,99 @@ async function refreshLivePanelNarratives(
   }
 
   revalidatePath(`/portal/adjudication/${applicationId}`);
+}
+
+export async function generatePanelNarrativeNow(
+  applicationId: string,
+  categoryId: string,
+) {
+  const owner = await requireProfile(["owner"]);
+  const admin = createAdminClient();
+  const [applicationResult, categoryResult] = await Promise.all([
+    admin.from("applications").select("cycle_id").eq("id", applicationId).single(),
+    admin.from("scoring_categories").select("rubric_id").eq("id", categoryId).single(),
+  ]);
+
+  if (applicationResult.error || categoryResult.error) {
+    throw new Error("The application or scoring category could not be found.");
+  }
+
+  const { data: rubric, error: rubricError } = await admin
+    .from("scoring_rubrics")
+    .select("cycle_id")
+    .eq("id", categoryResult.data.rubric_id)
+    .single();
+  if (rubricError || rubric?.cycle_id !== applicationResult.data.cycle_id) {
+    throw new Error("This scoring category does not belong to the application.");
+  }
+
+  const claimedAt = new Date().toISOString();
+  const { data: existingFeedback, error: existingFeedbackError } = await admin
+    .from("adjudication_panel_feedback")
+    .select("id,status")
+    .eq("application_id", applicationId)
+    .eq("category_id", categoryId)
+    .maybeSingle();
+  if (existingFeedbackError) throw new Error(existingFeedbackError.message);
+
+  let claimed = false;
+  if (existingFeedback) {
+    const { data, error } = await admin
+      .from("adjudication_panel_feedback")
+      .update({
+        status: "draft",
+        generated_by: owner.id,
+        generated_at: claimedAt,
+      })
+      .eq("id", existingFeedback.id)
+      .in("status", ["draft", "generated"])
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    claimed = Boolean(data);
+  } else {
+    const { data, error } = await admin
+      .from("adjudication_panel_feedback")
+      .insert({
+        application_id: applicationId,
+        category_id: categoryId,
+        status: "draft",
+        generated_by: owner.id,
+        generated_at: claimedAt,
+      })
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    claimed = Boolean(data);
+  }
+
+  if (!claimed) {
+    throw new Error(
+      "This comment has already been sent to the panel. Return it to Owner draft before regenerating it.",
+    );
+  }
+
+  try {
+    const result = await generatePanelCommentDraft(
+      applicationId,
+      categoryId,
+      owner.id,
+      claimedAt,
+      true,
+    );
+    if (!result.generated) {
+      throw new Error("The Owner draft changed while it was being generated. Try again.");
+    }
+    revalidatePath(`/portal/adjudication/${applicationId}`);
+    return result;
+  } catch (error) {
+    console.error("[adjudication:narrative] Manual Owner draft generation failed.", {
+      applicationId,
+      categoryId,
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 export async function savePanelFeedback(
