@@ -5,33 +5,277 @@ import { revalidatePath } from "next/cache";
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
 import { twoPointRangeFromStart } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
+import { logEvent } from "@/lib/observability";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import type { AppRole } from "@/lib/types";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+type CategoryDecision = {
+  category_id: string;
+  is_eligible: boolean;
+  range_min: number | null;
+  range_max: number | null;
+  advisory_note: string | null;
+  owner_override: boolean;
+  owner_override_note: string | null;
+};
+
+type ExistingCategoryProposal = {
+  id: string;
+  category_id: string;
+  proposed_by: string;
+  is_eligible: boolean;
+  range_min: number | string | null;
+  range_max: number | string | null;
+  status: string;
+  advisory_note: string | null;
+  owner_override_note: string | null;
+  approved_at: string | null;
+};
+
+export type CategoryProposalSaveResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  changedCount?: number;
+  attemptId?: string;
+};
+
+const ACTIVE_APPLICATION_ERROR = "The active application was not found.";
+
+function numbersMatch(
+  left: number | string | null,
+  right: number | null,
+) {
+  if (left == null || right == null) return left == null && right == null;
+  return Number(left) === right;
+}
+
+async function saveAssignedWorkspaceCategoryProposals({
+  applicationId,
+  actorId,
+  actorRole,
+  decisions,
+}: {
+  applicationId: string;
+  actorId: string;
+  actorRole: AppRole;
+  decisions: CategoryDecision[];
+}) {
+  const admin = createAdminClient();
+  const { data: application, error: applicationError } = await admin
+    .from("applications")
+    .select("id,form_version_id,is_archived")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (applicationError) throw new Error(applicationError.message);
+  if (!application || application.is_archived) {
+    throw new Error("This application is no longer available for review.");
+  }
+  if (!application.form_version_id) {
+    throw new Error("This application does not have a published form.");
+  }
+
+  const { data: formVersion, error: formVersionError } = await admin
+    .from("application_form_versions")
+    .select("scoring_rubric_id")
+    .eq("id", application.form_version_id)
+    .maybeSingle();
+
+  if (formVersionError) throw new Error(formVersionError.message);
+  if (!formVersion?.scoring_rubric_id) {
+    throw new Error("No scoring rubric is assigned to this application.");
+  }
+
+  const { data: categoryRows, error: categoryError } = await admin
+    .from("scoring_categories")
+    .select("id")
+    .eq("rubric_id", formVersion.scoring_rubric_id)
+    .eq("active", true);
+
+  if (categoryError) throw new Error(categoryError.message);
+  const validCategoryIds = new Set(
+    (categoryRows ?? []).map((category) => category.id),
+  );
+  const submittedCategoryIds = new Set(
+    decisions.map((decision) => decision.category_id),
+  );
+
+  if (
+    submittedCategoryIds.size !== decisions.length ||
+    decisions.some((decision) => !validCategoryIds.has(decision.category_id))
+  ) {
+    throw new Error(
+      "A submitted category does not belong to this application rubric.",
+    );
+  }
+
+  const { data: existingRows, error: existingError } = await admin
+    .from("adjudication_category_proposals")
+    .select(
+      "id,category_id,proposed_by,is_eligible,range_min,range_max,status,advisory_note,owner_override_note,approved_at",
+    )
+    .eq("application_id", applicationId)
+    .in("category_id", [...submittedCategoryIds]);
+
+  if (existingError) throw new Error(existingError.message);
+  const existingByCategory = new Map(
+    ((existingRows ?? []) as ExistingCategoryProposal[]).map((proposal) => [
+      proposal.category_id,
+      proposal,
+    ]),
+  );
+  const changedCategoryIds = new Set<string>();
+  const proposalRows = decisions.flatMap((decision) => {
+    const existing = existingByCategory.get(decision.category_id);
+
+    if (
+      existing?.status === "overridden" &&
+      actorRole !== "owner"
+    ) {
+      return [];
+    }
+
+    const ownerOverride =
+      actorRole === "owner" && decision.owner_override;
+    const ownerOverrideNote =
+      actorRole === "owner" ? decision.owner_override_note : null;
+    const decisionChanged =
+      !existing ||
+      existing.is_eligible !== decision.is_eligible ||
+      !numbersMatch(existing.range_min, decision.range_min) ||
+      !numbersMatch(existing.range_max, decision.range_max) ||
+      existing.advisory_note !== decision.advisory_note ||
+      (actorRole === "owner" &&
+        existing.owner_override_note !== ownerOverrideNote) ||
+      (ownerOverride && existing.status !== "overridden") ||
+      (!ownerOverride && existing.status === "overridden");
+    const nextStatus = ownerOverride
+      ? "overridden"
+      : existing && !decisionChanged
+        ? existing.status
+        : "proposed";
+
+    if (decisionChanged) changedCategoryIds.add(decision.category_id);
+
+    return [
+      {
+        application_id: applicationId,
+        category_id: decision.category_id,
+        proposed_by: actorId,
+        is_eligible: decision.is_eligible,
+        range_min: decision.range_min,
+        range_max: decision.range_max,
+        status: nextStatus,
+        advisory_note: decision.advisory_note,
+        owner_override_note: ownerOverrideNote,
+        approved_at:
+          nextStatus === "approved" ? (existing?.approved_at ?? null) : null,
+      },
+    ];
+  });
+
+  if (proposalRows.length === 0) return 0;
+
+  const { data: savedRows, error: saveError } = await admin
+    .from("adjudication_category_proposals")
+    .upsert(proposalRows, { onConflict: "application_id,category_id" })
+    .select("id,category_id");
+
+  if (saveError) throw new Error(saveError.message);
+
+  const changedProposalIds = (savedRows ?? [])
+    .filter((proposal) => changedCategoryIds.has(proposal.category_id))
+    .map((proposal) => proposal.id);
+
+  if (changedProposalIds.length > 0) {
+    const { error: approvalError } = await admin
+      .from("adjudication_category_approvals")
+      .delete()
+      .in("proposal_id", changedProposalIds);
+
+    if (approvalError) throw new Error(approvalError.message);
+
+    const { data: assignments, error: assignmentError } = await admin
+      .from("adjudicator_assignments")
+      .select("adjudicator_user_id")
+      .eq("application_id", applicationId)
+      .eq("can_score", true)
+      .is("removed_at", null);
+
+    if (assignmentError) throw new Error(assignmentError.message);
+    const recipientIds = [
+      ...new Set(
+        (assignments ?? []).map(
+          (assignment) => assignment.adjudicator_user_id,
+        ),
+      ),
+    ];
+
+    if (recipientIds.length > 0) {
+      const changedCount = changedCategoryIds.size;
+      const { error: notificationError } = await admin
+        .from("user_notifications")
+        .insert(
+          recipientIds.map((userId) => ({
+            user_id: userId,
+            notification_type: "category_approval_required",
+            title: "Category decisions ready for review",
+            body: `${changedCount} eligibility or two-point range decision${changedCount === 1 ? "" : "s"} updated.`,
+            href: `/portal/adjudication/${applicationId}`,
+            related_application_id: applicationId,
+          })),
+        );
+
+      if (notificationError) {
+        logEvent("warn", "adjudication.category_proposal_notification_failed", {
+          applicationId,
+          actorId,
+          message: notificationError.message,
+        });
+      }
+    }
+  }
+
+  return changedCategoryIds.size;
+}
+
 export async function saveAllCategoryProposals(
   applicationId: string,
+  _previous: CategoryProposalSaveResult,
   formData: FormData,
-) {
+): Promise<CategoryProposalSaveResult> {
   const profile = await requireProfile(["advisory_member", "owner"]);
+  const attemptId = new Date().toISOString();
   const categoryIds = formData
     .getAll("category_id")
     .map(String)
     .filter(Boolean);
 
   if (categoryIds.length === 0) {
-    throw new Error("No categories were submitted.");
+    return { ok: false, error: "No categories were submitted.", attemptId };
   }
 
-  const decisions = categoryIds.map((categoryId) => {
+  const decisions: CategoryDecision[] = categoryIds.map((categoryId) => {
     const eligible = formData.get(`eligible_${categoryId}`) === "on";
     const rangeText = text(formData, `range_${categoryId}`);
     const range = eligible ? twoPointRangeFromStart(rangeText) : null;
 
     if (eligible && !range) {
-      throw new Error("Every eligible category needs a valid two-point range.");
+      return {
+        category_id: categoryId,
+        is_eligible: eligible,
+        range_min: Number.NaN,
+        range_max: Number.NaN,
+        advisory_note: null,
+        owner_override: false,
+        owner_override_note: null,
+      };
     }
 
     return {
@@ -46,8 +290,65 @@ export async function saveAllCategoryProposals(
     };
   });
 
+  if (
+    decisions.some(
+      (decision) =>
+        decision.is_eligible &&
+        (!Number.isFinite(decision.range_min) ||
+          !Number.isFinite(decision.range_max)),
+    )
+  ) {
+    return {
+      ok: false,
+      error: "Every eligible category needs a valid two-point range.",
+      attemptId,
+    };
+  }
+
+  if (
+    profile.role === "owner" &&
+    decisions.some(
+      (decision) =>
+        decision.owner_override && !decision.owner_override_note,
+    )
+  ) {
+    return {
+      ok: false,
+      error: "Every Owner override needs an override note.",
+      attemptId,
+    };
+  }
+
   const supabase = await createClient();
-  const { error } = await supabase.rpc(
+  const { data: canReview, error: accessError } = await supabase.rpc(
+    "can_advisory_review_application",
+    {
+      p_application_id: applicationId,
+      p_user_id: profile.id,
+    },
+  );
+
+  if (accessError) {
+    logEvent("error", "adjudication.category_proposal_access_check_failed", {
+      applicationId,
+      actorId: profile.id,
+      message: accessError.message,
+    });
+    return {
+      ok: false,
+      error: "We couldn't confirm access to this review. Please try again.",
+      attemptId,
+    };
+  }
+  if (!canReview) {
+    return {
+      ok: false,
+      error: "You are no longer assigned to review this application.",
+      attemptId,
+    };
+  }
+
+  const { data, error } = await supabase.rpc(
     "save_all_adjudication_category_proposals",
     {
       p_application_id: applicationId,
@@ -55,9 +356,70 @@ export async function saveAllCategoryProposals(
     },
   );
 
-  if (error) throw new Error(error.message);
-  await queuePanelReviewForOwnersIfReady(applicationId, profile.id);
+  let changedCount = Number(data ?? 0);
+  if (error) {
+    if (error.message === ACTIVE_APPLICATION_ERROR) {
+      try {
+        changedCount = await saveAssignedWorkspaceCategoryProposals({
+          applicationId,
+          actorId: profile.id,
+          actorRole: profile.role,
+          decisions,
+        });
+      } catch (fallbackError) {
+        const message =
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : "Unable to save the category decisions.";
+        logEvent("error", "adjudication.category_proposal_fallback_failed", {
+          applicationId,
+          actorId: profile.id,
+          message,
+        });
+        return {
+          ok: false,
+          error: message,
+          attemptId,
+        };
+      }
+    } else {
+      logEvent("error", "adjudication.category_proposal_save_failed", {
+        applicationId,
+        actorId: profile.id,
+        code: error.code,
+        message: error.message,
+      });
+      return {
+        ok: false,
+        error: error.message,
+        attemptId,
+      };
+    }
+  }
+
+  try {
+    await queuePanelReviewForOwnersIfReady(applicationId, profile.id);
+  } catch (queueError) {
+    logEvent("warn", "adjudication.owner_review_queue_check_failed", {
+      applicationId,
+      actorId: profile.id,
+      message:
+        queueError instanceof Error
+          ? queueError.message
+          : "Owner review queue check failed.",
+    });
+  }
+
   revalidatePath(`/portal/adjudication/${applicationId}`);
+  return {
+    ok: true,
+    changedCount,
+    message:
+      changedCount === 0
+        ? "All category decisions are already up to date."
+        : `${changedCount} category decision${changedCount === 1 ? "" : "s"} saved.`,
+    attemptId,
+  };
 }
 
 export async function respondCategoryProposal(
