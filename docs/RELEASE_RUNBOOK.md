@@ -3,8 +3,11 @@
 ## Required configuration
 
 - Confirm production Supabase URL, publishable key, and server-only service-role key.
+- Confirm the Supabase Auth Site URL is `https://ghsmta.getproductionops.com`,
+  the exact `/auth/callback` URL is allowlisted, and every authentication email
+  template uses `{{ .ConfirmationURL }}` for its action link.
 - Confirm SMTP host, port, account, app password, sender, and reply-to address.
-- Confirm `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET`, and the OpenAI server key.
+- Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS origin, then confirm `CRON_SECRET` and the OpenAI server key.
 - Confirm the adjudicator and Advisory Committee Adobe Sign Web Form URLs.
 - Keep `STAFF_SIGNUP_ENABLED=false` unless a controlled registration window is active.
 - Keep `PHONE_VERIFICATION_ENABLED=false` until the Supabase SMS provider is configured and tested.

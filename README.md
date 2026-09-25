@@ -33,7 +33,12 @@ npm run dev
 4. Put the project URL and publishable key in `.env.local`.
 5. In Authentication > URL Configuration, add:
    - `http://localhost:3000/auth/callback`
-   - your Vercel production callback URL
+   - `https://ghsmta.getproductionops.com/auth/callback`
+6. Set the Supabase **Site URL** to `https://ghsmta.getproductionops.com`. Never
+   use the `*.supabase.co` project API URL as the Site URL.
+7. In Authentication > Email Templates, keep the confirmation, magic-link,
+   invite, and password-recovery buttons linked to `{{ .ConfirmationURL }}`.
+   Linking directly to `{{ .SiteURL }}` skips the Supabase verification step.
 
 ## 3. Create the first owner
 
@@ -53,7 +58,7 @@ Import the repository and add these environment variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_SITE_URL` — canonical origin including `https://` in production
 
 For the complete production release, also configure these server-only values:
 

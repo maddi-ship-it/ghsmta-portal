@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { normalizePhoneE164 } from "@/lib/phone";
+import { portalAuthCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,12 +55,12 @@ export async function staffSignup(formData: FormData) {
   }
 
   const headerStore = await headers();
-  const origin =
-    headerStore.get("origin") ??
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    "http://localhost:3000";
   const phoneVerificationEnabled =
     process.env.PHONE_VERIFICATION_ENABLED === "true";
+  const emailRedirectTo = portalAuthCallbackUrl(
+    phoneVerificationEnabled ? "/verify-phone" : "/portal",
+    headerStore.get("origin"),
+  );
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -73,9 +74,7 @@ export async function staffSignup(formData: FormData) {
         staff_signup: true,
         requested_role: "adjudicator",
       },
-      emailRedirectTo: `${origin}/auth/callback?next=${
-        phoneVerificationEnabled ? "/verify-phone" : "/portal"
-      }`,
+      emailRedirectTo,
     },
   });
 

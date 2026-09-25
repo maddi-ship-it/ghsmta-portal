@@ -9,6 +9,7 @@ import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { mfaGraceDeadline } from "@/lib/security-features";
+import { portalAuthCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/types";
@@ -352,12 +353,16 @@ export async function forcePasswordReset(userId: string) {
   }
 
   const headerStore = await headers();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? headerStore.get("origin") ?? "http://localhost:3000";
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.generateLink({
     type: "recovery",
     email: profile.email,
-    options: { redirectTo: `${siteUrl}/auth/callback?next=/update-password` },
+    options: {
+      redirectTo: portalAuthCallbackUrl(
+        "/update-password",
+        headerStore.get("origin"),
+      ),
+    },
   });
 
   if (error) throw new Error(error.message);

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import { portalAuthCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -147,11 +148,10 @@ export async function inviteSchoolTeamMember(formData: FormData) {
   }
 
   const headerStore = await headers();
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    headerStore.get("origin") ??
-    "http://localhost:3000";
-  const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent(TEAM_PATH)}`;
+  const redirectTo = portalAuthCallbackUrl(
+    TEAM_PATH,
+    headerStore.get("origin"),
+  );
 
   const linkData = await createAccessLink({
     email,
@@ -312,14 +312,13 @@ export async function resendSchoolTeamInvite(formData: FormData) {
   }
 
   const headerStore = await headers();
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    headerStore.get("origin") ??
-    "http://localhost:3000";
   const linkData = await createAccessLink({
     email: memberProfile.email,
     fullName: memberProfile.full_name ?? memberProfile.email,
-    redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(TEAM_PATH)}`,
+    redirectTo: portalAuthCallbackUrl(
+      TEAM_PATH,
+      headerStore.get("origin"),
+    ),
     existingUser: true,
   });
 

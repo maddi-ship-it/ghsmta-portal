@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { normalizePhoneE164 } from "@/lib/phone";
 import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
+import { portalAuthCallbackUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signup(formData: FormData) {
@@ -18,10 +19,10 @@ export async function signup(formData: FormData) {
   }
 
   const headerStore = await headers();
-  const origin =
-    headerStore.get("origin") ??
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    "http://localhost:3000";
+  const emailRedirectTo = portalAuthCallbackUrl(
+    PHONE_VERIFICATION_ENABLED ? "/verify-phone" : "/portal",
+    headerStore.get("origin"),
+  );
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -33,7 +34,7 @@ export async function signup(formData: FormData) {
         phone_e164: phone,
         require_phone_verification: PHONE_VERIFICATION_ENABLED,
       },
-      emailRedirectTo: `${origin}/auth/callback?next=${PHONE_VERIFICATION_ENABLED ? "/verify-phone" : "/portal"}`,
+      emailRedirectTo,
     },
   });
 
