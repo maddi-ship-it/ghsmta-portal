@@ -1461,6 +1461,18 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   letter-spacing: .08em;
   text-transform: uppercase;
 }
+.schedule-distance-link {
+  width: fit-content;
+  color: var(--portal-gold-bright, #8a6813);
+  font-size: .78rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.schedule-distance-link:hover,
+.schedule-distance-link:focus-visible {
+  color: var(--portal-ivory, var(--navy-900));
+}
 .schedule-school-instructions {
   margin: 0;
   padding: 13px 14px;

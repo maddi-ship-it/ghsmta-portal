@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 import { ApplicantScheduleBoard } from "@/components/applicant-schedule-board";
+import { ScheduleDistanceLink } from "@/components/schedule-distance-link";
 import { ScheduleOwnerTools } from "@/components/schedule-owner-tools";
 import { OwnerScheduleMessages } from "@/components/owner-schedule-messages";
 import { requireProfile } from "@/lib/auth";
+import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import { roleLabel } from "@/lib/format";
 import {
   DEFAULT_SCHEDULE_TRACK_FILTER,
@@ -14,6 +16,12 @@ import {
   type ScheduleFilter,
   type ScheduleTrackFilter,
 } from "@/lib/schedule-filters";
+import {
+  cityFromVenueAddress,
+  scheduleCityLabel,
+  scheduleDirectionsUrl,
+} from "@/lib/schedule-location";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
 
@@ -36,7 +44,7 @@ import {
 type ScheduleSlotStatus = "draft" | "open" | "closed" | "cancelled";
 
 const SCHEDULE_APPLICATION_COLUMNS =
-  "id,cycle_id,applicant_user_id,school_name,production_title,status";
+  "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status";
 const OWNER_SLOTS_PER_PAGE = 24;
 
 type ScheduleSlot = {
@@ -280,6 +288,7 @@ export default async function SchedulePage({
     ? (params.section as OwnerScheduleSection)
     : "overview";
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const applicantApplicationResultPromise = profile.role === "applicant"
     ? supabase
@@ -672,6 +681,80 @@ export default async function SchedulePage({
     ]),
   );
 
+  const scheduleApplicationIds = [
+    ...new Set(
+      profile.role === "applicant"
+        ? applicantApplications.map((application) => application.id)
+        : staffBookings.map((booking) => booking.application_id),
+    ),
+  ];
+  const knownScheduleApplications = scheduleApplicationIds
+    .map((applicationId) => applicationLookup.get(applicationId))
+    .filter((application): application is Application => Boolean(application));
+  const knownScheduleApplicationIds = new Set(
+    knownScheduleApplications.map((application) => application.id),
+  );
+  const missingScheduleApplicationIds = scheduleApplicationIds.filter(
+    (applicationId) => !knownScheduleApplicationIds.has(applicationId),
+  );
+  const missingScheduleApplicationsResult = missingScheduleApplicationIds.length
+    ? await admin
+        .from("applications")
+        .select("id,form_version_id")
+        .in("id", missingScheduleApplicationIds)
+    : { data: [], error: null };
+  if (missingScheduleApplicationsResult.error) {
+    console.error("Unable to load application city fallbacks for scheduling.", {
+      message: missingScheduleApplicationsResult.error.message,
+    });
+  }
+  const scheduleApplicationsForLocations = [
+    ...knownScheduleApplications.map((application) => ({
+      id: application.id,
+      form_version_id: application.form_version_id,
+    })),
+    ...(missingScheduleApplicationsResult.data ?? []),
+  ];
+  let applicationCityById = new Map<string, string>();
+  try {
+    const applicationDetails = await loadBillingApplicationDetails(
+      admin,
+      scheduleApplicationsForLocations,
+    );
+    applicationCityById = new Map(
+      [...applicationDetails.entries()].flatMap(([applicationId, details]) => {
+        const city =
+          details.schoolCity ?? cityFromVenueAddress(details.schoolAddress);
+        return city ? [[applicationId, city]] : [];
+      }),
+    );
+  } catch (error) {
+    console.error("Unable to resolve application city fallbacks for scheduling.", {
+      error,
+    });
+  }
+  const bookedApplicationCityBySlot = new Map(
+    staffBookings.flatMap((booking) => {
+      const city = applicationCityById.get(booking.application_id);
+      return city ? [[booking.slot_id, city] as const] : [];
+    }),
+  );
+  const bookedCityLabel = scheduleCityLabel({
+    venueAddress: bookedSchoolDetails?.venue_address,
+    applicationCity: bookedApplication
+      ? applicationCityById.get(bookedApplication.id)
+      : null,
+    fallbackLocation: bookedSlot?.location,
+  });
+  const bookedDirectionsUrl = scheduleDirectionsUrl({
+    venueName: bookedSchoolDetails?.venue_name,
+    venueAddress: bookedSchoolDetails?.venue_address,
+    applicationCity: bookedApplication
+      ? applicationCityById.get(bookedApplication.id)
+      : null,
+    fallbackLocation: bookedSlot?.location,
+  });
+
   const applicantWaitlistEntries = waitlistEntries.filter((entry) =>
     applicantApplications.some((application) => application.id === entry.application_id),
   );
@@ -683,6 +766,7 @@ export default async function SchedulePage({
   const applicantScheduleSlots = profile.role === "applicant"
     ? displaySlots.map((slot) => {
         const cycle = cycleMap.get(slot.cycle_id);
+        const visitDetails = schoolDetailsMap.get(slot.id);
         const slotAvailability = availabilityMap.get(slot.id);
         const slotApplications = applicantApplications.filter(
           (application) => application.cycle_id === slot.cycle_id,
@@ -702,8 +786,23 @@ export default async function SchedulePage({
           title: slot.title,
           dateLabel: formatSlotDate(slot.starts_at),
           timeLabel: formatSlotTime(slot.starts_at, slot.ends_at),
-          locationLabel:
-            slot.location || schoolDetailsMap.get(slot.id)?.venue_name || "TBA",
+          cityLabel: scheduleCityLabel({
+            venueAddress: visitDetails?.venue_address,
+            applicationCity:
+              slotAvailability?.is_mine && slotAvailability.my_application_id
+                ? applicationCityById.get(slotAvailability.my_application_id)
+                : null,
+            fallbackLocation: slot.location,
+          }),
+          directionsUrl: scheduleDirectionsUrl({
+            venueName: visitDetails?.venue_name,
+            venueAddress: visitDetails?.venue_address,
+            applicationCity:
+              slotAvailability?.is_mine && slotAvailability.my_application_id
+                ? applicationCityById.get(slotAvailability.my_application_id)
+                : null,
+            fallbackLocation: slot.location,
+          }),
           cycleLabel: cycle
             ? `${cycle.season_year} · ${cycle.name}`
             : "Program",
@@ -1012,7 +1111,8 @@ export default async function SchedulePage({
           <div className="panel-body schedule-booking-summary">
             <strong>{formatSlotDate(bookedSlot.starts_at)}</strong>
             <span>{formatSlotTime(bookedSlot.starts_at, bookedSlot.ends_at)} ET</span>
-            {bookedSlot.location && <span>{bookedSlot.location}</span>}
+            <span>{bookedCityLabel}</span>
+            <ScheduleDistanceLink href={bookedDirectionsUrl} />
             {bookedSlot.school_instructions && <p>{bookedSlot.school_instructions}</p>}
             <div className="info-banner">
               Your school cannot remove or change this reservation. Contact GHSMTA staff if a change is required.
@@ -1061,6 +1161,17 @@ export default async function SchedulePage({
               const slotAvailability = availabilityMap.get(slot.id);
               const booking = bookingMap.get(slot.id);
               const visitDetails = schoolDetailsMap.get(slot.id) ?? null;
+              const cityLabel = scheduleCityLabel({
+                venueAddress: visitDetails?.venue_address,
+                applicationCity: bookedApplicationCityBySlot.get(slot.id),
+                fallbackLocation: slot.location,
+              });
+              const directionsUrl = scheduleDirectionsUrl({
+                venueName: visitDetails?.venue_name,
+                venueAddress: visitDetails?.venue_address,
+                applicationCity: bookedApplicationCityBySlot.get(slot.id),
+                fallbackLocation: slot.location,
+              });
               const participants = staffBySlot.get(slot.id) ?? [];
               const panelists = participants.filter(
                 (participant) => participant.participation_mode === "panel",
@@ -1131,7 +1242,7 @@ export default async function SchedulePage({
                         <small>{booking?.production_title || slot.title}</small>
                       </span>
                       <span className="schedule-list-location">
-                        <strong>{slot.location || visitDetails?.venue_name || "TBA"}</strong>
+                        <strong>{cityLabel}</strong>
                         <small>{cycle ? `${cycle.season_year} · ${cycle.name}` : "Program"}</small>
                       </span>
                       <span className="schedule-list-metric">
@@ -1172,7 +1283,7 @@ export default async function SchedulePage({
                   <div className="panel-body schedule-slot-body">
                     <div className="schedule-slot-meta">
                       <span><strong>Time</strong>{formatSlotTime(slot.starts_at, slot.ends_at)} ET</span>
-                      <span><strong>Location</strong>{slot.location || "To be announced"}</span>
+                      <span><strong>City</strong>{cityLabel}<ScheduleDistanceLink href={directionsUrl} /></span>
                     </div>
 
                     {slot.school_instructions && (

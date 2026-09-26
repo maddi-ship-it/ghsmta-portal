@@ -10,6 +10,7 @@ import {
   joinScheduleSlotWaitlist,
   leaveScheduleSlotWaitlist,
 } from "@/app/portal/schedule/actions";
+import { ScheduleDistanceLink } from "@/components/schedule-distance-link";
 import { ScheduleSubmitButton } from "@/components/schedule-submit-button";
 import { createClient } from "@/lib/supabase/client";
 
@@ -33,7 +34,8 @@ type ApplicantScheduleSlot = {
   title: string;
   dateLabel: string;
   timeLabel: string;
-  locationLabel: string;
+  cityLabel: string;
+  directionsUrl: string | null;
   cycleLabel: string;
   waitlistCount: number;
   applications: ApplicationOption[];
@@ -145,14 +147,14 @@ export function ApplicantScheduleBoard({ slots, initialAvailability, view }: { s
                 <summary className="schedule-list-summary schedule-applicant-list-summary">
                   <span className="schedule-list-date"><strong>{slot.dateLabel}</strong><small>{slot.timeLabel} ET</small></span>
                   <span className="schedule-list-school"><strong>{isBooked ? "Booked" : "Open slot"}</strong><small>{slot.title}</small></span>
-                  <span className="schedule-list-location"><strong>{slot.locationLabel}</strong><small>{slot.cycleLabel}</small></span>
+                  <span className="schedule-list-location"><strong>{slot.cityLabel}</strong><small>{slot.cycleLabel}</small></span>
                   <span className="schedule-list-metric"><strong>{slot.waitlistCount}</strong><small>waiting</small></span>
                   <span className={`badge ${isBooked ? "schedule-availability-taken" : "schedule-availability-open"}`}>{isBooked ? "Taken" : "Open"}</span>
                   <span className="schedule-list-expand">Details</span>
                 </summary>
 
                 <div className="schedule-slot-expanded applicant-schedule-slot-expanded">
-                  <div className="schedule-applicant-slot-copy"><p className="eyebrow">{slot.cycleLabel}</p><h2>{slot.title}</h2><p><strong>{slot.dateLabel}</strong><br />{slot.timeLabel} ET · {slot.locationLabel}</p></div>
+                  <div className="schedule-applicant-slot-copy"><p className="eyebrow">{slot.cycleLabel}</p><h2>{slot.title}</h2><p><strong>{slot.dateLabel}</strong><br />{slot.timeLabel} ET · {slot.cityLabel}</p><ScheduleDistanceLink href={slot.directionsUrl} /></div>
                   <div className="schedule-school-action schedule-applicant-booking-action">
                     {offered ? (
                       <div className="waitlist-offer-card"><span className="badge badge-warning">Exclusive offer</span><h3>This slot is held for your school.</h3><p>Accept before {new Date(waitlist.offer_expires_at!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</p><div className="button-row"><form action={acceptScheduleSlotWaitlistOffer.bind(null, waitlist.id)}><button className="button button-gold" type="submit">Accept slot</button></form><form action={declineScheduleSlotWaitlistOffer.bind(null, waitlist.id)}><button className="button button-secondary" type="submit">Decline</button></form></div></div>

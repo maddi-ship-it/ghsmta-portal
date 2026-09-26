@@ -39,6 +39,7 @@ type BillingTableQuery = {
 
 export type BillingApplicationDetails = {
   schoolAddress: string | null;
+  schoolCity: string | null;
   schoolPhone: string | null;
   schoolType: string | null;
   selectedTrack: string | null;
@@ -74,6 +75,11 @@ const SCHOOL_ADDRESS_FRAGMENTS = [
   "mailing address",
 ];
 
+const SCHOOL_CITY_FRAGMENTS = [
+  "school address city",
+  "mailing address city",
+];
+
 const SCHOOL_PHONE_FRAGMENTS = [
   "school phone number extension",
   "school phone",
@@ -89,6 +95,7 @@ const SCHOOL_TYPE_FRAGMENTS = [
 const BILLING_DETAIL_FRAGMENTS = [
   ...PROGRAM_QUESTION_FRAGMENTS,
   ...LEGACY_TRACK_FRAGMENTS,
+  ...SCHOOL_CITY_FRAGMENTS,
   ...SCHOOL_ADDRESS_FRAGMENTS,
   ...SCHOOL_PHONE_FRAGMENTS,
   ...SCHOOL_TYPE_FRAGMENTS,
@@ -144,6 +151,15 @@ function addressToText(value: unknown): string {
   return [street1, street2, cityLine, country]
     .filter(Boolean)
     .join("\n");
+}
+
+function structuredAddressCityToText(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "";
+  }
+
+  const record = value as Record<string, unknown>;
+  return answerToText(record.locality) || answerToText(record.city);
 }
 
 function trackToText(value: unknown): string {
@@ -229,6 +245,18 @@ export function buildBillingApplicationDetails(
       SCHOOL_ADDRESS_FRAGMENTS,
       addressToText,
     ),
+    schoolCity:
+      findAnswer(
+        sortedQuestions,
+        answerByQuestionId,
+        SCHOOL_CITY_FRAGMENTS,
+      ) ??
+      findAnswer(
+        sortedQuestions,
+        answerByQuestionId,
+        SCHOOL_ADDRESS_FRAGMENTS,
+        structuredAddressCityToText,
+      ),
     schoolPhone: findAnswer(
       sortedQuestions,
       answerByQuestionId,

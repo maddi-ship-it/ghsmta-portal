@@ -155,6 +155,72 @@ describe("billing application details", () => {
     expect(details.selectedTrack).toBe("Mentorship Track");
   });
 
+  it("extracts a city from a structured school address", () => {
+    const details = buildBillingApplicationDetails(
+      [
+        {
+          id: "school-address",
+          form_version_id: "form-1",
+          question_key: "acceptd_q_83003",
+          label: "School Address",
+          source_label: "School Address",
+          sort_order: 10,
+        },
+      ],
+      [
+        {
+          application_id: "application-1",
+          question_id: "school-address",
+          value: {
+            street_address1: "123 Main Street",
+            locality: "Atlanta",
+            administrative_area_level_1: "GA",
+            postal_code: "30303",
+          },
+        },
+      ],
+    );
+
+    expect(details.schoolCity).toBe("Atlanta");
+  });
+
+  it("prefers the separate city answer over a street-only address answer", () => {
+    const details = buildBillingApplicationDetails(
+      [
+        {
+          id: "school-street",
+          form_version_id: "form-1",
+          question_key: "acceptd_c043_school_address_street_address",
+          label: "School Address - Street Address",
+          source_label: "School Address - Street Address",
+          sort_order: 10,
+        },
+        {
+          id: "school-city",
+          form_version_id: "form-1",
+          question_key: "acceptd_c043_school_address_city",
+          label: "School Address - City",
+          source_label: "School Address - City",
+          sort_order: 20,
+        },
+      ],
+      [
+        {
+          application_id: "application-1",
+          question_id: "school-street",
+          value: "456 Peachtree Street",
+        },
+        {
+          application_id: "application-1",
+          question_id: "school-city",
+          value: "Decatur",
+        },
+      ],
+    );
+
+    expect(details.schoolCity).toBe("Decatur");
+  });
+
   it("loads billing details in bulk without losing imported answers past the default Supabase page size", async () => {
     const applicationId = "application-1";
     const schoolTypeQuestionId = "school-type";

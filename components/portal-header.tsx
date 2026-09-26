@@ -121,17 +121,14 @@ function buildNavigation(
     } else {
       primary.push({
         href: "/portal/adjudication",
-        label:
-          profile.role === "adjudicator"
-            ? "Assignments"
-            : "Adjudication",
+        label: "Adjudication",
         icon: "✓",
       });
     }
   }
 
   if (profile.role === "advisory_member") {
-    management.push({
+    resources.push({
       href: "/portal/admin/cycles",
       label: "Programs",
       icon: "◫",
