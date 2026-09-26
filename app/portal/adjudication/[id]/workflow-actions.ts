@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
 import { twoPointRangeFromStart } from "@/lib/adjudication-ranges";
+import {
+  categoryDecisionHasChanges,
+  type CategoryDecision,
+  type ExistingCategoryProposal,
+} from "@/lib/adjudication-category-decisions";
 import { requireProfile } from "@/lib/auth";
 import { logEvent } from "@/lib/observability";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -13,29 +18,6 @@ import type { AppRole } from "@/lib/types";
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
-
-type CategoryDecision = {
-  category_id: string;
-  is_eligible: boolean;
-  range_min: number | null;
-  range_max: number | null;
-  advisory_note: string | null;
-  owner_override: boolean;
-  owner_override_note: string | null;
-};
-
-type ExistingCategoryProposal = {
-  id: string;
-  category_id: string;
-  proposed_by: string;
-  is_eligible: boolean;
-  range_min: number | string | null;
-  range_max: number | string | null;
-  status: string;
-  advisory_note: string | null;
-  owner_override_note: string | null;
-  approved_at: string | null;
-};
 
 export type CategoryProposalSaveResult = {
   ok: boolean;
@@ -252,10 +234,14 @@ export async function saveAllCategoryProposals(
 ): Promise<CategoryProposalSaveResult> {
   const profile = await requireProfile(["advisory_member", "owner"]);
   const attemptId = new Date().toISOString();
-  const categoryIds = formData
-    .getAll("category_id")
-    .map(String)
-    .filter(Boolean);
+  const categoryIds = [
+    ...new Set(
+      formData
+        .getAll("category_id")
+        .map(String)
+        .filter(Boolean),
+    ),
+  ];
 
   if (categoryIds.length === 0) {
     return { ok: false, error: "No categories were submitted.", attemptId };
@@ -266,58 +252,17 @@ export async function saveAllCategoryProposals(
     const rangeText = text(formData, `range_${categoryId}`);
     const range = eligible ? twoPointRangeFromStart(rangeText) : null;
 
-    if (eligible && !range) {
-      return {
-        category_id: categoryId,
-        is_eligible: eligible,
-        range_min: Number.NaN,
-        range_max: Number.NaN,
-        advisory_note: null,
-        owner_override: false,
-        owner_override_note: null,
-      };
-    }
-
     return {
       category_id: categoryId,
       is_eligible: eligible,
-      range_min: range?.rangeMinimum ?? null,
-      range_max: range?.rangeMaximum ?? null,
+      range_min: range?.rangeMinimum ?? (eligible ? Number.NaN : null),
+      range_max: range?.rangeMaximum ?? (eligible ? Number.NaN : null),
       advisory_note: text(formData, `note_${categoryId}`) || null,
       owner_override: formData.get(`override_${categoryId}`) === "on",
       owner_override_note:
         text(formData, `override_note_${categoryId}`) || null,
     };
   });
-
-  if (
-    decisions.some(
-      (decision) =>
-        decision.is_eligible &&
-        (!Number.isFinite(decision.range_min) ||
-          !Number.isFinite(decision.range_max)),
-    )
-  ) {
-    return {
-      ok: false,
-      error: "Every eligible category needs a valid two-point range.",
-      attemptId,
-    };
-  }
-
-  if (
-    profile.role === "owner" &&
-    decisions.some(
-      (decision) =>
-        decision.owner_override && !decision.owner_override_note,
-    )
-  ) {
-    return {
-      ok: false,
-      error: "Every Owner override needs an override note.",
-      attemptId,
-    };
-  }
 
   const supabase = await createClient();
   const { data: canReview, error: accessError } = await supabase.rpc(
@@ -348,11 +293,85 @@ export async function saveAllCategoryProposals(
     };
   }
 
+  const { data: existingRows, error: existingError } = await supabase
+    .from("adjudication_category_proposals")
+    .select(
+      "id,category_id,proposed_by,is_eligible,range_min,range_max,status,advisory_note,owner_override_note,approved_at",
+    )
+    .eq("application_id", applicationId)
+    .in("category_id", categoryIds);
+
+  if (existingError) {
+    logEvent("error", "adjudication.category_proposal_load_failed", {
+      applicationId,
+      actorId: profile.id,
+      code: existingError.code,
+      message: existingError.message,
+    });
+    return {
+      ok: false,
+      error: "We couldn't load the existing category decisions. Please try again.",
+      attemptId,
+    };
+  }
+
+  const existingByCategory = new Map(
+    ((existingRows ?? []) as ExistingCategoryProposal[]).map((proposal) => [
+      proposal.category_id,
+      proposal,
+    ]),
+  );
+  const changedDecisions = decisions.filter((decision) =>
+    categoryDecisionHasChanges(
+      decision,
+      existingByCategory.get(decision.category_id),
+      profile.role,
+    ),
+  );
+
+  if (
+    changedDecisions.some(
+      (decision) =>
+        decision.is_eligible &&
+        (!Number.isFinite(decision.range_min) ||
+          !Number.isFinite(decision.range_max)),
+    )
+  ) {
+    return {
+      ok: false,
+      error: "Each changed eligible category needs a valid two-point range.",
+      attemptId,
+    };
+  }
+
+  if (
+    profile.role === "owner" &&
+    changedDecisions.some(
+      (decision) =>
+        decision.owner_override && !decision.owner_override_note,
+    )
+  ) {
+    return {
+      ok: false,
+      error: "Every Owner override needs an override note.",
+      attemptId,
+    };
+  }
+
+  if (changedDecisions.length === 0) {
+    return {
+      ok: true,
+      changedCount: 0,
+      message: "All category decisions are already up to date.",
+      attemptId,
+    };
+  }
+
   const { data, error } = await supabase.rpc(
     "save_all_adjudication_category_proposals",
     {
       p_application_id: applicationId,
-      p_decisions: decisions,
+      p_decisions: changedDecisions,
     },
   );
 
@@ -364,7 +383,7 @@ export async function saveAllCategoryProposals(
           applicationId,
           actorId: profile.id,
           actorRole: profile.role,
-          decisions,
+          decisions: changedDecisions,
         });
       } catch (fallbackError) {
         const message =

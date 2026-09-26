@@ -13,6 +13,8 @@ export default async function UpdatePasswordPage({
       ? "Passwords must be at least eight characters."
       : params.error === "match"
         ? "The passwords do not match."
+        : params.error === "finalize"
+          ? "Your password was changed, but portal access could not be restored. Try saving it once more or contact an Owner."
         : params.error
           ? "The password could not be updated. Request a fresh reset link and try again."
           : null;
