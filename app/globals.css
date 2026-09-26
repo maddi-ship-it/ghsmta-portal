@@ -10468,8 +10468,43 @@ html[data-theme="light"] .button-secondary:not(.hero *):not(.public-header *):no
   font-weight: 700;
 }
 
-.schedule-pagination a:last-child {
+.schedule-pagination > a:last-child {
   justify-self: end;
+}
+
+.schedule-pagination-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.schedule-pagination-pages a,
+.schedule-pagination-pages span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0.35rem;
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 999px;
+  background: var(--portal-surface-raised, var(--paper));
+  color: var(--portal-text, var(--navy-700));
+  text-decoration: none;
+}
+
+.schedule-pagination-pages a:hover,
+.schedule-pagination-pages a:focus-visible {
+  border-color: var(--portal-gold, var(--gold-500));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-gold, var(--gold-500)) 24%, transparent);
+}
+
+.schedule-pagination-pages .active {
+  border-color: var(--portal-gold, var(--gold-500));
+  background: color-mix(in srgb, var(--portal-gold, var(--gold-500)) 20%, transparent);
+  color: var(--portal-ivory, var(--navy-900));
 }
 
 .schedule-participant-mode-form .select {

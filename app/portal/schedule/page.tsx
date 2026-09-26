@@ -6,9 +6,13 @@ import { OwnerScheduleMessages } from "@/components/owner-schedule-messages";
 import { requireProfile } from "@/lib/auth";
 import { roleLabel } from "@/lib/format";
 import {
+  DEFAULT_SCHEDULE_TRACK_FILTER,
   defaultScheduleFilter,
   resolveScheduleFilter,
+  resolveScheduleTrackFilter,
+  scheduleSlotMatchesTrack,
   type ScheduleFilter,
+  type ScheduleTrackFilter,
 } from "@/lib/schedule-filters";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
@@ -151,6 +155,7 @@ type ScheduleSearchParams = {
   sort?: ScheduleSort;
   view?: ScheduleView;
   filter?: ScheduleFilter;
+  track?: ScheduleTrackFilter;
   q?: string;
   section?: OwnerScheduleSection;
   page?: string;
@@ -268,6 +273,7 @@ export default async function SchedulePage({
   const selectedView: ScheduleView = params.view === "cards" ? "cards" : "list";
   const defaultFilter = defaultScheduleFilter(profile.role);
   const selectedFilter = resolveScheduleFilter(profile.role, params.filter);
+  const selectedTrack = resolveScheduleTrackFilter(params.track);
   const scheduleSearch = (params.q ?? "").trim();
   const ownerSections: OwnerScheduleSection[] = ["overview", "timeslots", "staffing", "waitlists", "messages"];
   const ownerSection: OwnerScheduleSection = ownerSections.includes(params.section as OwnerScheduleSection)
@@ -541,6 +547,10 @@ export default async function SchedulePage({
         return false;
       }
 
+      if (!scheduleSlotMatchesTrack(slot.title, selectedTrack)) {
+        return false;
+      }
+
       switch (selectedFilter) {
         case 'open':
           return slot.status === 'open';
@@ -617,6 +627,7 @@ export default async function SchedulePage({
     view: selectedView,
     sort: selectedSort,
     filter: selectedFilter,
+    track: selectedTrack,
     ...(scheduleSearch ? { q: scheduleSearch } : {}),
   };
 
@@ -924,6 +935,12 @@ export default async function SchedulePage({
             <option value="understaffed">Understaffed</option>
             <option value="mine">My schedule</option>
           </select>
+          <label className="sr-only" htmlFor="schedule_track">Filter by track</label>
+          <select className="select" defaultValue={selectedTrack} id="schedule_track" name="track">
+            <option value="competition">Competition Track</option>
+            <option value="mentorship">Mentorship Track</option>
+            <option value="all">All Tracks</option>
+          </select>
           <label className="sr-only" htmlFor="schedule_sort">Sort schedule</label>
           <select className="select" defaultValue={selectedSort} id="schedule_sort" name="sort">
             <option value="date_asc">Date — earliest first</option>
@@ -935,7 +952,7 @@ export default async function SchedulePage({
             <option value="waitlist_desc">Waitlist count</option>
           </select>
           <button className="button button-secondary button-compact" type="submit">Apply</button>
-          {(scheduleSearch || selectedFilter !== defaultFilter || selectedSort !== "date_asc") && (
+          {(scheduleSearch || selectedFilter !== defaultFilter || selectedTrack !== DEFAULT_SCHEDULE_TRACK_FILTER || selectedSort !== "date_asc") && (
             <Link
               className="text-button"
               href={{
@@ -1586,11 +1603,27 @@ export default async function SchedulePage({
             <nav className="schedule-pagination" aria-label="Schedule pages">
               {currentOwnerPage > 1 ? (
                 <Link href={{ pathname: "/portal/schedule", query: { ...ownerPageQuery, page: currentOwnerPage - 1 } }}>Previous</Link>
-              ) : <span />}
-              <span>Page {currentOwnerPage} of {ownerPageCount}</span>
+              ) : <span aria-hidden="true" />}
+              <div className="schedule-pagination-pages">
+                {Array.from({ length: ownerPageCount }, (_, index) => index + 1).map((pageNumber) =>
+                  pageNumber === currentOwnerPage ? (
+                    <span aria-current="page" className="active" key={pageNumber}>
+                      {pageNumber}
+                    </span>
+                  ) : (
+                    <Link
+                      aria-label={`Go to schedule page ${pageNumber}`}
+                      href={{ pathname: "/portal/schedule", query: { ...ownerPageQuery, page: pageNumber } }}
+                      key={pageNumber}
+                    >
+                      {pageNumber}
+                    </Link>
+                  ),
+                )}
+              </div>
               {currentOwnerPage < ownerPageCount ? (
                 <Link href={{ pathname: "/portal/schedule", query: { ...ownerPageQuery, page: currentOwnerPage + 1 } }}>Next</Link>
-              ) : <span />}
+              ) : <span aria-hidden="true" />}
             </nav>
           )}
         </section>
