@@ -4429,6 +4429,12 @@ body.modal-open {
 .consensus-matrix-table td { vertical-align: top; }
 .consensus-matrix-table td:first-child { min-width: 190px; }
 .consensus-matrix-table small { display: block; margin-top: 4px; color: var(--muted); }
+.consensus-comment-assignment {
+  display: grid;
+  gap: 8px;
+  min-width: 210px;
+}
+.consensus-comment-assignment .text-button { justify-self: start; }
 .consensus-row-form { display: grid; grid-template-columns: 110px 150px 125px minmax(220px, 1fr) minmax(150px, .7fr) auto; gap: 10px; align-items: center; }
 .consensus-owner-override { display: grid; gap: 6px; }
 .consensus-response-inline { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }

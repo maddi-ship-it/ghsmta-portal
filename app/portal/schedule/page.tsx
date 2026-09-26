@@ -21,6 +21,10 @@ import {
   scheduleCityLabel,
   scheduleDirectionsUrl,
 } from "@/lib/schedule-location";
+import {
+  canSelfJoinScheduleSlot,
+  scheduleSlotHasAdvisoryMember,
+} from "@/lib/schedule-staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
@@ -1179,6 +1183,8 @@ export default async function SchedulePage({
               const currentEnrollment = participants.find(
                 (participant) => participant.user_id === profile.id,
               );
+              const advisoryMemberAssigned =
+                scheduleSlotHasAdvisoryMember(participants);
               const slotApplications =
                 (profile.role as AppRole) === "applicant"
                   ? applicantApplications.filter(
@@ -1194,13 +1200,20 @@ export default async function SchedulePage({
                 (person) =>
                   !participants.some(
                     (participant) => participant.user_id === person.id,
+                  ) &&
+                  !(
+                    person.role === "advisory_member" &&
+                    advisoryMemberAssigned
                   ),
               );
               const isPast = new Date(slot.starts_at).getTime() <= serverTime;
-              const canSelfJoin =
-                slot.status === "open" &&
-                !isPast &&
-                !currentEnrollment;
+              const canSelfJoin = canSelfJoinScheduleSlot({
+                currentEnrollment: Boolean(currentEnrollment),
+                isPast,
+                participants,
+                role: profile.role,
+                status: slot.status,
+              });
               const schoolAccessOpen =
                 Boolean(slot.school_booking_opens_at) &&
                 new Date(slot.school_booking_opens_at!).getTime() <= serverTime &&
@@ -1474,8 +1487,19 @@ export default async function SchedulePage({
                                   disabled={!canSelfJoin}
                                   type="submit"
                                 >
-                                  {isPast ? "Slot has passed" : "Join this slot"}
+                                  {isPast
+                                    ? "Slot has passed"
+                                    : profile.role === "advisory_member" &&
+                                        advisoryMemberAssigned
+                                      ? "Advisory member assigned"
+                                      : "Join this slot"}
                                 </button>
+                                {profile.role === "advisory_member" &&
+                                  advisoryMemberAssigned && (
+                                    <small>
+                                      Each slot can have one Advisory Committee member.
+                                    </small>
+                                  )}
                               </form>
                             )}
                           </div>
@@ -1491,9 +1515,7 @@ export default async function SchedulePage({
                                   <label htmlFor={`advisory_staff_${slot.id}`}>Portal user</label>
                                   <select className="select" id={`advisory_staff_${slot.id}`} name="user_id" required>
                                     <option value="">Choose person</option>
-                                    {ownerStaff
-                                      .filter((person) => !participants.some((participant) => participant.user_id === person.id))
-                                      .map((person) => (
+                                    {ownerAvailableStaff.map((person) => (
                                         <option key={person.id} value={person.id}>
                                           {person.full_name ?? person.email} — {roleLabel(person.role)}
                                         </option>

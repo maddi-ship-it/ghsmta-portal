@@ -187,6 +187,18 @@ function labeledValues(
     .join(" · ");
 }
 
+function performerSubject(
+  index: AnswerIndex,
+  nameAliases: string[],
+  roleAliases: string[],
+) {
+  const studentName = firstValue(index, nameAliases);
+  const role = firstValue(index, roleAliases);
+
+  if (studentName && role) return `${studentName} (${role})`;
+  return studentName || role;
+}
+
 export function resolveScoringCategorySubjects(
   input: ResolveSubjectInput,
 ): Record<string, string> {
@@ -260,23 +272,31 @@ export function resolveScoringCategorySubjects(
       "costume_designer_name",
       "costume_coordinator_name",
     ]),
-    leading_actress: firstValue(index, [
-      "leading_actress_name",
-    ]),
-    leading_actor: firstValue(index, [
-      "leading_actor_name",
-    ]),
-    supporting_performer_a: firstValue(index, [
-      "supporting_performer_a_name",
-      "supporting_performer_1_name",
-    ]),
-    supporting_performer_b: firstValue(index, [
-      "supporting_performer_b_name",
-      "supporting_performer_2_name",
-    ]),
-    featured_performer: firstValue(index, [
-      "featured_performer_name",
-    ]),
+    leading_actress: performerSubject(
+      index,
+      ["leading_actress_name"],
+      ["leading_actress_role"],
+    ),
+    leading_actor: performerSubject(
+      index,
+      ["leading_actor_name"],
+      ["leading_actor_role"],
+    ),
+    supporting_performer_a: performerSubject(
+      index,
+      ["supporting_performer_a_name", "supporting_performer_1_name"],
+      ["supporting_performer_a_role", "supporting_performer_1_role"],
+    ),
+    supporting_performer_b: performerSubject(
+      index,
+      ["supporting_performer_b_name", "supporting_performer_2_name"],
+      ["supporting_performer_b_role", "supporting_performer_2_role"],
+    ),
+    featured_performer: performerSubject(
+      index,
+      ["featured_performer_name"],
+      ["featured_performer_role"],
+    ),
     direction: firstValue(index, [
       "director_name",
       "production_director_name",

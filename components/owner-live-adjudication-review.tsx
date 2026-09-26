@@ -469,7 +469,7 @@ export function OwnerLiveAdjudicationReview({
   const [feedback, setFeedback] = useState(initialFeedback);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "error">(
-    isOwner ? "connecting" : "live",
+    "connecting",
   );
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -517,10 +517,15 @@ export function OwnerLiveAdjudicationReview({
     setScorecards(nextScorecards);
     setScores((scoreResult.data ?? []) as AdjudicationScore[]);
     setComments((commentResult.data ?? []) as AdjudicationCategoryComment[]);
-    setFeedback((feedbackResult.data ?? []) as AdjudicationPanelFeedback[]);
+    const nextFeedback = (feedbackResult.data ?? []) as AdjudicationPanelFeedback[];
+    setFeedback(
+      isOwner
+        ? nextFeedback
+        : nextFeedback.filter((item) => item.status === "approved"),
+    );
     setLastUpdated(new Date());
     setConnectionState("live");
-  }, [applicationId, supabase]);
+  }, [applicationId, isOwner, supabase]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
@@ -530,11 +535,9 @@ export function OwnerLiveAdjudicationReview({
   const scorecardKey = scorecards.map((scorecard) => scorecard.id).sort().join(",");
 
   useEffect(() => {
-    if (!isOwner) return;
-
     const channels = [
       supabase
-        .channel(`owner-scorecards:${applicationId}`)
+        .channel(`panel-review-scorecards:${applicationId}`)
         .on(
           "postgres_changes",
           {
@@ -552,7 +555,7 @@ export function OwnerLiveAdjudicationReview({
           }
         }),
       supabase
-        .channel(`owner-feedback:${applicationId}`)
+        .channel(`panel-review-feedback:${applicationId}`)
         .on(
           "postgres_changes",
           {
@@ -569,7 +572,7 @@ export function OwnerLiveAdjudicationReview({
     for (const scorecardId of scorecardKey ? scorecardKey.split(",") : []) {
       channels.push(
         supabase
-          .channel(`owner-scores:${scorecardId}`)
+          .channel(`panel-review-scores:${scorecardId}`)
           .on(
             "postgres_changes",
             {
@@ -584,7 +587,7 @@ export function OwnerLiveAdjudicationReview({
       );
       channels.push(
         supabase
-          .channel(`owner-comments:${scorecardId}`)
+          .channel(`panel-review-comments:${scorecardId}`)
           .on(
             "postgres_changes",
             {
@@ -605,38 +608,34 @@ export function OwnerLiveAdjudicationReview({
     };
   }, [applicationId, isOwner, refreshData, scheduleRefresh, scorecardKey, supabase]);
 
-  const visibleScorecards = isOwner
-    ? scorecards
-    : scorecards.filter(
-        (scorecard) => scorecard.status === "submitted" || scorecard.status === "locked",
-      );
+  const visibleScorecards = scorecards;
 
   return (
     <>
-      {isOwner && (
-        <div className={`live-review-status live-review-status-${connectionState}`}>
-          <span aria-hidden="true" />
-          <div>
-            <strong>
-              {connectionState === "live"
+      <div className={`live-review-status live-review-status-${connectionState}`}>
+        <span aria-hidden="true" />
+        <div>
+          <strong>
+            {connectionState === "live"
+              ? isOwner
                 ? "Live owner review"
-                : connectionState === "connecting"
-                  ? "Connecting to live scoring…"
-                  : "Live connection interrupted"}
-            </strong>
-            <small>
-              {lastUpdated
-                ? `Last database update ${lastUpdated.toLocaleTimeString()}`
-                : "Draft scores and comments will appear here as adjudicators save."}
-            </small>
-          </div>
-          {connectionState === "error" && (
-            <button className="button button-secondary button-compact" onClick={() => void refreshData()} type="button">
-              Refresh now
-            </button>
-          )}
+                : "Live Advisory Committee review"
+              : connectionState === "connecting"
+                ? "Connecting to live scoring…"
+                : "Live connection interrupted"}
+          </strong>
+          <small>
+            {lastUpdated
+              ? `Last database update ${lastUpdated.toLocaleTimeString()}`
+              : "Draft scores and comments will appear here as panel members save."}
+          </small>
         </div>
-      )}
+        {connectionState === "error" && (
+          <button className="button button-secondary button-compact" onClick={() => void refreshData()} type="button">
+            Refresh now
+          </button>
+        )}
+      </div>
 
       <section className="metric-grid adjudication-review-metrics" aria-label="Panel progress">
         <article className="metric-card">
@@ -669,7 +668,7 @@ export function OwnerLiveAdjudicationReview({
         <div className="panel-header">
           <div>
             <h2>Panel scorecards</h2>
-            <p>{isOwner ? "Draft activity updates live." : "Submitted scorecards are shown."}</p>
+            <p>Draft scores and comments update live as panel members save.</p>
           </div>
         </div>
         <div className="panel-body panelist-grid">
@@ -744,7 +743,7 @@ export function OwnerLiveAdjudicationReview({
                 {category.guidance && <p>{category.guidance}</p>}
               </div>
               <div className="category-average">
-                <span>{isOwner ? "Live panel average" : "Panel average"}</span>
+                <span>Live panel average</span>
                 <strong>{formatScoreAverage(average)}</strong>
               </div>
             </div>
@@ -758,7 +757,7 @@ export function OwnerLiveAdjudicationReview({
                       <th key={card.id}>
                         {profileMap.get(card.adjudicator_user_id)?.full_name?.split(" ")[0] ??
                           "Panelist"}
-                        {isOwner && <small>{scorecardStatusLabel(card.status)}</small>}
+                        <small>{scorecardStatusLabel(card.status)}</small>
                       </th>
                     ))}
                     <th>Average</th>
@@ -811,7 +810,7 @@ export function OwnerLiveAdjudicationReview({
             </div>
 
             <div className="panel-body">
-              <h3>{isOwner ? "Live adjudicator comments" : "Adjudicator comment quadrants"}</h3>
+              <h3>Live adjudicator comments</h3>
               <div className="raw-comment-grid">
                 {visibleScorecards.map((card) => {
                   const panelist = profileMap.get(card.adjudicator_user_id);
