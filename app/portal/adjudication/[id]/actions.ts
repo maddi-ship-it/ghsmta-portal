@@ -1174,104 +1174,128 @@ export async function assignPanelNarrativeReviewer(
 ) {
   const advisoryMember = await requireProfile(["advisory_member"]);
   const assigneeId = formText(formData, "assigned_to");
-  if (!assigneeId) throw new Error("Choose a panel member.");
+  const returnPath = `/portal/adjudication/${applicationId}`;
+  if (!assigneeId) redirect(`${returnPath}?error=assignment`);
 
-  const supabase = await createClient();
-  const { data: canReview, error: accessError } = await supabase.rpc(
-    "can_advisory_review_application",
-    {
-      p_application_id: applicationId,
-      p_user_id: advisoryMember.id,
-    },
-  );
-  if (accessError) throw new Error(accessError.message);
-  if (!canReview) {
-    throw new Error("You do not have panel review access for this school.");
-  }
-
-  const admin = createAdminClient();
-  const [feedbackResult, assignmentResult, assigneeResult, categoryResult] =
-    await Promise.all([
-      admin
-        .from("adjudication_panel_feedback")
-        .select("id,status,approved_by")
-        .eq("application_id", applicationId)
-        .eq("category_id", categoryId)
-        .maybeSingle(),
-      admin
-        .from("adjudicator_assignments")
-        .select("id")
-        .eq("application_id", applicationId)
-        .eq("adjudicator_user_id", assigneeId)
-        .eq("can_comment", true)
-        .is("removed_at", null)
-        .maybeSingle(),
-      admin
-        .from("profiles")
-        .select("id,full_name,email,role,active")
-        .eq("id", assigneeId)
-        .maybeSingle(),
-      admin
-        .from("scoring_categories")
-        .select("title")
-        .eq("id", categoryId)
-        .maybeSingle(),
-    ]);
-
-  const firstError = [
-    feedbackResult.error,
-    assignmentResult.error,
-    assigneeResult.error,
-    categoryResult.error,
-  ].find(Boolean);
-  if (firstError) throw new Error(firstError.message);
-  if (!feedbackResult.data) throw new Error("The final comment was not found.");
-  if (!assignmentResult.data || !assigneeResult.data?.active) {
-    throw new Error("Choose an active commenting member of this panel.");
-  }
-  if (
-    !["adjudicator", "advisory_member"].includes(
-      assigneeResult.data.role,
-    )
-  ) {
-    throw new Error("Choose an adjudicator or Advisory Committee member.");
-  }
-
-  const { data: approver } = feedbackResult.data.approved_by
-    ? await admin
-        .from("profiles")
-        .select("role")
-        .eq("id", feedbackResult.data.approved_by)
-        .maybeSingle()
-    : { data: null };
-  if (
-    feedbackResult.data.status !== "approved" ||
-    approver?.role !== "owner"
-  ) {
-    throw new Error(
-      "This final comment is not currently awaiting panel review.",
+  let assignmentError: unknown = null;
+  try {
+    const supabase = await createClient();
+    const { data: canReview, error: accessError } = await supabase.rpc(
+      "can_advisory_review_application",
+      {
+        p_application_id: applicationId,
+        p_user_id: advisoryMember.id,
+      },
     );
+    if (accessError) throw new Error(accessError.message);
+    if (!canReview) {
+      throw new Error("You do not have panel review access for this school.");
+    }
+
+    const admin = createAdminClient();
+    const [feedbackResult, assignmentResult, assigneeResult, categoryResult] =
+      await Promise.all([
+        admin
+          .from("adjudication_panel_feedback")
+          .select("id,status,approved_by")
+          .eq("application_id", applicationId)
+          .eq("category_id", categoryId)
+          .maybeSingle(),
+        admin
+          .from("adjudicator_assignments")
+          .select("id")
+          .eq("application_id", applicationId)
+          .eq("adjudicator_user_id", assigneeId)
+          .eq("can_comment", true)
+          .is("removed_at", null)
+          .maybeSingle(),
+        admin
+          .from("profiles")
+          .select("id,full_name,email,role,active")
+          .eq("id", assigneeId)
+          .maybeSingle(),
+        admin
+          .from("scoring_categories")
+          .select("title")
+          .eq("id", categoryId)
+          .maybeSingle(),
+      ]);
+
+    const firstError = [
+      feedbackResult.error,
+      assignmentResult.error,
+      assigneeResult.error,
+      categoryResult.error,
+    ].find(Boolean);
+    if (firstError) throw new Error(firstError.message);
+    if (!feedbackResult.data) throw new Error("The final comment was not found.");
+    if (!assignmentResult.data || !assigneeResult.data?.active) {
+      throw new Error("Choose an active commenting member of this panel.");
+    }
+    if (
+      !["adjudicator", "advisory_member"].includes(
+        assigneeResult.data.role,
+      )
+    ) {
+      throw new Error("Choose an adjudicator or Advisory Committee member.");
+    }
+
+    const { data: approver } = feedbackResult.data.approved_by
+      ? await admin
+          .from("profiles")
+          .select("role")
+          .eq("id", feedbackResult.data.approved_by)
+          .maybeSingle()
+      : { data: null };
+    if (
+      feedbackResult.data.status !== "approved" ||
+      approver?.role !== "owner"
+    ) {
+      throw new Error(
+        "This final comment is not currently awaiting panel review.",
+      );
+    }
+
+    const { error: updateError } = await admin
+      .from("adjudication_panel_feedback")
+      .update({ assigned_to: assigneeId })
+      .eq("id", feedbackResult.data.id);
+    if (updateError) throw new Error(updateError.message);
+
+    const { error: notificationError } = await admin
+      .from("user_notifications")
+      .insert({
+        user_id: assigneeId,
+        notification_type: "panel_narrative_assigned",
+        title: "Final comment assigned to you",
+        body: `${categoryResult.data?.title ?? "Adjudication category"} is ready for your review.`,
+        href: returnPath,
+        related_application_id: applicationId,
+      });
+    if (notificationError) {
+      console.error("Unable to create the panel narrative assignment notification.", {
+        applicationId,
+        categoryId,
+        assigneeId,
+        notificationError,
+      });
+    }
+  } catch (error) {
+    assignmentError = error;
   }
 
-  const { error: updateError } = await admin
-    .from("adjudication_panel_feedback")
-    .update({ assigned_to: assigneeId })
-    .eq("id", feedbackResult.data.id);
-  if (updateError) throw new Error(updateError.message);
-
-  const { error: notificationError } = await admin
-    .from("user_notifications")
-    .insert({
-      user_id: assigneeId,
-      notification_type: "panel_narrative_assigned",
-      title: "Final comment assigned to you",
-      body: `${categoryResult.data?.title ?? "Adjudication category"} is ready for your review.`,
-      href: `/portal/adjudication/${applicationId}`,
-      related_application_id: applicationId,
+  if (assignmentError) {
+    console.error("Unable to assign the panel narrative reviewer.", {
+      applicationId,
+      categoryId,
+      assigneeId,
+      error: assignmentError,
     });
-  if (notificationError) throw new Error(notificationError.message);
+    redirect(`${returnPath}?error=assignment`);
+  }
 
-  revalidatePath(`/portal/adjudication/${applicationId}`);
+  revalidatePath(returnPath);
+  redirect(`${returnPath}?assigned=1`);
 }
 
 export async function releaseAdjudicationResults(

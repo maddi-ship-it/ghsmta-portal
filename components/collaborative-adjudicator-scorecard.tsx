@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -287,18 +288,28 @@ function CategoryScoreSection({
             numericScores.length,
         );
 
+  const currentDecision = officialProposal
+    ? {
+        eligible: officialProposal.is_eligible,
+        rangeStart:
+          officialProposal.range_min == null
+            ? null
+            : Number(officialProposal.range_min),
+      }
+    : decision;
+
   const rangeEnd =
-    decision.rangeStart == null
+    currentDecision.rangeStart == null
       ? null
-      : Number((decision.rangeStart + 2).toFixed(2));
+      : Number((currentDecision.rangeStart + 2).toFixed(2));
 
   const rangeMismatch = Boolean(
-    decision.eligible &&
+    currentDecision.eligible &&
       allScoresEntered &&
       average != null &&
-      decision.rangeStart != null &&
+      currentDecision.rangeStart != null &&
       rangeEnd != null &&
-      (average < decision.rangeStart - 0.0001 ||
+      (average < currentDecision.rangeStart - 0.0001 ||
         average > rangeEnd + 0.0001),
   );
 
@@ -393,7 +404,7 @@ function CategoryScoreSection({
           <CategoryAverageSummary
             allScoresEntered={allScoresEntered}
             average={average}
-            decision={decision}
+            decision={currentDecision}
             onReviewScores={() => {
               setExpanded(true);
               setReviewOpen(true);
@@ -409,6 +420,7 @@ function CategoryScoreSection({
                 officialProposal?.range_min ?? categoryComment?.score_range_min
               }
               disabled={readOnly}
+              key={`${officialProposal?.id ?? "draft"}:${officialProposal?.is_eligible ?? initialEligible}:${officialProposal?.range_min ?? categoryComment?.score_range_min ?? "none"}`}
               locked={Boolean(officialProposal)}
               onStateChange={setDecision}
               scoreValues={scoreOptions.map((option) => option.value)}
@@ -718,7 +730,7 @@ function CategoryScoreSection({
                 </h2>
                 <p>
                   Your average is <strong>{formatAverage(average)}</strong>. It
-                  must fall within {decision.rangeStart?.toFixed(2)}–
+                  must fall within {currentDecision.rangeStart?.toFixed(2)}–
                   {rangeEnd?.toFixed(2)}.
                 </p>
               </div>
@@ -736,7 +748,7 @@ function CategoryScoreSection({
               <span>Current average</span>
               <strong>{formatAverage(average)}</strong>
               <small>
-                Required range {decision.rangeStart?.toFixed(2)}–
+                Required range {currentDecision.rangeStart?.toFixed(2)}–
                 {rangeEnd?.toFixed(2)}
               </small>
             </div>
@@ -824,37 +836,96 @@ export function CollaborativeAdjudicatorScorecard({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [panelRows, setPanelRows] = useState(initialPanelRows);
+  const [liveCategoryProposals, setLiveCategoryProposals] =
+    useState(categoryProposals);
+  const [liveCategoryApprovals, setLiveCategoryApprovals] =
+    useState(categoryApprovals);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [refreshError, setRefreshError] = useState(false);
+  const [liveConnection, setLiveConnection] = useState(false);
+  const refreshTimer = useRef<number | null>(null);
+
+  const refreshWorkspace = useCallback(async () => {
+    const [panelResult, proposalResult] = await Promise.all([
+      supabase.rpc("get_shared_adjudication_observations", {
+        p_application_id: applicationId,
+      }),
+      supabase
+        .from("adjudication_category_proposals")
+        .select(
+          "id,category_id,is_eligible,range_min,range_max,status,advisory_note",
+        )
+        .eq("application_id", applicationId),
+    ]);
+
+    if (panelResult.error || proposalResult.error) {
+      setRefreshError(true);
+      return;
+    }
+
+    const nextProposals = (proposalResult.data ?? []) as CategoryProposal[];
+    const proposalIds = nextProposals.map((proposal) => proposal.id);
+    const approvalResult = proposalIds.length
+      ? await supabase
+          .from("adjudication_category_approvals")
+          .select("proposal_id,adjudicator_user_id,response,comment")
+          .in("proposal_id", proposalIds)
+      : { data: [], error: null };
+
+    if (approvalResult.error) {
+      setRefreshError(true);
+      return;
+    }
+
+    setPanelRows((panelResult.data ?? []) as PanelObservationRow[]);
+    setLiveCategoryProposals(nextProposals);
+    setLiveCategoryApprovals(
+      (approvalResult.data ?? []) as CategoryApproval[],
+    );
+    setLastRefreshed(new Date());
+    setRefreshError(false);
+  }, [applicationId, supabase]);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(
+      () => void refreshWorkspace(),
+      100,
+    );
+  }, [refreshWorkspace]);
 
   useEffect(() => {
-    let active = true;
-
-    const refreshPanelComments = async () => {
-      const { data, error } = await supabase.rpc(
-        "get_shared_adjudication_observations",
-        { p_application_id: applicationId },
-      );
-
-      if (!active) return;
-
-      if (error) {
-        setRefreshError(true);
-        return;
-      }
-
-      setPanelRows((data ?? []) as PanelObservationRow[]);
-      setLastRefreshed(new Date());
-      setRefreshError(false);
-    };
-
-    const timer = window.setInterval(refreshPanelComments, 3000);
+    const initialRefreshTimer = window.setTimeout(
+      () => void refreshWorkspace(),
+      0,
+    );
+    const timer = window.setInterval(() => void refreshWorkspace(), 3000);
+    const channel = supabase
+      .channel(`adjudication-workspace:${applicationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "adjudication_category_proposals",
+          filter: `application_id=eq.${applicationId}`,
+        },
+        scheduleRefresh,
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setLiveConnection(true);
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setLiveConnection(false);
+        }
+      });
 
     return () => {
-      active = false;
+      window.clearTimeout(initialRefreshTimer);
       window.clearInterval(timer);
+      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+      void supabase.removeChannel(channel);
     };
-  }, [applicationId, supabase]);
+  }, [applicationId, refreshWorkspace, scheduleRefresh, supabase]);
 
   const panelMembers = useMemo(
     () =>
@@ -890,13 +961,13 @@ export function CollaborativeAdjudicatorScorecard({
   );
 
   const proposalMap = useMemo(
-    () => new Map(categoryProposals.map((proposal) => [proposal.category_id, proposal])),
-    [categoryProposals],
+    () => new Map(liveCategoryProposals.map((proposal) => [proposal.category_id, proposal])),
+    [liveCategoryProposals],
   );
 
   const approvalMap = useMemo(
-    () => new Map(categoryApprovals.filter((approval) => approval.adjudicator_user_id === currentUserId).map((approval) => [approval.proposal_id, approval])),
-    [categoryApprovals, currentUserId],
+    () => new Map(liveCategoryApprovals.filter((approval) => approval.adjudicator_user_id === currentUserId).map((approval) => [approval.proposal_id, approval])),
+    [currentUserId, liveCategoryApprovals],
   );
 
   const commentColumnsStyle = {
@@ -917,8 +988,10 @@ export function CollaborativeAdjudicatorScorecard({
         <div>
           <strong>
             {refreshError
-              ? "Unable to refresh panel comments"
-              : "Panel comments refresh automatically"}
+              ? "Live refresh interrupted"
+              : liveConnection
+                ? "Two-point ranges update live"
+                : "Comments and two-point ranges refresh automatically"}
           </strong>
           <small>
             {lastRefreshed

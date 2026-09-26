@@ -11,7 +11,6 @@ import {
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
-import { AdjudicationReferenceLinks } from "@/components/adjudication-reference-links";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
@@ -306,6 +305,7 @@ export default async function AdjudicationApplicationPage({
     saved?: string;
     submitted?: string;
     released?: string;
+    assigned?: string;
     error?: string;
     missing?: string;
   }>;
@@ -806,12 +806,12 @@ export default async function AdjudicationApplicationPage({
         </div>
       </div>
 
-      <AdjudicationReferenceLinks links={referenceLinks} />
-
       {query.saved && <div className="notice page-message">Your scorecard draft was saved.</div>}
       {query.submitted && <div className="notice page-message">Your scorecard was submitted and is now read-only.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
+      {query.assigned && <div className="notice page-message">The final comment assignment was saved.</div>}
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field and score{canComment ? ", including criterion comments," : ""} before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
+      {query.error === "assignment" && <div className="form-error page-message">The final comment assignment could not be saved. Refresh the page and try again.</div>}
 
       {isScoringParticipant && !canComment && (
         <div className="comment-permission-banner" role="status">
@@ -823,7 +823,7 @@ export default async function AdjudicationApplicationPage({
         </div>
       )}
 
-      <ApplicationReferenceBar panels={referencePanels} />
+      <ApplicationReferenceBar links={referenceLinks} panels={referencePanels} />
 
       {(isScoringParticipant || canPanelReview) && (
       <AdjudicationConsensusBar

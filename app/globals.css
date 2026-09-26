@@ -3247,7 +3247,10 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 }
 
 .application-reference-button {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
   min-height: 34px;
   padding: 7px 12px;
   border: 1px solid var(--line);
@@ -3257,6 +3260,7 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   font: inherit;
   font-size: .78rem;
   font-weight: 850;
+  text-decoration: none;
   cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }

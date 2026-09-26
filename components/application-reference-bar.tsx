@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import type {
   ApplicationReferencePanel,
@@ -40,8 +40,15 @@ function formatValue(label: string, rawValue: string) {
 }
 
 export function ApplicationReferenceBar({
+  links = [],
   panels,
 }: {
+  links?: Array<{
+    key: string;
+    label: string;
+    href: string;
+    fileName?: string;
+  }>;
   panels: ApplicationReferencePanel[];
 }) {
   const [activePanel, setActivePanel] =
@@ -77,14 +84,39 @@ export function ApplicationReferenceBar({
 
         <div className="application-reference-buttons">
           {panels.map((panel) => (
-            <button
+            <Fragment key={panel.key}>
+              <button
+                className="application-reference-button"
+                onClick={() => setActivePanel(panel)}
+                type="button"
+              >
+                {panel.shortTitle}
+              </button>
+              {panel.key === "musical-budget" && links.map((link) => (
+                <a
+                  className="application-reference-button"
+                  href={link.href}
+                  key={link.key}
+                  rel="noreferrer"
+                  target="_blank"
+                  title={link.fileName}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </Fragment>
+          ))}
+          {!panels.some((panel) => panel.key === "musical-budget") && links.map((link) => (
+            <a
               className="application-reference-button"
-              key={panel.key}
-              onClick={() => setActivePanel(panel)}
-              type="button"
+              href={link.href}
+              key={link.key}
+              rel="noreferrer"
+              target="_blank"
+              title={link.fileName}
             >
-              {panel.shortTitle}
-            </button>
+              {link.label}
+            </a>
           ))}
         </div>
       </div>
