@@ -40,3 +40,30 @@ export function shouldRefreshGeneratedNarrative({
 
   return !generatedAtTime || latestSourceUpdate > generatedAtTime;
 }
+
+export function isAssignedPanelNarrativeReviewer({
+  assignedTo,
+  reviewerId,
+}: {
+  assignedTo: string | null | undefined;
+  reviewerId: string;
+}) {
+  return Boolean(assignedTo && assignedTo === reviewerId);
+}
+
+export function isPanelNarrativeApprovalComplete({
+  assignedTo,
+  approvedBy,
+  panelReviewerIds,
+}: {
+  assignedTo: string | null | undefined;
+  approvedBy: string | null | undefined;
+  panelReviewerIds: ReadonlySet<string>;
+}) {
+  return Boolean(
+    assignedTo &&
+      approvedBy &&
+      assignedTo === approvedBy &&
+      panelReviewerIds.has(approvedBy),
+  );
+}

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isAssignedPanelNarrativeReviewer,
+  isPanelNarrativeApprovalComplete,
   resolveGeneratedNarrativeFinal,
   shouldRefreshGeneratedNarrative,
 } from "./panel-narrative";
@@ -56,5 +58,45 @@ describe("Owner panel narrative generation", () => {
         cooldownMs: 90_000,
       }),
     ).toBe(true);
+  });
+
+  it("only lets the assigned panel member approve a final comment", () => {
+    expect(
+      isAssignedPanelNarrativeReviewer({
+        assignedTo: "panelist-1",
+        reviewerId: "panelist-1",
+      }),
+    ).toBe(true);
+    expect(
+      isAssignedPanelNarrativeReviewer({
+        assignedTo: "panelist-1",
+        reviewerId: "panelist-2",
+      }),
+    ).toBe(false);
+    expect(
+      isAssignedPanelNarrativeReviewer({
+        assignedTo: null,
+        reviewerId: "panelist-1",
+      }),
+    ).toBe(false);
+  });
+
+  it("requires approval from the assigned active panel reviewer", () => {
+    const panelReviewerIds = new Set(["panelist-1", "panelist-2"]);
+
+    expect(
+      isPanelNarrativeApprovalComplete({
+        assignedTo: "panelist-1",
+        approvedBy: "panelist-1",
+        panelReviewerIds,
+      }),
+    ).toBe(true);
+    expect(
+      isPanelNarrativeApprovalComplete({
+        assignedTo: "panelist-1",
+        approvedBy: "panelist-2",
+        panelReviewerIds,
+      }),
+    ).toBe(false);
   });
 });

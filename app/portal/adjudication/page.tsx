@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { AdjudicationReferenceLinks } from "@/components/adjudication-reference-links";
+import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -27,6 +29,7 @@ export default async function AdjudicationDashboard({
   const searchQuery = String(params.q ?? "").trim();
   const normalizedSearchQuery = normalizeSearch(searchQuery);
   const supabase = await createClient();
+  const referenceLinksPromise = loadAdjudicationReferenceLinks(supabase);
 
   const cyclesResult = await supabase
     .from("award_cycles")
@@ -189,6 +192,7 @@ export default async function AdjudicationDashboard({
   const visibleAdvisoryQueue = advisoryQueue.filter((row) =>
     matchesSearch(row.application),
   );
+  const referenceLinks = await referenceLinksPromise;
 
   return (
     <>
@@ -204,6 +208,8 @@ export default async function AdjudicationDashboard({
           </div>
         )}
       </div>
+
+      <AdjudicationReferenceLinks links={referenceLinks} />
 
       <section className="metric-grid" aria-label="Adjudication overview">
         <article className="metric-card"><span className="metric-label">Productions</span><strong className="metric-value">{applications.length}</strong></article>

@@ -245,7 +245,21 @@ button { cursor: pointer; }
 
 /* Form builder and application workflow */
 .heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.adjudication-reference-panel { margin-bottom: 24px; }
+.adjudication-reference-panel .panel-header > div:first-child { display: grid; gap: 5px; }
+.adjudication-reference-panel .panel-header p { margin: 0; color: var(--muted); }
+.panel-narrative-assignment-form {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
 .page-message { margin-bottom: 20px; }
+
+@media (max-width: 700px) {
+  .panel-narrative-assignment-form { grid-template-columns: 1fr; }
+}
 .record-link {
   display: flex;
   align-items: center;

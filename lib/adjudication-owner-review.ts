@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isPanelNarrativeApprovalComplete } from "@/lib/panel-narrative";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type OwnerReviewQueueResult =
@@ -61,7 +62,7 @@ export async function queuePanelReviewForOwnersIfReady(
       .eq("application_id", applicationId),
     admin
       .from("adjudication_panel_feedback")
-      .select("category_id,status,final_comment,approved_by")
+      .select("category_id,status,final_comment,assigned_to,approved_by")
       .eq("application_id", applicationId),
     admin
       .from("adjudication_reviews")
@@ -128,8 +129,11 @@ export async function queuePanelReviewForOwnersIfReady(
       return (
         feedback?.status !== "approved" ||
         !feedback.final_comment?.trim() ||
-        !feedback.approved_by ||
-        !panelReviewerIds.has(feedback.approved_by)
+        !isPanelNarrativeApprovalComplete({
+          assignedTo: feedback.assigned_to,
+          approvedBy: feedback.approved_by,
+          panelReviewerIds,
+        })
       );
     })
   ) {

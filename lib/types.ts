@@ -347,6 +347,7 @@ export type AdjudicationPanelFeedback = {
   openai_request_id: string | null;
   generated_by: string | null;
   generated_at: string | null;
+  assigned_to: string | null;
   approved_by: string | null;
   approved_at: string | null;
   created_at: string;

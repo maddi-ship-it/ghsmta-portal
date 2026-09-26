@@ -5,6 +5,11 @@ import { ScheduleOwnerTools } from "@/components/schedule-owner-tools";
 import { OwnerScheduleMessages } from "@/components/owner-schedule-messages";
 import { requireProfile } from "@/lib/auth";
 import { roleLabel } from "@/lib/format";
+import {
+  defaultScheduleFilter,
+  resolveScheduleFilter,
+  type ScheduleFilter,
+} from "@/lib/schedule-filters";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
 
@@ -119,14 +124,6 @@ type ScheduleSort =
   | "waitlist_desc";
 
 type ScheduleView = "list" | "cards";
-type ScheduleFilter =
-  | "all"
-  | "open"
-  | "booked"
-  | "unbooked"
-  | "waitlisted"
-  | "understaffed"
-  | "mine";
 
 type ScheduleWaitlistEntry = {
   id: string;
@@ -269,20 +266,8 @@ export default async function SchedulePage({
     ? (params.sort as ScheduleSort)
     : "date_asc";
   const selectedView: ScheduleView = params.view === "cards" ? "cards" : "list";
-  const allowedFilters: ScheduleFilter[] = [
-    "all",
-    "open",
-    "booked",
-    "unbooked",
-    "waitlisted",
-    "understaffed",
-    "mine",
-  ];
-  const selectedFilter: ScheduleFilter = allowedFilters.includes(
-    params.filter as ScheduleFilter,
-  )
-    ? (params.filter as ScheduleFilter)
-    : "all";
+  const defaultFilter = defaultScheduleFilter(profile.role);
+  const selectedFilter = resolveScheduleFilter(profile.role, params.filter);
   const scheduleSearch = (params.q ?? "").trim();
   const ownerSections: OwnerScheduleSection[] = ["overview", "timeslots", "staffing", "waitlists", "messages"];
   const ownerSection: OwnerScheduleSection = ownerSections.includes(params.section as OwnerScheduleSection)
@@ -950,8 +935,19 @@ export default async function SchedulePage({
             <option value="waitlist_desc">Waitlist count</option>
           </select>
           <button className="button button-secondary button-compact" type="submit">Apply</button>
-          {(scheduleSearch || selectedFilter !== "all" || selectedSort !== "date_asc") && (
-            <Link className="text-button" href={`/portal/schedule?view=${selectedView}`}>Reset</Link>
+          {(scheduleSearch || selectedFilter !== defaultFilter || selectedSort !== "date_asc") && (
+            <Link
+              className="text-button"
+              href={{
+                pathname: "/portal/schedule",
+                query: {
+                  view: selectedView,
+                  ...(profile.role === "owner" ? { section: ownerSection } : {}),
+                },
+              }}
+            >
+              Reset
+            </Link>
           )}
         </form>
       </section>

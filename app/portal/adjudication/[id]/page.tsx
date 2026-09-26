@@ -11,6 +11,7 @@ import {
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
+import { AdjudicationReferenceLinks } from "@/components/adjudication-reference-links";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
@@ -19,6 +20,7 @@ import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls"
 import { ScorecardDraftButton } from "@/components/scorecard-draft-button";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
+import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -41,6 +43,7 @@ import type {
 } from "@/lib/types";
 
 import {
+  assignPanelNarrativeReviewer,
   releaseAdjudicationResults,
   savePanelFeedback,
 } from "./actions";
@@ -84,6 +87,12 @@ type ScheduleSchoolDetailReference = {
   day_of_contact_phone: string | null;
 };
 
+type PanelNarrativeReviewer = {
+  id: string;
+  name: string;
+  role: "adjudicator" | "advisory_member";
+};
+
 const EASTERN_TIME_ZONE = "America/New_York";
 
 function formatReferenceDate(value: string) {
@@ -113,15 +122,21 @@ function scorecardStatusLabel(status: string) {
 function PanelNarrativeWorkflow({
   applicationId,
   canComment,
+  canAssign,
   categories,
+  currentUserId,
   feedback,
+  panelReviewers,
   panelApprovedCategoryIds,
   reviewStatus,
 }: {
   applicationId: string;
   canComment: boolean;
+  canAssign: boolean;
   categories: ScoringCategory[];
+  currentUserId: string;
   feedback: AdjudicationPanelFeedback[];
+  panelReviewers: PanelNarrativeReviewer[];
   panelApprovedCategoryIds: string[];
   reviewStatus: string;
 }) {
@@ -132,6 +147,9 @@ function PanelNarrativeWorkflow({
     reviewStatus,
   );
   const panelApprovedCategories = new Set(panelApprovedCategoryIds);
+  const panelReviewerById = new Map(
+    panelReviewers.map((reviewer) => [reviewer.id, reviewer]),
+  );
   const availableCount = feedback.filter((item) =>
     Boolean(item.final_comment?.trim()),
   ).length;
@@ -161,8 +179,15 @@ function PanelNarrativeWorkflow({
           const categoryFeedback = feedbackByCategory.get(category.id);
           const finalComment = categoryFeedback?.final_comment?.trim() ?? "";
           const panelApproved = panelApprovedCategories.has(category.id);
+          const assignedReviewer = categoryFeedback?.assigned_to
+            ? panelReviewerById.get(categoryFeedback.assigned_to)
+            : undefined;
           const canEdit =
-            canComment && finalComment && !panelApproved && !sentToOwners;
+            canComment &&
+            finalComment &&
+            !panelApproved &&
+            !sentToOwners &&
+            categoryFeedback?.assigned_to === currentUserId;
 
           return (
             <article className="panel-narrative-card" key={category.id}>
@@ -174,18 +199,55 @@ function PanelNarrativeWorkflow({
                 <span className={`badge ${panelApproved ? "badge-complete" : "badge-warning"}`}>
                   {panelApproved
                     ? "Panel approved"
+                    : assignedReviewer
+                      ? `Assigned to ${assignedReviewer.name}`
                     : finalComment
-                      ? "Ready for panel review"
+                      ? "Needs assignment"
                       : "With Owner"}
                 </span>
               </div>
 
               {finalComment ? (
-                canEdit ? (
-                  <form
-                    action={savePanelFeedback.bind(null, applicationId, category.id)}
-                    className="form-stack"
-                  >
+                <>
+                  {canAssign && !panelApproved && !sentToOwners && (
+                    <form
+                      action={assignPanelNarrativeReviewer.bind(
+                        null,
+                        applicationId,
+                        category.id,
+                      )}
+                      className="panel-narrative-assignment-form"
+                    >
+                      <div className="field">
+                        <label htmlFor={`panel_comment_assignee_${category.id}`}>
+                          Assign this final comment
+                        </label>
+                        <select
+                          className="select"
+                          defaultValue={categoryFeedback?.assigned_to ?? ""}
+                          id={`panel_comment_assignee_${category.id}`}
+                          name="assigned_to"
+                          required
+                        >
+                          <option value="">Choose a panel member</option>
+                          {panelReviewers.map((reviewer) => (
+                            <option key={reviewer.id} value={reviewer.id}>
+                              {reviewer.name} — {reviewer.role === "advisory_member" ? "Advisory Committee" : "Adjudicator"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button className="button button-secondary button-compact" type="submit">
+                        Save assignment
+                      </button>
+                    </form>
+                  )}
+
+                  {canEdit ? (
+                    <form
+                      action={savePanelFeedback.bind(null, applicationId, category.id)}
+                      className="form-stack"
+                    >
                     <div className="field">
                       <label htmlFor={`panel_final_comment_${category.id}`}>
                         School-facing final comment
@@ -209,12 +271,18 @@ function PanelNarrativeWorkflow({
                         Approve and return to Owners
                       </button>
                     </div>
-                  </form>
-                ) : (
-                  <div className="comment-readonly-surface panel-narrative-preview">
-                    {finalComment}
-                  </div>
-                )
+                    </form>
+                  ) : (
+                    <>
+                      <div className="comment-readonly-surface panel-narrative-preview">
+                        {finalComment}
+                      </div>
+                      {!panelApproved && !assignedReviewer && (
+                        <p className="field-help">An Advisory Committee member must assign this comment before it can be edited and approved.</p>
+                      )}
+                    </>
+                  )}
+                </>
               ) : (
                 <div className="comment-readonly-surface">
                   The live draft is with the Owners. It will appear here after
@@ -247,6 +315,7 @@ export default async function AdjudicationApplicationPage({
   const query = await searchParams;
   const supabase = await createClient();
   const admin = createAdminClient();
+  const referenceLinksPromise = loadAdjudicationReferenceLinks(supabase);
 
   const { data: applicationData, error: applicationError } = await supabase
     .from("applications")
@@ -379,6 +448,7 @@ export default async function AdjudicationApplicationPage({
     releaseResult,
     scheduleBookingsResult,
     scheduleStaffResult,
+    panelAssignmentsResult,
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
@@ -394,6 +464,14 @@ export default async function AdjudicationApplicationPage({
       : supabase.from("adjudication_releases").select("*").eq("application_id", id).maybeSingle(),
     supabase.rpc("get_schedule_bookings_for_staff"),
     supabase.rpc("get_schedule_staff_directory"),
+    isScoringParticipant || canPanelReview
+      ? admin
+          .from("adjudicator_assignments")
+          .select("adjudicator_user_id")
+          .eq("application_id", id)
+          .eq("can_comment", true)
+          .is("removed_at", null)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
@@ -415,6 +493,27 @@ export default async function AdjudicationApplicationPage({
   const release = releaseResult.data as AdjudicationRelease | null;
 
   if (feedbackResult.error) throw new Error(feedbackResult.error.message);
+  if (panelAssignmentsResult.error) {
+    throw new Error(panelAssignmentsResult.error.message);
+  }
+
+  const panelReviewerIds = [
+    ...new Set(
+      (panelAssignmentsResult.data ?? []).map(
+        (assignment) => assignment.adjudicator_user_id,
+      ),
+    ),
+  ];
+  const panelReviewerProfilesPromise = panelReviewerIds.length
+    ? Promise.resolve(
+        admin
+          .from("profiles")
+          .select("id,full_name,email,role,active")
+          .in("id", panelReviewerIds)
+          .eq("active", true)
+          .in("role", ["adjudicator", "advisory_member"]),
+      )
+    : Promise.resolve({ data: [], error: null });
 
   const feedbackApproverIds = [
     ...new Set(
@@ -676,9 +775,22 @@ export default async function AdjudicationApplicationPage({
       adjudicatorProfiles = (data ?? []) as Profile[];
     }
   }
+  const { data: panelReviewerProfiles, error: panelReviewerProfilesError } =
+    await panelReviewerProfilesPromise;
+  if (panelReviewerProfilesError) {
+    throw new Error(panelReviewerProfilesError.message);
+  }
+  const panelNarrativeReviewers = (panelReviewerProfiles ?? [])
+    .map((reviewer) => ({
+      id: reviewer.id,
+      name: reviewer.full_name ?? reviewer.email ?? "Panel member",
+      role: reviewer.role as PanelNarrativeReviewer["role"],
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
   const ownScorecard = isScoringParticipant ? scorecards[0] ?? null : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
   const canComment = Boolean(ownParticipantResult.data?.can_comment);
+  const referenceLinks = await referenceLinksPromise;
 
   return (
     <>
@@ -693,6 +805,8 @@ export default async function AdjudicationApplicationPage({
           <Link className="button button-secondary" href="/portal/adjudication">Back to adjudication</Link>
         </div>
       </div>
+
+      <AdjudicationReferenceLinks links={referenceLinks} />
 
       {query.saved && <div className="notice page-message">Your scorecard draft was saved.</div>}
       {query.submitted && <div className="notice page-message">Your scorecard was submitted and is now read-only.</div>}
@@ -856,8 +970,11 @@ export default async function AdjudicationApplicationPage({
         <PanelNarrativeWorkflow
           applicationId={id}
           canComment={canComment}
+          canAssign={profile.role === "advisory_member" && canPanelReview}
           categories={categories}
+          currentUserId={profile.id}
           feedback={panelVisibleFeedback}
+          panelReviewers={panelNarrativeReviewers}
           panelApprovedCategoryIds={panelApprovedCategoryIds}
           reviewStatus={reviewResult.data?.status ?? "draft"}
         />
@@ -888,8 +1005,11 @@ export default async function AdjudicationApplicationPage({
             <PanelNarrativeWorkflow
               applicationId={id}
               canComment={canComment}
+              canAssign={canPanelReview}
               categories={categories}
+              currentUserId={profile.id}
               feedback={panelVisibleFeedback}
+              panelReviewers={panelNarrativeReviewers}
               panelApprovedCategoryIds={panelApprovedCategoryIds}
               reviewStatus={reviewResult.data?.status ?? "draft"}
             />
