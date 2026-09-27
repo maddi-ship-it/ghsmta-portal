@@ -212,6 +212,12 @@ function PanelNarrativeWorkflow({
 
               {finalComment ? (
                 <>
+                  {assignedReviewer && (
+                    <div className="final-comment-assignee">
+                      <span>Assigned final comment writer</span>
+                      <strong>{assignedReviewer.name}</strong>
+                    </div>
+                  )}
                   {canEdit ? (
                     <form
                       action={savePanelFeedback.bind(null, applicationId, category.id)}
@@ -253,10 +259,18 @@ function PanelNarrativeWorkflow({
                   )}
                 </>
               ) : (
-                <div className="comment-readonly-surface">
-                  The live draft is with the Owners. It will appear here after
-                  an Owner sends it to the panel.
-                </div>
+                <>
+                  {assignedReviewer && (
+                    <div className="final-comment-assignee">
+                      <span>Assigned final comment writer</span>
+                      <strong>{assignedReviewer.name}</strong>
+                    </div>
+                  )}
+                  <div className="comment-readonly-surface">
+                    The live draft is with the Owners. It will appear here after
+                    an Owner sends it to the panel.
+                  </div>
+                </>
               )}
             </article>
           );
@@ -527,7 +541,9 @@ export default async function AdjudicationApplicationPage({
     )
     .map((item) => item.category_id);
   const panelVisibleFeedback = feedback.filter(
-    (item) => item.status === "approved",
+    (item) =>
+      item.status === "approved" &&
+      (profile.role !== "adjudicator" || item.assigned_to === profile.id),
   );
 
   if (scheduleBookingsResult.error) {

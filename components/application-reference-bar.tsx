@@ -2,9 +2,11 @@
 
 import { Fragment, useEffect, useState } from "react";
 
+import { AdjudicationReferenceDocumentModal } from "@/components/adjudication-reference-document-modal";
 import type {
   ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
+import type { AdjudicationReferenceLink } from "@/lib/adjudication-reference-documents";
 
 export const OPEN_CATEGORY_REVIEW_EVENT =
   "ghsmta:open-adjudication-category-review";
@@ -49,12 +51,7 @@ export function ApplicationReferenceBar({
   panels,
   reviewActions,
 }: {
-  links?: Array<{
-    key: string;
-    label: string;
-    href: string;
-    fileName?: string;
-  }>;
+  links?: AdjudicationReferenceLink[];
   panels: ApplicationReferencePanel[];
   reviewActions?: {
     showCategoryReview: boolean;
@@ -120,32 +117,20 @@ export function ApplicationReferenceBar({
               >
                 {panel.shortTitle}
               </button>
-              {panel.key === "musical-budget" && links.map((link) => (
-                <a
-                  className="application-reference-button"
-                  href={link.href}
-                  key={link.key}
-                  rel="noreferrer"
-                  target="_blank"
-                  title={link.fileName}
-                >
-                  {link.label}
-                </a>
-              ))}
+              {panel.key === "musical-budget" && (
+                <AdjudicationReferenceDocumentModal
+                  buttonClassName="application-reference-button"
+                  links={links}
+                />
+              )}
             </Fragment>
           ))}
-          {!panels.some((panel) => panel.key === "musical-budget") && links.map((link) => (
-            <a
-              className="application-reference-button"
-              href={link.href}
-              key={link.key}
-              rel="noreferrer"
-              target="_blank"
-              title={link.fileName}
-            >
-              {link.label}
-            </a>
-          ))}
+          {!panels.some((panel) => panel.key === "musical-budget") && (
+            <AdjudicationReferenceDocumentModal
+              buttonClassName="application-reference-button"
+              links={links}
+            />
+          )}
         </div>
       </div>
 

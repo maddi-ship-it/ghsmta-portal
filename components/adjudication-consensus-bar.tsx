@@ -2,7 +2,6 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 
-import { assignPanelNarrativeReviewer } from "@/app/portal/adjudication/[id]/actions";
 import {
   ownerUpdateAdjudicationReview,
   respondCategoryProposal,
@@ -812,34 +811,19 @@ export function AdjudicationConsensusBar({
                                 Final comment writer
                               </label>
                             {role === "advisory_member" ? (
-                              <div className="consensus-comment-assignment">
-                                <select
-                                  className="select"
-                                  defaultValue={assigneeId ?? ""}
-                                  id={assigneeFieldName}
-                                  name={assigneeFieldName}
-                                >
-                                  <option value="">Choose panel member</option>
-                                  {panelReviewers.map((reviewer) => (
-                                    <option key={reviewer.id} value={reviewer.id}>
-                                      {reviewer.name}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  className="button button-secondary button-compact"
-                                  formAction={assignPanelNarrativeReviewer.bind(
-                                    null,
-                                    applicationId,
-                                    category.id,
-                                    assigneeFieldName,
-                                  )}
-                                  formNoValidate
-                                  type="submit"
-                                >
-                                  Save assignment
-                                </button>
-                              </div>
+                              <select
+                                className="select"
+                                defaultValue={assigneeId ?? ""}
+                                id={assigneeFieldName}
+                                name={assigneeFieldName}
+                              >
+                                <option value="">Choose panel member</option>
+                                {panelReviewers.map((reviewer) => (
+                                  <option key={reviewer.id} value={reviewer.id}>
+                                    {reviewer.name}
+                                  </option>
+                                ))}
+                              </select>
                             ) : (
                               <strong className="advisory-decision-assignee">
                                 {assignedReviewer?.name ?? "Unassigned"}
@@ -919,9 +903,9 @@ export function AdjudicationConsensusBar({
                 </button>
                 <ScheduleSubmitButton
                   className="button button-gold"
-                  pendingLabel="Saving all decisions…"
+                  pendingLabel="Saving all decisions & assignments…"
                 >
-                  Save all category decisions
+                  Save all decisions &amp; assignments
                 </ScheduleSubmitButton>
                 </div>
               </div>

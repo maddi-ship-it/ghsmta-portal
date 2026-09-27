@@ -144,12 +144,14 @@ function categoryAverage(
 
 function LivePanelFeedbackEditor({
   applicationId,
+  assignedReviewerName,
   category,
   feedback,
   liveDraft,
   panelApproved,
 }: {
   applicationId: string;
+  assignedReviewerName: string | undefined;
   category: ScoringCategory;
   feedback: AdjudicationPanelFeedback | undefined;
   liveDraft: string;
@@ -342,6 +344,12 @@ function LivePanelFeedbackEditor({
           }
         }}
       >
+        {assignedReviewerName && (
+          <div className="final-comment-assignee">
+            <span>Assigned final comment writer</span>
+            <strong>{assignedReviewerName}</strong>
+          </div>
+        )}
         <div className="field">
           <div className="field-label-row">
             <label htmlFor={`final_comment_${category.id}`}>Final panel comment</label>
@@ -754,6 +762,12 @@ export function OwnerLiveAdjudicationReview({
         const categoryFeedback = feedback.find(
           (item) => item.category_id === category.id,
         );
+        const assignedReviewer = categoryFeedback?.assigned_to
+          ? profileMap.get(categoryFeedback.assigned_to)
+          : undefined;
+        const assignedReviewerName = assignedReviewer
+          ? assignedReviewer.full_name ?? assignedReviewer.email ?? undefined
+          : undefined;
         const average = categoryAverage(
           category.id,
           criteria,
@@ -967,6 +981,7 @@ export function OwnerLiveAdjudicationReview({
                 <LivePanelFeedbackEditor
                   key={`${category.id}:${categoryFeedback?.updated_at ?? "live"}`}
                   applicationId={applicationId}
+                  assignedReviewerName={assignedReviewerName}
                   category={category}
                   feedback={categoryFeedback}
                   liveDraft={liveDraft}
@@ -978,8 +993,16 @@ export function OwnerLiveAdjudicationReview({
                   )}
                 />
               ) : (
-                <div className="narrative-preview">
-                  {categoryFeedback?.final_comment || "No panel narrative has been prepared yet."}
+                <div className="form-stack">
+                  {assignedReviewerName && (
+                    <div className="final-comment-assignee">
+                      <span>Assigned final comment writer</span>
+                      <strong>{assignedReviewerName}</strong>
+                    </div>
+                  )}
+                  <div className="narrative-preview">
+                    {categoryFeedback?.final_comment || "No panel narrative has been prepared yet."}
+                  </div>
                 </div>
               )}
             </div>

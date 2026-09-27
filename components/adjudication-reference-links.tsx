@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AdjudicationReferenceDocumentModal } from "@/components/adjudication-reference-document-modal";
 import type { AdjudicationReferenceLink } from "@/lib/adjudication-reference-documents";
 
 export function AdjudicationReferenceLinks({
@@ -19,18 +20,10 @@ export function AdjudicationReferenceLinks({
           <p>Keep the rubric and shared evaluation language open while you review.</p>
         </div>
         <div className="heading-actions">
-          {links.map((link) => (
-            <a
-              className="button button-secondary button-compact"
-              href={link.href}
-              key={link.key}
-              rel="noreferrer"
-              target="_blank"
-              title={link.fileName}
-            >
-              {link.label}
-            </a>
-          ))}
+          <AdjudicationReferenceDocumentModal
+            buttonClassName="button button-secondary button-compact"
+            links={links}
+          />
           <Link
             className="button button-secondary button-compact"
             href="/portal/reference-documents"

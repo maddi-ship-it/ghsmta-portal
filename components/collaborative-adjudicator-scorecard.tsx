@@ -294,6 +294,13 @@ function InlinePanelNarrativeReview({
         </span>
       </div>
 
+      {assignedReviewerName && (
+        <div className="final-comment-assignee">
+          <span>Assigned final comment writer</span>
+          <strong>{assignedReviewerName}</strong>
+        </div>
+      )}
+
       {!ownerSentComment ? (
         <div className="comment-readonly-surface">
           The Owner draft will appear here after an Owner sends it to the

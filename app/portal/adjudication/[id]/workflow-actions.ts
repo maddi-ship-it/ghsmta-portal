@@ -227,6 +227,183 @@ async function saveAssignedWorkspaceCategoryProposals({
   return changedCategoryIds.size;
 }
 
+async function savePanelNarrativeAssignments({
+  applicationId,
+  actorId,
+  categoryIds,
+  formData,
+}: {
+  applicationId: string;
+  actorId: string;
+  categoryIds: string[];
+  formData: FormData;
+}) {
+  const assignments = categoryIds.map((categoryId) => ({
+    categoryId,
+    assignedTo: text(formData, `assigned_to_${categoryId}`) || null,
+  }));
+  const admin = createAdminClient();
+  const { data: application, error: applicationError } = await admin
+    .from("applications")
+    .select("form_version_id")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (applicationError) throw new Error(applicationError.message);
+  if (!application?.form_version_id) {
+    throw new Error("This application does not have a published form.");
+  }
+
+  const { data: formVersion, error: formVersionError } = await admin
+    .from("application_form_versions")
+    .select("scoring_rubric_id")
+    .eq("id", application.form_version_id)
+    .maybeSingle();
+
+  if (formVersionError) throw new Error(formVersionError.message);
+  if (!formVersion?.scoring_rubric_id) {
+    throw new Error("No scoring rubric is assigned to this application.");
+  }
+
+  const [categoryResult, feedbackResult, panelAssignmentResult] =
+    await Promise.all([
+      admin
+        .from("scoring_categories")
+        .select("id,title")
+        .eq("rubric_id", formVersion.scoring_rubric_id)
+        .eq("active", true)
+        .in("id", categoryIds),
+      admin
+        .from("adjudication_panel_feedback")
+        .select("id,category_id,assigned_to")
+        .eq("application_id", applicationId)
+        .in("category_id", categoryIds),
+      admin
+        .from("adjudicator_assignments")
+        .select("adjudicator_user_id")
+        .eq("application_id", applicationId)
+        .eq("can_comment", true)
+        .is("removed_at", null),
+    ]);
+
+  const firstError = [
+    categoryResult.error,
+    feedbackResult.error,
+    panelAssignmentResult.error,
+  ].find(Boolean);
+  if (firstError) throw new Error(firstError.message);
+
+  const categoryById = new Map(
+    (categoryResult.data ?? []).map((category) => [category.id, category]),
+  );
+  if (categoryIds.some((categoryId) => !categoryById.has(categoryId))) {
+    throw new Error(
+      "A submitted category does not belong to this application rubric.",
+    );
+  }
+
+  const selectedReviewerIds = [
+    ...new Set(
+      assignments.flatMap((assignment) =>
+        assignment.assignedTo ? [assignment.assignedTo] : [],
+      ),
+    ),
+  ];
+  const panelReviewerIds = new Set(
+    (panelAssignmentResult.data ?? []).map(
+      (assignment) => assignment.adjudicator_user_id,
+    ),
+  );
+  const { data: reviewerProfiles, error: reviewerProfileError } =
+    selectedReviewerIds.length > 0
+      ? await admin
+          .from("profiles")
+          .select("id,active,role")
+          .in("id", selectedReviewerIds)
+      : { data: [], error: null };
+
+  if (reviewerProfileError) throw new Error(reviewerProfileError.message);
+  const validReviewerIds = new Set(
+    (reviewerProfiles ?? [])
+      .filter(
+        (reviewer) =>
+          reviewer.active &&
+          ["adjudicator", "advisory_member"].includes(reviewer.role) &&
+          panelReviewerIds.has(reviewer.id),
+      )
+      .map((reviewer) => reviewer.id),
+  );
+  if (
+    selectedReviewerIds.some((reviewerId) => !validReviewerIds.has(reviewerId))
+  ) {
+    throw new Error("Choose an active commenting member of this panel.");
+  }
+
+  const feedbackByCategory = new Map(
+    (feedbackResult.data ?? []).map((feedback) => [
+      feedback.category_id,
+      feedback,
+    ]),
+  );
+  const changedAssignments = assignments.filter(
+    (assignment) =>
+      (feedbackByCategory.get(assignment.categoryId)?.assigned_to ?? null) !==
+      assignment.assignedTo,
+  );
+
+  const assignmentSaveResults = await Promise.all(
+    changedAssignments.map((assignment) => {
+      const existing = feedbackByCategory.get(assignment.categoryId);
+      return existing
+        ? admin
+            .from("adjudication_panel_feedback")
+            .update({ assigned_to: assignment.assignedTo })
+            .eq("id", existing.id)
+        : assignment.assignedTo
+          ? admin.from("adjudication_panel_feedback").insert({
+              application_id: applicationId,
+              category_id: assignment.categoryId,
+              assigned_to: assignment.assignedTo,
+              status: "draft",
+            })
+          : Promise.resolve({ error: null });
+    }),
+  );
+  const assignmentSaveError = assignmentSaveResults.find(
+    (result) => result.error,
+  )?.error;
+  if (assignmentSaveError) throw new Error(assignmentSaveError.message);
+
+  const notifications = changedAssignments.flatMap((assignment) => {
+    if (!assignment.assignedTo) return [];
+    return [
+      {
+        user_id: assignment.assignedTo,
+        notification_type: "panel_narrative_assigned",
+        title: "Final comment assigned to you",
+        body: `You are assigned to the final comment for ${categoryById.get(assignment.categoryId)?.title ?? "this category"}.`,
+        href: `/portal/adjudication/${applicationId}`,
+        related_application_id: applicationId,
+      },
+    ];
+  });
+
+  if (notifications.length > 0) {
+    const { error: notificationError } = await admin
+      .from("user_notifications")
+      .insert(notifications);
+    if (notificationError) {
+      logEvent("warn", "adjudication.narrative_assignment_notification_failed", {
+        applicationId,
+        actorId,
+        message: notificationError.message,
+      });
+    }
+  }
+
+  return changedAssignments.length;
+}
+
 export async function saveAllCategoryProposals(
   applicationId: string,
   _previous: CategoryProposalSaveResult,
@@ -387,15 +564,6 @@ export async function saveAllCategoryProposals(
     };
   }
 
-  if (changedDecisions.length === 0 && changedScoreability.length === 0) {
-    return {
-      ok: true,
-      changedCount: 0,
-      message: "All category decisions are already up to date.",
-      attemptId,
-    };
-  }
-
   let changedCount = 0;
   if (changedDecisions.length > 0) {
     const { data, error } = await supabase.rpc(
@@ -479,6 +647,28 @@ export async function saveAllCategoryProposals(
     changedCount += changedScoreability.length;
   }
 
+  if (profile.role === "advisory_member") {
+    try {
+      changedCount += await savePanelNarrativeAssignments({
+        applicationId,
+        actorId: profile.id,
+        categoryIds,
+        formData,
+      });
+    } catch (assignmentError) {
+      const message =
+        assignmentError instanceof Error
+          ? assignmentError.message
+          : "The final comment assignments could not be saved.";
+      logEvent("error", "adjudication.narrative_assignment_save_failed", {
+        applicationId,
+        actorId: profile.id,
+        message,
+      });
+      return { ok: false, error: message, attemptId };
+    }
+  }
+
   try {
     await queuePanelReviewForOwnersIfReady(applicationId, profile.id);
   } catch (queueError) {
@@ -498,8 +688,8 @@ export async function saveAllCategoryProposals(
     changedCount,
     message:
       changedCount === 0
-        ? "All category decisions are already up to date."
-        : `${changedCount} category decision${changedCount === 1 ? "" : "s"} saved.`,
+        ? "All category decisions and assignments are already up to date."
+        : `${changedCount} category decision or assignment change${changedCount === 1 ? "" : "s"} saved.`,
     attemptId,
   };
 }
