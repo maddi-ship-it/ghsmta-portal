@@ -11939,6 +11939,134 @@ html[data-theme="light"] .regal-path-section {
   background: linear-gradient(180deg, #fffdf7, #fff7e7);
 }
 
+/* Focused two-point-range review */
+.range-review-modal {
+  width: min(1120px, 100%);
+}
+
+.range-review-modal .consensus-matrix-table {
+  min-width: 1040px;
+}
+
+.range-review-modal .consensus-matrix-table td:first-child {
+  min-width: 220px;
+}
+
+.range-review-modal .consensus-matrix-table td {
+  padding-block: 18px;
+}
+
+.range-review-modal .consensus-matrix-table td:first-child small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.range-review-average {
+  display: grid;
+  min-width: 155px;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid var(--portal-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--portal-surface-2) 84%, transparent);
+}
+
+.range-review-average strong {
+  color: var(--portal-gold-bright);
+  font-size: 1.18rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.range-review-average-within {
+  border-color: color-mix(in srgb, var(--portal-success) 52%, transparent);
+  background: color-mix(in srgb, var(--portal-success) 11%, var(--portal-surface-2));
+}
+
+.range-review-average-outside {
+  border-color: color-mix(in srgb, var(--portal-warning) 58%, transparent);
+  background: color-mix(in srgb, var(--portal-warning) 12%, var(--portal-surface-2));
+}
+
+.range-review-dispute {
+  min-width: 210px;
+  padding-top: 3px;
+}
+
+.range-review-dispute summary {
+  color: var(--portal-muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.range-review-dispute[open] {
+  display: grid;
+  gap: 9px;
+}
+
+.range-review-dispute label {
+  color: var(--portal-text);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.range-review-footer {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.range-review-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--portal-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.range-review-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--portal-muted);
+}
+
+.range-review-live-dot-live {
+  background: var(--portal-success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--portal-success) 15%, transparent);
+}
+
+.range-review-live-dot-error {
+  background: var(--portal-warning);
+}
+
+.schedule-workspace-filters .schedule-date-filter {
+  width: 165px;
+  max-width: 165px;
+}
+
+@media (max-width: 760px) {
+  .range-review-modal .modal-header h2 {
+    font-size: clamp(1.45rem, 7vw, 2rem);
+  }
+
+  .range-review-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .range-review-footer .button {
+    width: 100%;
+  }
+
+  .schedule-workspace-filters .schedule-date-filter {
+    width: 100%;
+    max-width: none;
+  }
+}
+
 html[data-theme="light"] .auth-method-tabs {
   background: #fff7e5;
 }

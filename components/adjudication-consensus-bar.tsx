@@ -16,6 +16,7 @@ import {
   OPEN_PANEL_REVIEW_EVENT,
 } from "@/components/application-reference-bar";
 import { formatTwoPointRangeStart } from "@/lib/adjudication-ranges";
+import { createClient } from "@/lib/supabase/client";
 import type { AppRole, ScoringCategory } from "@/lib/types";
 
 type Proposal = {
@@ -56,6 +57,15 @@ type CategoryApproval = {
   adjudicator_user_id: string;
   response: string;
   comment: string | null;
+};
+
+type LivePanelAverage = {
+  category_id: string;
+  average_score: number | string | null;
+  score_count: number | string;
+  scoring_member_count: number | string;
+  assigned_scorer_count: number | string;
+  updated_at: string | null;
 };
 
 function statusLabel(value: string) {
@@ -101,6 +111,15 @@ export function AdjudicationConsensusBar({
   const [matrixOpen, setMatrixOpen] = useState(false);
   const [rangeReviewOpen, setRangeReviewOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [livePanelAverages, setLivePanelAverages] = useState<
+    LivePanelAverage[]
+  >([]);
+  const [liveAverageStatus, setLiveAverageStatus] = useState<
+    "loading" | "live" | "error"
+  >("loading");
+  const [liveAverageUpdatedAt, setLiveAverageUpdatedAt] =
+    useState<Date | null>(null);
+  const supabase = useMemo(() => createClient(), []);
   const saveCategoryAction = useMemo(
     () => saveAllCategoryProposals.bind(null, applicationId),
     [applicationId],
@@ -145,6 +164,13 @@ export function AdjudicationConsensusBar({
       ),
     [approvals, currentUserId],
   );
+  const panelAverageByCategory = useMemo(
+    () =>
+      new Map(
+        livePanelAverages.map((average) => [average.category_id, average]),
+      ),
+    [livePanelAverages],
+  );
   const unresolved = categories.filter((category) => {
     const proposal = proposalByCategory.get(category.id);
     return !proposal || !["approved", "overridden"].includes(proposal.status);
@@ -177,6 +203,46 @@ export function AdjudicationConsensusBar({
       window.removeEventListener(OPEN_PANEL_REVIEW_EVENT, openPanelReview);
     };
   }, [canReviewRanges, canSetDecisions, compact]);
+
+  useEffect(() => {
+    if (!rangeReviewOpen || !canReviewRanges) return;
+
+    let disposed = false;
+    let requestInFlight = false;
+
+    const loadPanelAverages = async (showLoading: boolean) => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      if (showLoading) setLiveAverageStatus("loading");
+
+      const { data, error } = await supabase.rpc(
+        "get_live_panel_category_averages",
+        { p_application_id: applicationId },
+      );
+      requestInFlight = false;
+
+      if (disposed) return;
+
+      if (error) {
+        setLiveAverageStatus("error");
+        return;
+      }
+
+      setLivePanelAverages((data ?? []) as LivePanelAverage[]);
+      setLiveAverageUpdatedAt(new Date());
+      setLiveAverageStatus("live");
+    };
+
+    void loadPanelAverages(true);
+    const timer = window.setInterval(() => {
+      void loadPanelAverages(false);
+    }, 3_000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [applicationId, canReviewRanges, rangeReviewOpen, supabase]);
 
   return (
     <>
@@ -247,18 +313,19 @@ export function AdjudicationConsensusBar({
           }}
         >
           <div
+            aria-labelledby="range-review-title"
             aria-modal="true"
-            className="modal-card consensus-matrix-modal"
+            className="modal-card consensus-matrix-modal range-review-modal"
             role="dialog"
           >
             <form>
               <div className="modal-header sticky-modal-header">
                 <div>
                   <p className="eyebrow">Adjudicator review</p>
-                  <h2>Approve eligibility and two-point ranges</h2>
+                  <h2 id="range-review-title">Two-point range review</h2>
                   <p>
-                    Review each category decision. The assigned final-comment
-                    writer appears beside its range.
+                    Compare each proposed range with the live panel average,
+                    then approve it or ask that it be revisited.
                   </p>
                 </div>
                 <button
@@ -278,6 +345,7 @@ export function AdjudicationConsensusBar({
                       <th>Category</th>
                       <th>Eligibility</th>
                       <th>Two-point range</th>
+                      <th>Live panel average</th>
                       <th>Final comment writer</th>
                       <th>Your approval</th>
                     </tr>
@@ -292,6 +360,25 @@ export function AdjudicationConsensusBar({
                       const assignedReviewer = assigneeId
                         ? reviewerById.get(assigneeId)
                         : undefined;
+                      const panelAverage = panelAverageByCategory.get(
+                        category.id,
+                      );
+                      const average =
+                        panelAverage?.average_score == null
+                          ? null
+                          : Number(panelAverage.average_score);
+                      const rangeMin =
+                        proposal?.range_min == null
+                          ? null
+                          : Number(proposal.range_min);
+                      const rangeMax =
+                        proposal?.range_max == null
+                          ? null
+                          : Number(proposal.range_max);
+                      const averageWithinRange =
+                        average != null && rangeMin != null && rangeMax != null
+                          ? average >= rangeMin && average <= rangeMax
+                          : null;
                       const commentFieldName = `range_response_comment_${category.id}`;
                       const finalizedByOwner = proposal?.status === "overridden";
 
@@ -330,6 +417,41 @@ export function AdjudicationConsensusBar({
                               : "No range"}
                           </td>
                           <td>
+                            <div
+                              className={
+                                averageWithinRange === true
+                                  ? "range-review-average range-review-average-within"
+                                  : averageWithinRange === false
+                                    ? "range-review-average range-review-average-outside"
+                                    : "range-review-average"
+                              }
+                            >
+                              <strong>
+                                {liveAverageStatus === "loading" && average == null
+                                  ? "Loading…"
+                                  : average == null
+                                    ? "—"
+                                    : average.toFixed(5)}
+                              </strong>
+                              <small>
+                                {panelAverage
+                                  ? `${Number(panelAverage.score_count)} scores · ${Number(
+                                      panelAverage.scoring_member_count,
+                                    )}/${Number(
+                                      panelAverage.assigned_scorer_count,
+                                    )} scorers`
+                                  : "Updates as scores are entered"}
+                              </small>
+                              {averageWithinRange != null && (
+                                <small>
+                                  {averageWithinRange
+                                    ? "Inside proposed range"
+                                    : "Outside proposed range"}
+                                </small>
+                              )}
+                            </div>
+                          </td>
+                          <td>
                             <strong>
                               {assignedReviewer?.name ?? "Not assigned yet"}
                             </strong>
@@ -356,17 +478,6 @@ export function AdjudicationConsensusBar({
                                     ? statusLabel(approval.response)
                                     : "Needs response"}
                                 </span>
-                                <textarea
-                                  aria-label={`Dispute note for ${category.title}`}
-                                  className="textarea compact-textarea"
-                                  defaultValue={approval?.comment ?? ""}
-                                  minLength={3}
-                                  name={commentFieldName}
-                                  onInput={(event) =>
-                                    event.currentTarget.setCustomValidity("")
-                                  }
-                                  placeholder="Only required when disputing"
-                                />
                                 <div className="button-row">
                                   <button
                                     className="button button-gold button-compact"
@@ -380,8 +491,25 @@ export function AdjudicationConsensusBar({
                                     formNoValidate
                                     type="submit"
                                   >
-                                    Approve
+                                    Approve range
                                   </button>
+                                </div>
+                                <details className="range-review-dispute">
+                                  <summary>Question this decision</summary>
+                                  <label htmlFor={commentFieldName}>
+                                    What should the Advisory Committee revisit?
+                                  </label>
+                                  <textarea
+                                    className="textarea compact-textarea"
+                                    defaultValue={approval?.comment ?? ""}
+                                    id={commentFieldName}
+                                    minLength={3}
+                                    name={commentFieldName}
+                                    onInput={(event) =>
+                                      event.currentTarget.setCustomValidity("")
+                                    }
+                                    placeholder="Add a short explanation"
+                                  />
                                   <button
                                     className="button button-danger button-compact"
                                     formAction={respondCategoryProposal.bind(
@@ -402,16 +530,16 @@ export function AdjudicationConsensusBar({
                                       ) {
                                         event.preventDefault();
                                         field.setCustomValidity(
-                                          "Add a short note explaining the dispute.",
+                                          "Add a short note explaining what should be revisited.",
                                         );
                                         field.reportValidity();
                                       }
                                     }}
                                     type="submit"
                                   >
-                                    Dispute
+                                    Send question
                                   </button>
-                                </div>
+                                </details>
                               </div>
                             )}
                           </td>
@@ -422,7 +550,26 @@ export function AdjudicationConsensusBar({
                 </table>
               </div>
 
-              <div className="sticky-modal-footer">
+              <div className="sticky-modal-footer range-review-footer">
+                <span aria-live="polite" className="range-review-live-status">
+                  <span
+                    aria-hidden="true"
+                    className={`range-review-live-dot range-review-live-dot-${liveAverageStatus}`}
+                  />
+                  {liveAverageStatus === "error"
+                    ? "Live averages temporarily unavailable"
+                    : liveAverageStatus === "loading"
+                      ? "Loading live panel averages…"
+                      : `Live panel averages${
+                          liveAverageUpdatedAt
+                            ? ` · updated ${liveAverageUpdatedAt.toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                second: "2-digit",
+                              })}`
+                            : ""
+                        }`}
+                </span>
                 <button
                   className="button button-dark"
                   onClick={() => setRangeReviewOpen(false)}

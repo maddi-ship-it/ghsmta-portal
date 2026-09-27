@@ -24,6 +24,8 @@ export type ScheduleTrackFilter =
 export const DEFAULT_SCHEDULE_TRACK_FILTER: ScheduleTrackFilter =
   "competition";
 
+export const SCHEDULE_TIME_ZONE = "America/New_York";
+
 const BOOKED_BY_DEFAULT_ROLES: ReadonlySet<AppRole> = new Set([
   "owner",
   "advisory_member",
@@ -63,4 +65,52 @@ export function scheduleSlotMatchesTrack(
 
   const isMentorship = slotTitle.toLowerCase().includes("mentor");
   return track === "mentorship" ? isMentorship : !isMentorship;
+}
+
+export function resolveScheduleDateFilter(requestedDate: string | undefined) {
+  if (!requestedDate) return null;
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(requestedDate);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return requestedDate;
+}
+
+export function scheduleDateKey(
+  startsAt: string,
+  timeZone = SCHEDULE_TIME_ZONE,
+) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(new Date(startsAt))
+    .reduce<Record<string, string>>((result, part) => {
+      if (part.type !== "literal") result[part.type] = part.value;
+      return result;
+    }, {});
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function scheduleSlotMatchesDate(
+  startsAt: string,
+  selectedDate: string | null,
+) {
+  return !selectedDate || scheduleDateKey(startsAt) === selectedDate;
 }

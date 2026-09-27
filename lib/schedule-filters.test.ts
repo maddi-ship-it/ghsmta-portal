@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SCHEDULE_TRACK_FILTER,
   defaultScheduleFilter,
+  resolveScheduleDateFilter,
   resolveScheduleFilter,
   resolveScheduleTrackFilter,
+  scheduleDateKey,
+  scheduleSlotMatchesDate,
   scheduleSlotMatchesTrack,
 } from "./schedule-filters";
 
@@ -71,6 +74,31 @@ describe("schedule track filters", () => {
       scheduleSlotMatchesTrack("FRIDAY EVENING (1)", "competition"),
     ).toBe(true);
     expect(scheduleSlotMatchesTrack("FRIDAY EVENING (1)", "all")).toBe(
+      true,
+    );
+  });
+});
+
+describe("schedule date filters", () => {
+  it("accepts real calendar dates and rejects malformed or impossible dates", () => {
+    expect(resolveScheduleDateFilter("2026-09-04")).toBe("2026-09-04");
+    expect(resolveScheduleDateFilter("09/04/2026")).toBeNull();
+    expect(resolveScheduleDateFilter("2026-02-30")).toBeNull();
+    expect(resolveScheduleDateFilter(undefined)).toBeNull();
+  });
+
+  it("uses the Eastern calendar date rather than the UTC date", () => {
+    expect(scheduleDateKey("2026-09-05T02:00:00.000Z")).toBe("2026-09-04");
+    expect(
+      scheduleSlotMatchesDate("2026-09-05T02:00:00.000Z", "2026-09-04"),
+    ).toBe(true);
+    expect(
+      scheduleSlotMatchesDate("2026-09-05T02:00:00.000Z", "2026-09-05"),
+    ).toBe(false);
+  });
+
+  it("does not filter slots when no date is selected", () => {
+    expect(scheduleSlotMatchesDate("2026-09-05T02:00:00.000Z", null)).toBe(
       true,
     );
   });

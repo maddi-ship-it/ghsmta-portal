@@ -135,6 +135,12 @@ export function ApplicantScheduleBoard({ slots, initialAvailability, view }: { s
       <div className="schedule-live-strip" aria-live="polite"><span className={`schedule-live-dot schedule-live-dot-${liveStatus}`} /><strong>{liveStatus === "live" ? "Live availability" : liveStatus === "refreshing" ? "Updating…" : liveStatus === "degraded" ? "Connection interrupted" : "Connecting…"}</strong><span>{lastUpdatedAt ? `Checked ${lastUpdatedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}` : "All schools see changes in real time."}</span><button className="text-button" type="button" onClick={() => void refreshRef.current()}>Refresh now</button></div>
 
       <div className={`schedule-slot-grid schedule-slot-grid-${view}`}>
+        {slots.length === 0 && (
+          <div className="panel empty-state schedule-empty-state">
+            <h3>No schedule slots match these filters.</h3>
+            <p>Choose a different date or reset the schedule filters.</p>
+          </div>
+        )}
         {slots.map((slot) => {
           const live = availabilityMap.get(slot.id);
           const isBooked = Boolean(live?.is_booked);

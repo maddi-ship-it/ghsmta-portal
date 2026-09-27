@@ -10,8 +10,10 @@ import { roleLabel } from "@/lib/format";
 import {
   DEFAULT_SCHEDULE_TRACK_FILTER,
   defaultScheduleFilter,
+  resolveScheduleDateFilter,
   resolveScheduleFilter,
   resolveScheduleTrackFilter,
+  scheduleSlotMatchesDate,
   scheduleSlotMatchesTrack,
   type ScheduleFilter,
   type ScheduleTrackFilter,
@@ -170,6 +172,7 @@ type ScheduleSearchParams = {
   view?: ScheduleView;
   filter?: ScheduleFilter;
   track?: ScheduleTrackFilter;
+  date?: string;
   q?: string;
   section?: OwnerScheduleSection;
   page?: string;
@@ -288,6 +291,7 @@ export default async function SchedulePage({
   const defaultFilter = defaultScheduleFilter(profile.role);
   const selectedFilter = resolveScheduleFilter(profile.role, params.filter);
   const selectedTrack = resolveScheduleTrackFilter(params.track);
+  const selectedDate = resolveScheduleDateFilter(params.date);
   const scheduleSearch = (params.q ?? "").trim();
   const ownerSections: OwnerScheduleSection[] = ["overview", "timeslots", "staffing", "waitlists", "messages"];
   const ownerSection: OwnerScheduleSection = ownerSections.includes(params.section as OwnerScheduleSection)
@@ -566,6 +570,10 @@ export default async function SchedulePage({
         return false;
       }
 
+      if (!scheduleSlotMatchesDate(slot.starts_at, selectedDate)) {
+        return false;
+      }
+
       switch (selectedFilter) {
         case 'open':
           return slot.status === 'open';
@@ -643,6 +651,7 @@ export default async function SchedulePage({
     sort: selectedSort,
     filter: selectedFilter,
     track: selectedTrack,
+    ...(selectedDate ? { date: selectedDate } : {}),
     ...(scheduleSearch ? { q: scheduleSearch } : {}),
   };
 
@@ -1046,6 +1055,15 @@ export default async function SchedulePage({
             <option value="mentorship">Mentorship Track</option>
             <option value="all">All Tracks</option>
           </select>
+          <label className="sr-only" htmlFor="schedule_date">Filter by date</label>
+          <input
+            aria-label="Filter schedule by date"
+            className="input schedule-date-filter"
+            defaultValue={selectedDate ?? ""}
+            id="schedule_date"
+            name="date"
+            type="date"
+          />
           <label className="sr-only" htmlFor="schedule_sort">Sort schedule</label>
           <select className="select" defaultValue={selectedSort} id="schedule_sort" name="sort">
             <option value="date_asc">Date — earliest first</option>
@@ -1057,7 +1075,7 @@ export default async function SchedulePage({
             <option value="waitlist_desc">Waitlist count</option>
           </select>
           <button className="button button-secondary button-compact" type="submit">Apply</button>
-          {(scheduleSearch || selectedFilter !== defaultFilter || selectedTrack !== DEFAULT_SCHEDULE_TRACK_FILTER || selectedSort !== "date_asc") && (
+          {(scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== DEFAULT_SCHEDULE_TRACK_FILTER || selectedSort !== "date_asc") && (
             <Link
               className="text-button"
               href={{
@@ -1153,7 +1171,9 @@ export default async function SchedulePage({
               <h3>
                 {(profile.role as AppRole) === "applicant"
                   ? "No schedule slots are currently open."
-                  : "No schedule slots are configured."}
+                  : scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== DEFAULT_SCHEDULE_TRACK_FILTER
+                    ? "No schedule slots match these filters."
+                    : "No schedule slots are configured."}
               </h3>
               <p>
                 {(profile.role as AppRole) === "applicant"
