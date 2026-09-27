@@ -477,6 +477,52 @@ export function OwnerLiveAdjudicationReview({
     () => new Map(profiles.map((profile) => [profile.id, profile])),
     [profiles],
   );
+  const scorecardByAssignmentId = useMemo(
+    () =>
+      new Map(
+        scorecards.map((scorecard) => [scorecard.assignment_id, scorecard]),
+      ),
+    [scorecards],
+  );
+  const panelRoster = useMemo(
+    () =>
+      assignments.map((assignment) => ({
+        assignment,
+        scorecard: scorecardByAssignmentId.get(assignment.id) ?? null,
+      })),
+    [assignments, scorecardByAssignmentId],
+  );
+  const visibleScorecards = useMemo(
+    () =>
+      panelRoster.flatMap(({ scorecard }) =>
+        scorecard ? [scorecard] : [],
+      ),
+    [panelRoster],
+  );
+  const visibleScorecardIds = useMemo(
+    () => new Set(visibleScorecards.map((scorecard) => scorecard.id)),
+    [visibleScorecards],
+  );
+  const scoreByCardAndCriterion = useMemo(
+    () =>
+      new Map(
+        scores.map((score) => [
+          `${score.scorecard_id}:${score.criterion_id}`,
+          score,
+        ]),
+      ),
+    [scores],
+  );
+  const commentByCardAndCategory = useMemo(
+    () =>
+      new Map(
+        comments.map((comment) => [
+          `${comment.scorecard_id}:${comment.category_id}`,
+          comment,
+        ]),
+      ),
+    [comments],
+  );
 
   const refreshData = useCallback(async () => {
     const { data: scorecardData, error: scorecardError } = await supabase
@@ -608,8 +654,6 @@ export function OwnerLiveAdjudicationReview({
     };
   }, [applicationId, isOwner, refreshData, scheduleRefresh, scorecardKey, supabase]);
 
-  const visibleScorecards = scorecards;
-
   return (
     <>
       <div className={`live-review-status live-review-status-${connectionState}`}>
@@ -644,12 +688,12 @@ export function OwnerLiveAdjudicationReview({
         </article>
         <article className="metric-card">
           <span className="metric-label">Started</span>
-          <strong className="metric-value">{scorecards.length}</strong>
+          <strong className="metric-value">{visibleScorecards.length}</strong>
         </article>
         <article className="metric-card">
           <span className="metric-label">Submitted</span>
           <strong className="metric-value">
-            {scorecards.filter(
+            {visibleScorecards.filter(
               (card) => card.status === "submitted" || card.status === "locked",
             ).length}
           </strong>
@@ -672,9 +716,8 @@ export function OwnerLiveAdjudicationReview({
           </div>
         </div>
         <div className="panel-body panelist-grid">
-          {assignments.map((assignment) => {
+          {panelRoster.map(({ assignment, scorecard: card }) => {
             const adjudicator = profileMap.get(assignment.adjudicator_user_id);
-            const card = scorecards.find((item) => item.assignment_id === assignment.id);
             return (
               <article className="panelist-card" key={assignment.id}>
                 <div>
@@ -720,7 +763,7 @@ export function OwnerLiveAdjudicationReview({
         const categoryComments = comments.filter(
           (comment) =>
             comment.category_id === category.id &&
-            visibleScorecards.some((scorecard) => scorecard.id === comment.scorecard_id),
+            visibleScorecardIds.has(comment.scorecard_id),
         );
         const liveDraft = composeLiveCommentDraft(
           category,
@@ -753,11 +796,15 @@ export function OwnerLiveAdjudicationReview({
                 <thead>
                   <tr>
                     <th>Criterion</th>
-                    {visibleScorecards.map((card) => (
-                      <th key={card.id}>
-                        {profileMap.get(card.adjudicator_user_id)?.full_name?.split(" ")[0] ??
+                    {panelRoster.map(({ assignment, scorecard }) => (
+                      <th key={assignment.id}>
+                        {profileMap.get(assignment.adjudicator_user_id)?.full_name?.split(" ")[0] ??
                           "Panelist"}
-                        <small>{scorecardStatusLabel(card.status)}</small>
+                        <small>
+                          {scorecard
+                            ? scorecardStatusLabel(scorecard.status)
+                            : "Not started"}
+                        </small>
                       </th>
                     ))}
                     <th>Average</th>
@@ -765,12 +812,12 @@ export function OwnerLiveAdjudicationReview({
                 </thead>
                 <tbody>
                   {categoryCriteria.map((criterion) => {
-                    const criterionRows = visibleScorecards.map((card) =>
-                      scores.find(
-                        (score) =>
-                          score.scorecard_id === card.id &&
-                          score.criterion_id === criterion.id,
-                      ),
+                    const criterionRows = panelRoster.map(({ scorecard }) =>
+                      scorecard
+                        ? scoreByCardAndCriterion.get(
+                            `${scorecard.id}:${criterion.id}`,
+                          )
+                        : undefined,
                     );
                     const numeric = criterionRows
                       .map((row) => row?.score)
@@ -812,79 +859,108 @@ export function OwnerLiveAdjudicationReview({
             <div className="panel-body">
               <h3>Live adjudicator comments</h3>
               <div className="raw-comment-grid">
-                {visibleScorecards.map((card) => {
-                  const panelist = profileMap.get(card.adjudicator_user_id);
-                  const comment = comments.find(
-                    (item) =>
-                      item.scorecard_id === card.id && item.category_id === category.id,
+                {panelRoster.map(({ assignment, scorecard: card }) => {
+                  const panelist = profileMap.get(
+                    assignment.adjudicator_user_id,
                   );
+                  const comment = card
+                    ? commentByCardAndCategory.get(
+                        `${card.id}:${category.id}`,
+                      )
+                    : undefined;
                   return (
-                    <article className="raw-comment-card" key={card.id}>
+                    <article className="raw-comment-card" key={assignment.id}>
                       <div className="raw-comment-card-heading">
                         <h4>{panelist?.full_name ?? panelist?.email ?? "Adjudicator"}</h4>
-                        <span className={`badge badge-scorecard-${card.status}`}>
-                          {scorecardStatusLabel(card.status)}
+                        <span
+                          className={`badge badge-scorecard-${card?.status ?? assignment.status}`}
+                        >
+                          {card ? scorecardStatusLabel(card.status) : "Not started"}
                         </span>
                       </div>
-                      {comment && (
-                        <div className="owner-category-decision-summary">
-                          <span
-                            className={[
-                              "badge",
-                              comment.is_eligible
-                                ? "badge-scorecard-submitted"
-                                : "badge-scorecard-reopened",
-                            ].join(" ")}
-                          >
-                            {comment.is_eligible ? "Eligible" : "Not eligible"}
-                          </span>
-
-                          {comment.score_range_min != null &&
-                            comment.score_range_max != null && (
-                              <span>
-                                2-point range: {Number(comment.score_range_min).toFixed(2)}–
-                                {Number(comment.score_range_max).toFixed(2)}
-                              </span>
-                            )}
-                        </div>
-                      )}
-                      {comment?.subject_name && (
-                        <p><strong>Subject:</strong> {comment.subject_name}</p>
-                      )}
-                      {comment && !comment.is_applicable ? (
-                        <p>
-                          <strong>Not applicable:</strong>{" "}
-                          {comment.not_applicable_reason ?? "No reason entered"}
-                        </p>
+                      {!card ? (
+                        <p>No scorecard has been started yet.</p>
                       ) : (
                         <>
-                          <div className="raw-comment-section">
-                            <strong>Successes:</strong>
-                            <RichTextPreview value={comment?.successes} />
-                          </div>
-                          <div className="raw-comment-section">
-                            <strong>Examples:</strong>
-                            <RichTextPreview value={comment?.success_examples} />
-                          </div>
-                          <div className="raw-comment-section">
-                            <strong>Growth:</strong>
-                            <RichTextPreview value={comment?.growth_areas} />
-                          </div>
-                          <div className="raw-comment-section">
-                            <strong>Growth examples:</strong>
-                            <RichTextPreview value={comment?.growth_examples} />
-                          </div>
+                          {comment && (
+                            <div className="owner-category-decision-summary">
+                              <span
+                                className={[
+                                  "badge",
+                                  comment.is_eligible
+                                    ? "badge-scorecard-submitted"
+                                    : "badge-scorecard-reopened",
+                                ].join(" ")}
+                              >
+                                {comment.is_eligible
+                                  ? "Eligible"
+                                  : "Not eligible"}
+                              </span>
+
+                              {comment.score_range_min != null &&
+                                comment.score_range_max != null && (
+                                  <span>
+                                    2-point range:{" "}
+                                    {Number(
+                                      comment.score_range_min,
+                                    ).toFixed(2)}
+                                    –
+                                    {Number(
+                                      comment.score_range_max,
+                                    ).toFixed(2)}
+                                  </span>
+                                )}
+                            </div>
+                          )}
+                          {comment?.subject_name && (
+                            <p>
+                              <strong>Subject:</strong> {comment.subject_name}
+                            </p>
+                          )}
+                          {comment && !comment.is_applicable ? (
+                            <p>
+                              <strong>Not applicable:</strong>{" "}
+                              {comment.not_applicable_reason ??
+                                "No reason entered"}
+                            </p>
+                          ) : (
+                            <>
+                              <div className="raw-comment-section">
+                                <strong>Successes:</strong>
+                                <RichTextPreview value={comment?.successes} />
+                              </div>
+                              <div className="raw-comment-section">
+                                <strong>Examples:</strong>
+                                <RichTextPreview
+                                  value={comment?.success_examples}
+                                />
+                              </div>
+                              <div className="raw-comment-section">
+                                <strong>Growth:</strong>
+                                <RichTextPreview value={comment?.growth_areas} />
+                              </div>
+                              <div className="raw-comment-section">
+                                <strong>Growth examples:</strong>
+                                <RichTextPreview
+                                  value={comment?.growth_examples}
+                                />
+                              </div>
+                            </>
+                          )}
+                          {comment && (
+                            <small className="live-comment-updated">
+                              Saved{" "}
+                              {new Date(
+                                comment.updated_at,
+                              ).toLocaleTimeString()}
+                            </small>
+                          )}
                         </>
-                      )}
-                      {comment && (
-                        <small className="live-comment-updated">
-                          Saved {new Date(comment.updated_at).toLocaleTimeString()}
-                        </small>
                       )}
                     </article>
                   );
                 })}
-                {visibleScorecards.length === 0 && <p>No scorecards are available yet.</p>}
+                {panelRoster.length === 0 && <p>No panel members are assigned yet.</p>}
               </div>
 
               {isOwner ? (

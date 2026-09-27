@@ -16,7 +16,6 @@ import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-ad
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
-import { ScorecardDraftButton } from "@/components/scorecard-draft-button";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
@@ -416,8 +415,18 @@ export default async function AdjudicationApplicationPage({
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
     profile.role === "adjudicator"
-      ? supabase.from("adjudicator_assignments").select("*").eq("application_id", id).eq("adjudicator_user_id", profile.id)
-      : supabase.from("adjudicator_assignments").select("*").eq("application_id", id).order("assigned_at"),
+      ? supabase
+          .from("adjudicator_assignments")
+          .select("*")
+          .eq("application_id", id)
+          .eq("adjudicator_user_id", profile.id)
+          .is("removed_at", null)
+      : supabase
+          .from("adjudicator_assignments")
+          .select("*")
+          .eq("application_id", id)
+          .is("removed_at", null)
+          .order("assigned_at"),
     profile.role === "adjudicator"
       ? supabase.from("adjudication_scorecards").select("*").eq("application_id", id).eq("adjudicator_user_id", profile.id)
       : supabase.from("adjudication_scorecards").select("*").eq("application_id", id).order("created_at"),
@@ -902,6 +911,10 @@ export default async function AdjudicationApplicationPage({
               response: string;
               comment: string | null;
             }>}
+            panelFeedback={panelVisibleFeedback}
+            panelReviewers={panelNarrativeReviewers}
+            panelApprovedCategoryIds={panelApprovedCategoryIds}
+            reviewStatus={reviewResult.data?.status ?? "draft"}
             ownScores={scores.filter(
               (score) => score.scorecard_id === ownScorecard?.id,
             )}
@@ -927,7 +940,6 @@ export default async function AdjudicationApplicationPage({
 
           {!readOnly && (
             <div className="application-action-bar scorecard-action-bar">
-              <ScorecardDraftButton applicationId={id} />
               <ScorecardSubmitControls
                 applicationId={id}
                 categories={categories}
@@ -937,16 +949,6 @@ export default async function AdjudicationApplicationPage({
             </div>
           )}
         </form>
-        <PanelNarrativeWorkflow
-          applicationId={id}
-          canComment={canComment}
-          categories={categories}
-          currentUserId={profile.id}
-          feedback={panelVisibleFeedback}
-          panelReviewers={panelNarrativeReviewers}
-          panelApprovedCategoryIds={panelApprovedCategoryIds}
-          reviewStatus={reviewResult.data?.status ?? "draft"}
-        />
         {profile.role === "advisory_member" && canPanelReview && (
           <OwnerLiveAdjudicationReview
             applicationId={id}

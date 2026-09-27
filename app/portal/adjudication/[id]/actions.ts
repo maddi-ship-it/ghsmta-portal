@@ -1011,7 +1011,7 @@ export async function savePanelFeedback(
     await Promise.all([
       admin
         .from("scoring_categories")
-        .select("rubric_id")
+        .select("title,rubric_id")
         .eq("id", categoryId)
         .single(),
       admin
@@ -1021,7 +1021,7 @@ export async function savePanelFeedback(
         .single(),
       admin
         .from("adjudication_panel_feedback")
-        .select("status,assigned_to,approved_by,approved_at")
+        .select("id,status,assigned_to,approved_by,approved_at")
         .eq("application_id", applicationId)
         .eq("category_id", categoryId)
         .maybeSingle(),
@@ -1095,18 +1095,42 @@ export async function savePanelFeedback(
       : new Date().toISOString()
     : null;
 
-  const { error } = await admin.from("adjudication_panel_feedback").upsert(
-    {
-      application_id: applicationId,
-      category_id: categoryId,
-      final_comment: finalComment,
-      status: approved ? "approved" : "generated",
-      approved_by: approvedBy,
-      approved_at: approvedAt,
-    },
-    { onConflict: "application_id,category_id" },
-  );
-  if (error) throw new Error(error.message);
+  let panelApprovalSaved = false;
+
+  if (editor.role === "owner") {
+    const { error } = await admin.from("adjudication_panel_feedback").upsert(
+      {
+        application_id: applicationId,
+        category_id: categoryId,
+        final_comment: finalComment,
+        status: approved ? "approved" : "generated",
+        approved_by: approvedBy,
+        approved_at: approvedAt,
+      },
+      { onConflict: "application_id,category_id" },
+    );
+    if (error) throw new Error(error.message);
+  } else {
+    const { data: savedApproval, error } = await admin
+      .from("adjudication_panel_feedback")
+      .update({
+        final_comment: finalComment,
+        status: "approved",
+        approved_by: editor.id,
+        approved_at: approvedAt,
+      })
+      .eq("id", existingFeedback!.id)
+      .eq("approved_by", existingFeedback!.approved_by!)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!savedApproval) {
+      throw new Error(
+        "This final comment was already reviewed by another panel member. Refresh to see the latest version.",
+      );
+    }
+    panelApprovalSaved = true;
+  }
 
   const sentToPanel =
     editor.role === "owner" &&
@@ -1147,7 +1171,52 @@ export async function savePanelFeedback(
   }
 
   if (approved && editor.role !== "owner") {
-    await queuePanelReviewForOwnersIfReady(applicationId, editor.id);
+    if (panelApprovalSaved) {
+      const { data: panelChannel, error: panelChannelError } = await admin
+        .from("chat_channels")
+        .select("id")
+        .eq("application_id", applicationId)
+        .eq("channel_type", "school")
+        .eq("active", true)
+        .maybeSingle();
+
+      if (panelChannelError) {
+        console.error("Unable to locate the panel channel after final-comment approval.", {
+          applicationId,
+          categoryId,
+          panelChannelError,
+        });
+      } else if (panelChannel) {
+        const reviewerName =
+          editor.full_name?.trim() || editor.email || "A panel member";
+        const { error: panelPostError } = await admin.from("chat_posts").insert({
+          channel_id: panelChannel.id,
+          author_id: editor.id,
+          subject: `Final comment approved: ${category.title}`,
+          body: `${reviewerName} approved the final comment for ${category.title}. It has been returned to the Owners for final review.`,
+        });
+
+        if (panelPostError) {
+          console.error("Unable to notify the panel channel about final-comment approval.", {
+            applicationId,
+            categoryId,
+            panelPostError,
+          });
+        } else {
+          revalidatePath("/portal/chat");
+        }
+      }
+    }
+
+    try {
+      await queuePanelReviewForOwnersIfReady(applicationId, editor.id);
+    } catch (reviewQueueError) {
+      console.error("Unable to refresh the Owner review queue after final-comment approval.", {
+        applicationId,
+        categoryId,
+        reviewQueueError,
+      });
+    }
   } else if (!approved) {
     const { data: review } = await admin
       .from("adjudication_reviews")

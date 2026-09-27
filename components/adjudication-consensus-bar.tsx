@@ -5,6 +5,7 @@ import { useActionState, useMemo, useState } from "react";
 import { assignPanelNarrativeReviewer } from "@/app/portal/adjudication/[id]/actions";
 import {
   ownerUpdateAdjudicationReview,
+  respondCategoryProposal,
   saveAllCategoryProposals,
   submitPanelForOwnerReview,
   type CategoryProposalSaveResult,
@@ -39,6 +40,14 @@ type NarrativeAssignment = {
   assigned_to: string | null;
 };
 
+type CategoryApproval = {
+  id: string;
+  proposal_id: string;
+  adjudicator_user_id: string;
+  response: string;
+  comment: string | null;
+};
+
 function statusLabel(value: string) {
   return value
     .replaceAll("_", " ")
@@ -61,19 +70,22 @@ export function AdjudicationConsensusBar({
   proposals,
   review,
   role,
+  currentUserId,
+  approvals,
 }: {
   applicationId: string;
   role: AppRole;
   currentUserId: string;
   categories: ScoringCategory[];
   proposals: Proposal[];
-  approvals: unknown[];
+  approvals: CategoryApproval[];
   review: Review;
   narrativesReady: boolean;
   narrativeAssignments: NarrativeAssignment[];
   panelReviewers: PanelReviewer[];
 }) {
   const [matrixOpen, setMatrixOpen] = useState(false);
+  const [rangeReviewOpen, setRangeReviewOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const saveCategoryAction = useMemo(
     () => saveAllCategoryProposals.bind(null, applicationId),
@@ -101,6 +113,17 @@ export function AdjudicationConsensusBar({
     () => new Map(panelReviewers.map((reviewer) => [reviewer.id, reviewer])),
     [panelReviewers],
   );
+  const approvalByProposal = useMemo(
+    () =>
+      new Map(
+        approvals
+          .filter(
+            (approval) => approval.adjudicator_user_id === currentUserId,
+          )
+          .map((approval) => [approval.proposal_id, approval]),
+      ),
+    [approvals, currentUserId],
+  );
   const unresolved = categories.filter((category) => {
     const proposal = proposalByCategory.get(category.id);
     return !proposal || !["approved", "overridden"].includes(proposal.status);
@@ -109,6 +132,7 @@ export function AdjudicationConsensusBar({
     (proposal) => proposal.status === "disputed",
   ).length;
   const canSetDecisions = role === "advisory_member" || role === "owner";
+  const canReviewRanges = role === "adjudicator";
 
   return (
     <>
@@ -126,6 +150,15 @@ export function AdjudicationConsensusBar({
           {review && <span className="badge">{statusLabel(review.status)}</span>}
         </div>
         <div className="consensus-main-actions">
+          {canReviewRanges && (
+            <button
+              className="button button-secondary button-compact"
+              onClick={() => setRangeReviewOpen(true)}
+              type="button"
+            >
+              Review ranges
+            </button>
+          )}
           {canSetDecisions && (
             <button
               className="button button-secondary button-compact"
@@ -154,6 +187,206 @@ export function AdjudicationConsensusBar({
           role="status"
         >
           {categorySaveResult.message}
+        </div>
+      )}
+
+      {rangeReviewOpen && canReviewRanges && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setRangeReviewOpen(false);
+            }
+          }}
+        >
+          <div
+            aria-modal="true"
+            className="modal-card consensus-matrix-modal"
+            role="dialog"
+          >
+            <form>
+              <div className="modal-header sticky-modal-header">
+                <div>
+                  <p className="eyebrow">Adjudicator review</p>
+                  <h2>Approve eligibility and two-point ranges</h2>
+                  <p>
+                    Review each category decision. The assigned final-comment
+                    writer appears beside its range.
+                  </p>
+                </div>
+                <button
+                  aria-label="Close range review"
+                  className="modal-close"
+                  onClick={() => setRangeReviewOpen(false)}
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="consensus-matrix-table-wrap">
+                <table className="data-table consensus-matrix-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Eligibility</th>
+                      <th>Two-point range</th>
+                      <th>Final comment writer</th>
+                      <th>Your approval</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((category) => {
+                      const proposal = proposalByCategory.get(category.id);
+                      const approval = proposal
+                        ? approvalByProposal.get(proposal.id)
+                        : undefined;
+                      const assigneeId = assignmentByCategory.get(category.id);
+                      const assignedReviewer = assigneeId
+                        ? reviewerById.get(assigneeId)
+                        : undefined;
+                      const commentFieldName = `range_response_comment_${category.id}`;
+                      const finalizedByOwner = proposal?.status === "overridden";
+
+                      return (
+                        <tr key={category.id}>
+                          <td>
+                            <strong>{category.title}</strong>
+                            <small>{category.description}</small>
+                          </td>
+                          <td>
+                            {proposal ? (
+                              <span
+                                className={`badge ${
+                                  proposal.is_eligible
+                                    ? "badge-complete"
+                                    : "badge-warning"
+                                }`}
+                              >
+                                {proposal.is_eligible
+                                  ? "Eligible"
+                                  : "Not eligible"}
+                              </span>
+                            ) : (
+                              <span className="badge badge-warning">
+                                Waiting for Advisory
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            {proposal?.is_eligible &&
+                            proposal.range_min != null &&
+                            proposal.range_max != null
+                              ? `${Number(proposal.range_min).toFixed(2)}–${Number(
+                                  proposal.range_max,
+                                ).toFixed(2)}`
+                              : "No range"}
+                          </td>
+                          <td>
+                            <strong>
+                              {assignedReviewer?.name ?? "Not assigned yet"}
+                            </strong>
+                          </td>
+                          <td>
+                            {!proposal ? (
+                              <span className="field-help">
+                                Available after Advisory saves the category.
+                              </span>
+                            ) : finalizedByOwner ? (
+                              <span className="badge badge-complete">
+                                Owner override
+                              </span>
+                            ) : (
+                              <div className="form-stack">
+                                <span
+                                  className={`badge ${
+                                    approval?.response === "approved"
+                                      ? "badge-complete"
+                                      : "badge-warning"
+                                  }`}
+                                >
+                                  {approval?.response
+                                    ? statusLabel(approval.response)
+                                    : "Needs response"}
+                                </span>
+                                <textarea
+                                  aria-label={`Dispute note for ${category.title}`}
+                                  className="textarea compact-textarea"
+                                  defaultValue={approval?.comment ?? ""}
+                                  minLength={3}
+                                  name={commentFieldName}
+                                  onInput={(event) =>
+                                    event.currentTarget.setCustomValidity("")
+                                  }
+                                  placeholder="Only required when disputing"
+                                />
+                                <div className="button-row">
+                                  <button
+                                    className="button button-gold button-compact"
+                                    formAction={respondCategoryProposal.bind(
+                                      null,
+                                      applicationId,
+                                      proposal.id,
+                                      "approved",
+                                      commentFieldName,
+                                    )}
+                                    formNoValidate
+                                    type="submit"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    className="button button-danger button-compact"
+                                    formAction={respondCategoryProposal.bind(
+                                      null,
+                                      applicationId,
+                                      proposal.id,
+                                      "disputed",
+                                      commentFieldName,
+                                    )}
+                                    onClick={(event) => {
+                                      const field =
+                                        event.currentTarget.form?.elements.namedItem(
+                                          commentFieldName,
+                                        );
+                                      if (
+                                        field instanceof HTMLTextAreaElement &&
+                                        field.value.trim().length < 3
+                                      ) {
+                                        event.preventDefault();
+                                        field.setCustomValidity(
+                                          "Add a short note explaining the dispute.",
+                                        );
+                                        field.reportValidity();
+                                      }
+                                    }}
+                                    type="submit"
+                                  >
+                                    Dispute
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="sticky-modal-footer">
+                <button
+                  className="button button-dark"
+                  onClick={() => setRangeReviewOpen(false)}
+                  type="button"
+                >
+                  Done
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

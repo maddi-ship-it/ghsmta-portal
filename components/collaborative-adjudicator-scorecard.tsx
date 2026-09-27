@@ -8,7 +8,9 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { useRouter } from "next/navigation";
 
+import { savePanelFeedback } from "@/app/portal/adjudication/[id]/actions";
 import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow-actions";
 import { CategoryScoringControls } from "@/components/category-scoring-controls";
 import { RichTextField } from "@/components/rich-text-field";
@@ -20,6 +22,7 @@ import {
 } from "@/lib/rich-text";
 import type {
   AdjudicationCategoryComment,
+  AdjudicationPanelFeedback,
   AdjudicationScore,
   ScoringCategory,
   ScoringCriterion,
@@ -65,6 +68,12 @@ type CategoryApproval = {
   adjudicator_user_id: string;
   response: string;
   comment: string | null;
+};
+
+type PanelNarrativeReviewer = {
+  id: string;
+  name: string;
+  role: "adjudicator" | "advisory_member";
 };
 
 function RichTextPreview({
@@ -188,6 +197,153 @@ function CategoryAverageSummary({
   );
 }
 
+function InlinePanelNarrativeReview({
+  applicationId,
+  category,
+  feedback,
+  assignedReviewerName,
+  currentUserId,
+  canComment,
+  panelApproved,
+  reviewStatus,
+}: {
+  applicationId: string;
+  category: ScoringCategory;
+  feedback: AdjudicationPanelFeedback | undefined;
+  assignedReviewerName: string | undefined;
+  currentUserId: string;
+  canComment: boolean;
+  panelApproved: boolean;
+  reviewStatus: string;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(feedback?.final_comment ?? "");
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const sentToOwners = ["ready_for_owner", "owner_review", "released"].includes(
+    reviewStatus,
+  );
+  const ownerSentComment = Boolean(feedback?.final_comment?.trim());
+  const canEdit = Boolean(
+    canComment &&
+      ownerSentComment &&
+      !panelApproved &&
+      !sentToOwners &&
+      feedback?.assigned_to === currentUserId,
+  );
+
+  const approveComment = async () => {
+    if (!value.trim() || saving) return;
+    setSaving(true);
+    setMessage("Approving final comment…");
+    const formData = new FormData();
+    formData.set("final_comment", value);
+    formData.set("approved", "on");
+
+    try {
+      await savePanelFeedback(applicationId, category.id, formData);
+      setMessage("Approved and returned to the Owners.");
+      router.refresh();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The final comment could not be approved.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="panel-narrative-card inline-panel-narrative-review">
+      <div className="panel-narrative-card-heading">
+        <div>
+          <span className="section-order">Final school-facing comment</span>
+          <h3>Final comment for {category.title}</h3>
+          <p>
+            The final comment stays beside the live brain-dump notes for this
+            category.
+          </p>
+        </div>
+        <span
+          className={`badge ${panelApproved ? "badge-complete" : "badge-warning"}`}
+        >
+          {panelApproved
+            ? "Panel approved"
+            : assignedReviewerName
+              ? `Assigned to ${assignedReviewerName}`
+              : ownerSentComment
+                ? "Needs assignment"
+                : "Waiting for Owner"}
+        </span>
+      </div>
+
+      {!ownerSentComment ? (
+        <div className="comment-readonly-surface">
+          The Owner draft will appear here after an Owner sends it to the
+          panel.
+        </div>
+      ) : canEdit ? (
+        <div className="form-stack">
+          <div className="field">
+            <label htmlFor={`inline_final_comment_${category.id}`}>
+              Review and edit the assigned final comment
+            </label>
+            <textarea
+              className="textarea narrative-textarea"
+              id={`inline_final_comment_${category.id}`}
+              onChange={(event) => setValue(event.target.value)}
+              onInput={(event) => event.stopPropagation()}
+              rows={8}
+              value={value}
+            />
+          </div>
+          <p className="field-help">
+            Approval returns this category to the Owners and posts an update
+            in the private panel channel.
+          </p>
+          <div className="button-row panel-narrative-actions">
+            <button
+              className="button button-dark"
+              disabled={saving || !value.trim()}
+              onClick={() => void approveComment()}
+              type="button"
+            >
+              {saving ? "Approving…" : "Approve and return to Owners"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="comment-readonly-surface panel-narrative-preview">
+            {feedback?.final_comment}
+          </div>
+          {!panelApproved && !assignedReviewerName && (
+            <p className="field-help">
+              An Advisory Committee member must assign a writer before this
+              comment can be edited and approved.
+            </p>
+          )}
+          {!panelApproved &&
+            assignedReviewerName &&
+            feedback?.assigned_to !== currentUserId && (
+              <p className="field-help">
+                {assignedReviewerName} is responsible for this final comment.
+              </p>
+            )}
+        </>
+      )}
+
+      {message && (
+        <small aria-live="polite" className="field-help">
+          {message}
+        </small>
+      )}
+    </section>
+  );
+}
+
 function CategoryScoreSection({
   category,
   categoryIndex,
@@ -196,6 +352,10 @@ function CategoryScoreSection({
   categorySubjectName,
   officialProposal,
   ownApproval,
+  panelFeedback,
+  assignedReviewerName,
+  panelApproved,
+  reviewStatus,
   applicationId,
   panelMembers,
   observationMap,
@@ -213,6 +373,10 @@ function CategoryScoreSection({
   categorySubjectName: string;
   officialProposal?: CategoryProposal;
   ownApproval?: CategoryApproval;
+  panelFeedback?: AdjudicationPanelFeedback;
+  assignedReviewerName?: string;
+  panelApproved: boolean;
+  reviewStatus: string;
   applicationId: string;
   panelMembers: PanelMember[];
   observationMap: Map<string, string | null>;
@@ -451,6 +615,11 @@ function CategoryScoreSection({
                 </span>
               </div>
 
+              <div className="owner-category-decision-summary">
+                <span>Final comment writer</span>
+                <strong>{assignedReviewerName ?? "Not assigned yet"}</strong>
+              </div>
+
               {officialProposal &&
                 officialProposal.status !== "overridden" && (
                   <div className="category-decision-response-actions">
@@ -678,6 +847,18 @@ function CategoryScoreSection({
           })}
         </div>
 
+        <InlinePanelNarrativeReview
+          applicationId={applicationId}
+          assignedReviewerName={assignedReviewerName}
+          canComment={canComment}
+          category={category}
+          currentUserId={currentUserId}
+          feedback={panelFeedback}
+          key={`${category.id}:${panelFeedback?.updated_at ?? "waiting"}`}
+          panelApproved={panelApproved}
+          reviewStatus={reviewStatus}
+        />
+
         <details className="private-category-notes">
           <summary>Optional private category notes</summary>
           <div className="field">
@@ -814,6 +995,10 @@ export function CollaborativeAdjudicatorScorecard({
   ownComments,
   categoryProposals,
   categoryApprovals,
+  panelFeedback,
+  panelReviewers,
+  panelApprovedCategoryIds,
+  reviewStatus,
   initialPanelRows,
   scoreOptions,
   canComment,
@@ -829,6 +1014,10 @@ export function CollaborativeAdjudicatorScorecard({
   ownComments: AdjudicationCategoryComment[];
   categoryProposals: CategoryProposal[];
   categoryApprovals: CategoryApproval[];
+  panelFeedback: AdjudicationPanelFeedback[];
+  panelReviewers: PanelNarrativeReviewer[];
+  panelApprovedCategoryIds: string[];
+  reviewStatus: string;
   initialPanelRows: PanelObservationRow[];
   scoreOptions: ScoreOption[];
   canComment: boolean;
@@ -840,13 +1029,14 @@ export function CollaborativeAdjudicatorScorecard({
     useState(categoryProposals);
   const [liveCategoryApprovals, setLiveCategoryApprovals] =
     useState(categoryApprovals);
+  const [livePanelFeedback, setLivePanelFeedback] = useState(panelFeedback);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [refreshError, setRefreshError] = useState(false);
   const [liveConnection, setLiveConnection] = useState(false);
   const refreshTimer = useRef<number | null>(null);
 
   const refreshWorkspace = useCallback(async () => {
-    const [panelResult, proposalResult] = await Promise.all([
+    const [panelResult, proposalResult, feedbackResult] = await Promise.all([
       supabase.rpc("get_shared_adjudication_observations", {
         p_application_id: applicationId,
       }),
@@ -856,9 +1046,16 @@ export function CollaborativeAdjudicatorScorecard({
           "id,category_id,is_eligible,range_min,range_max,status,advisory_note",
         )
         .eq("application_id", applicationId),
+      canComment
+        ? supabase
+            .from("adjudication_panel_feedback")
+            .select("*")
+            .eq("application_id", applicationId)
+            .eq("status", "approved")
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
-    if (panelResult.error || proposalResult.error) {
+    if (panelResult.error || proposalResult.error || feedbackResult.error) {
       setRefreshError(true);
       return;
     }
@@ -882,9 +1079,14 @@ export function CollaborativeAdjudicatorScorecard({
     setLiveCategoryApprovals(
       (approvalResult.data ?? []) as CategoryApproval[],
     );
+    if (canComment && feedbackResult.data) {
+      setLivePanelFeedback(
+        feedbackResult.data as AdjudicationPanelFeedback[],
+      );
+    }
     setLastRefreshed(new Date());
     setRefreshError(false);
-  }, [applicationId, supabase]);
+  }, [applicationId, canComment, supabase]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
@@ -908,6 +1110,16 @@ export function CollaborativeAdjudicatorScorecard({
           event: "*",
           schema: "public",
           table: "adjudication_category_proposals",
+          filter: `application_id=eq.${applicationId}`,
+        },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "adjudication_panel_feedback",
           filter: `application_id=eq.${applicationId}`,
         },
         scheduleRefresh,
@@ -970,6 +1182,22 @@ export function CollaborativeAdjudicatorScorecard({
     [currentUserId, liveCategoryApprovals],
   );
 
+  const feedbackMap = useMemo(
+    () =>
+      new Map(livePanelFeedback.map((item) => [item.category_id, item])),
+    [livePanelFeedback],
+  );
+
+  const reviewerMap = useMemo(
+    () => new Map(panelReviewers.map((reviewer) => [reviewer.id, reviewer])),
+    [panelReviewers],
+  );
+
+  const panelApprovedCategories = useMemo(
+    () => new Set(panelApprovedCategoryIds),
+    [panelApprovedCategoryIds],
+  );
+
   const commentColumnsStyle = {
     "--panel-comment-count": Math.max(panelMembers.length, 1),
   } as CSSProperties;
@@ -1014,6 +1242,14 @@ export function CollaborativeAdjudicatorScorecard({
           }
           officialProposal={proposalMap.get(category.id)}
           ownApproval={proposalMap.get(category.id) ? approvalMap.get(proposalMap.get(category.id)!.id) : undefined}
+          panelFeedback={feedbackMap.get(category.id)}
+          assignedReviewerName={
+            feedbackMap.get(category.id)?.assigned_to
+              ? reviewerMap.get(feedbackMap.get(category.id)!.assigned_to!)?.name
+              : undefined
+          }
+          panelApproved={panelApprovedCategories.has(category.id)}
+          reviewStatus={reviewStatus}
           applicationId={applicationId}
           commentColumnsStyle={commentColumnsStyle}
           currentUserId={currentUserId}
