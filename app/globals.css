@@ -14107,5 +14107,87 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 @media (max-width: 900px) {
   .portal-shell .portal-main .scoring-category-sticky-title {
     top: calc(120px + env(safe-area-inset-top));
+    min-height: 44px;
+    padding: 6px 9px;
+    border-radius: 10px;
+  }
+
+  .portal-shell .portal-main .scoring-category-sticky-title .category-collapse-title {
+    font-size: 1rem;
+    line-height: 1.1;
+  }
+
+  .portal-shell .portal-main .scoring-category-sticky-title .category-collapse-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    font-size: 1rem;
+  }
+
+  .portal-shell .portal-main .score-guide-panel {
+    border-radius: 10px;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .panel-header {
+    padding: 8px 10px 6px;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .panel-header h2 {
+    font-size: 0.88rem;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .panel-header p {
+    margin-top: 2px;
+    font-size: 0.64rem;
+    line-height: 1.25;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .score-scale-grid > div {
+    min-height: 60px;
+    gap: 2px;
+    padding: 7px 9px;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .score-scale-grid strong {
+    font-size: 1rem;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .score-scale-grid span {
+    font-size: 0.68rem;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .score-scale-grid small {
+    font-size: 0.58rem;
+    line-height: 1.2;
+  }
+}
+
+@media (max-width: 560px) {
+  .portal-shell .portal-main .scoring-category-sticky-title {
+    min-height: 40px;
+    padding: 5px 8px;
+  }
+
+  .portal-shell .portal-main .scoring-category-sticky-title .category-collapse-title {
+    font-size: 0.9rem;
+  }
+
+  .portal-shell .portal-main .scoring-category-sticky-title .category-collapse-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.9rem;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .panel-header p {
+    display: none;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .score-scale-grid > div {
+    min-height: 52px;
+    padding: 6px 8px;
+  }
+
+  .portal-shell .portal-main .score-guide-panel .score-scale-grid small {
+    -webkit-line-clamp: 1;
   }
 }
