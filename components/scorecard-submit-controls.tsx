@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { saveAdjudicatorScorecard } from "@/app/portal/adjudication/[id]/actions";
 import { offlineScorecardDraftKey } from "@/components/adjudicator-autosave";
 import { richTextHasContent } from "@/lib/rich-text";
+import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import type { ScoringCategory, ScoringCriterion } from "@/lib/types";
 
 type CompletionState = {
@@ -26,6 +27,8 @@ function evaluateCompletion(
   let missingCount = 0;
 
   for (const category of categories) {
+    const isOverallProduction =
+      category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
     const usesEligibilityControl =
       formData.get(`eligibility_control_${category.id}`) === "1";
 
@@ -36,16 +39,17 @@ function evaluateCompletion(
           formData.get(`not_applicable_${category.id}`) === "on"
         );
 
-    if (!eligible) {
-      continue;
-    }
-
-    if (!formText(formData, `score_range_start_${category.id}`)) {
+    if (
+      !isOverallProduction &&
+      eligible &&
+      !formText(formData, `score_range_start_${category.id}`)
+    ) {
       missingCount += 1;
     }
 
     if (
       category.subject_label &&
+      eligible &&
       !formText(formData, `subject_name_${category.id}`)
     ) {
       missingCount += 1;
@@ -59,9 +63,9 @@ function evaluateCompletion(
     for (const criterion of categoryCriteria) {
       const rawScore = formText(formData, `score_${criterion.id}`);
 
-      if (!rawScore) {
+      if (!isOverallProduction && !rawScore) {
         missingCount += 1;
-      } else {
+      } else if (!isOverallProduction) {
         const numericScore = Number(rawScore);
         if (Number.isFinite(numericScore)) {
           categoryScores.push(numericScore);
@@ -85,6 +89,8 @@ function evaluateCompletion(
     const rangeStart = rawRangeStart ? Number(rawRangeStart) : null;
 
     if (
+      !isOverallProduction &&
+      eligible &&
       rangeStart != null &&
       categoryScores.length === categoryCriteria.length &&
       categoryCriteria.length > 0

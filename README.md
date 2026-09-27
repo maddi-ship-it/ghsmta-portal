@@ -67,9 +67,10 @@ For the complete production release, also configure these server-only values:
 - `ACCEPTD_API_TOKEN` — server-only Acceptd application pull access
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
 - `SMTP_FROM_NAME` and `SMTP_REPLY_TO` (optional)
-- `OPENAI_API_KEY` — voice dictation and handwritten-note scanning
+- `OPENAI_API_KEY` — voice dictation, handwritten-note scanning, and adjudication brain-dump sorting
 - `OPENAI_TRANSCRIBE_MODEL` (optional; defaults to `gpt-4o-mini-transcribe`)
 - `OPENAI_HANDWRITING_MODEL` (optional; defaults to `gpt-5.6-sol`)
+- `OPENAI_ADJUDICATION_SORT_MODEL` (optional; falls back to `OPENAI_MODEL`)
 - `ADOBE_SIGN_ADJUDICATOR_EMBED_URL` — adjudicator Adobe Sign Web Form URL
 - `ADOBE_SIGN_ADVISORY_MEMBER_EMBED_URL` — Advisory Committee Adobe Sign Web Form URL
 

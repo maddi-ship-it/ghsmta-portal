@@ -12,6 +12,10 @@ import {
 } from "@/lib/adjudication";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
+import {
+  calculateOverallProductionScore,
+  OVERALL_PRODUCTION_CATEGORY_KEY,
+} from "@/lib/adjudication-overall-score";
 import { requireProfile } from "@/lib/auth";
 import {
   isAssignedPanelNarrativeReviewer,
@@ -121,6 +125,19 @@ async function persistAdjudicatorScorecard(
 
   if (proposalError) throw new Error(proposalError.message);
 
+  const { data: scoreabilityData, error: scoreabilityError } = await supabase
+    .from("adjudication_category_scoreability")
+    .select("category_id,is_scoreable")
+    .eq("application_id", applicationId);
+
+  if (scoreabilityError) throw new Error(scoreabilityError.message);
+
+  const unscoreableCategoryIds = new Set(
+    (scoreabilityData ?? [])
+      .filter((decision) => decision.is_scoreable === false)
+      .map((decision) => decision.category_id),
+  );
+
   const officialProposalMap = new Map(
     (proposalData ?? []).map((proposal) => [proposal.category_id, proposal]),
   );
@@ -189,8 +206,16 @@ async function persistAdjudicatorScorecard(
   const scoreRows: Array<Record<string, unknown>> = [];
   const commentRows: Array<Record<string, unknown>> = [];
   const missing: string[] = [];
+  const sourceScores = new Map<string, number | null>();
 
   for (const category of categories) {
+    if (
+      category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY ||
+      unscoreableCategoryIds.has(category.id)
+    ) {
+      continue;
+    }
+
     const officialProposal = officialProposalMap.get(category.id);
     const usesEligibilityControl =
       formData.get(`eligibility_control_${category.id}`) === "1";
@@ -259,12 +284,10 @@ async function persistAdjudicatorScorecard(
     const commentRow: Record<string, unknown> = {
       scorecard_id: scorecard.id,
       category_id: category.id,
-      subject_name: isEligible
-        ? formText(formData, `subject_name_${category.id}`) ||
-          categorySubjectDefaults[category.category_key] ||
-          null
-        : null,
-      is_applicable: isEligible,
+      subject_name: formText(formData, `subject_name_${category.id}`) ||
+        categorySubjectDefaults[category.category_key] ||
+        null,
+      is_applicable: true,
       is_eligible: isEligible,
       not_applicable_reason: null,
       score_range_min: isEligible && validRange ? rangeMinimum : null,
@@ -297,18 +320,17 @@ async function persistAdjudicatorScorecard(
         );
       }
 
-      if (isEligible && validScore && numericScore != null) {
+      if (validScore && numericScore != null) {
         categoryNumericScores.push(numericScore);
       }
 
-      if (submit && isEligible && !validScore) {
+      if (submit && !validScore) {
         missing.push(`${category.title}: ${criterion.title} score`);
       }
 
       if (
         submit &&
         canComment &&
-        isEligible &&
         !richTextHasContent(observation)
       ) {
         missing.push(`${category.title}: ${criterion.title} observation`);
@@ -317,12 +339,16 @@ async function persistAdjudicatorScorecard(
       const scoreRow: Record<string, unknown> = {
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
-        score: isEligible && validScore ? numericScore : null,
+        score: validScore ? numericScore : null,
       };
       if (canComment) {
-        scoreRow.observation = isEligible ? observation || null : null;
+        scoreRow.observation = observation || null;
       }
       scoreRows.push(scoreRow);
+      sourceScores.set(
+        criterion.id,
+        validScore && numericScore != null ? numericScore : null,
+      );
     }
 
     if (
@@ -346,6 +372,66 @@ async function persistAdjudicatorScorecard(
           `${category.title}: category average must be within ${rangeMinimum.toFixed(2)}–${rangeMaximum.toFixed(2)}`,
         );
       }
+    }
+  }
+
+  const overallCategory = categories.find(
+    (category) =>
+      category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY,
+  );
+  if (overallCategory && !unscoreableCategoryIds.has(overallCategory.id)) {
+    const overallCriteria = criteria.filter(
+      (criterion) => criterion.category_id === overallCategory.id,
+    );
+    const overall = calculateOverallProductionScore({
+      categories,
+      criteria,
+      scores: sourceScores,
+      unscoreableCategoryIds,
+    });
+
+    if (
+      submit &&
+      (overall.score == null ||
+        overall.completedCategoryCount !== overall.scoreableCategoryCount)
+    ) {
+      missing.push("Overall Production: complete every scoreable category");
+    }
+
+    commentRows.push({
+      scorecard_id: scorecard.id,
+      category_id: overallCategory.id,
+      subject_name: null,
+      is_applicable: true,
+      is_eligible: true,
+      not_applicable_reason: null,
+      score_range_min: null,
+      score_range_max: null,
+      ...(canComment
+        ? {
+            private_notes:
+              formText(formData, `private_notes_${overallCategory.id}`) || null,
+          }
+        : {}),
+    });
+
+    for (const criterion of overallCriteria) {
+      const observation = sanitizeRichTextHtml(
+        formText(formData, `observation_${criterion.id}`),
+      );
+
+      if (submit && canComment && !richTextHasContent(observation)) {
+        missing.push(
+          `${overallCategory.title}: ${criterion.title} observation`,
+        );
+      }
+
+      scoreRows.push({
+        scorecard_id: scorecard.id,
+        criterion_id: criterion.id,
+        score: overall.score,
+        ...(canComment ? { observation: observation || null } : {}),
+      });
     }
   }
 

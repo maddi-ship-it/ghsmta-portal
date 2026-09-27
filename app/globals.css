@@ -3138,8 +3138,9 @@ html[data-theme="light"] .notification-popover-row.is-unread {
   }
 
   .portal-shell .portal-main .score-guide-panel {
-    top: calc(174px + env(safe-area-inset-top));
-    z-index: 27;
+    position: static;
+    top: auto;
+    z-index: auto;
     overflow-x: auto;
     overflow-y: hidden;
     border-radius: 9px;
@@ -14263,5 +14264,97 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 
   .portal-shell .portal-main .score-guide-panel .score-scale-grid small {
     -webkit-line-clamp: 1;
+  }
+}
+/* Initial adjudication capture and AI-assisted rubric sorting. */
+.adjudication-brain-dump {
+  overflow: hidden;
+}
+
+.adjudication-brain-dump-summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  list-style: none;
+  padding: 18px 22px;
+}
+
+.adjudication-brain-dump-summary::-webkit-details-marker {
+  display: none;
+}
+
+.adjudication-brain-dump-summary > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.adjudication-brain-dump-summary strong {
+  color: var(--portal-ivory, #101b35);
+  font-family: var(--font-display, Georgia, serif);
+  font-size: clamp(1.2rem, 2vw, 1.7rem);
+}
+
+.adjudication-brain-dump-summary-hint {
+  color: var(--portal-muted, #68738a);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.adjudication-brain-dump[open] .adjudication-brain-dump-summary {
+  border-bottom: 1px solid var(--portal-line, #d7dce7);
+}
+
+.adjudication-brain-dump-body {
+  display: grid;
+  gap: 14px;
+}
+
+.adjudication-brain-dump-input {
+  min-height: 190px;
+}
+
+.adjudication-brain-dump-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.adjudication-brain-dump-actions small {
+  color: var(--portal-muted, #68738a);
+}
+
+.adjudication-brain-dump-message {
+  margin: 0;
+}
+
+.derived-score-output {
+  align-items: center;
+  background: color-mix(in srgb, var(--portal-gold, #a77d19) 10%, transparent);
+  border: 1px solid var(--portal-line-strong, rgba(145, 108, 22, 0.34));
+  border-radius: 10px;
+  color: var(--portal-gold-bright, #85600e);
+  display: flex;
+  font-size: 1.05rem;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 9px 12px;
+}
+
+@media (max-width: 720px) {
+  .adjudication-brain-dump-summary {
+    align-items: flex-start;
+    padding: 14px 16px;
+  }
+
+  .adjudication-brain-dump-summary-hint {
+    font-size: 0;
+  }
+
+  .adjudication-brain-dump-summary-hint::after {
+    content: "Toggle";
+    font-size: 0.78rem;
   }
 }

@@ -11,6 +11,7 @@ import {
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
+import { AdjudicationBrainDump } from "@/components/adjudication-brain-dump";
 import { AdjudicationCategorySidebar } from "@/components/adjudication-category-sidebar";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
@@ -20,6 +21,7 @@ import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls"
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
+import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -665,10 +667,14 @@ export default async function AdjudicationApplicationPage({
   const scores = (scoresResult.data ?? []) as AdjudicationScore[];
   const comments = (commentsResult.data ?? []) as AdjudicationCategoryComment[];
 
-  const [proposalResult, reviewResult] = await Promise.all([
+  const [proposalResult, scoreabilityResult, reviewResult] = await Promise.all([
     supabase
       .from("adjudication_category_proposals")
       .select("*")
+      .eq("application_id", id),
+    supabase
+      .from("adjudication_category_scoreability")
+      .select("category_id,is_scoreable,reason")
       .eq("application_id", id),
     supabase
       .from("adjudication_reviews")
@@ -678,6 +684,7 @@ export default async function AdjudicationApplicationPage({
   ]);
 
   if (proposalResult.error) throw new Error(proposalResult.error.message);
+  if (scoreabilityResult.error) throw new Error(scoreabilityResult.error.message);
   if (reviewResult.error) throw new Error(reviewResult.error.message);
 
   const proposalIds = (proposalResult.data ?? []).map(
@@ -778,6 +785,39 @@ export default async function AdjudicationApplicationPage({
       proposal,
     ]),
   );
+  const categoryScoreability = (scoreabilityResult.data ?? []) as Array<{
+    category_id: string;
+    is_scoreable: boolean;
+    reason: string | null;
+  }>;
+  const unscoreableCategoryIds = new Set(
+    categoryScoreability
+      .filter((decision) => !decision.is_scoreable)
+      .map((decision) => decision.category_id),
+  );
+  const scoreableCategories = categories.filter(
+    (category) => !unscoreableCategoryIds.has(category.id),
+  );
+  const scoreableCategoryIds = new Set(
+    scoreableCategories.map((category) => category.id),
+  );
+  const scoreableCriteria = criteria.filter((criterion) =>
+    scoreableCategoryIds.has(criterion.category_id),
+  );
+  const decisionCategories = categories.filter(
+    (category) =>
+      category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
+  );
+  const visibleDecisionCategories =
+    profile.role === "adjudicator"
+      ? decisionCategories.filter(
+          (category) => !unscoreableCategoryIds.has(category.id),
+        )
+      : decisionCategories;
+  const narrativeCategories = scoreableCategories.filter(
+    (category) =>
+      category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
+  );
   const ownApprovalByProposal = new Map(
     (approvalResult.data ?? [])
       .filter((approval) => approval.adjudicator_user_id === profile.id)
@@ -785,7 +825,7 @@ export default async function AdjudicationApplicationPage({
   );
   const initiallyCompletedCategoryIds =
     isScoringParticipant
-      ? categories
+      ? scoreableCategories
           .filter((category) => {
             const proposal = proposalByCategory.get(category.id);
             const approval = proposal
@@ -800,6 +840,7 @@ export default async function AdjudicationApplicationPage({
                     ownScoreByCriterion.get(criterion.id)?.observation,
                 ),
               rangeApproved:
+                category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY ||
                 proposal?.status === "overridden" ||
                 approval?.response === "approved",
             });
@@ -865,15 +906,15 @@ export default async function AdjudicationApplicationPage({
           response: string;
           comment: string | null;
         }>}
-        categories={categories}
+        categories={visibleDecisionCategories}
         currentUserId={profile.id}
         narrativeAssignments={feedback.map((item) => ({
           category_id: item.category_id,
           assigned_to: item.assigned_to,
         }))}
         narrativesReady={
-          categories.length > 0 &&
-          categories.every((category) =>
+          narrativeCategories.length > 0 &&
+          narrativeCategories.every((category) =>
             panelApprovedCategoryIds.includes(category.id),
           )
         }
@@ -889,6 +930,7 @@ export default async function AdjudicationApplicationPage({
           advisory_note: string | null;
           owner_override_note: string | null;
         }>}
+        scoreability={categoryScoreability}
         review={reviewResult.data as { status: string; owner_note: string | null } | null}
         panelReviewers={panelNarrativeReviewers}
         role={profile.role}
@@ -898,7 +940,7 @@ export default async function AdjudicationApplicationPage({
 
       <div className="adjudication-score-layout">
         <AdjudicationCategorySidebar
-          categories={categories}
+          categories={scoreableCategories}
           initialCompletedCategoryIds={initiallyCompletedCategoryIds}
           showCompletion={isScoringParticipant}
         />
@@ -911,6 +953,12 @@ export default async function AdjudicationApplicationPage({
             applicationId={id}
             disabled={readOnly}
           />
+          <AdjudicationBrainDump
+            applicationId={id}
+            canComment={canComment}
+            defaultValue={ownScorecard?.internal_notes}
+            readOnly={readOnly}
+          />
           <section className="panel score-guide-panel">
             <div className="panel-header"><div><h2>Scoring guide</h2><p>Use the 1–10 scale in 0.25-point increments. Scores remain private to you, advisory members, and owners.</p></div></div>
             <div className="score-scale-grid">
@@ -920,9 +968,9 @@ export default async function AdjudicationApplicationPage({
 
           <CollaborativeAdjudicatorScorecard
             applicationId={id}
-            categories={categories}
+            categories={scoreableCategories}
             categorySubjectDefaults={categorySubjectDefaults}
-            criteria={criteria}
+            criteria={scoreableCriteria}
             currentUserId={profile.id}
             currentUserName={profile.full_name ?? profile.email ?? "Adjudicator"}
             initialPanelRows={(sharedObservationResult.data ?? []) as Array<{
@@ -961,28 +1009,13 @@ export default async function AdjudicationApplicationPage({
             scoreOptions={scoreChoices}
           />
 
-          <section className="panel">
-            <div className="panel-body">
-              <div className="field">
-                <label htmlFor={canComment ? "scorecard_internal_notes" : undefined}>Overall private notes</label>
-                {canComment ? (
-                  <textarea className="textarea" id="scorecard_internal_notes" name="scorecard_internal_notes" defaultValue={ownScorecard?.internal_notes ?? ""} disabled={readOnly} />
-                ) : (
-                  <div className="comment-readonly-surface">
-                    {ownScorecard?.internal_notes || "No private notes were entered before commenting was disabled."}
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-
           {!readOnly && (
             <div className="application-action-bar scorecard-action-bar">
               <ScorecardSubmitControls
                 applicationId={id}
-                categories={categories}
+                categories={scoreableCategories}
                 requireComments={canComment}
-                criteria={criteria}
+                criteria={scoreableCriteria}
               />
             </div>
           )}
@@ -991,8 +1024,8 @@ export default async function AdjudicationApplicationPage({
           <OwnerLiveAdjudicationReview
             applicationId={id}
             isOwner={false}
-            categories={categories}
-            criteria={criteria}
+            categories={scoreableCategories}
+            criteria={scoreableCriteria}
             assignments={assignments}
             profiles={adjudicatorProfiles}
             initialScorecards={scorecards}
@@ -1029,7 +1062,7 @@ export default async function AdjudicationApplicationPage({
             <PanelNarrativeWorkflow
               applicationId={id}
               canComment={canComment}
-              categories={categories}
+              categories={narrativeCategories}
               currentUserId={profile.id}
               feedback={panelVisibleFeedback}
               panelReviewers={panelNarrativeReviewers}
@@ -1052,8 +1085,8 @@ export default async function AdjudicationApplicationPage({
           <OwnerLiveAdjudicationReview
             applicationId={id}
             isOwner={profile.role === "owner"}
-            categories={categories}
-            criteria={criteria}
+            categories={scoreableCategories}
+            criteria={scoreableCriteria}
             assignments={assignments}
             profiles={adjudicatorProfiles}
             initialScorecards={scorecards}

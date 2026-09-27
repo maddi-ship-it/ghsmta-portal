@@ -96,7 +96,11 @@ export function CategoryScoringControls({
         />
         <span>
           <strong>Eligible</strong>
-          <small>{locked ? "Set by Advisory Committee" : "Include this category in scoring"}</small>
+          <small>
+            {locked
+              ? "Award eligibility set by Advisory Committee"
+              : "Qualifies for this award category"}
+          </small>
         </span>
       </label>
 

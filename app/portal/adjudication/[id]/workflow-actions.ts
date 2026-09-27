@@ -263,6 +263,11 @@ export async function saveAllCategoryProposals(
         text(formData, `override_note_${categoryId}`) || null,
     };
   });
+  const scoreabilityDecisions = categoryIds.map((categoryId) => ({
+    category_id: categoryId,
+    is_scoreable: formData.get(`scoreable_${categoryId}`) === "on",
+    reason: text(formData, `scoreability_reason_${categoryId}`) || null,
+  }));
 
   const supabase = await createClient();
   const { data: canReview, error: accessError } = await supabase.rpc(
@@ -293,20 +298,32 @@ export async function saveAllCategoryProposals(
     };
   }
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from("adjudication_category_proposals")
-    .select(
-      "id,category_id,proposed_by,is_eligible,range_min,range_max,status,advisory_note,owner_override_note,approved_at",
-    )
-    .eq("application_id", applicationId)
-    .in("category_id", categoryIds);
+  const [existingProposalResult, existingScoreabilityResult] =
+    await Promise.all([
+      supabase
+        .from("adjudication_category_proposals")
+        .select(
+          "id,category_id,proposed_by,is_eligible,range_min,range_max,status,advisory_note,owner_override_note,approved_at",
+        )
+        .eq("application_id", applicationId)
+        .in("category_id", categoryIds),
+      supabase
+        .from("adjudication_category_scoreability")
+        .select("category_id,is_scoreable,reason")
+        .eq("application_id", applicationId)
+        .in("category_id", categoryIds),
+    ]);
 
-  if (existingError) {
+  if (existingProposalResult.error || existingScoreabilityResult.error) {
     logEvent("error", "adjudication.category_proposal_load_failed", {
       applicationId,
       actorId: profile.id,
-      code: existingError.code,
-      message: existingError.message,
+      code:
+        existingProposalResult.error?.code ??
+        existingScoreabilityResult.error?.code,
+      message:
+        existingProposalResult.error?.message ??
+        existingScoreabilityResult.error?.message,
     });
     return {
       ok: false,
@@ -316,9 +333,14 @@ export async function saveAllCategoryProposals(
   }
 
   const existingByCategory = new Map(
-    ((existingRows ?? []) as ExistingCategoryProposal[]).map((proposal) => [
-      proposal.category_id,
-      proposal,
+    ((existingProposalResult.data ?? []) as ExistingCategoryProposal[]).map(
+      (proposal) => [proposal.category_id, proposal],
+    ),
+  );
+  const existingScoreabilityByCategory = new Map(
+    (existingScoreabilityResult.data ?? []).map((row) => [
+      row.category_id,
+      row,
     ]),
   );
   const changedDecisions = decisions.filter((decision) =>
@@ -328,6 +350,13 @@ export async function saveAllCategoryProposals(
       profile.role,
     ),
   );
+  const changedScoreability = scoreabilityDecisions.filter((decision) => {
+    const existing = existingScoreabilityByCategory.get(decision.category_id);
+    return existing
+      ? existing.is_scoreable !== decision.is_scoreable ||
+          existing.reason !== decision.reason
+      : !decision.is_scoreable || decision.reason != null;
+  });
 
   if (
     changedDecisions.some(
@@ -358,7 +387,7 @@ export async function saveAllCategoryProposals(
     };
   }
 
-  if (changedDecisions.length === 0) {
+  if (changedDecisions.length === 0 && changedScoreability.length === 0) {
     return {
       ok: true,
       changedCount: 0,
@@ -367,53 +396,87 @@ export async function saveAllCategoryProposals(
     };
   }
 
-  const { data, error } = await supabase.rpc(
-    "save_all_adjudication_category_proposals",
-    {
-      p_application_id: applicationId,
-      p_decisions: changedDecisions,
-    },
-  );
+  let changedCount = 0;
+  if (changedDecisions.length > 0) {
+    const { data, error } = await supabase.rpc(
+      "save_all_adjudication_category_proposals",
+      {
+        p_application_id: applicationId,
+        p_decisions: changedDecisions,
+      },
+    );
 
-  let changedCount = Number(data ?? 0);
-  if (error) {
-    if (error.message === ACTIVE_APPLICATION_ERROR) {
-      try {
-        changedCount = await saveAssignedWorkspaceCategoryProposals({
+    changedCount = Number(data ?? 0);
+    if (error) {
+      if (error.message === ACTIVE_APPLICATION_ERROR) {
+        try {
+          changedCount = await saveAssignedWorkspaceCategoryProposals({
+            applicationId,
+            actorId: profile.id,
+            actorRole: profile.role,
+            decisions: changedDecisions,
+          });
+        } catch (fallbackError) {
+          const message =
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : "Unable to save the category decisions.";
+          logEvent("error", "adjudication.category_proposal_fallback_failed", {
+            applicationId,
+            actorId: profile.id,
+            message,
+          });
+          return {
+            ok: false,
+            error: message,
+            attemptId,
+          };
+        }
+      } else {
+        logEvent("error", "adjudication.category_proposal_save_failed", {
           applicationId,
           actorId: profile.id,
-          actorRole: profile.role,
-          decisions: changedDecisions,
-        });
-      } catch (fallbackError) {
-        const message =
-          fallbackError instanceof Error
-            ? fallbackError.message
-            : "Unable to save the category decisions.";
-        logEvent("error", "adjudication.category_proposal_fallback_failed", {
-          applicationId,
-          actorId: profile.id,
-          message,
+          code: error.code,
+          message: error.message,
         });
         return {
           ok: false,
-          error: message,
+          error: error.message,
           attemptId,
         };
       }
-    } else {
-      logEvent("error", "adjudication.category_proposal_save_failed", {
+    }
+  }
+
+  if (changedScoreability.length > 0) {
+    const { error: scoreabilityError } = await supabase
+      .from("adjudication_category_scoreability")
+      .upsert(
+        changedScoreability.map((decision) => ({
+          application_id: applicationId,
+          category_id: decision.category_id,
+          is_scoreable: decision.is_scoreable,
+          reason: decision.reason,
+          marked_by: profile.id,
+        })),
+        { onConflict: "application_id,category_id" },
+      );
+
+    if (scoreabilityError) {
+      logEvent("error", "adjudication.category_scoreability_save_failed", {
         applicationId,
         actorId: profile.id,
-        code: error.code,
-        message: error.message,
+        code: scoreabilityError.code,
+        message: scoreabilityError.message,
       });
       return {
         ok: false,
-        error: error.message,
+        error: "The scoreability settings could not be saved.",
         attemptId,
       };
     }
+
+    changedCount += changedScoreability.length;
   }
 
   try {

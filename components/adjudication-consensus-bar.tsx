@@ -44,6 +44,12 @@ type NarrativeAssignment = {
   assigned_to: string | null;
 };
 
+type CategoryScoreability = {
+  category_id: string;
+  is_scoreable: boolean;
+  reason: string | null;
+};
+
 type CategoryApproval = {
   id: string;
   proposal_id: string;
@@ -72,6 +78,7 @@ export function AdjudicationConsensusBar({
   narrativesReady,
   panelReviewers,
   proposals,
+  scoreability,
   review,
   role,
   currentUserId,
@@ -83,6 +90,7 @@ export function AdjudicationConsensusBar({
   currentUserId: string;
   categories: ScoringCategory[];
   proposals: Proposal[];
+  scoreability: CategoryScoreability[];
   approvals: CategoryApproval[];
   review: Review;
   narrativesReady: boolean;
@@ -104,6 +112,13 @@ export function AdjudicationConsensusBar({
   const proposalByCategory = useMemo(
     () => new Map(proposals.map((proposal) => [proposal.category_id, proposal])),
     [proposals],
+  );
+  const scoreabilityByCategory = useMemo(
+    () =>
+      new Map(
+        scoreability.map((decision) => [decision.category_id, decision]),
+      ),
+    [scoreability],
   );
   const assignmentByCategory = useMemo(
     () =>
@@ -168,7 +183,7 @@ export function AdjudicationConsensusBar({
       {!compact ? (
       <div className="adjudication-consensus-bar consolidated-consensus-bar">
         <div className="consensus-summary">
-          <strong>Eligibility &amp; two-point ranges</strong>
+          <strong>Eligibility, scoreability &amp; two-point ranges</strong>
           <span
             className={unresolved ? "badge badge-warning" : "badge badge-complete"}
           >
@@ -438,7 +453,7 @@ export function AdjudicationConsensusBar({
               <div className="modal-header sticky-modal-header">
                 <div>
                   <p className="eyebrow">Advisory Committee review</p>
-                  <h2>Eligibility, ranges &amp; final comments</h2>
+                  <h2>Eligibility, scoreability, ranges &amp; final comments</h2>
                   <p>
                     Set category decisions and assign each final comment before
                     the Owner sends it to the panel.
@@ -481,6 +496,7 @@ export function AdjudicationConsensusBar({
                     <tr>
                       <th>Category</th>
                       <th>Eligible</th>
+                      <th>Scoreable</th>
                       <th>Two-point range</th>
                       <th>Final comment reviewer</th>
                       <th>Status</th>
@@ -491,6 +507,8 @@ export function AdjudicationConsensusBar({
                   <tbody>
                     {categories.map((category) => {
                       const proposal = proposalByCategory.get(category.id);
+                      const scoreabilityDecision =
+                        scoreabilityByCategory.get(category.id);
                       const assigneeId = assignmentByCategory.get(category.id);
                       const assignedReviewer = assigneeId
                         ? reviewerById.get(assigneeId)
@@ -524,6 +542,28 @@ export function AdjudicationConsensusBar({
                               />
                               <span>Eligible</span>
                             </label>
+                          </td>
+                          <td>
+                            <label className="switch-control">
+                              <input
+                                defaultChecked={
+                                  scoreabilityDecision?.is_scoreable ?? true
+                                }
+                                name={`scoreable_${category.id}`}
+                                type="checkbox"
+                              />
+                              <span>Scoreable</span>
+                            </label>
+                            <input
+                              className="input input-compact"
+                              defaultValue={scoreabilityDecision?.reason ?? ""}
+                              name={`scoreability_reason_${category.id}`}
+                              placeholder="Optional reason"
+                            />
+                            <small className="field-help">
+                              Non-scoreable categories are hidden and excluded
+                              from Overall Production.
+                            </small>
                           </td>
                           <td>
                             <select

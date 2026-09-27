@@ -18,6 +18,11 @@ import {
   ADJUDICATION_CATEGORY_COMPLETION_EVENT,
   isAdjudicationCategoryComplete,
 } from "@/lib/adjudication-category-completion";
+import {
+  calculateOverallProductionScore,
+  OVERALL_PRODUCTION_CATEGORY_KEY,
+  type OverallProductionScore,
+} from "@/lib/adjudication-overall-score";
 import { createClient } from "@/lib/supabase/client";
 import { roundScoreAverage } from "@/lib/adjudication";
 import {
@@ -369,6 +374,8 @@ function CategoryScoreSection({
   readOnly,
   currentUserId,
   commentColumnsStyle,
+  overallProductionScore,
+  onScoreChange,
 }: {
   category: ScoringCategory;
   categoryIndex: number;
@@ -390,7 +397,11 @@ function CategoryScoreSection({
   readOnly: boolean;
   currentUserId: string;
   commentColumnsStyle: CSSProperties;
+  overallProductionScore: OverallProductionScore;
+  onScoreChange: (criterionId: string, value: number | null) => void;
 }) {
+  const isOverallProduction =
+    category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
   const initialEligible =
     officialProposal?.is_eligible ??
     categoryComment?.is_eligible ??
@@ -458,7 +469,9 @@ function CategoryScoreSection({
     numericScores.length === categoryCriteria.length;
 
   const average =
-    numericScores.length === 0
+    isOverallProduction
+      ? overallProductionScore.score
+      : numericScores.length === 0
       ? null
       : roundScoreAverage(
           numericScores.reduce((sum, score) => sum + score, 0) /
@@ -481,7 +494,8 @@ function CategoryScoreSection({
       : Number((currentDecision.rangeStart + 2).toFixed(2));
 
   const rangeMismatch = Boolean(
-    currentDecision.eligible &&
+    !isOverallProduction &&
+      currentDecision.eligible &&
       allScoresEntered &&
       average != null &&
       currentDecision.rangeStart != null &&
@@ -511,6 +525,13 @@ function CategoryScoreSection({
       ...current,
       [criterionId]: nextValue,
     }));
+    const numericValue = nextValue ? Number(nextValue) : null;
+    onScoreChange(
+      criterionId,
+      numericValue != null && Number.isFinite(numericValue)
+        ? numericValue
+        : null,
+    );
   };
 
   const updateComment = (criterionId: string, nextValue: string) => {
@@ -557,7 +578,8 @@ function CategoryScoreSection({
     comments: categoryCriteria.map(
       (criterion) => commentValues[criterion.id],
     ),
-    rangeApproved: decisionResponseState === "approved",
+    rangeApproved:
+      isOverallProduction || decisionResponseState === "approved",
   });
 
   useEffect(() => {
@@ -606,17 +628,30 @@ function CategoryScoreSection({
         </div>
 
         <div className="scoring-category-header-actions">
-          <CategoryAverageSummary
-            allScoresEntered={allScoresEntered}
-            average={average}
-            decision={currentDecision}
-            onReviewScores={() => {
-              setExpanded(true);
-              setReviewOpen(true);
-            }}
-            rangeMismatch={rangeMismatch}
-          />
+          {isOverallProduction ? (
+            <div className="category-average-summary category-overall-summary">
+              <span>Your derived overall score</span>
+              <strong>{formatAverage(overallProductionScore.score)}</strong>
+              <small>
+                Based on {overallProductionScore.completedCategoryCount} of{" "}
+                {overallProductionScore.scoreableCategoryCount} scoreable
+                categories
+              </small>
+            </div>
+          ) : (
+            <CategoryAverageSummary
+              allScoresEntered={allScoresEntered}
+              average={average}
+              decision={currentDecision}
+              onReviewScores={() => {
+                setExpanded(true);
+                setReviewOpen(true);
+              }}
+              rangeMismatch={rangeMismatch}
+            />
+          )}
 
+          {!isOverallProduction && (
           <div className="category-decision-controls-stack">
             <CategoryScoringControls
               categoryId={category.id}
@@ -694,6 +729,7 @@ function CategoryScoreSection({
                 )}
             </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -866,6 +902,14 @@ function CategoryScoreSection({
 
                 <div className="personal-score-column">
                   <label htmlFor={`score_${criterion.id}`}>Your score</label>
+                  {isOverallProduction ? (
+                    <output
+                      aria-label="Automatically calculated overall production score"
+                      className="derived-score-output"
+                    >
+                      {formatAverage(overallProductionScore.score)}
+                    </output>
+                  ) : (
                   <select
                     className="select score-select"
                     disabled={readOnly}
@@ -885,13 +929,14 @@ function CategoryScoreSection({
                       </option>
                     ))}
                   </select>
+                  )}
                 </div>
               </article>
             );
           })}
         </div>
 
-        <InlinePanelNarrativeReview
+        {!isOverallProduction && <InlinePanelNarrativeReview
           applicationId={applicationId}
           assignedReviewerName={assignedReviewerName}
           canComment={canComment}
@@ -901,7 +946,7 @@ function CategoryScoreSection({
           key={`${category.id}:${panelFeedback?.updated_at ?? "waiting"}`}
           panelApproved={panelApproved}
           reviewStatus={reviewStatus}
-        />
+        />}
 
         <details className="private-category-notes">
           <summary>Optional private category notes</summary>
@@ -931,7 +976,7 @@ function CategoryScoreSection({
 
       </div>
 
-      {reviewOpen && !readOnly && (
+      {reviewOpen && !readOnly && !isOverallProduction && (
         <div
           className="score-range-modal-backdrop"
           onMouseDown={(event) => {
@@ -1077,6 +1122,13 @@ export function CollaborativeAdjudicatorScorecard({
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [refreshError, setRefreshError] = useState(false);
   const [liveConnection, setLiveConnection] = useState(false);
+  const [liveOwnScoreValues, setLiveOwnScoreValues] = useState<
+    Record<string, number | null>
+  >(() =>
+    Object.fromEntries(
+      ownScores.map((score) => [score.criterion_id, score.score]),
+    ),
+  );
   const refreshTimer = useRef<number | null>(null);
 
   const refreshWorkspace = useCallback(async () => {
@@ -1208,6 +1260,26 @@ export function CollaborativeAdjudicatorScorecard({
     [ownScores],
   );
 
+  const overallProductionScore = useMemo(
+    () =>
+      calculateOverallProductionScore({
+        categories,
+        criteria,
+        scores: new Map(Object.entries(liveOwnScoreValues)),
+      }),
+    [categories, criteria, liveOwnScoreValues],
+  );
+
+  const updateLiveOwnScore = useCallback(
+    (criterionId: string, value: number | null) => {
+      setLiveOwnScoreValues((current) => ({
+        ...current,
+        [criterionId]: value,
+      }));
+    },
+    [],
+  );
+
   const ownCommentMap = useMemo(
     () =>
       new Map(
@@ -1304,6 +1376,8 @@ export function CollaborativeAdjudicatorScorecard({
           canComment={canComment}
           readOnly={readOnly}
           scoreOptions={scoreOptions}
+          overallProductionScore={overallProductionScore}
+          onScoreChange={updateLiveOwnScore}
         />
       ))}
     </>

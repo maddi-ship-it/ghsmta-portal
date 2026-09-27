@@ -10,6 +10,10 @@ import {
   richTextHasContent,
   sanitizeRichTextHtml,
 } from "@/lib/rich-text";
+import {
+  APPLY_ADJUDICATION_BRAIN_DUMP_EVENT,
+  type ApplyAdjudicationBrainDumpDetail,
+} from "@/lib/adjudication-brain-dump";
 
 type RichTextCommand =
   | "bold"
@@ -112,6 +116,50 @@ export function RichTextField({
       window.removeEventListener("ghsmta:offline-draft-restore", restoreDraftValue);
     };
   }, [name]);
+
+  useEffect(() => {
+    if (!name.startsWith("observation_") || disabled) {
+      return;
+    }
+
+    const applySortedNotes = (event: Event) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const detail = (event as CustomEvent<ApplyAdjudicationBrainDumpDetail>)
+        .detail;
+      const criterionId = name.slice("observation_".length);
+      const assignment = detail?.assignments?.find(
+        (item) => item.criterionId === criterionId,
+      );
+      if (!assignment?.text.trim()) return;
+
+      const addition = sanitizeRichTextHtml(assignment.text);
+      const current = sanitizeRichTextHtml(editor.innerHTML);
+      const nextValue = richTextHasContent(current)
+        ? `${current}${addition}`
+        : addition;
+
+      editor.innerHTML = nextValue;
+      setValue(nextValue);
+      onValueChange?.(nextValue);
+      window.setTimeout(() => {
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      }, 0);
+    };
+
+    window.addEventListener(
+      APPLY_ADJUDICATION_BRAIN_DUMP_EVENT,
+      applySortedNotes,
+    );
+
+    return () => {
+      window.removeEventListener(
+        APPLY_ADJUDICATION_BRAIN_DUMP_EVENT,
+        applySortedNotes,
+      );
+    };
+  }, [disabled, name, onValueChange]);
 
   const syncValue = () => {
     const editor = editorRef.current;
