@@ -17,11 +17,17 @@ import {
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
 import { requireProfile } from "@/lib/auth";
+import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import {
   isAssignedPanelNarrativeReviewer,
   resolveGeneratedNarrativeFinal,
   shouldRefreshGeneratedNarrative,
 } from "@/lib/panel-narrative";
+import {
+  buildScoringGuideContext,
+  calculateLivePanelCategoryAverage,
+  resolvePanelCommentScoringContext,
+} from "@/lib/panel-comment-context";
 import { resolvePanelCommentModel } from "@/lib/panel-comment-model";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,8 +40,11 @@ import type {
   Application,
   ApplicationAnswer,
   ApplicationQuestion,
+  AwardCycle,
   ScoringCategory,
   ScoringCriterion,
+  ScoringRubric,
+  ScoringScaleLevel,
 } from "@/lib/types";
 
 function formText(formData: FormData, name: string) {
@@ -617,24 +626,74 @@ async function generatePanelCommentDraft(
   if (applicationError || !applicationData) throw new Error("Application not found.");
   const application = applicationData as Application;
 
-  const [{ data: categoryData }, { data: criteriaData }, { data: cardsData }] = await Promise.all([
+  const [
+    categoryResult,
+    criteriaResult,
+    cardsResult,
+    assignmentsResult,
+    cycleResult,
+    applicationDetails,
+  ] = await Promise.all([
     admin.from("scoring_categories").select("*").eq("id", categoryId).single(),
-    admin.from("scoring_criteria").select("*").eq("category_id", categoryId).eq("active", true).order("sort_order"),
-    admin.from("adjudication_scorecards").select("*").eq("application_id", applicationId).in("status", ["draft", "reopened", "submitted", "locked"]),
+    admin
+      .from("scoring_criteria")
+      .select("*")
+      .eq("category_id", categoryId)
+      .eq("active", true)
+      .order("sort_order"),
+    admin
+      .from("adjudication_scorecards")
+      .select("*")
+      .eq("application_id", applicationId)
+      .in("status", ["draft", "reopened", "submitted", "locked"]),
+    admin
+      .from("adjudicator_assignments")
+      .select("id")
+      .eq("application_id", applicationId)
+      .is("removed_at", null),
+    admin.from("award_cycles").select("*").eq("id", application.cycle_id).single(),
+    loadBillingApplicationDetails(admin, [application]),
   ]);
 
-  if (!categoryData) throw new Error("Scoring category not found.");
+  if (categoryResult.error || !categoryResult.data) {
+    throw new Error(categoryResult.error?.message ?? "Scoring category not found.");
+  }
+  if (criteriaResult.error) throw new Error(criteriaResult.error.message);
+  if (cardsResult.error) throw new Error(cardsResult.error.message);
+  if (assignmentsResult.error) throw new Error(assignmentsResult.error.message);
+  if (cycleResult.error || !cycleResult.data) {
+    throw new Error(cycleResult.error?.message ?? "Award cycle not found.");
+  }
+
+  const categoryData = categoryResult.data;
   const category = categoryData as ScoringCategory;
-  const { data: categoryRubric, error: categoryRubricError } = await admin
-    .from("scoring_rubrics")
-    .select("cycle_id")
-    .eq("id", category.rubric_id)
-    .single();
-  if (categoryRubricError || categoryRubric?.cycle_id !== application.cycle_id) {
+  const [rubricResult, scaleResult] = await Promise.all([
+    admin.from("scoring_rubrics").select("*").eq("id", category.rubric_id).single(),
+    admin
+      .from("scoring_scale_levels")
+      .select("*")
+      .eq("rubric_id", category.rubric_id)
+      .order("score", { ascending: false }),
+  ]);
+  if (
+    rubricResult.error ||
+    !rubricResult.data ||
+    rubricResult.data.cycle_id !== application.cycle_id
+  ) {
     throw new Error("This scoring category does not belong to the application.");
   }
-  const criteria = (criteriaData ?? []) as ScoringCriterion[];
-  const scorecards = (cardsData ?? []) as AdjudicationScorecard[];
+  if (scaleResult.error) throw new Error(scaleResult.error.message);
+
+  const activeAssignmentIds = new Set(
+    (assignmentsResult.data ?? []).map((assignment) => assignment.id),
+  );
+  const criteria = (criteriaResult.data ?? []) as ScoringCriterion[];
+  const scorecards = ((cardsResult.data ?? []) as AdjudicationScorecard[]).filter(
+    (scorecard) => activeAssignmentIds.has(scorecard.assignment_id),
+  );
+  const cycle = cycleResult.data as AwardCycle;
+  const rubric = rubricResult.data as ScoringRubric;
+  const scaleLevels = (scaleResult.data ?? []) as ScoringScaleLevel[];
   if (scorecards.length === 0) throw new Error("No adjudicator scorecards are available.");
 
   const scorecardIds = scorecards.map((card) => card.id);
@@ -718,10 +777,26 @@ async function generatePanelCommentDraft(
     prompt = globalPromptData as AiPromptTemplate;
   }
 
+  const panelAverage = calculateLivePanelCategoryAverage(
+    category.id,
+    criteria,
+    scorecards,
+    scores,
+  );
+  const scoringContext = resolvePanelCommentScoringContext({
+    selectedTrack: applicationDetails.get(application.id)?.selectedTrack ?? null,
+    cycleProgramType: cycle.program_type,
+    panelAverage,
+  });
+
   const userPrompt = applyPromptTemplate(prompt.user_prompt_template, {
     school_name: application.school_name,
     production_title: application.production_title ?? "Untitled production",
     category_title: category.title,
+    program_track: scoringContext.programTrack,
+    scoring_mode: scoringContext.scoringMode,
+    average_panel_score: scoringContext.averagePanelScore,
+    scoring_guide: buildScoringGuideContext(rubric, scaleLevels),
     criteria: criterionText,
     raw_comments: rawComments,
   });
@@ -740,6 +815,15 @@ async function generatePanelCommentDraft(
         { role: "system", content: prompt.system_prompt },
         { role: "user", content: userPrompt },
       ],
+      text: {
+        format: { type: "text" },
+        verbosity: "high",
+      },
+      reasoning: {
+        effort: "high",
+        mode: "pro",
+        summary: null,
+      },
     }),
   });
 

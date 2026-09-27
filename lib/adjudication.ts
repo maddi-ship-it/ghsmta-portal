@@ -6,7 +6,7 @@ import type {
   ScoringCriterion,
 } from "@/lib/types";
 
-import { richTextToPlainText } from "@/lib/rich-text";
+import { richTextToPlainText } from "./rich-text";
 
 
 export const SCORE_AVERAGE_DECIMALS = 5;
@@ -133,52 +133,82 @@ export function buildCommentContext(
     )
     .join("\n");
 
-  const rawComments = comments
-    .filter((comment) => comment.is_applicable)
-    .map((comment, index) => {
-      const observations = categoryCriteria
-        .map((criterion) => {
-          const observation = richTextToPlainText(
-            scores.find(
-              (score) =>
-                score.scorecard_id === comment.scorecard_id &&
-                score.criterion_id === criterion.id,
-            )?.observation,
-          );
+  const applicableComments = comments.filter((comment) => comment.is_applicable);
+  const adjudicatorNumberByScorecard = new Map(
+    applicableComments.map((comment, index) => [comment.scorecard_id, index + 1]),
+  );
 
-          return observation
-            ? `- ${criterion.title}: ${observation}`
-            : null;
-        })
-        .filter(Boolean)
-        .join("\n");
+  const criterionEvidence = categoryCriteria.map((criterion) => {
+    const observations = applicableComments
+      .map((comment) => {
+        const observation = richTextToPlainText(
+          scores.find(
+            (score) =>
+              score.scorecard_id === comment.scorecard_id &&
+              score.criterion_id === criterion.id,
+          )?.observation,
+        );
+        if (!observation) return null;
 
+        const roleMatch = comment.subject_name
+          ?.trim()
+          .match(/\(([^()]+)\)\s*$/);
+        const roleContext = roleMatch?.[1]
+          ? ` · Role: ${roleMatch[1].trim()}`
+          : "";
+
+        return `- Adjudicator ${adjudicatorNumberByScorecard.get(comment.scorecard_id)}${roleContext}: ${observation}`;
+      })
+      .filter((observation): observation is string => Boolean(observation));
+
+    return { criterion, observations };
+  });
+
+  const categoryEvidence = applicableComments
+    .map((comment) => {
+      const richTextPart = (label: string, value: string | null) => {
+        const text = richTextToPlainText(value);
+        return text ? `${label}: ${text}` : null;
+      };
+      const roleMatch = comment.subject_name
+        ?.trim()
+        .match(/\(([^()]+)\)\s*$/);
       const parts = [
-        comment.subject_name ? `Subject: ${comment.subject_name}` : null,
-        observations ? `Criterion observations:\n${observations}` : null,
-        comment.successes
-          ? `Successes: ${richTextToPlainText(comment.successes)}`
-          : null,
-        comment.success_examples
-          ? `Success examples: ${richTextToPlainText(
-              comment.success_examples,
-            )}`
-          : null,
-        comment.growth_areas
-          ? `Opportunities for growth: ${richTextToPlainText(
-              comment.growth_areas,
-            )}`
-          : null,
-        comment.growth_examples
-          ? `Growth examples: ${richTextToPlainText(
-              comment.growth_examples,
-            )}`
-          : null,
-      ].filter(Boolean);
+        roleMatch?.[1] ? `Role: ${roleMatch[1].trim()}` : null,
+        richTextPart("Successes", comment.successes),
+        richTextPart("Success examples", comment.success_examples),
+        richTextPart("Opportunities for growth", comment.growth_areas),
+        richTextPart("Growth examples", comment.growth_examples),
+      ].filter((part): part is string => Boolean(part));
 
-      return `Adjudicator ${index + 1}\n${parts.join("\n")}`;
+      return parts.length
+        ? `Adjudicator ${adjudicatorNumberByScorecard.get(comment.scorecard_id)}\n${parts.join("\n")}`
+        : null;
     })
-    .join("\n\n");
+    .filter((entry): entry is string => Boolean(entry));
+
+  const hasEvidence =
+    criterionEvidence.some(({ observations }) => observations.length > 0) ||
+    categoryEvidence.length > 0;
+
+  const rawComments = hasEvidence
+    ? [
+        "CRITERION-SPECIFIC OBSERVATIONS",
+        ...criterionEvidence.map(
+          ({ criterion, observations }) =>
+            `Criterion: ${criterion.title}\n${
+              observations.length
+                ? observations.join("\n")
+                : "- No criterion-specific observation was supplied."
+            }`,
+        ),
+        categoryEvidence.length
+          ? `ADDITIONAL CATEGORY EVIDENCE\n${categoryEvidence.join("\n\n")}`
+          : null,
+      ]
+        .filter((section): section is string => Boolean(section))
+        .join("\n\n")
+    : "";
 
   return { criterionText, rawComments };
 }

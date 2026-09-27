@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { requireProfile } from "@/lib/auth";
+import { DEFAULT_PANEL_COMMENT_USER_TEMPLATE } from "@/lib/panel-comment-context";
 import { DEFAULT_PANEL_COMMENT_MODEL } from "@/lib/panel-comment-model";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -19,15 +20,6 @@ import {
   removeAdjudicatorAssignment,
   saveAiPrompt,
 } from "./actions";
-
-const defaultUserTemplate = `SCHOOL: {{school_name}}
-PRODUCTION: {{production_title}}
-CATEGORY: {{category_title}}
-CRITERIA:
-{{criteria}}
-
-ADJUDICATOR OBSERVATIONS:
-{{raw_comments}}`;
 
 export default async function ScoringAdminPage({
   searchParams,
@@ -236,8 +228,8 @@ export default async function ScoringAdminPage({
             </div>
             <div className="field">
               <label htmlFor="user_prompt_template">User prompt template</label>
-              <textarea className="textarea prompt-textarea" id="user_prompt_template" name="user_prompt_template" defaultValue={latestGlobalPrompt?.user_prompt_template ?? defaultUserTemplate} required />
-              <small className="field-help">Available placeholders: {"{{school_name}}"}, {"{{production_title}}"}, {"{{category_title}}"}, {"{{criteria}}"}, and {"{{raw_comments}}"}.</small>
+              <textarea className="textarea prompt-textarea" id="user_prompt_template" name="user_prompt_template" defaultValue={latestGlobalPrompt?.user_prompt_template ?? DEFAULT_PANEL_COMMENT_USER_TEMPLATE} required />
+              <small className="field-help">Available placeholders: {"{{school_name}}"}, {"{{production_title}}"}, {"{{category_title}}"}, {"{{program_track}}"}, {"{{scoring_mode}}"}, {"{{average_panel_score}}"}, {"{{scoring_guide}}"}, {"{{criteria}}"}, and {"{{raw_comments}}"}. Both prompt fields remain fully editable.</small>
             </div>
             <button className="button button-dark" type="submit">Save AI prompt</button>
           </form>
