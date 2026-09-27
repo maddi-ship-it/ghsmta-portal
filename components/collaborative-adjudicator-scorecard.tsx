@@ -19,6 +19,10 @@ import {
   isAdjudicationCategoryComplete,
 } from "@/lib/adjudication-category-completion";
 import {
+  ADJUDICATION_SCORE_CHANGE_EVENT,
+  type AdjudicationScoreChangeDetail,
+} from "@/lib/adjudication-score-events";
+import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
   type OverallProductionScore,
@@ -634,7 +638,7 @@ function CategoryScoreSection({
               <strong>{formatAverage(overallProductionScore.score)}</strong>
               <small>
                 Based on {overallProductionScore.completedCategoryCount} of{" "}
-                {overallProductionScore.scoreableCategoryCount} scoreable
+                {overallProductionScore.scoreableCategoryCount} applicable
                 categories
               </small>
             </div>
@@ -1276,6 +1280,12 @@ export function CollaborativeAdjudicatorScorecard({
         ...current,
         [criterionId]: value,
       }));
+      window.dispatchEvent(
+        new CustomEvent<AdjudicationScoreChangeDetail>(
+          ADJUDICATION_SCORE_CHANGE_EVENT,
+          { detail: { criterionId, value } },
+        ),
+      );
     },
     [],
   );

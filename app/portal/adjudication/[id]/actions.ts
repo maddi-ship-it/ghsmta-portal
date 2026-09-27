@@ -395,7 +395,7 @@ async function persistAdjudicatorScorecard(
       (overall.score == null ||
         overall.completedCategoryCount !== overall.scoreableCategoryCount)
     ) {
-      missing.push("Overall Production: complete every scoreable category");
+      missing.push("Overall Production: complete every applicable category");
     }
 
     commentRows.push({

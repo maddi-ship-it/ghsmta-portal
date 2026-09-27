@@ -471,7 +471,7 @@ export async function saveAllCategoryProposals(
       });
       return {
         ok: false,
-        error: "The scoreability settings could not be saved.",
+        error: "The applicability settings could not be saved.",
         attemptId,
       };
     }

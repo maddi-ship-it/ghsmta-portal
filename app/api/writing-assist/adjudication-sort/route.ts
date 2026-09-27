@@ -166,7 +166,7 @@ export async function POST(request: Request) {
 
   if (criterionResult.error || scoreabilityResult.error) {
     return NextResponse.json(
-      { error: "The scoreable rubric criteria could not be loaded." },
+      { error: "The applicable rubric criteria could not be loaded." },
       { status: 500 },
     );
   }
@@ -198,7 +198,7 @@ export async function POST(request: Request) {
 
   if (rubricTargets.length === 0) {
     return NextResponse.json(
-      { error: "There are no scoreable criteria available for sorting." },
+      { error: "There are no applicable criteria available for sorting." },
       { status: 422 },
     );
   }

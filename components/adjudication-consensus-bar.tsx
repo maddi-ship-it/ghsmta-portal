@@ -259,7 +259,7 @@ export function AdjudicationConsensusBar({
       {!compact ? (
       <div className="adjudication-consensus-bar consolidated-consensus-bar">
         <div className="consensus-summary">
-          <strong>Eligibility, scoreability &amp; two-point ranges</strong>
+          <strong>Eligibility, applicability &amp; two-point ranges</strong>
           <span
             className={unresolved ? "badge badge-warning" : "badge badge-complete"}
           >
@@ -617,7 +617,7 @@ export function AdjudicationConsensusBar({
                   </p>
                   <h2 id="category-decision-title">Category decisions</h2>
                   <p>
-                    Set eligibility, scoreability, two-point ranges, and final
+                    Set eligibility, applicability, two-point ranges, and final
                     comment writers in one place.
                   </p>
                 </div>
@@ -636,7 +636,7 @@ export function AdjudicationConsensusBar({
               <div className="advisory-decision-help">
                 <p>
                   <strong>Eligible</strong> controls awards consideration.
-                  <strong> Scoreable</strong> controls whether scoring fields
+                  <strong> Applicable</strong> controls whether scoring fields
                   appear and whether the category counts toward Overall
                   Production.
                 </p>
@@ -765,13 +765,13 @@ export function AdjudicationConsensusBar({
                                 type="checkbox"
                               />
                               <span>
-                                <strong>Scoreable</strong>
+                                <strong>Applicable</strong>
                                 <small>Counts toward Overall Production</small>
                               </span>
                             </label>
                             <div className="advisory-decision-field">
                               <label htmlFor={`scoreability_reason_${category.id}`}>
-                                Non-scoreable reason
+                                Reason not applicable
                               </label>
                               <input
                                 className="input input-compact"
@@ -780,7 +780,9 @@ export function AdjudicationConsensusBar({
                                 name={`scoreability_reason_${category.id}`}
                                 placeholder="Optional context"
                               />
-                              <small>Shown when scoring is disabled.</small>
+                              <small>
+                                Shown when the category is not applicable.
+                              </small>
                             </div>
                             <div className="advisory-decision-field">
                               <label htmlFor={`range_${category.id}`}>

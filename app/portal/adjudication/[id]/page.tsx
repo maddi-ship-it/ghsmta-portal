@@ -13,6 +13,7 @@ import {
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
 import { AdjudicationBrainDump } from "@/components/adjudication-brain-dump";
 import { AdjudicationCategorySidebar } from "@/components/adjudication-category-sidebar";
+import { AdjudicationOverallProduction } from "@/components/adjudication-overall-production";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
@@ -804,6 +805,10 @@ export default async function AdjudicationApplicationPage({
   const scoreableCriteria = criteria.filter((criterion) =>
     scoreableCategoryIds.has(criterion.category_id),
   );
+  const overallProductionCategory = scoreableCategories.find(
+    (category) =>
+      category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY,
+  );
   const decisionCategories = categories.filter(
     (category) =>
       category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
@@ -940,7 +945,7 @@ export default async function AdjudicationApplicationPage({
 
       <div className="adjudication-score-layout">
         <AdjudicationCategorySidebar
-          categories={scoreableCategories}
+          categories={narrativeCategories}
           initialCompletedCategoryIds={initiallyCompletedCategoryIds}
           showCompletion={isScoringParticipant}
         />
@@ -952,6 +957,18 @@ export default async function AdjudicationApplicationPage({
           <AdjudicatorAutosave
             applicationId={id}
             disabled={readOnly}
+          />
+          <AdjudicationOverallProduction
+            canComment={canComment}
+            categories={scoreableCategories}
+            criteria={scoreableCriteria}
+            ownScores={ownScores}
+            privateNotes={comments.find(
+              (comment) =>
+                comment.scorecard_id === ownScorecard?.id &&
+                comment.category_id === overallProductionCategory?.id,
+            )?.private_notes}
+            readOnly={readOnly}
           />
           <AdjudicationBrainDump
             applicationId={id}
@@ -968,7 +985,7 @@ export default async function AdjudicationApplicationPage({
 
           <CollaborativeAdjudicatorScorecard
             applicationId={id}
-            categories={scoreableCategories}
+            categories={narrativeCategories}
             categorySubjectDefaults={categorySubjectDefaults}
             criteria={scoreableCriteria}
             currentUserId={profile.id}
