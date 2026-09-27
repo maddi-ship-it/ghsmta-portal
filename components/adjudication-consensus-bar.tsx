@@ -205,7 +205,10 @@ export function AdjudicationConsensusBar({
   }, [canReviewRanges, canSetDecisions, compact]);
 
   useEffect(() => {
-    if (!rangeReviewOpen || !canReviewRanges) return;
+    const shouldLoadLiveAverages =
+      (rangeReviewOpen && canReviewRanges) ||
+      (matrixOpen && canSetDecisions);
+    if (!shouldLoadLiveAverages) return;
 
     let disposed = false;
     let requestInFlight = false;
@@ -242,7 +245,14 @@ export function AdjudicationConsensusBar({
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [applicationId, canReviewRanges, rangeReviewOpen, supabase]);
+  }, [
+    applicationId,
+    canReviewRanges,
+    canSetDecisions,
+    matrixOpen,
+    rangeReviewOpen,
+    supabase,
+  ]);
 
   return (
     <>
@@ -592,28 +602,28 @@ export function AdjudicationConsensusBar({
           }}
         >
           <div
+            aria-labelledby="category-decision-title"
             aria-modal="true"
-            className="modal-card consensus-matrix-modal"
+            className="modal-card consensus-matrix-modal advisory-decision-modal"
             role="dialog"
           >
             <form action={categorySaveAction}>
               <div className="modal-header sticky-modal-header">
                 <div>
-                  <p className="eyebrow">Advisory Committee review</p>
-                  <h2>Eligibility, scoreability, ranges &amp; final comments</h2>
+                  <p className="eyebrow">
+                    {role === "owner"
+                      ? "Owner category review"
+                      : "Advisory Committee review"}
+                  </p>
+                  <h2 id="category-decision-title">Category decisions</h2>
                   <p>
-                    Set category decisions and assign each final comment before
-                    the Owner sends it to the panel.
+                    Set eligibility, scoreability, two-point ranges, and final
+                    comment writers in one place.
                   </p>
                 </div>
                 <div className="modal-header-actions">
-                  <ScheduleSubmitButton
-                    className="button button-gold"
-                    pendingLabel="Saving all decisions…"
-                  >
-                    Save all category decisions
-                  </ScheduleSubmitButton>
                   <button
+                    aria-label="Close category decisions"
                     className="modal-close"
                     onClick={() => setMatrixOpen(false)}
                     type="button"
@@ -621,6 +631,26 @@ export function AdjudicationConsensusBar({
                     ×
                   </button>
                 </div>
+              </div>
+
+              <div className="advisory-decision-help">
+                <p>
+                  <strong>Eligible</strong> controls awards consideration.
+                  <strong> Scoreable</strong> controls whether scoring fields
+                  appear and whether the category counts toward Overall
+                  Production.
+                </p>
+                <span aria-live="polite" className="range-review-live-status">
+                  <span
+                    aria-hidden="true"
+                    className={`range-review-live-dot range-review-live-dot-${liveAverageStatus}`}
+                  />
+                  {liveAverageStatus === "error"
+                    ? "Live averages temporarily unavailable"
+                    : liveAverageStatus === "loading"
+                      ? "Loading live panel averages…"
+                      : "Live panel averages updating automatically"}
+                </span>
               </div>
 
               {!categorySaveResult.ok && categorySaveResult.error && (
@@ -637,22 +667,8 @@ export function AdjudicationConsensusBar({
                 </div>
               )}
 
-              <div className="consensus-matrix-table-wrap">
-                <table className="data-table consensus-matrix-table">
-                  <thead>
-                    <tr>
-                      <th>Category</th>
-                      <th>Eligible</th>
-                      <th>Scoreable</th>
-                      <th>Two-point range</th>
-                      <th>Final comment reviewer</th>
-                      <th>Status</th>
-                      <th>Advisory note</th>
-                      {role === "owner" && <th>Owner override</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categories.map((category) => {
+              <div className="advisory-decision-list">
+                {categories.map((category) => {
                       const proposal = proposalByCategory.get(category.id);
                       const scoreabilityDecision =
                         scoreabilityByCategory.get(category.id);
@@ -661,37 +677,86 @@ export function AdjudicationConsensusBar({
                         ? reviewerById.get(assigneeId)
                         : undefined;
                       const assigneeFieldName = `assigned_to_${category.id}`;
+                      const panelAverage = panelAverageByCategory.get(
+                        category.id,
+                      );
+                      const average =
+                        panelAverage?.average_score == null
+                          ? null
+                          : Number(panelAverage.average_score);
 
                       return (
-                        <tr
-                          className={
+                        <article
+                          className={`advisory-decision-card ${
                             proposal?.status === "disputed"
-                              ? "consensus-row-disputed"
+                              ? "advisory-decision-card-disputed"
                               : ""
-                          }
+                          }`}
                           key={category.id}
                         >
-                          <td>
+                          <header className="advisory-decision-card-header">
+                            <div>
                             <input
                               name="category_id"
                               type="hidden"
                               value={category.id}
                             />
-                            <strong>{category.title}</strong>
-                            <small>{category.description}</small>
-                          </td>
-                          <td>
-                            <label className="switch-control">
+                              <span className="advisory-decision-category-number">
+                                Category {category.sort_order}
+                              </span>
+                              <h3>{category.title}</h3>
+                              {category.description && (
+                                <p>{category.description}</p>
+                              )}
+                            </div>
+                            <div className="advisory-decision-summary">
+                              <div className="advisory-live-average">
+                                <span>Live panel average</span>
+                                <strong>
+                                  {liveAverageStatus === "loading" && average == null
+                                    ? "Loading…"
+                                    : average == null
+                                      ? "—"
+                                      : average.toFixed(5)}
+                                </strong>
+                                <small>
+                                  {panelAverage
+                                    ? `${Number(panelAverage.score_count)} scores from ${Number(
+                                        panelAverage.scoring_member_count,
+                                      )}/${Number(
+                                        panelAverage.assigned_scorer_count,
+                                      )} scoring members`
+                                    : "Updates as panel scores are entered"}
+                                </small>
+                              </div>
+                              <span
+                                className={`badge ${
+                                  proposal?.status === "approved" ||
+                                  proposal?.status === "overridden"
+                                    ? "badge-complete"
+                                    : "badge-warning"
+                                }`}
+                              >
+                                {proposal
+                                  ? statusLabel(proposal.status)
+                                  : "Not proposed"}
+                              </span>
+                            </div>
+                          </header>
+
+                          <div className="advisory-decision-grid">
+                            <label className="advisory-decision-toggle">
                               <input
                                 defaultChecked={proposal?.is_eligible ?? true}
                                 name={`eligible_${category.id}`}
                                 type="checkbox"
                               />
-                              <span>Eligible</span>
+                              <span>
+                                <strong>Eligible</strong>
+                                <small>Awards consideration</small>
+                              </span>
                             </label>
-                          </td>
-                          <td>
-                            <label className="switch-control">
+                            <label className="advisory-decision-toggle">
                               <input
                                 defaultChecked={
                                   scoreabilityDecision?.is_scoreable ?? true
@@ -699,25 +764,34 @@ export function AdjudicationConsensusBar({
                                 name={`scoreable_${category.id}`}
                                 type="checkbox"
                               />
-                              <span>Scoreable</span>
+                              <span>
+                                <strong>Scoreable</strong>
+                                <small>Counts toward Overall Production</small>
+                              </span>
                             </label>
-                            <input
-                              className="input input-compact"
-                              defaultValue={scoreabilityDecision?.reason ?? ""}
-                              name={`scoreability_reason_${category.id}`}
-                              placeholder="Optional reason"
-                            />
-                            <small className="field-help">
-                              Non-scoreable categories are hidden and excluded
-                              from Overall Production.
-                            </small>
-                          </td>
-                          <td>
+                            <div className="advisory-decision-field">
+                              <label htmlFor={`scoreability_reason_${category.id}`}>
+                                Non-scoreable reason
+                              </label>
+                              <input
+                                className="input input-compact"
+                                defaultValue={scoreabilityDecision?.reason ?? ""}
+                                id={`scoreability_reason_${category.id}`}
+                                name={`scoreability_reason_${category.id}`}
+                                placeholder="Optional context"
+                              />
+                              <small>Shown when scoring is disabled.</small>
+                            </div>
+                            <div className="advisory-decision-field">
+                              <label htmlFor={`range_${category.id}`}>
+                                Two-point range
+                              </label>
                             <select
                               className="select"
                               defaultValue={formatTwoPointRangeStart(
                                 proposal?.range_min,
                               )}
+                              id={`range_${category.id}`}
                               name={`range_${category.id}`}
                             >
                               <option value="">No range</option>
@@ -727,14 +801,20 @@ export function AdjudicationConsensusBar({
                                 </option>
                               ))}
                             </select>
-                          </td>
-                          <td>
+                              <small>
+                                Choose the approved low and high range.
+                              </small>
+                            </div>
+                            <div className="advisory-decision-field advisory-decision-writer">
+                              <label htmlFor={assigneeFieldName}>
+                                Final comment writer
+                              </label>
                             {role === "advisory_member" ? (
                               <div className="consensus-comment-assignment">
                                 <select
-                                  aria-label={`Final comment reviewer for ${category.title}`}
                                   className="select"
                                   defaultValue={assigneeId ?? ""}
+                                  id={assigneeFieldName}
                                   name={assigneeFieldName}
                                 >
                                   <option value="">Choose panel member</option>
@@ -745,7 +825,7 @@ export function AdjudicationConsensusBar({
                                   ))}
                                 </select>
                                 <button
-                                  className="text-button"
+                                  className="button button-secondary button-compact"
                                   formAction={assignPanelNarrativeReviewer.bind(
                                     null,
                                     applicationId,
@@ -759,36 +839,26 @@ export function AdjudicationConsensusBar({
                                 </button>
                               </div>
                             ) : (
-                              <span>
+                              <strong className="advisory-decision-assignee">
                                 {assignedReviewer?.name ?? "Unassigned"}
-                              </span>
+                              </strong>
                             )}
-                          </td>
-                          <td>
-                            <span
-                              className={`badge ${
-                                proposal?.status === "approved" ||
-                                proposal?.status === "overridden"
-                                  ? "badge-complete"
-                                  : "badge-warning"
-                              }`}
-                            >
-                              {proposal
-                                ? statusLabel(proposal.status)
-                                : "Not proposed"}
-                            </span>
-                          </td>
-                          <td>
+                            </div>
+                            <div className="advisory-decision-field advisory-decision-note">
+                              <label htmlFor={`note_${category.id}`}>
+                                Advisory note
+                              </label>
                             <textarea
                               className="textarea compact-textarea"
                               defaultValue={proposal?.advisory_note ?? ""}
+                              id={`note_${category.id}`}
                               name={`note_${category.id}`}
-                              placeholder="Context for adjudicators"
+                              placeholder="Optional context for adjudicators"
                             />
-                          </td>
-                          {role === "owner" && (
-                            <td>
-                              <label className="inline-check">
+                            </div>
+                            {role === "owner" && (
+                              <div className="advisory-decision-field advisory-owner-override">
+                                <label className="advisory-decision-toggle">
                                 <input
                                   defaultChecked={
                                     proposal?.status === "overridden"
@@ -796,26 +866,48 @@ export function AdjudicationConsensusBar({
                                   name={`override_${category.id}`}
                                   type="checkbox"
                                 />
-                                Override
-                              </label>
-                              <input
-                                className="input input-compact"
-                                defaultValue={
-                                  proposal?.owner_override_note ?? ""
-                                }
-                                name={`override_note_${category.id}`}
-                                placeholder="Required override note"
-                              />
-                            </td>
-                          )}
-                        </tr>
+                                  <span>
+                                    <strong>Owner override</strong>
+                                    <small>Finalize without panel approval</small>
+                                  </span>
+                                </label>
+                                <label htmlFor={`override_note_${category.id}`}>
+                                  Override note
+                                </label>
+                                <input
+                                  className="input input-compact"
+                                  defaultValue={
+                                    proposal?.owner_override_note ?? ""
+                                  }
+                                  id={`override_note_${category.id}`}
+                                  name={`override_note_${category.id}`}
+                                  placeholder="Required when overriding"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </article>
                       );
                     })}
-                  </tbody>
-                </table>
               </div>
 
-              <div className="sticky-modal-footer">
+              <div className="sticky-modal-footer advisory-decision-footer">
+                <span aria-live="polite" className="range-review-live-status">
+                  <span
+                    aria-hidden="true"
+                    className={`range-review-live-dot range-review-live-dot-${liveAverageStatus}`}
+                  />
+                  {liveAverageStatus === "live" && liveAverageUpdatedAt
+                    ? `Panel averages updated ${liveAverageUpdatedAt.toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}`
+                    : liveAverageStatus === "error"
+                      ? "Live averages temporarily unavailable"
+                      : "Loading live panel averages…"}
+                </span>
+                <div className="button-row">
                 <button
                   className="button button-secondary"
                   onClick={() => setMatrixOpen(false)}
@@ -829,6 +921,7 @@ export function AdjudicationConsensusBar({
                 >
                   Save all category decisions
                 </ScheduleSubmitButton>
+                </div>
               </div>
             </form>
           </div>

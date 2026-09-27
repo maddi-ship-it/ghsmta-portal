@@ -12047,6 +12047,268 @@ html[data-theme="light"] .regal-path-section {
   max-width: 165px;
 }
 
+/* Advisory category decisions */
+.advisory-decision-modal {
+  width: min(1180px, 100%);
+}
+
+.advisory-decision-modal .sticky-modal-header {
+  margin: -24px -24px 0;
+  padding: 22px 24px 18px;
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: color-mix(in srgb, var(--portal-surface) 96%, transparent);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--portal-bg-deep) 32%, transparent);
+}
+
+.advisory-decision-modal .sticky-modal-header h2 {
+  color: var(--portal-ivory);
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+}
+
+.advisory-decision-modal .sticky-modal-header p:last-child {
+  max-width: 720px;
+  margin: 7px 0 0;
+  color: var(--portal-muted);
+}
+
+.advisory-decision-modal .modal-close {
+  color: var(--portal-text);
+  background: var(--portal-surface-3);
+}
+
+.advisory-decision-help {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--portal-surface-2) 88%, transparent);
+}
+
+.advisory-decision-help p {
+  margin: 0;
+  color: var(--portal-muted);
+  line-height: 1.5;
+}
+
+.advisory-decision-list {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 18px;
+}
+
+.advisory-decision-card {
+  overflow: hidden;
+  border: 1px solid var(--portal-line);
+  border-radius: 18px;
+  background: var(--portal-surface-2);
+  content-visibility: auto;
+  contain-intrinsic-size: 430px;
+}
+
+.advisory-decision-card-disputed {
+  border-color: color-mix(in srgb, var(--portal-warning) 56%, var(--portal-line));
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--portal-warning) 76%, transparent);
+}
+
+.advisory-decision-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: start;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--portal-line);
+  background: color-mix(in srgb, var(--portal-surface-3) 72%, transparent);
+}
+
+.advisory-decision-category-number {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--portal-gold-bright);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.advisory-decision-card-header h3 {
+  margin: 0;
+  color: var(--portal-ivory);
+  font-size: 1.18rem;
+}
+
+.advisory-decision-card-header p {
+  max-width: 690px;
+  margin: 6px 0 0;
+  color: var(--portal-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.advisory-decision-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.advisory-live-average {
+  display: grid;
+  min-width: 230px;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--portal-gold) 34%, var(--portal-line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--portal-gold) 8%, var(--portal-surface));
+}
+
+.advisory-live-average > span {
+  color: var(--portal-muted);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.advisory-live-average strong {
+  color: var(--portal-gold-bright);
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.advisory-live-average small {
+  color: var(--portal-muted);
+  font-size: 0.72rem;
+}
+
+.advisory-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+
+.advisory-decision-toggle,
+.advisory-decision-field {
+  min-width: 0;
+  border: 1px solid var(--portal-line);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--portal-surface) 70%, transparent);
+}
+
+.advisory-decision-toggle {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 14px;
+  cursor: pointer;
+}
+
+.advisory-decision-toggle input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.advisory-decision-toggle span,
+.advisory-decision-toggle small,
+.advisory-decision-toggle strong {
+  display: block;
+}
+
+.advisory-decision-toggle strong {
+  color: var(--portal-ivory);
+}
+
+.advisory-decision-toggle small,
+.advisory-decision-field small {
+  margin-top: 3px;
+  color: var(--portal-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.advisory-decision-field {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 13px 14px;
+}
+
+.advisory-decision-field > label {
+  color: var(--portal-ivory);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+
+.advisory-decision-field .select,
+.advisory-decision-field .input,
+.advisory-decision-field .textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.advisory-decision-writer,
+.advisory-decision-note {
+  grid-column: span 2;
+}
+
+.advisory-decision-note .compact-textarea {
+  min-height: 92px;
+}
+
+.advisory-decision-assignee {
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: var(--portal-surface-3);
+}
+
+.advisory-owner-override {
+  grid-column: span 2;
+}
+
+.advisory-decision-footer {
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -24px -24px;
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: color-mix(in srgb, var(--portal-surface) 97%, transparent);
+  box-shadow: 0 -12px 30px color-mix(in srgb, var(--portal-bg-deep) 24%, transparent);
+}
+
+html[data-theme="light"] .advisory-decision-modal .sticky-modal-header,
+html[data-theme="light"] .advisory-decision-footer {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+html[data-theme="light"] .advisory-decision-modal .sticky-modal-header h2,
+html[data-theme="light"] .advisory-decision-card-header h3,
+html[data-theme="light"] .advisory-decision-toggle strong,
+html[data-theme="light"] .advisory-decision-field > label {
+  color: #142039;
+}
+
+html[data-theme="light"] .advisory-decision-card {
+  background: #fffdf8;
+}
+
+html[data-theme="light"] .advisory-decision-card-header,
+html[data-theme="light"] .advisory-decision-help {
+  background: #fff7e6;
+}
+
+html[data-theme="light"] .advisory-decision-toggle,
+html[data-theme="light"] .advisory-decision-field {
+  background: #ffffff;
+}
+
 @media (max-width: 760px) {
   .range-review-modal .modal-header h2 {
     font-size: clamp(1.45rem, 7vw, 2rem);
@@ -12064,6 +12326,49 @@ html[data-theme="light"] .regal-path-section {
   .schedule-workspace-filters .schedule-date-filter {
     width: 100%;
     max-width: none;
+  }
+
+  .advisory-decision-modal .sticky-modal-header {
+    align-items: flex-start;
+  }
+
+  .advisory-decision-help,
+  .advisory-decision-card-header,
+  .advisory-decision-footer {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .advisory-decision-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .advisory-live-average {
+    min-width: 0;
+  }
+
+  .advisory-decision-grid {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .advisory-decision-writer,
+  .advisory-decision-note,
+  .advisory-owner-override {
+    grid-column: auto;
+  }
+
+  .advisory-decision-footer .button-row,
+  .advisory-decision-footer .button {
+    width: 100%;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1040px) {
+  .advisory-decision-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
