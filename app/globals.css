@@ -14441,6 +14441,39 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   color: var(--portal-text);
 }
 
+.panel-narrative-autosave {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  max-width: 100%;
+  color: var(--portal-muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.panel-narrative-autosave > span {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+
+.panel-narrative-autosave-pending > span,
+.panel-narrative-autosave-saving > span,
+.panel-narrative-autosave-offline > span {
+  background: #f79009;
+}
+
+.panel-narrative-autosave-saved > span {
+  background: #12b76a;
+}
+
+.panel-narrative-autosave-error > span {
+  background: #f04438;
+}
+
 .panel-narrative-preview {
   color: var(--portal-text);
 }

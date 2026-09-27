@@ -1322,6 +1322,75 @@ export async function savePanelFeedback(
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }
 
+export async function autosavePanelFeedbackDraft(
+  applicationId: string,
+  categoryId: string,
+  draftComment: string,
+) {
+  const editor = await requirePanelNarrativeEditor(applicationId);
+  if (editor.role === "owner") {
+    throw new Error("Owner comments use the Owner review autosave workflow.");
+  }
+
+  const finalComment = draftComment.trim();
+  if (!finalComment) {
+    throw new Error("The final comment cannot be blank.");
+  }
+
+  const admin = createAdminClient();
+  const { data: existingFeedback, error: feedbackError } = await admin
+    .from("adjudication_panel_feedback")
+    .select("id,status,assigned_to,approved_by")
+    .eq("application_id", applicationId)
+    .eq("category_id", categoryId)
+    .maybeSingle();
+
+  if (feedbackError) throw new Error(feedbackError.message);
+  if (!existingFeedback?.approved_by || existingFeedback.status !== "approved") {
+    throw new Error(
+      "The Owner has not sent this final comment to the panel, or it has already been panel-approved.",
+    );
+  }
+  if (
+    !isAssignedPanelNarrativeReviewer({
+      assignedTo: existingFeedback.assigned_to,
+      reviewerId: editor.id,
+    })
+  ) {
+    throw new Error("This final comment is assigned to another panel member.");
+  }
+
+  const { data: existingApprover, error: approverError } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", existingFeedback.approved_by)
+    .maybeSingle();
+
+  if (approverError) throw new Error(approverError.message);
+  if (existingApprover?.role !== "owner") {
+    throw new Error("This final comment has already completed panel review.");
+  }
+
+  const { data: savedDraft, error: saveError } = await admin
+    .from("adjudication_panel_feedback")
+    .update({ final_comment: finalComment })
+    .eq("id", existingFeedback.id)
+    .eq("status", "approved")
+    .eq("assigned_to", editor.id)
+    .eq("approved_by", existingFeedback.approved_by)
+    .select("updated_at")
+    .maybeSingle();
+
+  if (saveError) throw new Error(saveError.message);
+  if (!savedDraft) {
+    throw new Error(
+      "This final comment changed while it was saving. Refresh to see the latest version.",
+    );
+  }
+
+  return { savedAt: savedDraft.updated_at ?? new Date().toISOString() };
+}
+
 export async function assignPanelNarrativeReviewer(
   applicationId: string,
   categoryId: string,

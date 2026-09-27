@@ -10,11 +10,10 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
 
-import { savePanelFeedback } from "@/app/portal/adjudication/[id]/actions";
 import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow-actions";
 import { CategoryScoringControls } from "@/components/category-scoring-controls";
+import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
 import {
   ADJUDICATION_CATEGORY_COMPLETION_EVENT,
@@ -231,10 +230,6 @@ function InlinePanelNarrativeReview({
   panelApproved: boolean;
   reviewStatus: string;
 }) {
-  const router = useRouter();
-  const [value, setValue] = useState(feedback?.final_comment ?? "");
-  const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
   const sentToOwners = ["ready_for_owner", "owner_review", "released"].includes(
     reviewStatus,
   );
@@ -246,29 +241,6 @@ function InlinePanelNarrativeReview({
       !sentToOwners &&
       feedback?.assigned_to === currentUserId,
   );
-
-  const approveComment = async () => {
-    if (!value.trim() || saving) return;
-    setSaving(true);
-    setMessage("Approving final comment…");
-    const formData = new FormData();
-    formData.set("final_comment", value);
-    formData.set("approved", "on");
-
-    try {
-      await savePanelFeedback(applicationId, category.id, formData);
-      setMessage("Approved and returned to the Owners.");
-      router.refresh();
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "The final comment could not be approved.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <section className="panel-narrative-card inline-panel-narrative-review">
@@ -307,35 +279,12 @@ function InlinePanelNarrativeReview({
           panel.
         </div>
       ) : canEdit ? (
-        <div className="form-stack">
-          <div className="field">
-            <label htmlFor={`inline_final_comment_${category.id}`}>
-              Review and edit the assigned final comment
-            </label>
-            <textarea
-              className="textarea narrative-textarea"
-              id={`inline_final_comment_${category.id}`}
-              onChange={(event) => setValue(event.target.value)}
-              onInput={(event) => event.stopPropagation()}
-              rows={8}
-              value={value}
-            />
-          </div>
-          <p className="field-help">
-            Approval returns this category to the Owners and posts an update
-            in the private panel channel.
-          </p>
-          <div className="button-row panel-narrative-actions">
-            <button
-              className="button button-dark"
-              disabled={saving || !value.trim()}
-              onClick={() => void approveComment()}
-              type="button"
-            >
-              {saving ? "Approving…" : "Approve and return to Owners"}
-            </button>
-          </div>
-        </div>
+        <PanelNarrativeReviewEditor
+          applicationId={applicationId}
+          categoryId={category.id}
+          currentUserId={currentUserId}
+          initialValue={feedback?.final_comment ?? ""}
+        />
       ) : (
         <>
           <div className="comment-readonly-surface panel-narrative-preview">
@@ -357,11 +306,6 @@ function InlinePanelNarrativeReview({
         </>
       )}
 
-      {message && (
-        <small aria-live="polite" className="field-help">
-          {message}
-        </small>
-      )}
     </section>
   );
 }
@@ -956,7 +900,6 @@ function CategoryScoreSection({
           category={category}
           currentUserId={currentUserId}
           feedback={panelFeedback}
-          key={`${category.id}:${panelFeedback?.updated_at ?? "waiting"}`}
           panelApproved={panelApproved}
           reviewStatus={reviewStatus}
         />}

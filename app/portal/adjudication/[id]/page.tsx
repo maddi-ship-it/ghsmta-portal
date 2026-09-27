@@ -21,6 +21,7 @@ import { ApplicationReferenceBar } from "@/components/application-reference-bar"
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
+import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
@@ -48,11 +49,7 @@ import type {
   ScoringScaleLevel,
 } from "@/lib/types";
 
-import {
-  releaseAdjudicationResults,
-  savePanelFeedback,
-} from "./actions";
-
+import { releaseAdjudicationResults } from "./actions";
 
 type ScheduleBookingReference = {
   slot_id: string;
@@ -219,34 +216,12 @@ function PanelNarrativeWorkflow({
                     </div>
                   )}
                   {canEdit ? (
-                    <form
-                      action={savePanelFeedback.bind(null, applicationId, category.id)}
-                      className="form-stack"
-                    >
-                    <div className="field">
-                      <label htmlFor={`panel_final_comment_${category.id}`}>
-                        School-facing final comment
-                      </label>
-                      <textarea
-                        className="textarea narrative-textarea"
-                        defaultValue={finalComment}
-                        id={`panel_final_comment_${category.id}`}
-                        name="final_comment"
-                        rows={8}
-                      />
-                    </div>
-                    <input name="approved" type="hidden" value="on" />
-                    <p className="field-help">
-                      Approving returns this comment to the Owners. When every
-                      final comment is approved, the full package moves to
-                      Owner review automatically.
-                    </p>
-                    <div className="button-row panel-narrative-actions">
-                      <button className="button button-dark" type="submit">
-                        Approve and return to Owners
-                      </button>
-                    </div>
-                    </form>
+                    <PanelNarrativeReviewEditor
+                      applicationId={applicationId}
+                      categoryId={category.id}
+                      currentUserId={currentUserId}
+                      initialValue={finalComment}
+                    />
                   ) : (
                     <>
                       <div className="comment-readonly-surface panel-narrative-preview">
