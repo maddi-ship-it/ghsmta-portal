@@ -713,9 +713,12 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 
 .scorecard-form { display: grid; gap: 20px; }
 .overall-production-summary {
-  display: grid;
   overflow: hidden;
   border-color: color-mix(in srgb, var(--gold-500) 58%, var(--line));
+}
+.big-picture-comment-panel {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--gold-500) 34%, var(--line));
 }
 .overall-production-score {
   display: grid;

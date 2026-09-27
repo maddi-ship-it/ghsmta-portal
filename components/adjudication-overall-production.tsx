@@ -31,16 +31,10 @@ export function AdjudicationOverallProduction({
   categories,
   criteria,
   ownScores,
-  privateNotes,
-  canComment,
-  readOnly,
 }: {
   categories: ScoringCategory[];
   criteria: ScoringCriterion[];
   ownScores: AdjudicationScore[];
-  privateNotes: string | null | undefined;
-  canComment: boolean;
-  readOnly: boolean;
 }) {
   const [scoreValues, setScoreValues] = useState<Record<string, number | null>>(
     () =>
@@ -77,9 +71,6 @@ export function AdjudicationOverallProduction({
   const overallCriterion = criteria.find(
     (criterion) => criterion.category_id === overallCategory?.id,
   );
-  const savedBigPicture = ownScores.find(
-    (score) => score.criterion_id === overallCriterion?.id,
-  )?.observation;
   const overall = useMemo(
     () =>
       calculateOverallProductionScore({
@@ -94,11 +85,6 @@ export function AdjudicationOverallProduction({
 
   return (
     <section className="panel overall-production-summary">
-      <input
-        defaultValue={privateNotes ?? ""}
-        name={`private_notes_${overallCategory.id}`}
-        type="hidden"
-      />
       <div className="overall-production-score">
         <div>
           <span className="eyebrow">Overall Production</span>
@@ -119,6 +105,45 @@ export function AdjudicationOverallProduction({
         </div>
       </div>
 
+    </section>
+  );
+}
+
+export function AdjudicationBigPictureComment({
+  categories,
+  criteria,
+  ownScores,
+  privateNotes,
+  canComment,
+  readOnly,
+}: {
+  categories: ScoringCategory[];
+  criteria: ScoringCriterion[];
+  ownScores: AdjudicationScore[];
+  privateNotes: string | null | undefined;
+  canComment: boolean;
+  readOnly: boolean;
+}) {
+  const overallCategory = categories.find(
+    (category) =>
+      category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY,
+  );
+  const overallCriterion = criteria.find(
+    (criterion) => criterion.category_id === overallCategory?.id,
+  );
+  const savedBigPicture = ownScores.find(
+    (score) => score.criterion_id === overallCriterion?.id,
+  )?.observation;
+
+  if (!overallCategory || !overallCriterion) return null;
+
+  return (
+    <section className="panel big-picture-comment-panel">
+      <input
+        defaultValue={privateNotes ?? ""}
+        name={`private_notes_${overallCategory.id}`}
+        type="hidden"
+      />
       <div className="overall-production-big-picture">
         <div>
           <span className="section-order">Production-wide notes</span>

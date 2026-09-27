@@ -1,12 +1,14 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 
@@ -1096,6 +1098,8 @@ export function CollaborativeAdjudicatorScorecard({
   scoreOptions,
   canComment,
   readOnly,
+  afterCategory,
+  afterCategoryTitle,
 }: {
   applicationId: string;
   currentUserId: string;
@@ -1115,6 +1119,8 @@ export function CollaborativeAdjudicatorScorecard({
   scoreOptions: ScoreOption[];
   canComment: boolean;
   readOnly: boolean;
+  afterCategory?: ReactNode;
+  afterCategoryTitle?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [panelRows, setPanelRows] = useState(initialPanelRows);
@@ -1327,6 +1333,8 @@ export function CollaborativeAdjudicatorScorecard({
   const commentColumnsStyle = {
     "--panel-comment-count": Math.max(panelMembers.length, 1),
   } as CSSProperties;
+  const normalizedAfterCategoryTitle =
+    afterCategoryTitle?.trim().toLocaleLowerCase();
 
   return (
     <>
@@ -1356,40 +1364,54 @@ export function CollaborativeAdjudicatorScorecard({
       </div>
 
       {categories.map((category, categoryIndex) => (
-        <CategoryScoreSection
-          category={category}
-          categoryComment={ownCommentMap.get(category.id)}
-          categoryCriteria={criteria.filter(
-            (criterion) => criterion.category_id === category.id,
-          )}
-          categoryIndex={categoryIndex}
-          categorySubjectName={
-            categorySubjectDefaults[category.category_key] ?? ""
-          }
-          officialProposal={proposalMap.get(category.id)}
-          ownApproval={proposalMap.get(category.id) ? approvalMap.get(proposalMap.get(category.id)!.id) : undefined}
-          panelFeedback={feedbackMap.get(category.id)}
-          assignedReviewerName={
-            feedbackMap.get(category.id)?.assigned_to
-              ? reviewerMap.get(feedbackMap.get(category.id)!.assigned_to!)?.name
-              : undefined
-          }
-          panelApproved={panelApprovedCategories.has(category.id)}
-          reviewStatus={reviewStatus}
-          applicationId={applicationId}
-          commentColumnsStyle={commentColumnsStyle}
-          currentUserId={currentUserId}
-          key={category.id}
-          observationMap={observationMap}
-          ownScoreMap={ownScoreMap}
-          panelMembers={panelMembers}
-          canComment={canComment}
-          readOnly={readOnly}
-          scoreOptions={scoreOptions}
-          overallProductionScore={overallProductionScore}
-          onScoreChange={updateLiveOwnScore}
-        />
+        <Fragment key={category.id}>
+          <CategoryScoreSection
+            category={category}
+            categoryComment={ownCommentMap.get(category.id)}
+            categoryCriteria={criteria.filter(
+              (criterion) => criterion.category_id === category.id,
+            )}
+            categoryIndex={categoryIndex}
+            categorySubjectName={
+              categorySubjectDefaults[category.category_key] ?? ""
+            }
+            officialProposal={proposalMap.get(category.id)}
+            ownApproval={proposalMap.get(category.id) ? approvalMap.get(proposalMap.get(category.id)!.id) : undefined}
+            panelFeedback={feedbackMap.get(category.id)}
+            assignedReviewerName={
+              feedbackMap.get(category.id)?.assigned_to
+                ? reviewerMap.get(feedbackMap.get(category.id)!.assigned_to!)?.name
+                : undefined
+            }
+            panelApproved={panelApprovedCategories.has(category.id)}
+            reviewStatus={reviewStatus}
+            applicationId={applicationId}
+            commentColumnsStyle={commentColumnsStyle}
+            currentUserId={currentUserId}
+            observationMap={observationMap}
+            ownScoreMap={ownScoreMap}
+            panelMembers={panelMembers}
+            canComment={canComment}
+            readOnly={readOnly}
+            scoreOptions={scoreOptions}
+            overallProductionScore={overallProductionScore}
+            onScoreChange={updateLiveOwnScore}
+          />
+          {afterCategory &&
+          category.title.trim().toLocaleLowerCase() ===
+            normalizedAfterCategoryTitle
+            ? afterCategory
+            : null}
+        </Fragment>
       ))}
+      {afterCategory &&
+      !categories.some(
+        (category) =>
+          category.title.trim().toLocaleLowerCase() ===
+          normalizedAfterCategoryTitle,
+      )
+        ? afterCategory
+        : null}
     </>
   );
 }

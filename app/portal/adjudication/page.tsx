@@ -95,8 +95,6 @@ export default async function AdjudicationDashboard({
     );
   }
 
-  const applicationIds = applications.map((application) => application.id);
-
   const advisoryReviewAccessResult =
     profile.role === "advisory_member"
       ? await supabase.rpc("get_advisory_review_application_ids")
@@ -111,6 +109,20 @@ export default async function AdjudicationDashboard({
       (row: { application_id: string }) => row.application_id,
     ),
   );
+
+  if (profile.role === "advisory_member") {
+    applications = applications.filter((application) =>
+      advisoryReviewApplicationIds.has(application.id),
+    );
+    const visibleApplicationIds = new Set(
+      applications.map((application) => application.id),
+    );
+    assignments = assignments.filter((assignment) =>
+      visibleApplicationIds.has(assignment.application_id),
+    );
+  }
+
+  const applicationIds = applications.map((application) => application.id);
 
   const { data: scorecardData, error: scorecardError } = applicationIds.length
     ? await supabase.from("adjudication_scorecards").select("*").in("application_id", applicationIds)
@@ -198,8 +210,8 @@ export default async function AdjudicationDashboard({
     <>
       <div className="page-heading">
         <div>
-          <h1>{profile.role === "adjudicator" ? "My adjudication assignments" : "Adjudication review"}</h1>
-          <p>{profile.role === "adjudicator" ? "Score assigned productions and complete all four comment quadrants before submitting." : "Review panel scorecards, synthesize comments, and prepare owner-controlled school releases."}</p>
+          <h1>{profile.role === "adjudicator" ? "My adjudication assignments" : profile.role === "advisory_member" ? "My adjudication schools" : "Adjudication review"}</h1>
+          <p>{profile.role === "adjudicator" ? "Score assigned productions and complete all four comment quadrants before submitting." : profile.role === "advisory_member" ? "Review the schools whose timeslots you joined or were assigned to." : "Review panel scorecards, synthesize comments, and prepare owner-controlled school releases."}</p>
         </div>
         {profile.role === "owner" && (
           <div className="heading-actions">
@@ -267,7 +279,7 @@ export default async function AdjudicationDashboard({
         </>
       )}
       <section className="panel">
-        <div className="panel-header"><div><h2>{profile.role === "adjudicator" ? "Assigned productions" : profile.role === "advisory_member" ? "All available applications" : "Productions under review"}</h2>{profile.role === "advisory_member" && <p>Every available adjudication application is available to read. Review tools activate only for schools whose timeslot you selected or were assigned.</p>}</div></div>
+        <div className="panel-header"><div><h2>{profile.role === "adjudicator" ? "Assigned productions" : profile.role === "advisory_member" ? "My signed-on schools" : "Productions under review"}</h2>{profile.role === "advisory_member" && <p>Schools appear here after you join their timeslot or an Owner assigns you.</p>}</div></div>
         <div className="adjudication-card-list">
           {profile.role === "adjudicator" ? (
             visibleRows.map((row) => {
@@ -311,9 +323,7 @@ export default async function AdjudicationDashboard({
                             : "badge-draft"
                         }`}
                       >
-                        {advisoryReviewApplicationIds.has(row.application.id)
-                          ? "Review enabled"
-                          : "Application access"}
+                        Review enabled
                       </span>
                     )}
                     <strong>{complete} / {row.assignments.length}</strong>
@@ -326,7 +336,7 @@ export default async function AdjudicationDashboard({
           {visibleRows.length === 0 && (
             <div className="empty-state">
               <h3>{searchQuery ? "No productions match that search." : "No adjudication work is available yet."}</h3>
-              <p>{searchQuery ? "Try another school, production, season, or program name." : profile.role === "adjudicator" ? "An owner must assign a production to you." : "Submitted applications will appear here once adjudicators are assigned."}</p>
+              <p>{searchQuery ? "Try another school, production, season, or program name." : profile.role === "adjudicator" ? "An owner must assign a production to you." : profile.role === "advisory_member" ? "Join a school timeslot in Scheduling, or ask an Owner to assign you." : "Submitted applications will appear here once adjudicators are assigned."}</p>
             </div>
           )}
         </div>

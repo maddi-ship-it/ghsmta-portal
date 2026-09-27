@@ -13,7 +13,10 @@ import {
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
 import { AdjudicationBrainDump } from "@/components/adjudication-brain-dump";
 import { AdjudicationCategorySidebar } from "@/components/adjudication-category-sidebar";
-import { AdjudicationOverallProduction } from "@/components/adjudication-overall-production";
+import {
+  AdjudicationBigPictureComment,
+  AdjudicationOverallProduction,
+} from "@/components/adjudication-overall-production";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
@@ -959,16 +962,9 @@ export default async function AdjudicationApplicationPage({
             disabled={readOnly}
           />
           <AdjudicationOverallProduction
-            canComment={canComment}
             categories={scoreableCategories}
             criteria={scoreableCriteria}
             ownScores={ownScores}
-            privateNotes={comments.find(
-              (comment) =>
-                comment.scorecard_id === ownScorecard?.id &&
-                comment.category_id === overallProductionCategory?.id,
-            )?.private_notes}
-            readOnly={readOnly}
           />
           <AdjudicationBrainDump
             applicationId={id}
@@ -984,6 +980,21 @@ export default async function AdjudicationApplicationPage({
           </section>
 
           <CollaborativeAdjudicatorScorecard
+            afterCategory={
+              <AdjudicationBigPictureComment
+                canComment={canComment}
+                categories={scoreableCategories}
+                criteria={scoreableCriteria}
+                ownScores={ownScores}
+                privateNotes={comments.find(
+                  (comment) =>
+                    comment.scorecard_id === ownScorecard?.id &&
+                    comment.category_id === overallProductionCategory?.id,
+                )?.private_notes}
+                readOnly={readOnly}
+              />
+            }
+            afterCategoryTitle="Direction"
             applicationId={id}
             categories={narrativeCategories}
             categorySubjectDefaults={categorySubjectDefaults}
