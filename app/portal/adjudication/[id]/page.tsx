@@ -220,6 +220,7 @@ function PanelNarrativeWorkflow({
                       applicationId={applicationId}
                       categoryId={category.id}
                       currentUserId={currentUserId}
+                      generatedAt={categoryFeedback?.generated_at ?? ""}
                       initialValue={finalComment}
                     />
                   ) : (

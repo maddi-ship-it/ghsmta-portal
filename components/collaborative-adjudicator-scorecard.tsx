@@ -283,6 +283,7 @@ function InlinePanelNarrativeReview({
           applicationId={applicationId}
           categoryId={category.id}
           currentUserId={currentUserId}
+          generatedAt={feedback?.generated_at ?? ""}
           initialValue={feedback?.final_comment ?? ""}
         />
       ) : (

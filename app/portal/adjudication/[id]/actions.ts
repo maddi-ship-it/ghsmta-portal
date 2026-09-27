@@ -1174,6 +1174,7 @@ export async function savePanelFeedback(
 ) {
   const editor = await requirePanelNarrativeEditor(applicationId);
   const finalComment = formText(formData, "final_comment");
+  const sourceGeneratedAt = formText(formData, "source_generated_at");
   const ownerRequestedPanelReview = formData.get("approved") === "on";
   if (!finalComment) throw new Error("The final panel comment cannot be blank.");
 
@@ -1192,7 +1193,7 @@ export async function savePanelFeedback(
         .single(),
       admin
         .from("adjudication_panel_feedback")
-        .select("id,status,assigned_to,approved_by,approved_at")
+        .select("id,status,assigned_to,approved_by,approved_at,generated_at")
         .eq("application_id", applicationId)
         .eq("category_id", categoryId)
         .maybeSingle(),
@@ -1232,6 +1233,15 @@ export async function savePanelFeedback(
   const panelAlreadyApproved = ["adjudicator", "advisory_member"].includes(
     existingApprover?.role ?? "",
   );
+
+  if (
+    existingFeedback &&
+    (!sourceGeneratedAt || sourceGeneratedAt !== existingFeedback.generated_at)
+  ) {
+    throw new Error(
+      "This final comment was regenerated after this page loaded. Refresh before saving.",
+    );
+  }
 
   if (editor.role !== "owner") {
     if (
@@ -1411,6 +1421,7 @@ export async function autosavePanelFeedbackDraft(
   applicationId: string,
   categoryId: string,
   draftComment: string,
+  sourceGeneratedAt: string,
 ) {
   const editor = await requirePanelNarrativeEditor(applicationId);
   if (editor.role === "owner") {
@@ -1425,12 +1436,20 @@ export async function autosavePanelFeedbackDraft(
   const admin = createAdminClient();
   const { data: existingFeedback, error: feedbackError } = await admin
     .from("adjudication_panel_feedback")
-    .select("id,status,assigned_to,approved_by")
+    .select("id,status,assigned_to,approved_by,generated_at")
     .eq("application_id", applicationId)
     .eq("category_id", categoryId)
     .maybeSingle();
 
   if (feedbackError) throw new Error(feedbackError.message);
+  if (
+    !sourceGeneratedAt ||
+    sourceGeneratedAt !== existingFeedback?.generated_at
+  ) {
+    throw new Error(
+      "This final comment was regenerated after this page loaded. Refresh before editing.",
+    );
+  }
   if (!existingFeedback?.approved_by || existingFeedback.status !== "approved") {
     throw new Error(
       "The Owner has not sent this final comment to the panel, or it has already been panel-approved.",
@@ -1463,6 +1482,7 @@ export async function autosavePanelFeedbackDraft(
     .eq("status", "approved")
     .eq("assigned_to", editor.id)
     .eq("approved_by", existingFeedback.approved_by)
+    .eq("generated_at", sourceGeneratedAt)
     .select("updated_at")
     .maybeSingle();
 

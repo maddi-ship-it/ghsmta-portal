@@ -20,6 +20,7 @@ type StoredPanelDraft = {
   categoryId: string;
   reviewerId: string;
   value: string;
+  sourceGeneratedAt: string;
   savedAt: string;
 };
 
@@ -27,11 +28,13 @@ export function PanelNarrativeReviewEditor({
   applicationId,
   categoryId,
   currentUserId,
+  generatedAt,
   initialValue,
 }: {
   applicationId: string;
   categoryId: string;
   currentUserId: string;
+  generatedAt: string;
   initialValue: string;
 }) {
   const router = useRouter();
@@ -41,6 +44,7 @@ export function PanelNarrativeReviewEditor({
   const mountedRef = useRef(false);
   const latestValueRef = useRef(initialValue);
   const savedValueRef = useRef(initialValue);
+  const sourceGeneratedAtRef = useRef(generatedAt);
   const [value, setValue] = useState(initialValue);
   const [autosaveState, setAutosaveState] =
     useState<AutosaveState>("saved");
@@ -56,6 +60,7 @@ export function PanelNarrativeReviewEditor({
         categoryId,
         reviewerId: currentUserId,
         value: draftValue,
+        sourceGeneratedAt: sourceGeneratedAtRef.current,
         savedAt: new Date().toISOString(),
       };
       window.localStorage.setItem(storageKey, JSON.stringify(draft));
@@ -94,6 +99,7 @@ export function PanelNarrativeReviewEditor({
           applicationId,
           categoryId,
           draftValue,
+          sourceGeneratedAtRef.current,
         ),
       );
       inFlightRef.current = saveOperation;
@@ -152,6 +158,7 @@ export function PanelNarrativeReviewEditor({
           draft.value !== initialValue
         ) {
           latestValueRef.current = draft.value;
+          sourceGeneratedAtRef.current = draft.sourceGeneratedAt ?? "";
           window.setTimeout(() => {
             if (!mountedRef.current) return;
             setValue(draft.value);
@@ -230,10 +237,11 @@ export function PanelNarrativeReviewEditor({
     if (latestValueRef.current !== savedValueRef.current) return;
     savedValueRef.current = initialValue;
     latestValueRef.current = initialValue;
+    sourceGeneratedAtRef.current = generatedAt;
     window.setTimeout(() => {
       if (mountedRef.current) setValue(initialValue);
     }, 0);
-  }, [initialValue]);
+  }, [generatedAt, initialValue]);
 
   const approveComment = async () => {
     if (!value.trim() || approving) return;
@@ -248,6 +256,7 @@ export function PanelNarrativeReviewEditor({
       const formData = new FormData();
       formData.set("final_comment", value);
       formData.set("approved", "on");
+      formData.set("source_generated_at", sourceGeneratedAtRef.current);
       await savePanelFeedback(applicationId, categoryId, formData);
       clearLocalDraft();
       setAutosaveState("saved");

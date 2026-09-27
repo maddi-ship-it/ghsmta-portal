@@ -178,6 +178,7 @@ function LivePanelFeedbackEditor({
       return JSON.parse(raw) as {
         finalComment?: string;
         approved?: boolean;
+        sourceGeneratedAt?: string;
       };
     } catch {
       window.localStorage.removeItem(storageKey);
@@ -196,6 +197,10 @@ function LivePanelFeedbackEditor({
 
     const formData = new FormData();
     formData.set("final_comment", finalComment);
+    formData.set(
+      "source_generated_at",
+      draft.sourceGeneratedAt ?? "",
+    );
     if (draft.approved) {
       formData.set("approved", "on");
     }
@@ -258,6 +263,7 @@ function LivePanelFeedbackEditor({
       const draft = JSON.parse(raw) as {
         finalComment?: string;
         approved?: boolean;
+        sourceGeneratedAt?: string;
       };
 
       if ((draft.finalComment ?? "").trim() === storedComment) {
@@ -291,6 +297,7 @@ function LivePanelFeedbackEditor({
         categoryId: category.id,
         finalComment,
         approved: Boolean(approved),
+        sourceGeneratedAt: feedback?.generated_at ?? "",
         savedAt: new Date().toISOString(),
       }),
     );
@@ -344,6 +351,11 @@ function LivePanelFeedbackEditor({
           }
         }}
       >
+        <input
+          name="source_generated_at"
+          type="hidden"
+          value={feedback?.generated_at ?? ""}
+        />
         {assignedReviewerName && (
           <div className="final-comment-assignee">
             <span>Assigned final comment writer</span>
