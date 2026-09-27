@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { requireProfile } from "@/lib/auth";
+import { DEFAULT_PANEL_COMMENT_MODEL } from "@/lib/panel-comment-model";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdjudicatorAssignment,
@@ -221,7 +222,7 @@ export default async function ScoringAdminPage({
               </div>
               <div className="field">
                 <label htmlFor="prompt_model">OpenAI model</label>
-                <input className="input" id="prompt_model" name="model" defaultValue={latestGlobalPrompt?.model ?? "gpt-5-mini"} required />
+                <input className="input" id="prompt_model" name="model" defaultValue={latestGlobalPrompt?.model ?? DEFAULT_PANEL_COMMENT_MODEL} required />
               </div>
               <input name="cycle_id" type="hidden" value="" />
               <div className="field">

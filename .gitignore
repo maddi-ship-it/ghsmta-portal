@@ -9,6 +9,9 @@ tmp/
 # Vercel
 .vercel/
 
+# Supabase CLI local state
+supabase/.temp/
+
 # Local environment files
 .env
 .env.local

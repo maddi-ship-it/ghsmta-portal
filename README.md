@@ -71,6 +71,7 @@ For the complete production release, also configure these server-only values:
 - `OPENAI_TRANSCRIBE_MODEL` (optional; defaults to `gpt-4o-mini-transcribe`)
 - `OPENAI_HANDWRITING_MODEL` (optional; defaults to `gpt-5.6-sol`)
 - `OPENAI_ADJUDICATION_SORT_MODEL` (optional; falls back to `OPENAI_MODEL`)
+- `OPENAI_MODEL` (optional; fallback model when an AI prompt does not specify one)
 - `ADOBE_SIGN_ADJUDICATOR_EMBED_URL` — adjudicator Adobe Sign Web Form URL
 - `ADOBE_SIGN_ADVISORY_MEMBER_EMBED_URL` — Advisory Committee Adobe Sign Web Form URL
 
@@ -177,7 +178,7 @@ For AI narrative generation, add these server-only variables locally and in Verc
 
 ```env
 OPENAI_API_KEY=sk-YOUR_OPENAI_API_KEY
-OPENAI_MODEL=gpt-5-mini
+OPENAI_MODEL=gpt-6-sol
 ```
 
 Never prefix the OpenAI key with `NEXT_PUBLIC_`.

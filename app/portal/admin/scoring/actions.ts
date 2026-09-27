@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
+import { DEFAULT_PANEL_COMMENT_MODEL } from "@/lib/panel-comment-model";
 import { createClient } from "@/lib/supabase/server";
 
 export async function assignAdjudicator(formData: FormData) {
@@ -60,7 +61,9 @@ export async function saveAiPrompt(formData: FormData) {
   const promptId = String(formData.get("prompt_id") ?? "").trim();
   const cycleId = String(formData.get("cycle_id") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
-  const model = String(formData.get("model") ?? "gpt-5-mini").trim();
+  const model = String(
+    formData.get("model") ?? DEFAULT_PANEL_COMMENT_MODEL,
+  ).trim();
   const systemPrompt = String(formData.get("system_prompt") ?? "").trim();
   const userPromptTemplate = String(formData.get("user_prompt_template") ?? "").trim();
 

@@ -22,6 +22,7 @@ import {
   resolveGeneratedNarrativeFinal,
   shouldRefreshGeneratedNarrative,
 } from "@/lib/panel-narrative";
+import { resolvePanelCommentModel } from "@/lib/panel-comment-model";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -725,7 +726,7 @@ async function generatePanelCommentDraft(
     raw_comments: rawComments,
   });
 
-  const model = process.env.OPENAI_MODEL || prompt.model || "gpt-5-mini";
+  const model = resolvePanelCommentModel(prompt.model, process.env.OPENAI_MODEL);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
