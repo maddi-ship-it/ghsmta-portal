@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { assignPanelNarrativeReviewer } from "@/app/portal/adjudication/[id]/actions";
 import {
@@ -11,6 +11,10 @@ import {
   type CategoryProposalSaveResult,
 } from "@/app/portal/adjudication/[id]/workflow-actions";
 import { ScheduleSubmitButton } from "@/components/schedule-submit-button";
+import {
+  OPEN_CATEGORY_REVIEW_EVENT,
+  OPEN_PANEL_REVIEW_EVENT,
+} from "@/components/application-reference-bar";
 import { formatTwoPointRangeStart } from "@/lib/adjudication-ranges";
 import type { AppRole, ScoringCategory } from "@/lib/types";
 
@@ -72,6 +76,7 @@ export function AdjudicationConsensusBar({
   role,
   currentUserId,
   approvals,
+  compact = false,
 }: {
   applicationId: string;
   role: AppRole;
@@ -83,6 +88,7 @@ export function AdjudicationConsensusBar({
   narrativesReady: boolean;
   narrativeAssignments: NarrativeAssignment[];
   panelReviewers: PanelReviewer[];
+  compact?: boolean;
 }) {
   const [matrixOpen, setMatrixOpen] = useState(false);
   const [rangeReviewOpen, setRangeReviewOpen] = useState(false);
@@ -134,8 +140,32 @@ export function AdjudicationConsensusBar({
   const canSetDecisions = role === "advisory_member" || role === "owner";
   const canReviewRanges = role === "adjudicator";
 
+  useEffect(() => {
+    if (!compact) return;
+
+    const openCategoryReview = () => {
+      if (canReviewRanges) {
+        setRangeReviewOpen(true);
+      } else if (canSetDecisions) {
+        setMatrixOpen(true);
+      }
+    };
+    const openPanelReview = () => {
+      if (canSetDecisions) setReviewOpen(true);
+    };
+
+    window.addEventListener(OPEN_CATEGORY_REVIEW_EVENT, openCategoryReview);
+    window.addEventListener(OPEN_PANEL_REVIEW_EVENT, openPanelReview);
+
+    return () => {
+      window.removeEventListener(OPEN_CATEGORY_REVIEW_EVENT, openCategoryReview);
+      window.removeEventListener(OPEN_PANEL_REVIEW_EVENT, openPanelReview);
+    };
+  }, [canReviewRanges, canSetDecisions, compact]);
+
   return (
     <>
+      {!compact ? (
       <div className="adjudication-consensus-bar consolidated-consensus-bar">
         <div className="consensus-summary">
           <strong>Eligibility &amp; two-point ranges</strong>
@@ -179,6 +209,7 @@ export function AdjudicationConsensusBar({
           )}
         </div>
       </div>
+      ) : null}
 
       {categorySaveResult.ok && categorySaveResult.message && (
         <div

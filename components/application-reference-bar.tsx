@@ -6,6 +6,11 @@ import type {
   ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 
+export const OPEN_CATEGORY_REVIEW_EVENT =
+  "ghsmta:open-adjudication-category-review";
+export const OPEN_PANEL_REVIEW_EVENT =
+  "ghsmta:open-adjudication-panel-review";
+
 function formatValue(label: string, rawValue: string) {
   const value = rawValue.trim();
   if (!value) return "Not provided";
@@ -42,6 +47,7 @@ function formatValue(label: string, rawValue: string) {
 export function ApplicationReferenceBar({
   links = [],
   panels,
+  reviewActions,
 }: {
   links?: Array<{
     key: string;
@@ -50,6 +56,10 @@ export function ApplicationReferenceBar({
     fileName?: string;
   }>;
   panels: ApplicationReferencePanel[];
+  reviewActions?: {
+    showCategoryReview: boolean;
+    showPanelReview: boolean;
+  };
 }) {
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
@@ -78,11 +88,29 @@ export function ApplicationReferenceBar({
         className="application-reference-bar"
         aria-label="Application reference views"
       >
-        <span className="application-reference-label">
-          Application data
-        </span>
-
         <div className="application-reference-buttons">
+          {reviewActions?.showCategoryReview ? (
+            <button
+              className="application-reference-button application-reference-review-button"
+              onClick={() =>
+                window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
+              }
+              type="button"
+            >
+              Review all categories
+            </button>
+          ) : null}
+          {reviewActions?.showPanelReview ? (
+            <button
+              className="application-reference-button application-reference-review-button"
+              onClick={() =>
+                window.dispatchEvent(new Event(OPEN_PANEL_REVIEW_EVENT))
+              }
+              type="button"
+            >
+              Panel review
+            </button>
+          ) : null}
           {panels.map((panel) => (
             <Fragment key={panel.key}>
               <button

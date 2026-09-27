@@ -2616,3 +2616,246 @@
   border-radius: 0.58rem;
   font-size: 0.59rem;
 }
+
+/* Facebook-inspired social workspace: conversations, feed, and people. */
+.shell {
+  grid-template-columns: minmax(270px, 310px) minmax(0, 1fr) minmax(230px, 270px);
+  min-height: min(820px, calc(100vh - 190px));
+  border-radius: 18px;
+}
+
+.threadWorkspace {
+  padding: 18px clamp(14px, 3vw, 34px) 30px;
+  background:
+    radial-gradient(circle at 50% 0, color-mix(in srgb, var(--portal-blue) 7%, transparent), transparent 28rem),
+    var(--portal-bg-deep);
+}
+
+.newThread,
+.threadFeed {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+
+.newThread {
+  margin-block: 0 14px;
+  border-radius: 14px;
+  box-shadow: var(--portal-shadow);
+}
+
+.newThreadHeading {
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.newThreadHeading strong {
+  color: var(--portal-ivory);
+  font-size: 0.96rem;
+}
+
+.threadFeed {
+  gap: 14px;
+  padding: 0;
+}
+
+.threadCard {
+  border-radius: 14px;
+  box-shadow: var(--portal-shadow);
+}
+
+.threadRoot {
+  padding: 20px;
+}
+
+.reactionBar {
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--portal-line);
+}
+
+.peopleRail {
+  display: flex;
+  min-width: 0;
+  max-height: min(820px, calc(100vh - 190px));
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 18px 14px 22px;
+  border-left: 1px solid var(--portal-line);
+  background: linear-gradient(180deg, var(--portal-surface-2), var(--portal-surface));
+  scrollbar-width: thin;
+}
+
+.aboutChannel {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 14px;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  background: var(--portal-surface-3);
+  text-align: center;
+}
+
+.aboutChannelIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 50%;
+  color: #071328;
+  background: var(--portal-gold);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.aboutChannel h2,
+.peopleHeading h2 {
+  margin: 4px 0 0;
+  color: var(--portal-ivory);
+  font-family: inherit;
+  font-size: 0.93rem;
+}
+
+.aboutChannel p {
+  margin: 6px 0 0;
+  color: var(--portal-muted);
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.peopleVisibility {
+  padding: 5px 9px;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 999px;
+  color: var(--portal-gold-bright);
+  background: color-mix(in srgb, var(--portal-gold) 10%, transparent);
+  font-size: 0.64rem;
+  font-weight: 850;
+}
+
+.peopleSection {
+  min-height: 0;
+}
+
+.peopleHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 4px 8px;
+}
+
+.peopleHeading button,
+.peopleRow > button {
+  border: 0;
+  color: var(--portal-blue);
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.peopleHeading button:hover,
+.peopleHeading button:focus-visible,
+.peopleRow > button:hover,
+.peopleRow > button:focus-visible {
+  color: var(--portal-gold-bright);
+}
+
+.peopleList {
+  display: grid;
+  gap: 3px;
+}
+
+.peopleRow {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px;
+  border-radius: 10px;
+}
+
+.peopleRow:hover {
+  background: var(--portal-surface-hover);
+}
+
+.peopleAvatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 2px solid var(--portal-surface);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--portal-blue-deep);
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.peopleIdentity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.peopleIdentity strong,
+.peopleIdentity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peopleIdentity strong {
+  color: var(--portal-text);
+  font-size: 0.78rem;
+}
+
+.peopleIdentity small,
+.peopleYou,
+.peopleEmpty {
+  color: var(--portal-muted);
+  font-size: 0.65rem;
+}
+
+.peopleRow > button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--portal-surface-3);
+  font-size: 0.86rem;
+}
+
+.peopleYou {
+  font-weight: 800;
+}
+
+.peopleEmpty {
+  padding: 16px 8px;
+  text-align: center;
+}
+
+@media (max-width: 1320px) {
+  .shell {
+    grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  }
+
+  .peopleRail {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .threadWorkspace {
+    padding: 14px;
+  }
+
+  .newThread,
+  .threadFeed {
+    width: 100%;
+  }
+}

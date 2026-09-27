@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { signOut } from "@/app/portal/actions";
 import { AutoClosingDetails } from "@/components/auto-closing-details";
+import { PortalNavLink } from "@/components/portal-nav-link";
 import { PortalUtilities } from "@/components/portal-utilities";
 import { roleLabel } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -13,10 +14,7 @@ type UnreadCounts = {
   chat_channel_count: number;
 };
 
-function buildNavigation(
-  profile: Profile,
-  chatMessageCount: number,
-) {
+function buildNavigation(profile: Profile) {
   const primary: NavItem[] = [
     {
       href: "/portal",
@@ -30,17 +28,17 @@ function buildNavigation(
       shortLabel: "Schedule",
       icon: "◷",
     },
-    {
-      href: "/portal/chat",
-      label: "Chat",
-      icon: "✉",
-      badgeCount: chatMessageCount,
-    },
   ];
 
   const resources: NavItem[] =
     profile.role === "program_manager"
-      ? []
+      ? [
+          {
+            href: "/portal/feedback",
+            label: "My requests",
+            icon: "?",
+          },
+        ]
       : [
           {
             href: "/portal/files",
@@ -59,6 +57,11 @@ function buildNavigation(
             label: "Requests & appeals",
             shortLabel: "Requests",
             icon: "⚖",
+          },
+          {
+            href: "/portal/feedback",
+            label: "My requests",
+            icon: "?",
           },
         ];
 
@@ -196,36 +199,13 @@ type NavItem = {
   label: string;
   shortLabel?: string;
   icon: string;
-  badgeCount?: number;
 };
 
-function renderBadge(
-  count: number | undefined,
-  options: { liveChat?: boolean } = {},
-) {
-  if ((!count || count < 1) && !options.liveChat) {
-    return null;
-  }
-
-  return (
-    <span
-      className="portal-nav-badge"
-      aria-label={`${count ?? 0} unread`}
-      data-live-chat-badge={options.liveChat ? "true" : undefined}
-      hidden={options.liveChat && (!count || count < 1)}
-    >
-      {count && count > 99 ? "99+" : count}
-    </span>
-  );
-}
-
 function DesktopLink({ item }: { item: NavItem }) {
-  const isChat = item.href === "/portal/chat";
   return (
-    <Link href={item.href} className="portal-desktop-link">
+    <PortalNavLink href={item.href} className="portal-desktop-link">
       <span>{item.label}</span>
-      {renderBadge(item.badgeCount, { liveChat: isChat })}
-    </Link>
+    </PortalNavLink>
   );
 }
 
@@ -242,6 +222,7 @@ function DesktopMenu({
 
   return (
     <AutoClosingDetails
+      activeHrefs={items.map((item) => item.href)}
       className="portal-nav-menu"
       summary={
         <>
@@ -255,13 +236,12 @@ function DesktopMenu({
     >
       <div className="portal-nav-menu-popover">
         {items.map((item) => (
-          <Link href={item.href} key={item.href}>
+          <PortalNavLink href={item.href} key={item.href}>
             <span className="portal-nav-menu-icon" aria-hidden="true">
               {item.icon}
             </span>
             <span>{item.label}</span>
-            {renderBadge(item.badgeCount, { liveChat: item.href === "/portal/chat" })}
-          </Link>
+          </PortalNavLink>
         ))}
       </div>
     </AutoClosingDetails>
@@ -288,7 +268,7 @@ export async function PortalHeader({
     countRow?.chat_message_count ?? 0,
   );
 
-  const navigation = buildNavigation(profile, chatMessageCount);
+  const navigation = buildNavigation(profile);
   const displayName =
     profile.preferred_name ??
     profile.full_name ??
@@ -328,6 +308,7 @@ export async function PortalHeader({
             />
 
             <AutoClosingDetails
+              activeHrefs={["/portal/account"]}
               className="portal-account-menu"
               summaryAriaLabel="Open account menu"
               summary={
@@ -355,6 +336,7 @@ export async function PortalHeader({
                 </div>
 
                 <Link href="/portal/account">Account settings</Link>
+                <Link href="/portal/feedback">My bug &amp; feature requests</Link>
 
                 <form action={signOut}>
                   <button type="submit">Sign out</button>
@@ -370,13 +352,12 @@ export async function PortalHeader({
         aria-label="Mobile portal navigation"
       >
         {navigation.mobile.map((item) => (
-          <Link href={item.href} key={item.href}>
+          <PortalNavLink href={item.href} key={item.href}>
             <span className="mobile-nav-icon" aria-hidden="true">
               {item.icon}
-              {renderBadge(item.badgeCount, { liveChat: item.href === "/portal/chat" })}
             </span>
             <small>{item.shortLabel ?? item.label}</small>
-          </Link>
+          </PortalNavLink>
         ))}
       </nav>
     </>

@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { createInvoicePdf } from "@/lib/reports/invoice-pdf";
+import { portalSiteUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { INVOICE_SCHOOL_CHAT_CHANNEL_TYPE } from "./delivery-routing";
@@ -18,15 +19,6 @@ function escapeHtml(value: string) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
-}
-
-function siteUrl() {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "http://localhost:3000")
-  ).replace(/\/$/, "");
 }
 
 export async function deliverSchoolInvoice(
@@ -83,7 +75,7 @@ export async function deliverSchoolInvoice(
     schoolName,
     deliveryType,
   );
-  const invoiceUrl = `${siteUrl()}/portal/invoices/${invoice.id}/pdf`;
+  const invoiceUrl = `${portalSiteUrl()}/portal/invoices/${invoice.id}/pdf`;
   const paymentUrl = invoice.payment_url as string | null;
   const promoCode = invoice.payment_promo_code as string | null;
   const actionUrl =

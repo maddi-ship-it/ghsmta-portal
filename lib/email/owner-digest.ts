@@ -1,6 +1,7 @@
 "server-only";
 
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import { portalSiteUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 
 type OwnerProfile = {
@@ -428,10 +429,7 @@ export async function sendOwnerDigestEmail(
     variables,
   );
 
-  const baseUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "https://ghsmta-portal.vercel.app"
-  ).replace(/\/+$/, "");
+  const baseUrl = portalSiteUrl();
   const reportUrl = `${baseUrl}/portal/admin/reports`;
 
   const activities = (activitiesResult.data ?? []) as DigestActivity[];

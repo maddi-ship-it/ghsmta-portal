@@ -2110,8 +2110,8 @@ export function TeamsChat({
                   {initials(profile.full_name ?? profile.email ?? "User")}
                 </span>
                 <div>
-                  <strong>Start a conversation</strong>
-                  <p>Post a topic, then continue it as a thread.</p>
+                  <strong>Share an update</strong>
+                  <p>Post to this group and continue the conversation in comments.</p>
                 </div>
               </div>
 
@@ -2600,6 +2600,59 @@ export function TeamsChat({
           </div>
         )}
       </section>
+
+      <aside className={styles.peopleRail} aria-label="Conversation details">
+        <section className={styles.aboutChannel}>
+          <span className={styles.aboutChannelIcon} aria-hidden="true">
+            {channelIcon(activeChannel.channel_type)}
+          </span>
+          <div>
+            <span className="eyebrow">About this group</span>
+            <h2>{activeChannel.channel_name}</h2>
+            <p>{activeChannel.channel_description ?? activeChannel.visibility_label}</p>
+          </div>
+          <span className={styles.peopleVisibility}>{activeChannel.visibility_label}</span>
+        </section>
+
+        <section className={styles.peopleSection}>
+          <div className={styles.peopleHeading}>
+            <div>
+              <span className="eyebrow">People</span>
+              <h2>{members.length} in this chat</h2>
+            </div>
+            <button onClick={openMemberDirectory} type="button">See all</button>
+          </div>
+
+          <div className={styles.peopleList}>
+            {members.slice(0, 12).map((member) => (
+              <div className={styles.peopleRow} key={member.user_id}>
+                <span className={styles.peopleAvatar} aria-hidden="true">
+                  {initials(member.display_name)}
+                </span>
+                <span className={styles.peopleIdentity}>
+                  <strong>{member.display_name}</strong>
+                  <small>{roleName(member.user_role)}</small>
+                </span>
+                {member.user_id === profile.id ? (
+                  <span className={styles.peopleYou}>You</span>
+                ) : (
+                  <button
+                    aria-label={`Message ${member.display_name}`}
+                    disabled={isPending}
+                    onClick={() => beginDirectMessage(member)}
+                    type="button"
+                  >
+                    ✉
+                  </button>
+                )}
+              </div>
+            ))}
+            {members.length === 0 && (
+              <p className={styles.peopleEmpty}>No member list is available.</p>
+            )}
+          </div>
+        </section>
+      </aside>
 
       {showMembers && (
         <MemberDirectoryDialog

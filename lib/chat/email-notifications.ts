@@ -1,4 +1,5 @@
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import { portalSiteUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type RecipientProfile = {
@@ -29,15 +30,6 @@ type ChatChannel = {
       }>
     | null;
 };
-
-function siteUrl() {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "http://localhost:3000")
-  ).replace(/\/$/, "");
-}
 
 function escapeHtml(value: string) {
   return value
@@ -425,7 +417,7 @@ export async function sendChatEmailNotifications({
     return;
   }
 
-  const chatUrl = `${siteUrl()}/portal/chat?channel=${channelId}`;
+  const chatUrl = `${portalSiteUrl()}/portal/chat?channel=${channelId}`;
   const preview = truncate(body.replace(/\s+/g, " ").trim(), 500);
   const emailSubject = `New chat message — ${label}`;
   const emailText = `${authorName} posted in ${label}.\n\n${subject}\n\n${preview}\n\nOpen Chat: ${chatUrl}`;

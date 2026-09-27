@@ -10,6 +10,7 @@ import {
   readImpersonationCookieValue,
   serializeImpersonationCookie,
 } from "@/lib/impersonation";
+import { portalSiteUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -84,10 +85,7 @@ export async function startApplicantImpersonation(targetUserId: string, formData
   }
 
   const headerStore = await headers();
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    headerStore.get("origin") ??
-    "http://localhost:3000";
+  const siteUrl = portalSiteUrl(headerStore.get("origin"));
   const startedAt = new Date().toISOString();
 
   const { data: audit, error: auditError } = await admin

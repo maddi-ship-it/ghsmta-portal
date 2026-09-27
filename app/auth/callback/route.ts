@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { safePortalRedirectPath } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/portal";
+  const next = safePortalRedirectPath(url.searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

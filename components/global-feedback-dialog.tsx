@@ -91,7 +91,7 @@ export function GlobalFeedbackDialog({ profile }: { profile: Profile }) {
             <div className="field"><label htmlFor="feedback_description">What happened, or what would help?</label><textarea className="textarea" id="feedback_description" name="description" rows={7} minLength={10} required /></div>
             <div className="field"><label htmlFor="feedback_files">Screenshot or supporting file</label><input className="input file-input" id="feedback_files" name="files" type="file" multiple /></div>
             <p className="privacy-note">The portal automatically includes your current page, role, browser, and screen size so the team can reproduce the issue.</p>
-            <div className="modal-actions"><button className="button button-secondary" type="button" onClick={() => setOpen(false)}>Cancel</button><button className="button button-gold" type="submit" disabled={busy}>{busy ? "Submitting…" : "Submit request"}</button></div>
+            <div className="modal-actions"><Link className="button button-secondary" href="/portal/feedback" onClick={() => setOpen(false)}>View my requests</Link><button className="button button-secondary" type="button" onClick={() => setOpen(false)}>Cancel</button><button className="button button-gold" type="submit" disabled={busy}>{busy ? "Submitting…" : "Submit request"}</button></div>
           </form>
         )}
       </div>

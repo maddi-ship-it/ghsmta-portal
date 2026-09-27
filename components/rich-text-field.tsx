@@ -47,6 +47,7 @@ export function RichTextField({
   disabled = false,
   placeholder,
   helpText,
+  onValueChange,
 }: {
   id: string;
   name: string;
@@ -55,6 +56,7 @@ export function RichTextField({
   disabled?: boolean;
   placeholder?: string;
   helpText?: string;
+  onValueChange?: (value: string) => void;
 }) {
   const editorRef =
     useRef<HTMLDivElement>(null);
@@ -118,11 +120,9 @@ export function RichTextField({
       return;
     }
 
-    setValue(
-      sanitizeRichTextHtml(
-        editor.innerHTML,
-      ),
-    );
+    const nextValue = sanitizeRichTextHtml(editor.innerHTML);
+    setValue(nextValue);
+    onValueChange?.(nextValue);
   };
 
   const runCommand = (

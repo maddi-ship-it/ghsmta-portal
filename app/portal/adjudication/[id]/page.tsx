@@ -11,6 +11,7 @@ import {
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
+import { AdjudicationCategorySidebar } from "@/components/adjudication-category-sidebar";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
@@ -18,6 +19,7 @@ import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudicatio
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
+import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -764,7 +766,51 @@ export default async function AdjudicationApplicationPage({
     : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
   const canComment = Boolean(ownParticipantResult.data?.can_comment);
+  const ownScores = scores.filter(
+    (score) => score.scorecard_id === ownScorecard?.id,
+  );
+  const ownScoreByCriterion = new Map(
+    ownScores.map((score) => [score.criterion_id, score]),
+  );
+  const proposalByCategory = new Map(
+    (proposalResult.data ?? []).map((proposal) => [
+      proposal.category_id,
+      proposal,
+    ]),
+  );
+  const ownApprovalByProposal = new Map(
+    (approvalResult.data ?? [])
+      .filter((approval) => approval.adjudicator_user_id === profile.id)
+      .map((approval) => [approval.proposal_id, approval]),
+  );
+  const initiallyCompletedCategoryIds =
+    isScoringParticipant
+      ? categories
+          .filter((category) => {
+            const proposal = proposalByCategory.get(category.id);
+            const approval = proposal
+              ? ownApprovalByProposal.get(proposal.id)
+              : undefined;
+
+            return isAdjudicationCategoryComplete({
+              comments: criteria
+                .filter((criterion) => criterion.category_id === category.id)
+                .map(
+                  (criterion) =>
+                    ownScoreByCriterion.get(criterion.id)?.observation,
+                ),
+              rangeApproved:
+                proposal?.status === "overridden" ||
+                approval?.response === "approved",
+            });
+          })
+          .map((category) => category.id)
+      : [];
   const referenceLinks = await referenceLinksPromise;
+  const showConsensusControls = isScoringParticipant || canPanelReview;
+  const compactConsensusControls =
+    showConsensusControls &&
+    (profile.role === "adjudicator" || profile.role === "advisory_member");
 
   return (
     <>
@@ -797,9 +843,19 @@ export default async function AdjudicationApplicationPage({
         </div>
       )}
 
-      <ApplicationReferenceBar links={referenceLinks} panels={referencePanels} />
+      <ApplicationReferenceBar
+        links={referenceLinks}
+        panels={referencePanels}
+        reviewActions={compactConsensusControls
+          ? {
+              showCategoryReview: true,
+              showPanelReview:
+                profile.role === "advisory_member" && canPanelReview,
+            }
+          : undefined}
+      />
 
-      {(isScoringParticipant || canPanelReview) && (
+      {showConsensusControls && (
       <AdjudicationConsensusBar
         applicationId={id}
         approvals={(approvalResult.data ?? []) as Array<{
@@ -836,32 +892,16 @@ export default async function AdjudicationApplicationPage({
         review={reviewResult.data as { status: string; owner_note: string | null } | null}
         panelReviewers={panelNarrativeReviewers}
         role={profile.role}
+        compact={compactConsensusControls}
       />
       )}
 
       <div className="adjudication-score-layout">
-        <aside className="score-category-sidebar">
-          <div className="score-category-sidebar-heading">
-            <span className="eyebrow">Scorecard</span>
-            <h2>Categories</h2>
-            <p>Select a category to jump to that section.</p>
-          </div>
-
-          <nav
-            className="score-category-tabs"
-            aria-label="Scoring categories"
-          >
-            {categories.map((category, index) => (
-              <a
-                href={`#category-${category.id}`}
-                key={category.id}
-              >
-                <span>{index + 1}</span>
-                <strong>{category.title}</strong>
-              </a>
-            ))}
-          </nav>
-        </aside>
+        <AdjudicationCategorySidebar
+          categories={categories}
+          initialCompletedCategoryIds={initiallyCompletedCategoryIds}
+          showCompletion={isScoringParticipant}
+        />
 
         <div className="adjudication-score-content">
       {isScoringParticipant ? (
@@ -915,9 +955,7 @@ export default async function AdjudicationApplicationPage({
             panelReviewers={panelNarrativeReviewers}
             panelApprovedCategoryIds={panelApprovedCategoryIds}
             reviewStatus={reviewResult.data?.status ?? "draft"}
-            ownScores={scores.filter(
-              (score) => score.scorecard_id === ownScorecard?.id,
-            )}
+            ownScores={ownScores}
             canComment={canComment}
             readOnly={readOnly}
             scoreOptions={scoreChoices}

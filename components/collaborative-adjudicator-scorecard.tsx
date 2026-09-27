@@ -14,6 +14,10 @@ import { savePanelFeedback } from "@/app/portal/adjudication/[id]/actions";
 import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow-actions";
 import { CategoryScoringControls } from "@/components/category-scoring-controls";
 import { RichTextField } from "@/components/rich-text-field";
+import {
+  ADJUDICATION_CATEGORY_COMPLETION_EVENT,
+  isAdjudicationCategoryComplete,
+} from "@/lib/adjudication-category-completion";
 import { createClient } from "@/lib/supabase/client";
 import { roundScoreAverage } from "@/lib/adjudication";
 import {
@@ -420,6 +424,15 @@ function CategoryScoreSection({
         }),
       ),
   );
+  const [commentValues, setCommentValues] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        categoryCriteria.map((criterion) => [
+          criterion.id,
+          ownScoreMap.get(criterion.id)?.observation ?? "",
+        ]),
+      ),
+  );
 
   useEffect(() => {
     const openFromHash = () => {
@@ -500,6 +513,13 @@ function CategoryScoreSection({
     }));
   };
 
+  const updateComment = (criterionId: string, nextValue: string) => {
+    setCommentValues((current) => ({
+      ...current,
+      [criterionId]: nextValue,
+    }));
+  };
+
   const decisionResponseState =
     !officialProposal
       ? "awaiting"
@@ -533,6 +553,24 @@ function CategoryScoreSection({
           ? "Review and approve or dispute this panel decision."
           : "The Advisory Committee has not finalized this category.";
 
+  const categoryComplete = isAdjudicationCategoryComplete({
+    comments: categoryCriteria.map(
+      (criterion) => commentValues[criterion.id],
+    ),
+    rangeApproved: decisionResponseState === "approved",
+  });
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent(ADJUDICATION_CATEGORY_COMPLETION_EVENT, {
+        detail: {
+          categoryId: category.id,
+          complete: categoryComplete,
+        },
+      }),
+    );
+  }, [category.id, categoryComplete]);
+
   return (
     <section
       className={[
@@ -545,7 +583,7 @@ function CategoryScoreSection({
         .join(" ")}
       id={`category-${category.id}`}
     >
-      <div className="panel-header scoring-category-header">
+      <div className="scoring-category-sticky-title">
         <button
           aria-expanded={expanded}
           className="category-collapse-toggle"
@@ -555,14 +593,17 @@ function CategoryScoreSection({
           <span className="category-collapse-icon" aria-hidden="true">
             {expanded ? "−" : "+"}
           </span>
-          <span className="scoring-category-heading-copy">
-            <span className="section-order">
-              Category {categoryIndex + 1}
-            </span>
-            <strong className="category-collapse-title">{category.title}</strong>
-            {category.guidance && <small>{category.guidance}</small>}
-          </span>
+          <strong className="category-collapse-title">{category.title}</strong>
         </button>
+      </div>
+
+      <div className="panel-header scoring-category-header">
+        <div className="scoring-category-heading-copy scoring-category-context">
+          <span className="section-order">
+            Category {categoryIndex + 1}
+          </span>
+          {category.guidance && <small>{category.guidance}</small>}
+        </div>
 
         <div className="scoring-category-header-actions">
           <CategoryAverageSummary
@@ -797,6 +838,9 @@ function CategoryScoreSection({
                             id={`observation_${criterion.id}`}
                             label={`${member.name} · Your comment`}
                             name={`observation_${criterion.id}`}
+                            onValueChange={(value) =>
+                              updateComment(criterion.id, value)
+                            }
                             placeholder="Enter your observable notes for this criterion"
                           />
                         ) : isCurrentUser ? (

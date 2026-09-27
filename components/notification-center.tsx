@@ -74,9 +74,19 @@ export function NotificationCenter({
   );
 
   const refreshChatChannels = useCallback(async () => {
-    const { data, error } = await supabase.rpc(
-      "get_my_chat_channels",
-    );
+    let { data, error } = await supabase.rpc("get_my_chat_channels_v4");
+
+    if (error) {
+      const fallbackResult = await supabase.rpc("get_my_chat_channels_v3");
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+
+    if (error) {
+      const legacyResult = await supabase.rpc("get_my_chat_channels");
+      data = legacyResult.data;
+      error = legacyResult.error;
+    }
 
     if (!error) {
       setChatChannels((data ?? []) as ChatChannelRow[]);

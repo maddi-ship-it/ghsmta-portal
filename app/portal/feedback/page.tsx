@@ -1,12 +1,9 @@
-import { redirect } from "next/navigation";
-
 import { requireProfile } from "@/lib/auth";
 import { FEEDBACK_STATUS_LABELS } from "@/lib/feedback";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function FeedbackPage() {
   const profile = await requireProfile();
-  if (profile.role === "owner") redirect("/portal/admin/feedback");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("portal_feedback_requests")

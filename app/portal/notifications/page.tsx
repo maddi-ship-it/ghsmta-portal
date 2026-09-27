@@ -6,7 +6,7 @@ export default async function NotificationsPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
 
-  const [notificationResult, channelResult] = await Promise.all([
+  const [notificationResult, richChannelResult] = await Promise.all([
     supabase
       .from("user_notifications")
       .select(
@@ -15,15 +15,29 @@ export default async function NotificationsPage() {
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(200),
-    supabase.rpc("get_my_chat_channels"),
+    supabase.rpc("get_my_chat_channels_v4"),
   ]);
+  let channelData = richChannelResult.data;
+  let channelError = richChannelResult.error;
+
+  if (channelError) {
+    const fallbackResult = await supabase.rpc("get_my_chat_channels_v3");
+    channelData = fallbackResult.data;
+    channelError = fallbackResult.error;
+  }
+
+  if (channelError) {
+    const legacyResult = await supabase.rpc("get_my_chat_channels");
+    channelData = legacyResult.data;
+    channelError = legacyResult.error;
+  }
 
   if (notificationResult.error) {
     throw new Error(notificationResult.error.message);
   }
 
-  if (channelResult.error) {
-    throw new Error(channelResult.error.message);
+  if (channelError) {
+    throw new Error(channelError.message);
   }
 
   return (
@@ -41,7 +55,7 @@ export default async function NotificationsPage() {
 
       <NotificationCenter
         initialNotifications={notificationResult.data ?? []}
-        initialChatChannels={channelResult.data ?? []}
+        initialChatChannels={channelData ?? []}
         userId={profile.id}
       />
     </>

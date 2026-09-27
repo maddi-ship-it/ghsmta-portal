@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canSelfJoinScheduleSlot,
+  scheduleStaffCapacity,
   scheduleSlotHasAdvisoryMember,
 } from "./schedule-staff";
 
@@ -34,5 +35,31 @@ describe("schedule advisory capacity", () => {
         status: "open",
       }),
     ).toBe(true);
+  });
+});
+
+describe("schedule staff capacity", () => {
+  it("counts adjudicator panel seats separately from the advisory member", () => {
+    const capacity = scheduleStaffCapacity([
+      { role: "adjudicator", participation_mode: "panel" },
+      { role: "adjudicator", participation_mode: "panel" },
+      { role: "adjudicator", participation_mode: "panel" },
+      { role: "advisory_member", participation_mode: "panel" },
+    ]);
+
+    expect(capacity.adjudicators).toBe(3);
+    expect(capacity.adjudicatorsFull).toBe(true);
+  });
+
+  it("caps one understudy and three shadows", () => {
+    const capacity = scheduleStaffCapacity([
+      { role: "adjudicator", participation_mode: "understudy" },
+      { role: "adjudicator", participation_mode: "shadow" },
+      { role: "adjudicator", participation_mode: "shadow" },
+      { role: "adjudicator", participation_mode: "shadow" },
+    ]);
+
+    expect(capacity.understudiesFull).toBe(true);
+    expect(capacity.shadowsFull).toBe(true);
   });
 });

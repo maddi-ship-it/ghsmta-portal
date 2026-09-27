@@ -23,6 +23,8 @@ import {
 } from "@/lib/schedule-location";
 import {
   canSelfJoinScheduleSlot,
+  SCHEDULE_STAFF_LIMITS,
+  scheduleStaffCapacity,
   scheduleSlotHasAdvisoryMember,
 } from "@/lib/schedule-staff";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -574,7 +576,7 @@ export default async function SchedulePage({
         case 'waitlisted':
           return slotWaitlistCount(slot) > 0;
         case 'understaffed':
-          return participants.filter((participant) => participant.participation_mode === "panel").length < 3;
+          return scheduleStaffCapacity(participants).adjudicators < SCHEDULE_STAFF_LIMITS.adjudicators;
         case 'mine':
           return Boolean(availabilityItem?.is_mine) ||
             participants.some((participant) => participant.user_id === profile.id);
@@ -606,8 +608,8 @@ export default async function SchedulePage({
 
       if (selectedSort === 'staff_desc') {
         const result =
-          (staffBySlot.get(right.id)?.filter((participant) => participant.participation_mode === "panel").length ?? 0) -
-          (staffBySlot.get(left.id)?.filter((participant) => participant.participation_mode === "panel").length ?? 0);
+          scheduleStaffCapacity(staffBySlot.get(right.id) ?? []).adjudicators -
+          scheduleStaffCapacity(staffBySlot.get(left.id) ?? []).adjudicators;
         if (result !== 0) return result;
       }
 
@@ -1177,9 +1179,16 @@ export default async function SchedulePage({
                 fallbackLocation: slot.location,
               });
               const participants = staffBySlot.get(slot.id) ?? [];
-              const panelists = participants.filter(
-                (participant) => participant.participation_mode === "panel",
-              );
+              const staffCapacity = scheduleStaffCapacity(participants);
+              const defaultJoinMode =
+                profile.role === "advisory_member" ||
+                !staffCapacity.adjudicatorsFull
+                  ? "panel"
+                  : !staffCapacity.understudiesFull
+                    ? "understudy"
+                    : !staffCapacity.shadowsFull
+                      ? "shadow"
+                      : "panel";
               const currentEnrollment = participants.find(
                 (participant) => participant.user_id === profile.id,
               );
@@ -1259,8 +1268,8 @@ export default async function SchedulePage({
                         <small>{cycle ? `${cycle.season_year} · ${cycle.name}` : "Program"}</small>
                       </span>
                       <span className="schedule-list-metric">
-                        <strong>{panelists.length}</strong>
-                        <small>panel</small>
+                        <strong>{staffCapacity.adjudicators}</strong>
+                        <small>adjudicators</small>
                       </span>
                       <span className="schedule-list-metric">
                         <strong>{waitlistCount}</strong>
@@ -1386,7 +1395,9 @@ export default async function SchedulePage({
                               <span className="eyebrow">Review team</span>
                               <h3>Adjudicators &amp; advisory members</h3>
                             </div>
-                            <span className="badge">{panelists.length} panel · {participants.length} total</span>
+                            <span className="badge">
+                              {staffCapacity.adjudicators}/{SCHEDULE_STAFF_LIMITS.adjudicators} adjudicators · {staffCapacity.understudies}/{SCHEDULE_STAFF_LIMITS.understudies} understudy · {staffCapacity.shadows}/{SCHEDULE_STAFF_LIMITS.shadows} shadows
+                            </span>
                           </div>
 
                           {participants.length === 0 ? (
@@ -1411,9 +1422,34 @@ export default async function SchedulePage({
                                       <form action={ownerAddStaff.bind(null, slot.id)} className="schedule-participant-mode-form">
                                         <input name="user_id" type="hidden" value={participant.user_id} />
                                         <select aria-label={`Participation mode for ${personName(participant)}`} className="select input-compact" defaultValue={participant.participation_mode} name="participation_mode">
-                                          <option value="panel">Panel</option>
-                                          <option value="understudy">Understudy</option>
-                                          <option value="shadow">Shadow</option>
+                                          <option
+                                            disabled={
+                                              participant.role === "adjudicator" &&
+                                              participant.participation_mode !== "panel" &&
+                                              staffCapacity.adjudicatorsFull
+                                            }
+                                            value="panel"
+                                          >
+                                            Panel adjudicator
+                                          </option>
+                                          <option
+                                            disabled={
+                                              participant.participation_mode !== "understudy" &&
+                                              staffCapacity.understudiesFull
+                                            }
+                                            value="understudy"
+                                          >
+                                            Understudy
+                                          </option>
+                                          <option
+                                            disabled={
+                                              participant.participation_mode !== "shadow" &&
+                                              staffCapacity.shadowsFull
+                                            }
+                                            value="shadow"
+                                          >
+                                            Shadow
+                                          </option>
                                         </select>
                                         <button className="text-button" type="submit">Update</button>
                                       </form>
@@ -1477,14 +1513,20 @@ export default async function SchedulePage({
                               <form action={joinScheduleSlot} className="schedule-join-form">
                                 <input name="slot_id" type="hidden" value={slot.id} />
                                 <label className="sr-only" htmlFor={`join_mode_${slot.id}`}>Participation type</label>
-                                <select className="select" defaultValue="panel" id={`join_mode_${slot.id}`} name="participation_mode">
-                                  <option value="panel">Panel — score the assigned school</option>
-                                  <option value="understudy">Understudy — available to be promoted</option>
-                                  <option value="shadow">Shadow — observe without scoring</option>
+                                <select className="select" defaultValue={defaultJoinMode} id={`join_mode_${slot.id}`} name="participation_mode">
+                                  <option disabled={profile.role === "adjudicator" && staffCapacity.adjudicatorsFull} value="panel">Panel — score the assigned school</option>
+                                  <option disabled={staffCapacity.understudiesFull} value="understudy">Understudy — available to be promoted</option>
+                                  <option disabled={staffCapacity.shadowsFull} value="shadow">Shadow — observe without scoring</option>
                                 </select>
                                 <button
                                   className="button button-dark"
-                                  disabled={!canSelfJoin}
+                                  disabled={
+                                    !canSelfJoin ||
+                                    (profile.role === "adjudicator" &&
+                                      staffCapacity.adjudicatorsFull &&
+                                      staffCapacity.understudiesFull &&
+                                      staffCapacity.shadowsFull)
+                                  }
                                   type="submit"
                                 >
                                   {isPast
@@ -1500,6 +1542,9 @@ export default async function SchedulePage({
                                       Each slot can have one Advisory Committee member.
                                     </small>
                                   )}
+                                <small>
+                                  Capacity: {staffCapacity.adjudicators}/{SCHEDULE_STAFF_LIMITS.adjudicators} adjudicators, {staffCapacity.understudies}/{SCHEDULE_STAFF_LIMITS.understudies} understudy, and {staffCapacity.shadows}/{SCHEDULE_STAFF_LIMITS.shadows} shadows.
+                                </small>
                               </form>
                             )}
                           </div>

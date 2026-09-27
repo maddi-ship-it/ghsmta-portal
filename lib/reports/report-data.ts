@@ -8,6 +8,7 @@ import {
   type ReportFormat,
   type ReportVariant,
 } from "@/lib/reports/report-definitions";
+import { portalSiteUrl } from "@/lib/site-url";
 
 type SupabaseLike = {
   from: (table: string) => any;
@@ -263,8 +264,7 @@ function timeRange(start: string | null | undefined, end: string | null | undefi
 }
 
 function portalLink(path: string) {
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/+$/, "");
-  return baseUrl ? `${baseUrl}${path}` : path;
+  return `${portalSiteUrl()}${path}`;
 }
 
 function questionHaystack(question: BillingQuestionRow) {

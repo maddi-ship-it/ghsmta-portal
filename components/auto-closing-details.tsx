@@ -8,6 +8,8 @@ import {
   useRef,
 } from "react";
 
+import { isPortalRouteActive } from "@/lib/portal-navigation";
+
 const HEADER_MENU_OPEN_EVENT = "ghsmta:header-menu-open";
 
 type AutoClosingDetailsProps = {
@@ -15,6 +17,7 @@ type AutoClosingDetailsProps = {
   summary: ReactNode;
   children: ReactNode;
   summaryAriaLabel?: string;
+  activeHrefs?: string[];
 };
 
 export function AutoClosingDetails({
@@ -22,10 +25,13 @@ export function AutoClosingDetails({
   summary,
   children,
   summaryAriaLabel,
+  activeHrefs,
 }: AutoClosingDetailsProps) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const pathname = usePathname();
   const menuId = useId();
+  const active =
+    activeHrefs?.some((href) => isPortalRouteActive(pathname, href)) ?? false;
 
   const closeMenu = () => {
     detailsRef.current?.removeAttribute("open");
@@ -110,12 +116,17 @@ export function AutoClosingDetails({
 
   return (
     <details
-      className={className}
+      className={`${className}${active ? " is-active" : ""}`}
       ref={detailsRef}
       onToggle={handleToggle}
       onClickCapture={handleClickCapture}
     >
-      <summary aria-label={summaryAriaLabel}>{summary}</summary>
+      <summary
+        aria-current={active ? "page" : undefined}
+        aria-label={summaryAriaLabel}
+      >
+        {summary}
+      </summary>
       {children}
     </details>
   );
