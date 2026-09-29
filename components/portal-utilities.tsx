@@ -637,6 +637,16 @@ export function PortalUtilities({
                       Reply in full chat
                     </Link>
                   </div>
+                ) : selectedChatChannel.channel_type === "portal_updates" && profile.role !== "owner" ? (
+                  <div className="header-chat-threaded-note">
+                    <span>Portal Updates is read-only. Only Owners can post.</span>
+                    <Link
+                      href={`/portal/chat?channel=${selectedChatChannel.channel_id}`}
+                      onClick={() => setChatOpen(false)}
+                    >
+                      Open updates
+                    </Link>
+                  </div>
                 ) : (
                   <form className="header-chat-composer" onSubmit={handleChatSubmit}>
                     <label className="sr-only" htmlFor="header-chat-message">

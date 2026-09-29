@@ -19,6 +19,7 @@ import {
   createChatMessage,
   createChatPost,
   createChatReply,
+  editChatMessage,
   markChatChannelUnread,
   moderateChatPost,
   ownerDeleteChatMessage,
@@ -42,6 +43,7 @@ export type ChannelType =
   | "general"
   | "networking"
   | "advisory_committee"
+  | "portal_updates"
   | "direct_message"
   | "group_direct_message";
 
@@ -123,6 +125,7 @@ export type ChatThread = {
 
 type FlatMessage = {
   id: string;
+  post_id: string;
   body: string;
   created_at: string;
   updated_at: string;
@@ -200,18 +203,33 @@ function formatFileSize(value: number) {
 }
 
 function ChatFilePicker() {
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
   return (
-    <label className={styles.filePicker}>
-      <span aria-hidden="true">＋</span>
-      <span>Attach files</span>
-      <input
-        accept={PORTAL_FILE_ACCEPT}
-        multiple
-        name="attachments"
-        type="file"
-      />
-      <small>Up to 25 MB each</small>
-    </label>
+    <div className={styles.filePickerGroup}>
+      <label className={styles.filePicker}>
+        <span aria-hidden="true">＋</span>
+        <span>Attach files</span>
+        <input
+          accept={PORTAL_FILE_ACCEPT}
+          multiple
+          name="attachments"
+          onChange={(event) => setSelectedFiles(Array.from(event.target.files ?? []))}
+          type="file"
+        />
+        <small>Up to 25 MB each</small>
+      </label>
+      {selectedFiles.length > 0 && (
+        <div className={styles.selectedFiles} aria-live="polite">
+          {selectedFiles.map((file) => (
+            <span key={`${file.name}-${file.size}-${file.lastModified}`}>
+              <strong>{file.name}</strong>
+              <small>{formatFileSize(file.size)}</small>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -223,17 +241,25 @@ function AttachmentList({
   if (attachments.length === 0) return null;
   return (
     <div className={styles.attachmentList}>
-      {attachments.map((attachment) => (
-        <a
-          href={attachment.signed_url ?? "#"}
-          key={attachment.id}
-          rel="noreferrer"
-          target="_blank"
-        >
-          <span aria-hidden="true">▱</span>
-          <span><strong>{attachment.original_name}</strong><small>{formatFileSize(attachment.file_size)}</small></span>
-        </a>
-      ))}
+      {attachments.map((attachment) => {
+        const isPdf =
+          attachment.mime_type === "application/pdf" ||
+          attachment.original_name.toLowerCase().endsWith(".pdf");
+        return (
+          <div className={styles.attachmentCard} key={attachment.id}>
+            <a href={attachment.signed_url ?? "#"} rel="noreferrer" target="_blank">
+              <span aria-hidden="true">▱</span>
+              <span><strong>{attachment.original_name}</strong><small>{formatFileSize(attachment.file_size)}</small></span>
+            </a>
+            {isPdf && attachment.signed_url && (
+              <details className={styles.pdfPreview}>
+                <summary>Preview PDF</summary>
+                <iframe src={`${attachment.signed_url}#toolbar=0&navpanes=0`} title={`Preview ${attachment.original_name}`} />
+              </details>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -282,6 +308,7 @@ const GROUP_FALLBACKS: Record<
   ChannelType,
   { key: string; label: string; order: number }
 > = {
+  portal_updates: { key: "portal_updates", label: "Portal Updates", order: 5 },
   applicant_community: { key: "community", label: "Community", order: 10 },
   scholarship_dm: {
     key: "scholarship_applicants",
@@ -334,6 +361,8 @@ function roleName(role: AppRole) {
 
 function channelIcon(type: ChannelType) {
   switch (type) {
+    case "portal_updates":
+      return "UP";
     case "school":
       return "ST";
     case "school_dm":
@@ -1224,6 +1253,17 @@ export function TeamsChat({
     messageKind: "post" | "reply";
   } | null>(null);
   const [deletionReason, setDeletionReason] = useState("");
+  const [attachmentPickerVersion, setAttachmentPickerVersion] = useState(0);
+  const [replyingTo, setReplyingTo] = useState<{
+    messageId: string;
+    postId: string;
+    authorName: string;
+  } | null>(null);
+  const [editingMessage, setEditingMessage] = useState<{
+    id: string;
+    kind: "post" | "reply";
+    body: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
   const feedEndRef = useRef<HTMLDivElement>(null);
 
@@ -1231,6 +1271,9 @@ export function TeamsChat({
     (channel) => channel.channel_id === selectedChannelId,
   );
   const isThreaded = activeChannel?.channel_type === "applicant_community";
+  const isPortalUpdates = activeChannel?.channel_type === "portal_updates";
+  const canPostToActiveChannel = !isPortalUpdates || profile.role === "owner";
+  const canSeeActiveChannelMembers = !isPortalUpdates || profile.role === "owner";
   const openThreadIds =
     openThreadState.channelId === selectedChannelId
       ? openThreadState.ids
@@ -1385,6 +1428,7 @@ export function TeamsChat({
       .flatMap((thread) => [
         {
           id: thread.post_id,
+          post_id: thread.post_id,
           body: thread.body,
           created_at: thread.created_at,
           updated_at: thread.updated_at,
@@ -1397,6 +1441,7 @@ export function TeamsChat({
         },
         ...thread.replies.map((reply) => ({
           id: reply.id,
+          post_id: thread.post_id,
           body: reply.body,
           created_at: reply.created_at,
           updated_at: reply.updated_at,
@@ -1655,6 +1700,7 @@ export function TeamsChat({
     form: HTMLFormElement,
     action: ChatAction,
     successMessage: string,
+    onSuccess?: () => void,
   ) => {
     const formData = new FormData(form);
     const files = formData
@@ -1721,8 +1767,10 @@ export function TeamsChat({
         });
       }
       form.reset();
+      setAttachmentPickerVersion((version) => version + 1);
       setStatus(files.length > 0 ? `${successMessage} Files attached.` : successMessage);
       await loadChannel();
+      onSuccess?.();
     });
   };
 
@@ -1739,6 +1787,26 @@ export function TeamsChat({
   const submitMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     runFormAction(event.currentTarget, createChatMessage, "Message sent.");
+  };
+
+  const submitInlineReply = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    runFormAction(
+      event.currentTarget,
+      createChatReply,
+      "Reply sent.",
+      () => setReplyingTo(null),
+    );
+  };
+
+  const submitMessageEdit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    runFormAction(
+      event.currentTarget,
+      editChatMessage,
+      "Message updated.",
+      () => setEditingMessage(null),
+    );
   };
 
   const submitBroadcast = (event: FormEvent<HTMLFormElement>) => {
@@ -2030,23 +2098,25 @@ export function TeamsChat({
             >
               Mark unread
             </button>
-            <button
-              aria-haspopup="dialog"
-              className={styles.memberSummary}
-              onClick={openMemberDirectory}
-              type="button"
-            >
-              <div className={styles.memberAvatars} aria-hidden="true">
-                {members.slice(0, 4).map((member) => (
-                  <span className={styles.memberAvatar} key={member.user_id}>
-                    {initials(member.display_name)}
-                  </span>
-                ))}
-              </div>
-              <span>
-                {members.length} {members.length === 1 ? "member" : "members"}
-              </span>
-            </button>
+            {canSeeActiveChannelMembers && (
+              <button
+                aria-haspopup="dialog"
+                className={styles.memberSummary}
+                onClick={openMemberDirectory}
+                type="button"
+              >
+                <div className={styles.memberAvatars} aria-hidden="true">
+                  {members.slice(0, 4).map((member) => (
+                    <span className={styles.memberAvatar} key={member.user_id}>
+                      {initials(member.display_name)}
+                    </span>
+                  ))}
+                </div>
+                <span>
+                  {members.length} {members.length === 1 ? "member" : "members"}
+                </span>
+              </button>
+            )}
           </div>
 
           <div className={styles.mobilePicker}>
@@ -2080,14 +2150,16 @@ export function TeamsChat({
             >
               Mark current chat unread
             </button>
-            <button
-              aria-haspopup="dialog"
-              className="button button-secondary button-compact"
-              onClick={openMemberDirectory}
-              type="button"
-            >
-              View {members.length} {members.length === 1 ? "member" : "members"}
-            </button>
+            {canSeeActiveChannelMembers && (
+              <button
+                aria-haspopup="dialog"
+                className="button button-secondary button-compact"
+                onClick={openMemberDirectory}
+                type="button"
+              >
+                View {members.length} {members.length === 1 ? "member" : "members"}
+              </button>
+            )}
           </div>
         </header>
 
@@ -2139,7 +2211,7 @@ export function TeamsChat({
               </div>
 
               <div className={styles.composerFooter}>
-                <div><ChatFilePicker /><span>Visible to school applicants and GHSMTA Owners.</span></div>
+                <div><ChatFilePicker key={`thread-files-${attachmentPickerVersion}`} /><span>Visible to school applicants and GHSMTA Owners.</span></div>
                 <button
                   className="button button-dark"
                   disabled={isPending}
@@ -2282,13 +2354,21 @@ export function TeamsChat({
                             </div>
                           </div>
 
-                          <p className={styles.messageBody}>
-                            <MentionedMessage
-                              body={thread.body}
-                              currentUserId={profile.id}
-                              members={members}
-                            />
-                          </p>
+                          {editingMessage?.id === thread.post_id && editingMessage.kind === "post" ? (
+                            <form className={styles.inlineEditForm} onSubmit={submitMessageEdit}>
+                              <input name="message_id" type="hidden" value={thread.post_id} />
+                              <input name="message_kind" type="hidden" value="post" />
+                              <textarea autoFocus className="textarea" defaultValue={thread.body} maxLength={5000} name="body" required rows={4} />
+                              <div>
+                                <button className="button button-dark button-compact" disabled={isPending} type="submit">Save</button>
+                                <button className="button button-secondary button-compact" onClick={() => setEditingMessage(null)} type="button">Cancel</button>
+                              </div>
+                            </form>
+                          ) : (
+                            <p className={styles.messageBody}>
+                              <MentionedMessage body={thread.body} currentUserId={profile.id} members={members} />
+                            </p>
+                          )}
                           <AttachmentList
                             attachments={attachments.filter(
                               (attachment) =>
@@ -2308,6 +2388,19 @@ export function TeamsChat({
                                   reaction.message_id === thread.post_id,
                               )}
                             />
+                          )}
+
+                          {!thread.post_deleted_at && thread.author_id === profile.id && (
+                            <div className={styles.messageFooter}>
+                              <button
+                                className={styles.messageActionButton}
+                                disabled={isPending}
+                                onClick={() => setEditingMessage({ id: thread.post_id, kind: "post", body: thread.body })}
+                                type="button"
+                              >
+                                Edit
+                              </button>
+                            </div>
                           )}
 
                           {profile.role === "owner" && (
@@ -2377,13 +2470,21 @@ export function TeamsChat({
                                     {formatFullTimestamp(reply.created_at)}
                                   </time>
                                 </div>
-                                <p className={styles.messageBody}>
-                                  <MentionedMessage
-                                    body={reply.body}
-                                    currentUserId={profile.id}
-                                    members={members}
-                                  />
-                                </p>
+                                {editingMessage?.id === reply.id && editingMessage.kind === "reply" ? (
+                                  <form className={styles.inlineEditForm} onSubmit={submitMessageEdit}>
+                                    <input name="message_id" type="hidden" value={reply.id} />
+                                    <input name="message_kind" type="hidden" value="reply" />
+                                    <textarea autoFocus className="textarea" defaultValue={reply.body} maxLength={5000} name="body" required rows={3} />
+                                    <div>
+                                      <button className="button button-dark button-compact" disabled={isPending} type="submit">Save</button>
+                                      <button className="button button-secondary button-compact" onClick={() => setEditingMessage(null)} type="button">Cancel</button>
+                                    </div>
+                                  </form>
+                                ) : (
+                                  <p className={styles.messageBody}>
+                                    <MentionedMessage body={reply.body} currentUserId={profile.id} members={members} />
+                                  </p>
+                                )}
                                 <AttachmentList
                                   attachments={attachments.filter(
                                     (attachment) =>
@@ -2403,6 +2504,18 @@ export function TeamsChat({
                                         reaction.message_id === reply.id,
                                     )}
                                   />
+                                )}
+                                {!reply.deleted_at && reply.author_id === profile.id && (
+                                  <div className={styles.messageFooter}>
+                                    <button
+                                      className={styles.messageActionButton}
+                                      disabled={isPending}
+                                      onClick={() => setEditingMessage({ id: reply.id, kind: "reply", body: reply.body })}
+                                      type="button"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
                                 )}
                                 {profile.role === "owner" && !reply.deleted_at && (
                                   <button
@@ -2453,7 +2566,7 @@ export function TeamsChat({
                                 rows={2}
                                 submitOnEnter
                               />
-                              <ChatFilePicker />
+                              <ChatFilePicker key={`reply-files-${thread.post_id}-${attachmentPickerVersion}`} />
                               <button
                                 className="button button-secondary button-compact"
                                 disabled={isPending}
@@ -2519,13 +2632,21 @@ export function TeamsChat({
                               <span>{roleName(message.author_role)}</span>
                             </div>
                           )}
-                          <div className={styles.chatBubble}>
-                            <MentionedMessage
-                              body={message.body}
-                              currentUserId={profile.id}
-                              members={members}
-                            />
-                          </div>
+                          {editingMessage?.id === message.id && editingMessage.kind === message.message_kind ? (
+                            <form className={styles.inlineEditForm} onSubmit={submitMessageEdit}>
+                              <input name="message_id" type="hidden" value={message.id} />
+                              <input name="message_kind" type="hidden" value={message.message_kind} />
+                              <textarea autoFocus className="textarea" defaultValue={message.body} maxLength={5000} name="body" required rows={3} />
+                              <div>
+                                <button className="button button-dark button-compact" disabled={isPending} type="submit">Save</button>
+                                <button className="button button-secondary button-compact" onClick={() => setEditingMessage(null)} type="button">Cancel</button>
+                              </div>
+                            </form>
+                          ) : (
+                            <div className={styles.chatBubble}>
+                              <MentionedMessage body={message.body} currentUserId={profile.id} members={members} />
+                            </div>
+                          )}
                           <AttachmentList
                             attachments={attachments.filter(
                               (attachment) => attachment.message_kind === message.message_kind && attachment.message_id === message.id,
@@ -2544,6 +2665,26 @@ export function TeamsChat({
                             <time dateTime={message.created_at}>
                               {formatTime(message.created_at)}
                             </time>
+                            {ownMessage && !message.deleted_at && (
+                              <button
+                                className={styles.messageActionButton}
+                                disabled={isPending}
+                                onClick={() => setEditingMessage({ id: message.id, kind: message.message_kind, body: message.body })}
+                                type="button"
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {canPostToActiveChannel && !message.deleted_at && (
+                              <button
+                                className={styles.messageActionButton}
+                                disabled={isPending}
+                                onClick={() => setReplyingTo({ messageId: message.id, postId: message.post_id, authorName: message.author_name })}
+                                type="button"
+                              >
+                                Reply
+                              </button>
+                            )}
                             {profile.role === "owner" && !message.deleted_at && (
                               <button
                                 className={`${styles.messageDeleteButton} danger-text`}
@@ -2565,6 +2706,21 @@ export function TeamsChat({
                           </div>
                         </div>
                       </article>
+                      {replyingTo?.messageId === message.id && (
+                        <form className={styles.inlineReplyForm} onSubmit={submitInlineReply}>
+                          <input name="channel_id" type="hidden" value={activeChannel.channel_id} />
+                          <input name="post_id" type="hidden" value={message.post_id} />
+                          <div>
+                            <strong>Reply to {replyingTo.authorName}</strong>
+                            <button aria-label="Cancel reply" onClick={() => setReplyingTo(null)} type="button">×</button>
+                          </div>
+                          <MentionTextarea id={`inline-reply-${message.id}`} members={members} name="body" placeholder="Write a reply" rows={2} submitOnEnter />
+                          <div className={styles.inlineReplyActions}>
+                            <ChatFilePicker key={`inline-reply-files-${message.id}-${attachmentPickerVersion}`} />
+                            <button className="button button-dark button-compact" disabled={isPending} type="submit">Reply</button>
+                          </div>
+                        </form>
+                      )}
                     </Fragment>
                   );
                 })
@@ -2572,6 +2728,7 @@ export function TeamsChat({
               <div ref={feedEndRef} />
             </div>
 
+            {canPostToActiveChannel ? (
             <form className={styles.messageComposer} onSubmit={submitMessage}>
               <input
                 name="channel_id"
@@ -2587,7 +2744,7 @@ export function TeamsChat({
                 submitOnEnter
               />
               <div className={styles.composerFooter}>
-                <div><ChatFilePicker /><span>{activeChannel.visibility_label}</span></div>
+                <div><ChatFilePicker key={`message-files-${attachmentPickerVersion}`} /><span>{activeChannel.visibility_label}</span></div>
                 <button
                   className="button button-dark"
                   disabled={isPending}
@@ -2597,6 +2754,12 @@ export function TeamsChat({
                 </button>
               </div>
             </form>
+            ) : (
+              <div className={styles.readOnlyComposer}>
+                <strong>Portal Updates is read-only.</strong>
+                <span>Only GHSMTA Owners can post. New updates will appear here automatically.</span>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -2614,6 +2777,7 @@ export function TeamsChat({
           <span className={styles.peopleVisibility}>{activeChannel.visibility_label}</span>
         </section>
 
+        {canSeeActiveChannelMembers && (
         <section className={styles.peopleSection}>
           <div className={styles.peopleHeading}>
             <div>
@@ -2652,9 +2816,10 @@ export function TeamsChat({
             )}
           </div>
         </section>
+        )}
       </aside>
 
-      {showMembers && (
+      {showMembers && canSeeActiveChannelMembers && (
         <MemberDirectoryDialog
           channel={activeChannel}
           currentUserId={profile.id}

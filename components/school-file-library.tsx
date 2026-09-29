@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { type DragEvent, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { archiveSchoolFile } from "@/app/portal/files/actions";
@@ -32,6 +32,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
   const [fileType, setFileType] = useState("playbill");
   const [reviewerVisible, setReviewerVisible] = useState(true);
   const [search, setSearch] = useState("");
+  const [dropActive, setDropActive] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -42,13 +43,15 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
 
   const visibleFiles = initialFiles.filter((file) => file.application_id === applicationId && [file.original_name, file.generated_name, file.person_name, file.award_category, file.document_category].join(" ").toLowerCase().includes(search.trim().toLowerCase()));
 
-  function upload(form: HTMLFormElement) {
-    const formData = new FormData(form);
-    const files = formData.getAll("files").filter((value): value is File => value instanceof File && value.size > 0);
+  function uploadFiles(
+    files: File[],
+    formData = new FormData(),
+    form?: HTMLFormElement,
+  ) {
     if (!application || !application.can_upload || files.length === 0) { setError("Choose an application and at least one file."); return; }
     const personName = String(formData.get("person_name") ?? "").trim();
     const awardCategory = String(formData.get("award_category") ?? "").trim();
-    if (personFields && (!personName || !awardCategory)) { setError("Enter the person’s name and award category."); return; }
+    if (personFields && (!personName || !awardCategory)) { setError("Open Upload files to add the person’s name and award category for this file type."); return; }
     setError(null); setMessage(null);
     startTransition(async () => {
       try {
@@ -75,9 +78,23 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
             productionName: application.production_title,
           },
         });
-        form.reset(); setMessage(`${files.length} file${files.length === 1 ? "" : "s"} uploaded.`); router.refresh();
+        form?.reset(); setMessage(`${files.length} file${files.length === 1 ? "" : "s"} uploaded.`); router.refresh();
       } catch (caught) { setError(caught instanceof Error ? caught.message : "Upload failed."); }
     });
+  }
+
+  function upload(form: HTMLFormElement) {
+    const formData = new FormData(form);
+    const files = formData.getAll("files").filter((value): value is File => value instanceof File && value.size > 0);
+    uploadFiles(files, formData, form);
+  }
+
+  function dropFiles(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDropActive(false);
+    const files = Array.from(event.dataTransfer.files).filter((file) => file.size > 0);
+    if (files.length === 0) return;
+    uploadFiles(files);
   }
 
   async function openFile(file: SchoolFileRecord) {
@@ -112,25 +129,120 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
 
   return (
     <div className="school-files-layout">
-      <aside className="panel school-files-sidebar"><div className="panel-header"><div><p className="eyebrow">School library</p><h2>Applications</h2></div></div><div className="panel-body school-file-application-list">{applications.map((item) => <button className={item.application_id === applicationId ? "school-file-application active" : "school-file-application"} key={item.application_id} onClick={() => setApplicationId(item.application_id)} type="button"><strong>{item.school_name}</strong><span>{item.production_title || item.program_name}</span><small>{item.can_upload ? "Upload + manage" : "Reviewer access"}</small></button>)}</div></aside>
-      <section className="panel school-files-main"><div className="panel-header"><div><p className="eyebrow">{profile.role === "applicant" ? "Your private school materials" : "Private school materials"}</p><h2>{application?.school_name}</h2><p>{application?.production_title}</p></div><span className="badge">{visibleFiles.length} files</span></div><div className="panel-body form-stack">
-        {application?.can_upload && <form className="typed-file-upload" onSubmit={(event) => { event.preventDefault(); upload(event.currentTarget); }}>
-          <div><h3>Upload school files</h3><p className="muted-copy">Files stay private to your school, GHSMTA Owners, and any assigned reviewers you allow.</p></div>
-          <PronunciationRecorder />
-          <div className="form-grid two-column-form"><div className="field"><label htmlFor="school_file_type">File type</label><select className="select" id="school_file_type" value={fileType} onChange={(event) => setFileType(event.target.value)}>{FILE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div><div className="field"><label htmlFor="school_file_input">Choose file</label><input className="input file-input" id="school_file_input" name="files" type="file" accept={selectedType[2]} multiple={fileType === "scenic"} required /></div></div>
-          {fileType === "logo" && <div className="field"><label>Display name</label><input className="input" name="display_name" placeholder="Official school or production logo" /></div>}
-          {fileType === "scenic" && <div className="form-grid two-column-form"><div className="field"><label>Drawing / rendering title</label><input className="input" name="display_name" required /></div><div className="field"><label>Scenic designer</label><input className="input" name="designer_name" /></div></div>}
-          {personFields && <div className="form-grid two-column-form"><div className="field"><label>Name of person</label><input className="input" name="person_name" required /></div><div className="field"><label>Award category</label><input className="input" name="award_category" required placeholder="Example: Leading Performer" /></div></div>}
-          {["headshot", "resume"].includes(fileType) && <div className="field"><label>Role / character <span>Optional</span></label><input className="input" name="role_or_character" /></div>}
-          {fileType === "name_pronunciation" && <div className="field"><label>Phonetic spelling <span>Optional</span></label><input className="input" name="phonetic_spelling" placeholder="Example: muh-RYE-uh" /></div>}
-          <div className="field"><label>Notes <span>Optional</span></label><textarea className="textarea" name="file_notes" rows={3} /></div>
-          <label className="checkbox-row"><input type="checkbox" checked={reviewerVisible} onChange={(event) => setReviewerVisible(event.target.checked)} /><span>Visible to assigned adjudicators and Advisory Committee members</span></label>
-          <button className="button button-gold" type="submit" disabled={pending}>{pending ? "Uploading…" : `Upload ${selectedType[1]}`}</button>
-        </form>}
-        {error && <div className="form-error">{error}</div>}{message && <div className="notice-banner success-banner">{message}</div>}
-        <div className="school-files-toolbar"><div><strong>{profile.role === "applicant" ? "Your files" : "Active files"}</strong><small>Up to 50 MB each</small></div><input className="input" type="search" placeholder="Search by file, person, or category" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-        <div className="school-file-list">{visibleFiles.length === 0 ? <div className="empty-state"><strong>No files uploaded yet.</strong><p>{application?.can_upload ? "Use the upload form above to add the first file for this school." : "This school has not shared any files yet."}</p></div> : visibleFiles.map((file) => <article className="school-file-row" key={file.id}><span className="school-file-icon">▱</span><div className="school-file-copy"><strong>{file.display_name || file.person_name || file.original_name}</strong><span>{labelFor(file.document_category)}{file.award_category ? ` · ${file.award_category}` : ""}{file.person_name ? ` · ${file.person_name}` : ""}</span><small>{formatBytes(file.file_size)} · {file.reviewer_visible ? "Assigned reviewers can access" : "School + Owners only"}</small></div><div className="school-file-actions"><button className="button button-secondary button-compact" type="button" onClick={() => void openFile(file)}>Open</button>{(profile.role === "owner" || application?.can_upload) && <button className="text-button danger-text" type="button" onClick={() => setPendingRemovalId(file.id)}>Remove</button>}</div></article>)}</div>
-      </div></section>
+      <aside className="panel school-files-sidebar">
+        <div className="panel-header">
+          <div><p className="eyebrow">School library</p><h2>Applications</h2></div>
+        </div>
+        <div className="panel-body school-file-application-list">
+          {applications.map((item) => (
+            <button
+              className={item.application_id === applicationId ? "school-file-application active" : "school-file-application"}
+              key={item.application_id}
+              onClick={() => setApplicationId(item.application_id)}
+              type="button"
+            >
+              <span className="school-file-application-icon" aria-hidden="true">▰</span>
+              <span className="school-file-application-copy">
+                <strong>{item.school_name}</strong>
+                <span>{item.production_title || item.program_name}</span>
+                <small>{item.can_upload ? "Upload + manage" : "Reviewer access"}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      <section className="panel school-files-main">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">{profile.role === "applicant" ? "Your private school materials" : "Private school materials"}</p>
+            <h2>{application?.school_name}</h2>
+            <p>{application?.production_title}</p>
+          </div>
+          <span className="badge">{visibleFiles.length} files</span>
+        </div>
+        <div className="panel-body form-stack">
+          <div className="school-drive-toolbar">
+            <div className="field school-file-type-picker">
+              <label htmlFor="school_file_drop_type">File type</label>
+              <select className="select" id="school_file_drop_type" value={fileType} onChange={(event) => setFileType(event.target.value)}>
+                {FILE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+              </select>
+            </div>
+            <input
+              aria-label="Search school files"
+              className="input school-file-search"
+              type="search"
+              placeholder="Search files"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {application?.can_upload && (
+              <details className="reference-action-drawer school-file-upload-drawer">
+                <summary>Upload files</summary>
+                <form className="typed-file-upload school-file-upload-form" onSubmit={(event) => { event.preventDefault(); upload(event.currentTarget); }}>
+                  <div><h3>Upload school files</h3><p className="muted-copy">Files stay private to your school, GHSMTA Owners, and assigned reviewers you allow.</p></div>
+                  <PronunciationRecorder />
+                  <div className="form-grid two-column-form">
+                    <div className="field"><label htmlFor="school_file_type">File type</label><select className="select" id="school_file_type" value={fileType} onChange={(event) => setFileType(event.target.value)}>{FILE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div>
+                    <div className="field"><label htmlFor="school_file_input">Choose file</label><input className="input file-input" id="school_file_input" name="files" type="file" accept={selectedType[2]} multiple={fileType === "scenic"} required /></div>
+                  </div>
+                  {fileType === "logo" && <div className="field"><label>Display name</label><input className="input" name="display_name" placeholder="Official school or production logo" /></div>}
+                  {fileType === "scenic" && <div className="form-grid two-column-form"><div className="field"><label>Drawing / rendering title</label><input className="input" name="display_name" required /></div><div className="field"><label>Scenic designer</label><input className="input" name="designer_name" /></div></div>}
+                  {personFields && <div className="form-grid two-column-form"><div className="field"><label>Name of person</label><input className="input" name="person_name" required /></div><div className="field"><label>Award category</label><input className="input" name="award_category" required placeholder="Example: Leading Performer" /></div></div>}
+                  {["headshot", "resume"].includes(fileType) && <div className="field"><label>Role / character <span>Optional</span></label><input className="input" name="role_or_character" /></div>}
+                  {fileType === "name_pronunciation" && <div className="field"><label>Phonetic spelling <span>Optional</span></label><input className="input" name="phonetic_spelling" placeholder="Example: muh-RYE-uh" /></div>}
+                  <div className="field"><label>Notes <span>Optional</span></label><textarea className="textarea" name="file_notes" rows={3} /></div>
+                  <label className="checkbox-row"><input type="checkbox" checked={reviewerVisible} onChange={(event) => setReviewerVisible(event.target.checked)} /><span>Visible to assigned adjudicators and Advisory Committee members</span></label>
+                  <button className="button button-gold" type="submit" disabled={pending}>{pending ? "Uploading…" : `Upload ${selectedType[1]}`}</button>
+                </form>
+              </details>
+            )}
+          </div>
+
+          {application?.can_upload && (
+            <div
+              className={`reference-drop-zone school-file-drop-zone ${dropActive ? "is-active" : ""}`}
+              onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false);
+              }}
+              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDropActive(true); }}
+              onDrop={dropFiles}
+            >
+              <span aria-hidden="true">⇧</span>
+              <div>
+                <strong>Drop {selectedType[1].toLowerCase()} files here</strong>
+                <small>They will be added to {application.school_name}. Use Upload files when person details are required.</small>
+              </div>
+            </div>
+          )}
+
+          {error && <div className="form-error">{error}</div>}
+          {message && <div className="notice-banner success-banner">{message}</div>}
+
+          <div className="school-file-list">
+            <div className="school-file-list-heading" aria-hidden="true"><span>Name</span><span>Access</span><span>Actions</span></div>
+            {visibleFiles.length === 0 ? (
+              <div className="empty-state"><strong>No files uploaded yet.</strong><p>{application?.can_upload ? "Drop files above or use Upload files to add the first item." : "This school has not shared any files yet."}</p></div>
+            ) : visibleFiles.map((file) => (
+              <article className="school-file-row" key={file.id}>
+                <span className="school-file-icon">▱</span>
+                <div className="school-file-copy">
+                  <strong>{file.display_name || file.person_name || file.original_name}</strong>
+                  <span>{labelFor(file.document_category)}{file.award_category ? ` · ${file.award_category}` : ""}{file.person_name ? ` · ${file.person_name}` : ""}</span>
+                  <small>{formatBytes(file.file_size)}</small>
+                </div>
+                <span className="school-file-access">{file.reviewer_visible ? "Assigned reviewers" : "School + Owners"}</span>
+                <div className="school-file-actions">
+                  <button className="button button-secondary button-compact" type="button" onClick={() => void openFile(file)}>Open</button>
+                  {(profile.role === "owner" || application?.can_upload) && <button className="text-button danger-text" type="button" onClick={() => setPendingRemovalId(file.id)}>Remove</button>}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <RegalConfirmDialog
         confirmLabel="Remove file"

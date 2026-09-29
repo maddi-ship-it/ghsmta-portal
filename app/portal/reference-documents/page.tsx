@@ -11,8 +11,8 @@ export default async function ReferenceDocumentsPage() {
           <span className="eyebrow">Shared library</span>
           <h1>REFERENCE DOCUMENTS</h1>
           <p>
-            Files are organized by audience. You will only see documents shared
-            with your portal role.
+            Browse audience-specific folders and files. You will only see
+            content shared with your portal role.
           </p>
         </div>
       </div>

@@ -24,7 +24,8 @@ type ChannelMode = {
     | "applicant_community"
     | "general"
     | "networking"
-    | "advisory_committee";
+    | "advisory_committee"
+    | "portal_updates";
 };
 
 function formText(formData: FormData, name: string) {
@@ -185,10 +186,13 @@ export async function createChatReply(
     return { ok: false, error: channelError ?? "Chat channel not found." };
   }
 
-  if (channel.channel_type !== "applicant_community") {
+  if (
+    channel.channel_type === "portal_updates" &&
+    profile.role !== "owner"
+  ) {
     return {
       ok: false,
-      error: `Replies are only available in ${SCHOOL_COMMUNITY_CHAT_LABEL}.`,
+      error: "Only Owners can reply in Portal Updates.",
     };
   }
 
@@ -269,6 +273,16 @@ export async function createChatMessage(
     };
   }
 
+  if (
+    channel.channel_type === "portal_updates" &&
+    profile.role !== "owner"
+  ) {
+    return {
+      ok: false,
+      error: "Only Owners can post in Portal Updates.",
+    };
+  }
+
   const { data: post, error } = await supabase
     .from("chat_posts")
     .insert({
@@ -301,6 +315,44 @@ export async function createChatMessage(
 
   revalidatePath("/portal/chat");
   return { ok: true, messageId: post.id, messageKind: "post" };
+}
+
+export async function editChatMessage(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  const profile = await requireProfile();
+  const messageId = formText(formData, "message_id");
+  const messageKind = formText(formData, "message_kind");
+  const body = formText(formData, "body");
+
+  if (!messageId || !["post", "reply"].includes(messageKind)) {
+    return { ok: false, error: "Chat message not found." };
+  }
+  if (!body) return { ok: false, error: "A message cannot be empty." };
+  if (body.length > 5000) {
+    return { ok: false, error: "The message is longer than the allowed limit." };
+  }
+
+  const table = messageKind === "post" ? "chat_posts" : "chat_replies";
+  const { data, error } = await (await createClient())
+    .from(table)
+    .update({ body })
+    .eq("id", messageId)
+    .eq("author_id", profile.id)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "You can only edit your own active messages." };
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+  return {
+    ok: true,
+    messageId,
+    messageKind: messageKind as "post" | "reply",
+  };
 }
 
 export async function markChatChannelUnread(

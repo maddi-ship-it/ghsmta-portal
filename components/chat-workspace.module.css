@@ -203,6 +203,11 @@
   background: #f1d98a;
 }
 
+.channelIcon_portal_updates {
+  color: #071328;
+  background: #f1d98a;
+}
+
 .channelCopy {
   min-width: 0;
 }
@@ -2375,6 +2380,42 @@
   gap: 0.35rem;
 }
 
+.filePickerGroup {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.selectedFiles {
+  display: flex;
+  max-width: min(560px, 70vw);
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.selectedFiles > span {
+  display: grid;
+  min-width: 150px;
+  max-width: 230px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--portal-border, #cbd5e1);
+  border-radius: 0.65rem;
+  background: var(--portal-surface-soft, rgba(127, 140, 170, 0.1));
+}
+
+.selectedFiles strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedFiles small {
+  color: var(--portal-text-muted, #627089);
+  font-size: 0.65rem;
+}
+
 .filePicker > span:first-child {
   align-items: center;
   border: 1px solid var(--portal-border, #cbd5e1);
@@ -2413,6 +2454,12 @@
   margin-top: 0.55rem;
 }
 
+.attachmentCard {
+  display: grid;
+  min-width: min(100%, 260px);
+  gap: 0.35rem;
+}
+
 .attachmentList a {
   align-items: center;
   background: var(--portal-surface-soft, rgba(127, 140, 170, 0.1));
@@ -2439,6 +2486,122 @@
 
 .attachmentList small {
   color: var(--portal-text-muted, #627089);
+}
+
+.pdfPreview > summary {
+  width: fit-content;
+  color: var(--portal-blue, #1d4ed8);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.pdfPreview > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pdfPreview > summary::before {
+  content: "▸ ";
+}
+
+.pdfPreview[open] > summary::before {
+  content: "▾ ";
+}
+
+.pdfPreview iframe {
+  display: block;
+  width: min(600px, 70vw);
+  height: 430px;
+  margin-top: 0.4rem;
+  border: 1px solid var(--portal-border, #cbd5e1);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.messageActionButton {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  color: var(--portal-blue, #1d4ed8);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.messageActionButton:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.inlineEditForm,
+.inlineReplyForm {
+  display: grid;
+  gap: 0.55rem;
+  width: min(620px, 100%);
+  padding: 0.65rem;
+  border: 1px solid var(--portal-border, #cbd5e1);
+  border-radius: 0.85rem;
+  background: var(--portal-surface-soft, rgba(127, 140, 170, 0.1));
+}
+
+.inlineEditForm > div,
+.inlineReplyActions,
+.inlineReplyForm > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.inlineReplyForm {
+  margin: 0.35rem 1rem 0.9rem auto;
+}
+
+.inlineReplyForm > div:first-child button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+
+.readOnlyComposer {
+  display: grid;
+  gap: 3px;
+  padding: 18px 22px;
+  border-top: 1px solid var(--portal-line, var(--line));
+  color: var(--portal-text, #e7ecf5);
+  background: color-mix(in srgb, var(--portal-surface, #0f1729) 96%, transparent);
+}
+
+.readOnlyComposer span {
+  color: var(--portal-muted, #9ca9be);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 700px) {
+  .selectedFiles,
+  .pdfPreview iframe {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .pdfPreview iframe {
+    height: 58vh;
+  }
+
+  .inlineReplyActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .reactionBar {

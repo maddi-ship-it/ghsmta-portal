@@ -32,6 +32,11 @@ const BOOKED_BY_DEFAULT_ROLES: ReadonlySet<AppRole> = new Set([
   "adjudicator",
 ]);
 
+const ALL_TRACKS_BY_DEFAULT_ROLES: ReadonlySet<AppRole> = new Set([
+  "advisory_member",
+  "adjudicator",
+]);
+
 export function defaultScheduleFilter(role: AppRole): ScheduleFilter {
   return BOOKED_BY_DEFAULT_ROLES.has(role) ? "booked" : "all";
 }
@@ -48,13 +53,22 @@ export function resolveScheduleFilter(
 }
 
 export function resolveScheduleTrackFilter(
+  role: AppRole,
   requestedTrack: string | undefined,
 ): ScheduleTrackFilter {
   if (SCHEDULE_TRACK_FILTERS.some((track) => track === requestedTrack)) {
     return requestedTrack as ScheduleTrackFilter;
   }
 
-  return DEFAULT_SCHEDULE_TRACK_FILTER;
+  return defaultScheduleTrackFilter(role);
+}
+
+export function defaultScheduleTrackFilter(
+  role: AppRole,
+): ScheduleTrackFilter {
+  return ALL_TRACKS_BY_DEFAULT_ROLES.has(role)
+    ? "all"
+    : DEFAULT_SCHEDULE_TRACK_FILTER;
 }
 
 export function scheduleSlotMatchesTrack(

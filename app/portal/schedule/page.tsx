@@ -8,8 +8,8 @@ import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import { roleLabel } from "@/lib/format";
 import {
-  DEFAULT_SCHEDULE_TRACK_FILTER,
   defaultScheduleFilter,
+  defaultScheduleTrackFilter,
   resolveScheduleDateFilter,
   resolveScheduleFilter,
   resolveScheduleTrackFilter,
@@ -24,10 +24,11 @@ import {
   scheduleDirectionsUrl,
 } from "@/lib/schedule-location";
 import {
+  canScheduleParticipantUseMode,
   canSelfJoinScheduleSlot,
   SCHEDULE_STAFF_LIMITS,
   scheduleStaffCapacity,
-  scheduleSlotHasAdvisoryMember,
+  scheduleSlotHasPrimaryAdvisoryMember,
 } from "@/lib/schedule-staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -275,6 +276,7 @@ export default async function SchedulePage({
 }) {
   const profile = await requireProfile();
   const params = await searchParams;
+  const supportsWaitlistFilters = profile.role === "applicant";
   const allowedSorts: ScheduleSort[] = [
     "date_asc",
     "date_desc",
@@ -282,15 +284,21 @@ export default async function SchedulePage({
     "school_desc",
     "status",
     "staff_desc",
-    "waitlist_desc",
+    ...(supportsWaitlistFilters ? (["waitlist_desc"] as const) : []),
   ];
   const selectedSort: ScheduleSort = allowedSorts.includes(params.sort as ScheduleSort)
     ? (params.sort as ScheduleSort)
     : "date_asc";
   const selectedView: ScheduleView = params.view === "cards" ? "cards" : "list";
   const defaultFilter = defaultScheduleFilter(profile.role);
-  const selectedFilter = resolveScheduleFilter(profile.role, params.filter);
-  const selectedTrack = resolveScheduleTrackFilter(params.track);
+  const selectedFilter = resolveScheduleFilter(
+    profile.role,
+    !supportsWaitlistFilters && params.filter === "waitlisted"
+      ? undefined
+      : params.filter,
+  );
+  const defaultTrack = defaultScheduleTrackFilter(profile.role);
+  const selectedTrack = resolveScheduleTrackFilter(profile.role, params.track);
   const selectedDate = resolveScheduleDateFilter(params.date);
   const scheduleSearch = (params.q ?? "").trim();
   const ownerSections: OwnerScheduleSection[] = ["overview", "timeslots", "staffing", "waitlists", "messages"];
@@ -1045,7 +1053,7 @@ export default async function SchedulePage({
             <option value="open">Open slots</option>
             <option value="booked">Booked</option>
             <option value="unbooked">Unbooked</option>
-            <option value="waitlisted">Has waitlist</option>
+            {supportsWaitlistFilters && <option value="waitlisted">Has waitlist</option>}
             <option value="understaffed">Understaffed</option>
             <option value="mine">My schedule</option>
           </select>
@@ -1072,10 +1080,10 @@ export default async function SchedulePage({
             <option value="school_desc">School — Z to A</option>
             <option value="status">Status</option>
             <option value="staff_desc">Reviewer count</option>
-            <option value="waitlist_desc">Waitlist count</option>
+            {supportsWaitlistFilters && <option value="waitlist_desc">Waitlist count</option>}
           </select>
           <button className="button button-secondary button-compact" type="submit">Apply</button>
-          {(scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== DEFAULT_SCHEDULE_TRACK_FILTER || selectedSort !== "date_asc") && (
+          {(scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== defaultTrack || selectedSort !== "date_asc") && (
             <Link
               className="text-button"
               href={{
@@ -1171,7 +1179,7 @@ export default async function SchedulePage({
               <h3>
                 {(profile.role as AppRole) === "applicant"
                   ? "No schedule slots are currently open."
-                  : scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== DEFAULT_SCHEDULE_TRACK_FILTER
+                  : scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== defaultTrack
                     ? "No schedule slots match these filters."
                     : "No schedule slots are configured."}
               </h3>
@@ -1200,10 +1208,15 @@ export default async function SchedulePage({
               });
               const participants = staffBySlot.get(slot.id) ?? [];
               const staffCapacity = scheduleStaffCapacity(participants);
+              const primaryAdvisoryMemberAssigned =
+                scheduleSlotHasPrimaryAdvisoryMember(participants);
               const defaultJoinMode =
-                profile.role === "advisory_member" ||
-                !staffCapacity.adjudicatorsFull
-                  ? "panel"
+                profile.role === "advisory_member"
+                  ? primaryAdvisoryMemberAssigned
+                    ? "shadow"
+                    : "panel"
+                  : !staffCapacity.adjudicatorsFull
+                    ? "panel"
                   : !staffCapacity.understudiesFull
                     ? "understudy"
                     : !staffCapacity.shadowsFull
@@ -1212,8 +1225,6 @@ export default async function SchedulePage({
               const currentEnrollment = participants.find(
                 (participant) => participant.user_id === profile.id,
               );
-              const advisoryMemberAssigned =
-                scheduleSlotHasAdvisoryMember(participants);
               const slotApplications =
                 (profile.role as AppRole) === "applicant"
                   ? applicantApplications.filter(
@@ -1229,10 +1240,6 @@ export default async function SchedulePage({
                 (person) =>
                   !participants.some(
                     (participant) => participant.user_id === person.id,
-                  ) &&
-                  !(
-                    person.role === "advisory_member" &&
-                    advisoryMemberAssigned
                   ),
               );
               const isPast = new Date(slot.starts_at).getTime() <= serverTime;
@@ -1242,6 +1249,7 @@ export default async function SchedulePage({
                 participants,
                 role: profile.role,
                 status: slot.status,
+                participationMode: defaultJoinMode,
               });
               const schoolAccessOpen =
                 Boolean(slot.school_booking_opens_at) &&
@@ -1258,8 +1266,6 @@ export default async function SchedulePage({
               if ((profile.role as AppRole) === "applicant" && slot.status === "draft") {
                 return null;
               }
-
-              const waitlistCount = slotWaitlistCount(slot);
 
               return (
                 <article
@@ -1287,13 +1293,23 @@ export default async function SchedulePage({
                         <strong>{cityLabel}</strong>
                         <small>{cycle ? `${cycle.season_year} · ${cycle.name}` : "Program"}</small>
                       </span>
-                      <span className="schedule-list-metric">
-                        <strong>{staffCapacity.adjudicators}</strong>
-                        <small>adjudicators</small>
-                      </span>
-                      <span className="schedule-list-metric">
-                        <strong>{waitlistCount}</strong>
-                        <small>waitlist</small>
+                      <span className="schedule-list-review-counts" aria-label="Review team signup counts">
+                        <span className="schedule-list-metric">
+                          <strong>{staffCapacity.advisoryMembers}</strong>
+                          <small>advisory</small>
+                        </span>
+                        <span className="schedule-list-metric">
+                          <strong>{staffCapacity.adjudicators}</strong>
+                          <small>adjudicators</small>
+                        </span>
+                        <span className="schedule-list-metric">
+                          <strong>{staffCapacity.understudies}</strong>
+                          <small>understudy</small>
+                        </span>
+                        <span className="schedule-list-metric">
+                          <strong>{staffCapacity.shadows}</strong>
+                          <small>shadows</small>
+                        </span>
                       </span>
                       <span className={`badge schedule-status schedule-status-${slot.status}`}>
                         {statusLabel(slot.status)}
@@ -1415,9 +1431,12 @@ export default async function SchedulePage({
                               <span className="eyebrow">Review team</span>
                               <h3>Adjudicators &amp; advisory members</h3>
                             </div>
-                            <span className="badge">
-                              {staffCapacity.adjudicators}/{SCHEDULE_STAFF_LIMITS.adjudicators} adjudicators · {staffCapacity.understudies}/{SCHEDULE_STAFF_LIMITS.understudies} understudy · {staffCapacity.shadows}/{SCHEDULE_STAFF_LIMITS.shadows} shadows
-                            </span>
+                            <div className="schedule-review-counts" aria-label="Review team signup counts">
+                              <span><strong>{staffCapacity.advisoryMembers}</strong><small>Advisory members</small></span>
+                              <span><strong>{staffCapacity.adjudicators}/{SCHEDULE_STAFF_LIMITS.adjudicators}</strong><small>Panel adjudicators</small></span>
+                              <span><strong>{staffCapacity.understudies}/{SCHEDULE_STAFF_LIMITS.understudies}</strong><small>Understudies</small></span>
+                              <span><strong>{staffCapacity.shadows}/{SCHEDULE_STAFF_LIMITS.shadows}</strong><small>Shadows</small></span>
+                            </div>
                           </div>
 
                           {participants.length === 0 ? (
@@ -1428,6 +1447,24 @@ export default async function SchedulePage({
                                 const scoringPermission = scoringPermissionMap.get(
                                   `${slot.id}:${participant.user_id}`,
                                 );
+                                const otherParticipants = participants.filter(
+                                  (item) => item.enrollment_id !== participant.enrollment_id,
+                                );
+                                const canUsePanelMode = canScheduleParticipantUseMode({
+                                  participants: otherParticipants,
+                                  role: participant.role,
+                                  participationMode: "panel",
+                                });
+                                const canUseUnderstudyMode = canScheduleParticipantUseMode({
+                                  participants: otherParticipants,
+                                  role: participant.role,
+                                  participationMode: "understudy",
+                                });
+                                const canUseShadowMode = canScheduleParticipantUseMode({
+                                  participants: otherParticipants,
+                                  role: participant.role,
+                                  participationMode: "shadow",
+                                });
                                 return (
                                 <div className="schedule-participant" key={participant.enrollment_id}>
                                   <span className="user-avatar">
@@ -1443,29 +1480,19 @@ export default async function SchedulePage({
                                         <input name="user_id" type="hidden" value={participant.user_id} />
                                         <select aria-label={`Participation mode for ${personName(participant)}`} className="select input-compact" defaultValue={participant.participation_mode} name="participation_mode">
                                           <option
-                                            disabled={
-                                              participant.role === "adjudicator" &&
-                                              participant.participation_mode !== "panel" &&
-                                              staffCapacity.adjudicatorsFull
-                                            }
+                                            disabled={!canUsePanelMode}
                                             value="panel"
                                           >
                                             Panel adjudicator
                                           </option>
                                           <option
-                                            disabled={
-                                              participant.participation_mode !== "understudy" &&
-                                              staffCapacity.understudiesFull
-                                            }
+                                            disabled={!canUseUnderstudyMode}
                                             value="understudy"
                                           >
                                             Understudy
                                           </option>
                                           <option
-                                            disabled={
-                                              participant.participation_mode !== "shadow" &&
-                                              staffCapacity.shadowsFull
-                                            }
+                                            disabled={!canUseShadowMode}
                                             value="shadow"
                                           >
                                             Shadow
@@ -1534,36 +1561,30 @@ export default async function SchedulePage({
                                 <input name="slot_id" type="hidden" value={slot.id} />
                                 <label className="sr-only" htmlFor={`join_mode_${slot.id}`}>Participation type</label>
                                 <select className="select" defaultValue={defaultJoinMode} id={`join_mode_${slot.id}`} name="participation_mode">
-                                  <option disabled={profile.role === "adjudicator" && staffCapacity.adjudicatorsFull} value="panel">Panel — score the assigned school</option>
-                                  <option disabled={staffCapacity.understudiesFull} value="understudy">Understudy — available to be promoted</option>
+                                  <option disabled={profile.role === "advisory_member" ? primaryAdvisoryMemberAssigned : staffCapacity.adjudicatorsFull} value="panel">Panel — score the assigned school</option>
+                                  <option disabled={(profile.role === "advisory_member" && primaryAdvisoryMemberAssigned) || staffCapacity.understudiesFull} value="understudy">Understudy — available to be promoted</option>
                                   <option disabled={staffCapacity.shadowsFull} value="shadow">Shadow — observe without scoring</option>
                                 </select>
                                 <button
                                   className="button button-dark"
-                                  disabled={
-                                    !canSelfJoin ||
-                                    (profile.role === "adjudicator" &&
-                                      staffCapacity.adjudicatorsFull &&
-                                      staffCapacity.understudiesFull &&
-                                      staffCapacity.shadowsFull)
-                                  }
+                                  disabled={!canSelfJoin}
                                   type="submit"
                                 >
                                   {isPast
                                     ? "Slot has passed"
                                     : profile.role === "advisory_member" &&
-                                        advisoryMemberAssigned
-                                      ? "Advisory member assigned"
+                                        primaryAdvisoryMemberAssigned
+                                      ? "Join as shadow"
                                       : "Join this slot"}
                                 </button>
                                 {profile.role === "advisory_member" &&
-                                  advisoryMemberAssigned && (
+                                  primaryAdvisoryMemberAssigned && (
                                     <small>
-                                      Each slot can have one Advisory Committee member.
+                                      This slot already has its primary Advisory member. Additional Advisory members may join as shadows.
                                     </small>
                                   )}
                                 <small>
-                                  Capacity: {staffCapacity.adjudicators}/{SCHEDULE_STAFF_LIMITS.adjudicators} adjudicators, {staffCapacity.understudies}/{SCHEDULE_STAFF_LIMITS.understudies} understudy, and {staffCapacity.shadows}/{SCHEDULE_STAFF_LIMITS.shadows} shadows.
+                                  Signups: {staffCapacity.advisoryMembers} Advisory, {staffCapacity.adjudicators}/{SCHEDULE_STAFF_LIMITS.adjudicators} panel adjudicators, {staffCapacity.understudies}/{SCHEDULE_STAFF_LIMITS.understudies} understudy, and {staffCapacity.shadows}/{SCHEDULE_STAFF_LIMITS.shadows} shadows.
                                 </small>
                               </form>
                             )}

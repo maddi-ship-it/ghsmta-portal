@@ -31,6 +31,8 @@ function fallbackChannelGroup(
   }
 
   switch (channelType) {
+    case "portal_updates":
+      return { key: "portal_updates", label: "Portal Updates", order: 5 };
     case "applicant_community":
       return { key: "community", label: "Community", order: 10 };
     case "scholarship_dm":
@@ -64,6 +66,8 @@ function fallbackChannelGroup(
 
 function fallbackVisibilityLabel(channelType: ChatChannel["channel_type"]) {
   switch (channelType) {
+    case "portal_updates":
+      return "All portal users · Owner posts only";
     case "applicant_community":
       return "Applicants + Owners";
     case "scholarship_dm":

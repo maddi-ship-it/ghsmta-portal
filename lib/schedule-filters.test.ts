@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SCHEDULE_TRACK_FILTER,
   defaultScheduleFilter,
+  defaultScheduleTrackFilter,
   resolveScheduleDateFilter,
   resolveScheduleFilter,
   resolveScheduleTrackFilter,
@@ -43,15 +44,30 @@ describe("resolveScheduleFilter", () => {
 });
 
 describe("schedule track filters", () => {
-  it("defaults schedules to the competition track", () => {
+  it("keeps competition as the owner and applicant default", () => {
     expect(DEFAULT_SCHEDULE_TRACK_FILTER).toBe("competition");
-    expect(resolveScheduleTrackFilter(undefined)).toBe("competition");
-    expect(resolveScheduleTrackFilter("not-a-track")).toBe("competition");
+    expect(defaultScheduleTrackFilter("owner")).toBe("competition");
+    expect(resolveScheduleTrackFilter("applicant", undefined)).toBe("competition");
+    expect(resolveScheduleTrackFilter("owner", "not-a-track")).toBe("competition");
+  });
+
+  it.each(["advisory_member", "adjudicator"] as const)(
+    "shows booked slots from every track by default for %s",
+    (role) => {
+      expect(defaultScheduleTrackFilter(role)).toBe("all");
+      expect(resolveScheduleTrackFilter(role, undefined)).toBe("all");
+    },
+  );
+
+  it("preserves explicit competition filters for reviewers", () => {
+    expect(resolveScheduleTrackFilter("adjudicator", "competition")).toBe(
+      "competition",
+    );
   });
 
   it("preserves explicit mentorship and all-track filters", () => {
-    expect(resolveScheduleTrackFilter("mentorship")).toBe("mentorship");
-    expect(resolveScheduleTrackFilter("all")).toBe("all");
+    expect(resolveScheduleTrackFilter("owner", "mentorship")).toBe("mentorship");
+    expect(resolveScheduleTrackFilter("owner", "all")).toBe("all");
   });
 
   it("recognizes mentorship slots without depending on capitalization", () => {

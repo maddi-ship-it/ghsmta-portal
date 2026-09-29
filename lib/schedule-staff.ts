@@ -14,6 +14,14 @@ export const SCHEDULE_STAFF_LIMITS = {
 export function scheduleStaffCapacity(
   participants: ScheduleParticipant[],
 ) {
+  const advisoryMembers = participants.filter(
+    (participant) => participant.role === "advisory_member",
+  ).length;
+  const primaryAdvisoryMembers = participants.filter(
+    (participant) =>
+      participant.role === "advisory_member" &&
+      participant.participation_mode !== "shadow",
+  ).length;
   const adjudicators = participants.filter(
     (participant) =>
       participant.role === "adjudicator" &&
@@ -27,6 +35,8 @@ export function scheduleStaffCapacity(
   ).length;
 
   return {
+    advisoryMembers,
+    primaryAdvisoryMembers,
     adjudicators,
     understudies,
     shadows,
@@ -44,23 +54,63 @@ export function scheduleSlotHasAdvisoryMember(
   );
 }
 
+export function scheduleSlotHasPrimaryAdvisoryMember(
+  participants: ScheduleParticipant[],
+) {
+  return participants.some(
+    (participant) =>
+      participant.role === "advisory_member" &&
+      participant.participation_mode !== "shadow",
+  );
+}
+
+export function canScheduleParticipantUseMode({
+  participants,
+  role,
+  participationMode,
+}: {
+  participants: ScheduleParticipant[];
+  role: AppRole;
+  participationMode: "panel" | "understudy" | "shadow";
+}) {
+  const capacity = scheduleStaffCapacity(participants);
+
+  if (role === "advisory_member") {
+    if (participationMode === "shadow") return !capacity.shadowsFull;
+    if (scheduleSlotHasPrimaryAdvisoryMember(participants)) return false;
+  }
+
+  if (participationMode === "panel") {
+    return role !== "adjudicator" || !capacity.adjudicatorsFull;
+  }
+
+  if (participationMode === "understudy") {
+    return !capacity.understudiesFull;
+  }
+
+  return !capacity.shadowsFull;
+}
+
 export function canSelfJoinScheduleSlot({
   currentEnrollment,
   isPast,
   participants,
   role,
   status,
+  participationMode,
 }: {
   currentEnrollment: boolean;
   isPast: boolean;
   participants: ScheduleParticipant[];
   role: AppRole;
   status: string;
+  participationMode: "panel" | "understudy" | "shadow";
 }) {
   if (status !== "open" || isPast || currentEnrollment) return false;
 
-  return !(
-    role === "advisory_member" &&
-    scheduleSlotHasAdvisoryMember(participants)
-  );
+  return canScheduleParticipantUseMode({
+    participants,
+    role,
+    participationMode,
+  });
 }
