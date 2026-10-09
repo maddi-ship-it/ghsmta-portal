@@ -4793,6 +4793,46 @@ body.modal-open {
   gap: 10px;
 }
 
+.reference-document-bulk-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 14px;
+  background: var(--portal-surface-2, var(--soft));
+}
+
+.reference-document-selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+}
+
+.reference-document-selection-summary strong {
+  color: var(--portal-text, var(--navy-900));
+}
+
+.reference-document-bulk-move {
+  display: grid;
+  grid-template-columns: minmax(190px, 280px) auto;
+  align-items: end;
+  gap: 7px;
+}
+
+.reference-document-bulk-move label {
+  grid-column: 1 / -1;
+  color: var(--portal-muted, var(--muted));
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.reference-document-bulk-move .select {
+  width: 100%;
+}
+
 .reference-document-card {
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr) auto;
@@ -4804,6 +4844,26 @@ body.modal-open {
   background: white;
 }
 
+.reference-document-card.is-owner {
+  grid-template-columns: 28px 46px minmax(0, 1fr) auto;
+}
+
+.reference-document-select {
+  display: grid;
+  width: 28px;
+  height: 44px;
+  place-items: center;
+  cursor: pointer;
+}
+
+.reference-document-select input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--portal-gold, #c99b28);
+  cursor: pointer;
+}
+
 .reference-document-card[draggable="true"] {
   cursor: grab;
 }
@@ -4812,8 +4872,31 @@ body.modal-open {
   cursor: grabbing;
 }
 
-.reference-document-card.is-moving {
+.reference-document-card.is-moving,
+.reference-document-card.is-dragging {
   opacity: 0.55;
+}
+
+.reference-document-card.is-moving {
+  pointer-events: none;
+}
+
+.reference-document-drag-preview {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  max-width: 360px;
+  overflow: hidden;
+  padding: 11px 16px;
+  border: 1px solid var(--portal-gold, #c99b28);
+  border-radius: 12px;
+  color: var(--portal-text, #f8f3e8);
+  background: var(--portal-surface-2, #152139);
+  box-shadow: 0 14px 36px rgba(7, 20, 47, 0.26);
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -5023,8 +5106,17 @@ body.modal-open {
     grid-column: auto;
   }
 
+  .reference-document-bulk-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .reference-document-card {
     grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .reference-document-card.is-owner {
+    grid-template-columns: 28px 42px minmax(0, 1fr);
   }
 
   .reference-document-actions {
@@ -5065,6 +5157,18 @@ body.modal-open {
 
   .reference-audience-options {
     display: grid;
+  }
+
+  .reference-document-bulk-move {
+    grid-template-columns: 1fr;
+  }
+
+  .reference-document-bulk-move label {
+    grid-column: auto;
+  }
+
+  .reference-document-bulk-move .button {
+    width: 100%;
   }
 
   .reference-library-toolbar,
@@ -11136,6 +11240,62 @@ html[data-theme="light"] .theme-setting-icon {
 .portal-shell .application-reference-row,
 .portal-shell .application-reference-group h3 {
   border-color: var(--portal-line);
+}
+
+.portal-shell .application-reference-eligibility-group .application-reference-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.portal-shell .application-reference-eligibility-group .application-reference-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--portal-line);
+  border-radius: 12px;
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .application-reference-eligibility-group .application-reference-row.is-overall-eligibility {
+  grid-column: 1 / -1;
+  border-color: color-mix(in srgb, var(--portal-gold) 42%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-gold) 8%, var(--portal-surface-2));
+}
+
+.portal-shell .application-reference-row dd.application-reference-status {
+  min-width: 72px;
+  justify-self: end;
+  padding: 5px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.portal-shell .application-reference-row dd.application-reference-status.is-true {
+  color: var(--portal-success);
+  background: color-mix(in srgb, var(--portal-success) 10%, transparent);
+}
+
+.portal-shell .application-reference-row dd.application-reference-status.is-false {
+  color: var(--portal-danger);
+  background: color-mix(in srgb, var(--portal-danger) 10%, transparent);
+}
+
+@media (max-width: 760px) {
+  .portal-shell .application-reference-eligibility-group .application-reference-list {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .portal-shell .application-reference-eligibility-group .application-reference-row.is-overall-eligibility {
+    grid-column: auto;
+  }
 }
 
 /* Scheduling, notification, and account states now derive from theme tokens. */

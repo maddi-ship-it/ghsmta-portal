@@ -125,8 +125,10 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [movingDocumentId, setMovingDocumentId] = useState<string | null>(null);
+  const [movingDocumentIds, setMovingDocumentIds] = useState<string[]>([]);
   const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [draggingDocumentIds, setDraggingDocumentIds] = useState<string[]>([]);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const [dropZoneActive, setDropZoneActive] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ReferenceDocument | null>(null);
@@ -230,6 +232,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
         ),
     [activeAudience, currentFolderId, libraryFolders],
   );
+
   const currentFolder = currentFolderId
     ? libraryFolders.find((folder) => folder.id === currentFolderId) ?? null
     : null;
@@ -490,32 +493,50 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
     await loadLibrary();
   }
 
-  async function moveDocumentToFolder(
-    document: ReferenceDocument,
+  async function moveDocumentsToFolder(
+    selectedDocuments: ReferenceDocument[],
     destinationFolderId: string | null,
   ) {
-    if (document.folder_id === destinationFolderId) return;
+    const documentsToMove = selectedDocuments.filter(
+      (document) => document.folder_id !== destinationFolderId,
+    );
+    if (documentsToMove.length === 0) return;
 
     setError(null);
     setMessage(null);
-    setMovingDocumentId(document.id);
+    const documentIds = documentsToMove.map((document) => document.id);
+    setMovingDocumentIds(documentIds);
 
     try {
       const { error: moveError } = await supabase
         .from("reference_documents")
         .update({ folder_id: destinationFolderId })
-        .eq("id", document.id);
+        .in("id", documentIds);
 
       if (moveError) {
         setError(moveError.message);
         return;
       }
 
-      setMessage(`${document.file_name} moved.`);
+      setSelectedDocumentIds((current) =>
+        current.filter((documentId) => !documentIds.includes(documentId)),
+      );
+      setMessage(
+        documentsToMove.length === 1
+          ? `${documentsToMove[0].file_name} moved.`
+          : `${documentsToMove.length} documents moved.`,
+      );
       await loadLibrary();
     } finally {
-      setMovingDocumentId(null);
+      setMovingDocumentIds([]);
     }
+  }
+
+  async function moveDocumentToFolder(
+    document: ReferenceDocument,
+    destinationFolderId: string | null,
+  ) {
+    await moveDocumentsToFolder([document], destinationFolderId);
   }
 
   async function moveDocument(
@@ -527,6 +548,24 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
     const formData = new FormData(event.currentTarget);
     const destination = String(formData.get("folder_id") ?? "");
     await moveDocumentToFolder(document, destination || null);
+  }
+
+  async function moveSelectedDocuments(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const destination = String(formData.get("bulk_folder_id") ?? "");
+    if (!destination) {
+      setError("Choose a destination folder.");
+      return;
+    }
+
+    const selectedDocuments = visibleDocuments.filter((document) =>
+      selectedDocumentIds.includes(document.id),
+    );
+    await moveDocumentsToFolder(
+      selectedDocuments,
+      destination === "__root__" ? null : destination,
+    );
   }
 
   async function renameDocument(
@@ -568,9 +607,40 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
     document: ReferenceDocument,
     event: DragEvent<HTMLElement>,
   ) {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest("a, button, details, form, input, label, select, textarea")
+    ) {
+      event.preventDefault();
+      return;
+    }
+
+    const documentIds = selectedDocumentIds.includes(document.id)
+      ? visibleDocuments
+          .filter((item) => selectedDocumentIds.includes(item.id))
+          .map((item) => item.id)
+      : [document.id];
+    setDraggingDocumentIds(documentIds);
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, document.id);
-    event.dataTransfer.setData("text/plain", document.file_name);
+    event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, JSON.stringify(documentIds));
+    event.dataTransfer.setData(
+      "text/plain",
+      documentIds.length === 1
+        ? document.file_name
+        : `${documentIds.length} selected documents`,
+    );
+
+    const dragPreview = window.document.createElement("div");
+    dragPreview.className = "reference-document-drag-preview";
+    dragPreview.setAttribute("aria-hidden", "true");
+    dragPreview.textContent =
+      documentIds.length === 1
+        ? document.file_name
+        : `${documentIds.length} selected documents`;
+    window.document.body.appendChild(dragPreview);
+    event.dataTransfer.setDragImage(dragPreview, 24, 24);
+    window.requestAnimationFrame(() => dragPreview.remove());
   }
 
   async function handleLibraryDrop(
@@ -581,10 +651,21 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
     setDragOverFolderId(null);
     setDropZoneActive(false);
 
-    const draggedDocumentId = event.dataTransfer.getData(DOCUMENT_DRAG_TYPE);
-    if (draggedDocumentId) {
-      const document = documents.find((item) => item.id === draggedDocumentId);
-      if (document) await moveDocumentToFolder(document, destinationFolderId);
+    const draggedDocumentPayload = event.dataTransfer.getData(DOCUMENT_DRAG_TYPE);
+    if (draggedDocumentPayload) {
+      let documentIds: string[];
+      try {
+        const parsed = JSON.parse(draggedDocumentPayload);
+        documentIds = Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];
+      } catch {
+        documentIds = [draggedDocumentPayload];
+      }
+      const selectedDocuments = documents.filter((document) =>
+        documentIds.includes(document.id),
+      );
+      if (selectedDocuments.length > 0) {
+        await moveDocumentsToFolder(selectedDocuments, destinationFolderId);
+      }
       return;
     }
 
@@ -646,9 +727,37 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
       referenceFolderPath(libraryFolders, folder.id),
     ]),
   );
+  const selectedDocumentIdSet = new Set(selectedDocumentIds);
+  const movingDocumentIdSet = new Set(movingDocumentIds);
+  const draggingDocumentIdSet = new Set(draggingDocumentIds);
+  const selectedDocuments = visibleDocuments.filter((document) =>
+    selectedDocumentIdSet.has(document.id),
+  );
+  const bulkDestinationFolders = libraryFolders.filter(
+    (folder) =>
+      folder.id !== currentFolderId &&
+      selectedDocuments.every((document) =>
+        referenceFolderCanContainDocument(folder, document),
+      ),
+  );
+  const allVisibleDocumentsSelected =
+    visibleDocuments.length > 0 &&
+    visibleDocuments.every((document) =>
+      selectedDocumentIdSet.has(document.id),
+    );
   const currentLocationLabel = currentFolder
     ? (folderPaths.get(currentFolder.id) ?? currentFolder.name)
     : activeAudienceLabel;
+
+  function openFolder(folderId: string | null) {
+    setCurrentFolderId(folderId);
+    setSelectedDocumentIds([]);
+  }
+
+  function openAudience(audience: ReferenceAudience) {
+    setActiveAudience(audience);
+    openFolder(null);
+  }
 
   function setDropEffect(event: DragEvent<HTMLElement>) {
     event.preventDefault();
@@ -674,10 +783,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
               aria-selected={activeAudience === folder.key}
               className={activeAudience === folder.key ? "is-active" : ""}
               key={folder.key}
-              onClick={() => {
-                setActiveAudience(folder.key);
-                setCurrentFolderId(null);
-              }}
+              onClick={() => openAudience(folder.key)}
               role="tab"
               type="button"
             >
@@ -692,7 +798,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
             <nav aria-label="Folder breadcrumb" className="reference-breadcrumbs">
               <button
                 className={dragOverFolderId === "root" ? "is-drop-target" : ""}
-                onClick={() => setCurrentFolderId(null)}
+                onClick={() => openFolder(null)}
                 onDragLeave={() => setDragOverFolderId(null)}
                 onDragOver={(event) => {
                   if (role !== "owner") return;
@@ -711,7 +817,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
                   <span aria-hidden="true">/</span>
                   <button
                     className={dragOverFolderId === folder.id ? "is-drop-target" : ""}
-                    onClick={() => setCurrentFolderId(folder.id)}
+                    onClick={() => openFolder(folder.id)}
                     onDragLeave={() => setDragOverFolderId(null)}
                     onDragOver={(event) => {
                       if (role !== "owner") return;
@@ -844,7 +950,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
                     <button
                       className={`reference-subfolder-card ${dragOverFolderId === folder.id ? "is-drop-target" : ""}`}
                       key={folder.id}
-                      onClick={() => setCurrentFolderId(folder.id)}
+                      onClick={() => openFolder(folder.id)}
                       onDragLeave={() => setDragOverFolderId(null)}
                       onDragOver={(event) => {
                         if (role !== "owner") return;
@@ -866,20 +972,106 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
                 </div>
               )}
 
+              {role === "owner" && visibleDocuments.length > 0 && (
+                <div className="reference-document-bulk-toolbar">
+                  <div className="reference-document-selection-summary">
+                    <strong>
+                      {selectedDocuments.length > 0
+                        ? `${selectedDocuments.length} selected`
+                        : "Select documents to move"}
+                    </strong>
+                    <div className="button-row">
+                      <button
+                        aria-pressed={allVisibleDocumentsSelected}
+                        className="text-button"
+                        onClick={() =>
+                          setSelectedDocumentIds(
+                            allVisibleDocumentsSelected
+                              ? []
+                              : visibleDocuments.map((document) => document.id),
+                          )
+                        }
+                        type="button"
+                      >
+                        {allVisibleDocumentsSelected ? "Clear all" : "Select all"}
+                      </button>
+                    </div>
+                  </div>
+                  <form
+                    className="reference-document-bulk-move"
+                    onSubmit={(event) => void moveSelectedDocuments(event)}
+                  >
+                    <label htmlFor="reference_bulk_folder">Move selected to</label>
+                    <select
+                      className="select input-compact"
+                      defaultValue=""
+                      disabled={selectedDocuments.length === 0}
+                      id="reference_bulk_folder"
+                      name="bulk_folder_id"
+                      required
+                    >
+                      <option disabled value="">Choose destination</option>
+                      {currentFolderId !== null && (
+                        <option value="__root__">Library root</option>
+                      )}
+                      {bulkDestinationFolders.map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {folderPaths.get(folder.id) ?? folder.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="button button-secondary button-compact"
+                      disabled={
+                        selectedDocuments.length === 0 ||
+                        movingDocumentIds.length > 0
+                      }
+                      type="submit"
+                    >
+                      {movingDocumentIds.length > 0 ? "Moving…" : "Move selected"}
+                    </button>
+                  </form>
+                </div>
+              )}
+
               {visibleDocuments.length > 0 && (
                 <div className="reference-document-grid">
                   {visibleDocuments.map((document) => (
                 <article
-                  className={`reference-document-card ${movingDocumentId === document.id ? "is-moving" : ""}`}
+                  className={`reference-document-card ${role === "owner" ? "is-owner" : ""} ${movingDocumentIdSet.has(document.id) ? "is-moving" : ""} ${draggingDocumentIdSet.has(document.id) ? "is-dragging" : ""}`}
                   draggable={role === "owner"}
                   key={document.id}
                   onDragEnd={() => {
+                    setDraggingDocumentIds([]);
                     setDragOverFolderId(null);
                     setDropZoneActive(false);
                   }}
                   onDragStart={(event) => beginDocumentDrag(document, event)}
                   title={role === "owner" ? "Drag this document onto a folder to move it" : undefined}
                 >
+                  {role === "owner" && (
+                    <label
+                      className="reference-document-select"
+                      draggable={false}
+                    >
+                      <input
+                        aria-label={`Select ${document.file_name}`}
+                        checked={selectedDocumentIdSet.has(document.id)}
+                        draggable={false}
+                        onChange={(event) => {
+                          const selected = event.currentTarget.checked;
+                          setSelectedDocumentIds((current) =>
+                            selected
+                              ? [...new Set([...current, document.id])]
+                              : current.filter(
+                                  (documentId) => documentId !== document.id,
+                                ),
+                          );
+                        }}
+                        type="checkbox"
+                      />
+                    </label>
+                  )}
                   <div className="reference-document-icon" aria-hidden="true">▤</div>
                   <div className="reference-document-copy">
                     <strong>{document.file_name}</strong>
@@ -893,7 +1085,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
                   </div>
                   <div className="reference-document-actions">
                     {document.signed_url ? (
-                      <a className="button button-secondary button-compact" href={document.signed_url} rel="noreferrer" target="_blank">
+                      <a className="button button-secondary button-compact" draggable={false} href={document.signed_url} rel="noreferrer" target="_blank">
                         Open
                       </a>
                     ) : (
@@ -922,8 +1114,8 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
                                 </option>
                               ))}
                           </select>
-                          <button className="button button-secondary button-compact" disabled={movingDocumentId === document.id} type="submit">
-                            {movingDocumentId === document.id ? "Moving…" : "Move"}
+                          <button className="button button-secondary button-compact" disabled={movingDocumentIdSet.has(document.id)} type="submit">
+                            {movingDocumentIdSet.has(document.id) ? "Moving…" : "Move"}
                           </button>
                         </form>
                         <button className="text-button danger-text" onClick={() => setPendingDelete(document)} type="button">

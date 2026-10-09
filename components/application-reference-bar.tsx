@@ -142,27 +142,59 @@ export function ApplicationReferenceBar({
               {activePanel.groups.length > 0 ? (
                 activePanel.groups.map((group) => (
                   <section
-                    className="application-reference-group"
+                    className={`application-reference-group${
+                      activePanel.key === "eligibility"
+                        ? " application-reference-eligibility-group"
+                        : ""
+                    }`}
                     key={`${activePanel.key}-${group.title}`}
                   >
                     <h3>{group.title}</h3>
 
                     {group.items.length > 0 ? (
                       <dl className="application-reference-list">
-                        {group.items.map((item, index) => (
-                          <div
-                            className="application-reference-row"
-                            key={`${item.label}-${index}`}
-                          >
-                            <dt>{item.label}</dt>
-                            <dd>
-                              {formatApplicationReferenceValue(
-                                item.label,
-                                item.value,
-                              )}
-                            </dd>
-                          </div>
-                        ))}
+                        {group.items.map((item, index) => {
+                          const formattedValue =
+                            formatApplicationReferenceValue(
+                              item.label,
+                              item.value,
+                            );
+                          const isEligibility =
+                            activePanel.key === "eligibility";
+                          const isOverallEligibility =
+                            isEligibility &&
+                            item.label
+                              .toLowerCase()
+                              .includes("overall production");
+
+                          return (
+                            <div
+                              className={`application-reference-row${
+                                isOverallEligibility
+                                  ? " is-overall-eligibility"
+                                  : ""
+                              }`}
+                              key={`${item.label}-${index}`}
+                            >
+                              <dt>{item.label}</dt>
+                              <dd
+                                className={
+                                  isEligibility
+                                    ? `application-reference-status ${
+                                        formattedValue === "True"
+                                          ? "is-true"
+                                          : formattedValue === "False"
+                                            ? "is-false"
+                                            : "is-neutral"
+                                      }`
+                                    : undefined
+                                }
+                              >
+                                {formattedValue}
+                              </dd>
+                            </div>
+                          );
+                        })}
                       </dl>
                     ) : (
                       <p className="application-reference-empty">
