@@ -316,6 +316,7 @@ function CategoryScoreSection({
   categoryIndex,
   categoryCriteria,
   categoryComment,
+  applicationDefaultEligible,
   categorySubjectName,
   officialProposal,
   ownApproval,
@@ -339,6 +340,7 @@ function CategoryScoreSection({
   categoryIndex: number;
   categoryCriteria: ScoringCriterion[];
   categoryComment: AdjudicationCategoryComment | undefined;
+  applicationDefaultEligible: boolean | undefined;
   categorySubjectName: string;
   officialProposal?: CategoryProposal;
   ownApproval?: CategoryApproval;
@@ -364,6 +366,7 @@ function CategoryScoreSection({
     officialProposal?.is_eligible ??
     categoryComment?.is_eligible ??
     categoryComment?.is_applicable ??
+    applicationDefaultEligible ??
     true;
 
   const [expanded, setExpanded] = useState(true);
@@ -1032,6 +1035,7 @@ function CategoryScoreSection({
 
 export function CollaborativeAdjudicatorScorecard({
   applicationId,
+  applicationEligibilityDefaults,
   currentUserId,
   currentUserName,
   categories,
@@ -1053,6 +1057,7 @@ export function CollaborativeAdjudicatorScorecard({
   afterCategoryTitle,
 }: {
   applicationId: string;
+  applicationEligibilityDefaults: Record<string, boolean>;
   currentUserId: string;
   currentUserName: string;
   categories: ScoringCategory[];
@@ -1319,6 +1324,9 @@ export function CollaborativeAdjudicatorScorecard({
           <CategoryScoreSection
             category={category}
             categoryComment={ownCommentMap.get(category.id)}
+            applicationDefaultEligible={
+              applicationEligibilityDefaults[category.category_key]
+            }
             categoryCriteria={criteria.filter(
               (criterion) => criterion.category_id === category.id,
             )}

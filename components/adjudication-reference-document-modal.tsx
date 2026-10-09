@@ -7,9 +7,13 @@ import type { AdjudicationReferenceLink } from "@/lib/adjudication-reference-doc
 
 export function AdjudicationReferenceDocumentModal({
   buttonClassName,
+  buttonLabels,
   links,
 }: {
   buttonClassName: string;
+  buttonLabels?: Partial<
+    Record<AdjudicationReferenceLink["key"], string>
+  >;
   links: AdjudicationReferenceLink[];
 }) {
   const [activeLink, setActiveLink] =
@@ -44,7 +48,7 @@ export function AdjudicationReferenceDocumentModal({
           title={link.fileName}
           type="button"
         >
-          {link.label}
+          {buttonLabels?.[link.key] ?? link.label}
         </button>
       ))}
 

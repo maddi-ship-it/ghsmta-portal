@@ -7,12 +7,12 @@ import {
 } from "@/lib/adjudication";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import {
+  buildApplicationCategoryEligibilityDefaults,
   buildApplicationReferencePanels,
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
 import { AdjudicationBrainDump } from "@/components/adjudication-brain-dump";
-import { AdjudicationCategorySidebar } from "@/components/adjudication-category-sidebar";
 import {
   AdjudicationBigPictureComment,
   AdjudicationOverallProduction,
@@ -445,6 +445,13 @@ export default async function AdjudicationApplicationPage({
     answers: applicationAnswers,
     eligibilityCategories: categories,
   });
+  const applicationEligibilityDefaults =
+    buildApplicationCategoryEligibilityDefaults({
+      application,
+      questions: applicationQuestions,
+      answers: applicationAnswers,
+      eligibilityCategories: categories,
+    });
   const scale = (scaleResult.data ?? []) as ScoringScaleLevel[];
   const scoreOptions = quarterScoreOptions(
     Number(rubric.score_min),
@@ -885,6 +892,11 @@ export default async function AdjudicationApplicationPage({
       )}
 
       <ApplicationReferenceBar
+        categoryNavigation={{
+          categories: narrativeCategories,
+          initialCompletedCategoryIds: initiallyCompletedCategoryIds,
+          showCompletion: isScoringParticipant,
+        }}
         links={referenceLinks}
         panels={referencePanels}
         reviewActions={compactConsensusControls
@@ -938,13 +950,7 @@ export default async function AdjudicationApplicationPage({
       />
       )}
 
-      <div className="adjudication-score-layout">
-        <AdjudicationCategorySidebar
-          categories={narrativeCategories}
-          initialCompletedCategoryIds={initiallyCompletedCategoryIds}
-          showCompletion={isScoringParticipant}
-        />
-
+      <div className="adjudication-score-layout adjudication-score-layout-single">
         <div className="adjudication-score-content">
       {isScoringParticipant ? (
         <>
@@ -988,6 +994,7 @@ export default async function AdjudicationApplicationPage({
             }
             afterCategoryTitle="Direction"
             applicationId={id}
+            applicationEligibilityDefaults={applicationEligibilityDefaults}
             categories={narrativeCategories}
             categorySubjectDefaults={categorySubjectDefaults}
             criteria={scoreableCriteria}

@@ -1,8 +1,12 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  AdjudicationCategoryJumpMenu,
+  type CategoryJumpOption,
+} from "@/components/adjudication-category-sidebar";
 import { AdjudicationReferenceDocumentModal } from "@/components/adjudication-reference-document-modal";
 import type {
   ApplicationReferencePanel,
@@ -15,11 +19,29 @@ export const OPEN_CATEGORY_REVIEW_EVENT =
 export const OPEN_PANEL_REVIEW_EVENT =
   "ghsmta:open-adjudication-panel-review";
 
+const PRIMARY_PANEL_ORDER = [
+  "eligibility",
+  "acting-candidates",
+  "musical-budget",
+  "program-vision",
+] as const;
+
+const REFERENCE_DOCUMENT_BUTTON_LABELS = {
+  "scoring-guide": "SCORING GUIDE",
+  "evaluative-glossary": "EVALUTIVE GLOSSARY",
+} as const;
+
 export function ApplicationReferenceBar({
+  categoryNavigation,
   links = [],
   panels,
   reviewActions,
 }: {
+  categoryNavigation?: {
+    categories: CategoryJumpOption[];
+    initialCompletedCategoryIds?: string[];
+    showCompletion: boolean;
+  };
   links?: AdjudicationReferenceLink[];
   panels: ApplicationReferencePanel[];
   reviewActions?: {
@@ -29,6 +51,23 @@ export function ApplicationReferenceBar({
 }) {
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
+  const panelByKey = new Map(panels.map((panel) => [panel.key, panel]));
+  const primaryPanels = PRIMARY_PANEL_ORDER.flatMap((key) => {
+    const panel = panelByKey.get(key);
+    return panel ? [panel] : [];
+  });
+  const fullApplicationPanel = panelByKey.get("full-application");
+
+  const panelButton = (panel: ApplicationReferencePanel) => (
+    <button
+      className="application-reference-button"
+      key={panel.key}
+      onClick={() => setActivePanel(panel)}
+      type="button"
+    >
+      {panel.shortTitle}
+    </button>
+  );
 
   useEffect(() => {
     if (!activePanel) return;
@@ -55,51 +94,73 @@ export function ApplicationReferenceBar({
         aria-label="Application reference views"
       >
         <div className="application-reference-buttons">
-          {reviewActions?.showCategoryReview ? (
-            <button
-              className="application-reference-button application-reference-review-button"
-              onClick={() =>
-                window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
-              }
-              type="button"
-            >
-              Review all categories
-            </button>
+          {categoryNavigation ? (
+            <>
+              <AdjudicationCategoryJumpMenu {...categoryNavigation} />
+              <span
+                aria-hidden="true"
+                className="application-reference-divider"
+              />
+            </>
           ) : null}
-          {reviewActions?.showPanelReview ? (
-            <button
-              className="application-reference-button application-reference-review-button"
-              onClick={() =>
-                window.dispatchEvent(new Event(OPEN_PANEL_REVIEW_EVENT))
-              }
-              type="button"
-            >
-              Panel review
-            </button>
+
+          {primaryPanels.map(panelButton)}
+
+          {primaryPanels.length > 0 && fullApplicationPanel ? (
+            <span
+              aria-hidden="true"
+              className="application-reference-divider"
+            />
           ) : null}
-          {panels.map((panel) => (
-            <Fragment key={panel.key}>
-              <button
-                className="application-reference-button"
-                onClick={() => setActivePanel(panel)}
-                type="button"
-              >
-                {panel.shortTitle}
-              </button>
-              {panel.key === "musical-budget" && (
-                <AdjudicationReferenceDocumentModal
-                  buttonClassName="application-reference-button"
-                  links={links}
-                />
-              )}
-            </Fragment>
-          ))}
-          {!panels.some((panel) => panel.key === "musical-budget") && (
+
+          {links.length > 0 ? (
             <AdjudicationReferenceDocumentModal
               buttonClassName="application-reference-button"
+              buttonLabels={REFERENCE_DOCUMENT_BUTTON_LABELS}
               links={links}
             />
-          )}
+          ) : null}
+
+          {fullApplicationPanel ? (
+            <>
+              {links.length > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className="application-reference-divider"
+                />
+              ) : null}
+              {panelButton(fullApplicationPanel)}
+            </>
+          ) : null}
+
+          {reviewActions?.showCategoryReview ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="application-reference-divider"
+              />
+              {reviewActions.showPanelReview ? (
+                <button
+                  className="application-reference-button application-reference-review-button"
+                  onClick={() =>
+                    window.dispatchEvent(new Event(OPEN_PANEL_REVIEW_EVENT))
+                  }
+                  type="button"
+                >
+                  Panel review
+                </button>
+              ) : null}
+              <button
+                className="application-reference-button application-reference-review-button"
+                onClick={() =>
+                  window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
+                }
+                type="button"
+              >
+                Review all categories
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 

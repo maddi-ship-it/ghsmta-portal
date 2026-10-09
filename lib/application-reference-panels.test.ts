@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildApplicationCategoryEligibilityDefaults,
   buildApplicationReferencePanels,
   formatApplicationReferenceValue,
 } from "./application-reference-panels";
@@ -136,6 +137,34 @@ describe("buildApplicationReferencePanels", () => {
         formatApplicationReferenceValue(item.label, item.value),
       ),
     ).toEqual(["True", "False", "False", "True"]);
+  });
+
+  it("provides adjudicator eligibility defaults from application data", () => {
+    const defaults = buildApplicationCategoryEligibilityDefaults({
+      application: legacyApplication,
+      questions: [
+        question("direction", "Direction - Award Eligible", 1, {
+          question_type: "yes_no",
+        }),
+        question("choreography", "Choreography - Award Eligibility", 2, {
+          question_type: "yes_no",
+        }),
+      ],
+      answers: [answer("direction", 1), answer("choreography", 0)],
+      eligibilityCategories: [
+        { category_key: "direction", title: "DIRECTION" },
+        { category_key: "choreography", title: "CHOREOGRAPHY" },
+        { category_key: "costume_design", title: "COSTUMES" },
+        { category_key: "overall_production", title: "OVERALL PRODUCTION" },
+      ],
+    });
+
+    expect(defaults).toEqual({
+      direction: true,
+      choreography: false,
+      costume_design: false,
+      overall_production: true,
+    });
   });
 
   it("calculates overall production as false at five ineligible categories", () => {

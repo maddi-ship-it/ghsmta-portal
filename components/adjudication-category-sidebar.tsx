@@ -7,17 +7,17 @@ import {
   type AdjudicationCategoryCompletionDetail,
 } from "@/lib/adjudication-category-completion";
 
-type SidebarCategory = {
+export type CategoryJumpOption = {
   id: string;
   title: string;
 };
 
-export function AdjudicationCategorySidebar({
+export function AdjudicationCategoryJumpMenu({
   categories,
   initialCompletedCategoryIds = [],
   showCompletion,
 }: {
-  categories: SidebarCategory[];
+  categories: CategoryJumpOption[];
   initialCompletedCategoryIds?: string[];
   showCompletion: boolean;
 }) {
@@ -59,39 +59,45 @@ export function AdjudicationCategorySidebar({
     };
   }, [showCompletion]);
 
+  const jumpToCategory = (categoryId: string) => {
+    if (!categoryId) return;
+
+    const hash = `#category-${categoryId}`;
+    window.history.pushState(null, "", hash);
+    window.dispatchEvent(new Event("hashchange"));
+
+    window.requestAnimationFrame(() => {
+      document.getElementById(`category-${categoryId}`)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "start",
+      });
+    });
+  };
+
   return (
-    <aside className="score-category-sidebar">
-      <div className="score-category-sidebar-heading">
-        <span className="eyebrow">Scorecard</span>
-        <h2>Categories</h2>
-        <p>Select a category to jump to that section.</p>
-      </div>
+    <select
+      aria-label="Jump to category"
+      className="application-reference-button application-category-jump-select"
+      defaultValue=""
+      onChange={(event) => {
+        jumpToCategory(event.currentTarget.value);
+        event.currentTarget.value = "";
+      }}
+    >
+      <option value="">JUMP TO CATEGORY</option>
+      {categories.map((category, index) => {
+        const complete =
+          showCompletion && completedCategoryIds.has(category.id);
 
-      <nav className="score-category-tabs" aria-label="Scoring categories">
-        {categories.map((category, index) => {
-          const complete =
-            showCompletion && completedCategoryIds.has(category.id);
-
-          return (
-            <a
-              className={complete ? "is-complete" : undefined}
-              href={`#category-${category.id}`}
-              key={category.id}
-            >
-              <span
-                aria-label={
-                  complete ? "Category complete" : `Category ${index + 1}`
-                }
-                className="score-category-marker"
-                role="img"
-              >
-                {complete ? "✓" : index + 1}
-              </span>
-              <strong>{category.title}</strong>
-            </a>
-          );
-        })}
-      </nav>
-    </aside>
+        return (
+          <option key={category.id} value={category.id}>
+            {complete ? "✓ " : ""}
+            {index + 1}. {category.title}
+          </option>
+        );
+      })}
+    </select>
   );
 }

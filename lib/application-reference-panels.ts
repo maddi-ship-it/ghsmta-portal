@@ -297,7 +297,7 @@ function allItems(rows: ReferenceRow[]) {
   return rows.map((row) => ({ label: row.label, value: row.value }));
 }
 
-function categoryEligibilityItems(
+function categoryEligibilitySelections(
   rows: ReferenceRow[],
   categories: NonNullable<ReferenceInput["eligibilityCategories"]>,
 ) {
@@ -336,7 +336,8 @@ function categoryEligibilityItems(
     return !["1", "true", "yes"].includes(item.value.trim().toLowerCase());
   }).length;
 
-  const items = categoryItems.map(({ categoryKey, label, value }) => ({
+  const selections = categoryItems.map(({ categoryKey, label, value }) => ({
+    categoryKey,
     label,
     value:
       categoryKey === "overall_production"
@@ -346,10 +347,52 @@ function categoryEligibilityItems(
         : value,
   }));
 
+  return { selections, usedRows };
+}
+
+function categoryEligibilityItems(
+  rows: ReferenceRow[],
+  categories: NonNullable<ReferenceInput["eligibilityCategories"]>,
+) {
+  const { selections, usedRows } = categoryEligibilitySelections(
+    rows,
+    categories,
+  );
+
   return [
-    ...items,
+    ...selections.map(({ label, value }) => ({ label, value })),
     ...allItems(rows.filter((row) => !usedRows.has(row))),
   ];
+}
+
+export function buildApplicationCategoryEligibilityDefaults(
+  input: ReferenceInput,
+): Record<string, boolean> {
+  const categories = input.eligibilityCategories ?? [];
+  if (categories.length === 0) return {};
+
+  const eligibilityRows = buildRows(input).filter((row) =>
+    `${row.key}_${normalize(row.label)}`.includes("eligib"),
+  );
+  const { selections } = categoryEligibilitySelections(
+    eligibilityRows,
+    categories,
+  );
+  const eligibilityByNormalizedKey = new Map(
+    selections.map((selection) => [
+      selection.categoryKey,
+      ["1", "true", "yes"].includes(
+        selection.value.trim().toLowerCase(),
+      ),
+    ]),
+  );
+
+  return Object.fromEntries(
+    categories.map((category) => [
+      category.category_key,
+      eligibilityByNormalizedKey.get(normalize(category.category_key)) ?? false,
+    ]),
+  );
 }
 
 function group(
@@ -542,7 +585,7 @@ export function buildApplicationReferencePanels(
     {
       key: "eligibility",
       title: "Category Eligibility View",
-      shortTitle: "Eligibility",
+      shortTitle: "ELIGIBILITY",
       description:
         "Award eligibility selections submitted by the school.",
       groups: [
@@ -555,7 +598,7 @@ export function buildApplicationReferencePanels(
     {
       key: "acting-candidates",
       title: "Individual Acting Category Candidates",
-      shortTitle: "Acting Candidates",
+      shortTitle: "ACTING CANDIDATES",
       description:
         "Submitted acting candidates, roles, pronouns, and grade levels.",
       groups: actingGroups,
@@ -563,7 +606,7 @@ export function buildApplicationReferencePanels(
     {
       key: "musical-budget",
       title: "Musical Budget View",
-      shortTitle: "Musical Budget",
+      shortTitle: "BUDGET",
       description:
         "Funding, compensation, expenses, and production-resource information supplied by the school.",
       groups: [
@@ -576,7 +619,7 @@ export function buildApplicationReferencePanels(
     {
       key: "program-vision",
       title: "Program Maturity, Vision, and Support",
-      shortTitle: "Program & Vision",
+      shortTitle: "PROGRAM MATURITY, VISION, SUPPORT VIEW",
       description:
         "Program participation, experience, I.D.E.A. work, production vision, and school context.",
       groups: [
