@@ -27,6 +27,7 @@ import {
   type ReferenceDocumentVisibility,
   type ReferenceFolder,
 } from "@/lib/reference-document-folders";
+import { compareReferenceNames } from "@/lib/reference-document-sort";
 import type { AppRole } from "@/lib/types";
 
 type ReferenceDocument = {
@@ -125,6 +126,7 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [movingDocumentId, setMovingDocumentId] = useState<string | null>(null);
+  const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const [dropZoneActive, setDropZoneActive] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ReferenceDocument | null>(null);
@@ -201,17 +203,32 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
     return () => window.clearTimeout(timer);
   }, [loadLibrary]);
 
-  const visibleDocuments = documents.filter((document) => {
-    return (
-      document.folder_id === currentFolderId &&
-      referenceItemVisibleToAudience(document, activeAudience)
-    );
-  });
+  const visibleDocuments = useMemo(
+    () =>
+      documents
+        .filter(
+          (document) =>
+            document.folder_id === currentFolderId &&
+            referenceItemVisibleToAudience(document, activeAudience),
+        )
+        .sort((left, right) =>
+          compareReferenceNames(left.file_name, right.file_name),
+        ),
+    [activeAudience, currentFolderId, documents],
+  );
 
-  const visibleFolders = libraryFolders.filter(
-    (folder) =>
-      folder.parent_id === currentFolderId &&
-      referenceItemVisibleToAudience(folder, activeAudience),
+  const visibleFolders = useMemo(
+    () =>
+      libraryFolders
+        .filter(
+          (folder) =>
+            folder.parent_id === currentFolderId &&
+            referenceItemVisibleToAudience(folder, activeAudience),
+        )
+        .sort((left, right) =>
+          compareReferenceNames(left.name, right.name),
+        ),
+    [activeAudience, currentFolderId, libraryFolders],
   );
   const currentFolder = currentFolderId
     ? libraryFolders.find((folder) => folder.id === currentFolderId) ?? null
@@ -510,6 +527,41 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
     const formData = new FormData(event.currentTarget);
     const destination = String(formData.get("folder_id") ?? "");
     await moveDocumentToFolder(document, destination || null);
+  }
+
+  async function renameDocument(
+    document: ReferenceDocument,
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    const formData = new FormData(event.currentTarget);
+    const fileName = String(formData.get("file_name") ?? "").trim();
+    if (!fileName) {
+      setError("Enter a file name.");
+      return;
+    }
+    if (fileName === document.file_name) return;
+
+    setRenamingDocumentId(document.id);
+    try {
+      const { error: renameError } = await supabase
+        .from("reference_documents")
+        .update({ file_name: fileName })
+        .eq("id", document.id);
+
+      if (renameError) {
+        setError(renameError.message);
+        return;
+      }
+
+      setMessage(`Renamed to ${fileName}.`);
+      await loadLibrary();
+    } finally {
+      setRenamingDocumentId(null);
+    }
   }
 
   function beginDocumentDrag(
@@ -851,6 +903,13 @@ export function ReferenceDocumentLibrary({ role }: { role: AppRole }) {
                       <details className="reference-document-menu">
                         <summary aria-label={`Actions for ${document.file_name}`}>•••</summary>
                         <div>
+                        <form className="reference-document-rename" onSubmit={(event) => void renameDocument(document, event)}>
+                          <label htmlFor={`document_name_${document.id}`}>File name</label>
+                          <input className="input input-compact" defaultValue={document.file_name} id={`document_name_${document.id}`} maxLength={255} name="file_name" required />
+                          <button className="button button-secondary button-compact" disabled={renamingDocumentId === document.id} type="submit">
+                            {renamingDocumentId === document.id ? "Renaming…" : "Rename"}
+                          </button>
+                        </form>
                         <form className="reference-document-move" onSubmit={(event) => void moveDocument(document, event)}>
                           <label htmlFor={`document_folder_${document.id}`}>Move to</label>
                           <select className="select input-compact" defaultValue={document.folder_id ?? ""} id={`document_folder_${document.id}`} name="folder_id">

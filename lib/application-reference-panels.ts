@@ -74,10 +74,80 @@ function displayValue(value: unknown): string {
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
     if ("value" in record) return displayValue(record.value);
+
+    const attachment =
+      record.attachment &&
+      typeof record.attachment === "object" &&
+      !Array.isArray(record.attachment)
+        ? (record.attachment as Record<string, unknown>)
+        : null;
+    if (attachment) {
+      return displayValue(attachment.name) || displayValue(record.answer);
+    }
+
+    const addressKeys = [
+      "street_address1",
+      "street_address2",
+      "locality",
+      "administrative_area_level_1",
+      "postal_code",
+      "country",
+    ];
+    if (addressKeys.some((key) => key in record)) {
+      return addressKeys
+        .map((key) => displayValue(record[key]))
+        .filter(Boolean)
+        .join(", ");
+    }
+
+    if ("answer" in record) return displayValue(record.answer);
     return "";
   }
 
   return String(value).trim();
+}
+
+export function formatApplicationReferenceValue(
+  label: string,
+  rawValue: string,
+) {
+  const value = rawValue.trim();
+  if (!value) return "Not provided";
+
+  const normalizedLabel = normalize(label);
+  const normalizedValue = value.toLowerCase();
+
+  if (normalizedLabel.includes("eligib")) {
+    if (["1", "true", "yes"].includes(normalizedValue)) return "True";
+    if (["0", "false", "no"].includes(normalizedValue)) return "False";
+  }
+
+  const numeric = Number(value.replace(/[$,%\s,]/g, ""));
+
+  if (Number.isFinite(numeric)) {
+    if (
+      normalizedLabel.includes("amount") ||
+      normalizedLabel.includes("compensation") ||
+      normalizedLabel.includes("spent") ||
+      normalizedLabel.includes("budget") ||
+      normalizedLabel.includes("fees")
+    ) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2,
+      }).format(numeric);
+    }
+
+    if (normalizedLabel.includes("percentage")) {
+      const percentage = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+      return `${percentage.toLocaleString("en-US", {
+        maximumFractionDigits: 2,
+      })}%`;
+    }
+  }
+
+  return value;
 }
 
 function flattenObject(
@@ -131,6 +201,16 @@ function flattenObject(
   }
 }
 
+function publicFormData(formData: Application["form_data"]) {
+  if (!formData || typeof formData !== "object" || Array.isArray(formData)) {
+    return formData;
+  }
+
+  return Object.fromEntries(
+    Object.entries(formData).filter(([key]) => key !== "acceptd"),
+  );
+}
+
 function buildRows({
   application,
   questions,
@@ -141,7 +221,7 @@ function buildRows({
   );
 
   const rows: ReferenceRow[] = questions
-    .filter((question) => question.active)
+    .filter((question) => question.question_type !== "content")
     .sort((a, b) => {
       const aOrder = a.source_column_index ?? a.sort_order;
       const bOrder = b.source_column_index ?? b.sort_order;
@@ -166,7 +246,7 @@ function buildRows({
     }));
 
   const fallbackRows: ReferenceRow[] = [];
-  flattenObject(application.form_data, fallbackRows);
+  flattenObject(publicFormData(application.form_data), fallbackRows);
   flattenObject(application.archived_payload, fallbackRows);
 
   const seen = new Set(
@@ -203,6 +283,10 @@ function uniqueItems(rows: ReferenceRow[]) {
   }
 
   return items;
+}
+
+function allItems(rows: ReferenceRow[]) {
+  return rows.map((row) => ({ label: row.label, value: row.value }));
 }
 
 function group(
@@ -256,14 +340,9 @@ export function buildApplicationReferencePanels(
 ): ApplicationReferencePanel[] {
   const rows = buildRows(input);
 
-  const eligibilityRows = rows.filter((row) => {
-    const normalized = `${row.key}_${normalize(row.label)}`;
-    return (
-      normalized.includes("award_eligible") ||
-      normalized.includes("award_eligibility") ||
-      normalized.includes("eligible_for_award")
-    );
-  });
+  const eligibilityRows = rows.filter((row) =>
+    `${row.key}_${normalize(row.label)}`.includes("eligib"),
+  );
 
   const actingGroups = [
     candidateGroup(rows, "Leading Actress", ["leading actress"]),
@@ -370,12 +449,30 @@ export function buildApplicationReferencePanels(
 
   const panels: ApplicationReferencePanel[] = [
     {
+      key: "full-application",
+      title: "Full Application",
+      shortTitle: "FULL APPLICATION",
+      description:
+        "Every application response available for this school, in the submitted form order.",
+      groups: [
+        {
+          title: "All application responses",
+          items: allItems(rows.filter((row) => row.value.trim().length > 0)),
+        },
+      ],
+    },
+    {
       key: "eligibility",
       title: "Category Eligibility View",
       shortTitle: "Eligibility",
       description:
         "Award eligibility selections submitted by the school.",
-      groups: [group("Application eligibility", eligibilityRows)],
+      groups: [
+        {
+          title: "Application eligibility",
+          items: allItems(eligibilityRows),
+        },
+      ],
     },
     {
       key: "acting-candidates",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { AdjudicationReferenceLink } from "@/lib/adjudication-reference-documents";
 
@@ -47,7 +48,7 @@ export function AdjudicationReferenceDocumentModal({
         </button>
       ))}
 
-      {activeLink && (
+      {activeLink && createPortal(
         <div
           className="application-reference-modal-backdrop"
           onMouseDown={(event) => {
@@ -86,7 +87,8 @@ export function AdjudicationReferenceDocumentModal({
               />
             </div>
           </section>
-        </div>
+        </div>,
+        document.querySelector(".portal-shell") ?? document.body,
       )}
     </>
   );

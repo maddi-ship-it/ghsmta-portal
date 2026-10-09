@@ -93,7 +93,6 @@ export default async function ApplicationDetailPage({
             .from("application_questions")
             .select("id,form_version_id,section_id,question_key,label,description,question_type,required,options,settings,visibility_rule,sort_order,active,source_column_index,source_label,imported,created_at,updated_at")
             .eq("form_version_id", application.form_version_id)
-            .eq("active", true)
             .order("sort_order")
             .order("created_at"),
           supabase
@@ -124,14 +123,15 @@ export default async function ApplicationDetailPage({
       : allStages;
   const progress = (progressResult.data ?? []) as ApplicationStageProgress[];
   const sections = (sectionsResult.data ?? []) as ApplicationSection[];
-  const questions = (questionsResult.data ?? []) as ApplicationQuestion[];
+  const allQuestions = (questionsResult.data ?? []) as ApplicationQuestion[];
+  const questions = allQuestions.filter((question) => question.active);
   const answers = (answersResult.data ?? []) as ApplicationAnswer[];
   const cycles = (cyclesResult.data ?? []) as AwardCycle[];
   const answerMap = new Map(answers.map((answer) => [answer.question_id, answer.value]));
   const progressMap = new Map(progress.map((item) => [item.stage_id, item]));
   const applicationReferencePanels = buildApplicationReferencePanels({
     application,
-    questions,
+    questions: allQuestions,
     answers,
   });
 

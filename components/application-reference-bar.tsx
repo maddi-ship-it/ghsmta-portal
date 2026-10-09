@@ -1,50 +1,19 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { AdjudicationReferenceDocumentModal } from "@/components/adjudication-reference-document-modal";
 import type {
   ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
+import { formatApplicationReferenceValue } from "@/lib/application-reference-panels";
 import type { AdjudicationReferenceLink } from "@/lib/adjudication-reference-documents";
 
 export const OPEN_CATEGORY_REVIEW_EVENT =
   "ghsmta:open-adjudication-category-review";
 export const OPEN_PANEL_REVIEW_EVENT =
   "ghsmta:open-adjudication-panel-review";
-
-function formatValue(label: string, rawValue: string) {
-  const value = rawValue.trim();
-  if (!value) return "Not provided";
-
-  const numeric = Number(value.replace(/[$,%\s,]/g, ""));
-  const normalizedLabel = label.toLowerCase();
-
-  if (Number.isFinite(numeric)) {
-    if (
-      normalizedLabel.includes("amount") ||
-      normalizedLabel.includes("compensation") ||
-      normalizedLabel.includes("spent") ||
-      normalizedLabel.includes("budget") ||
-      normalizedLabel.includes("fees")
-    ) {
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 2,
-      }).format(numeric);
-    }
-
-    if (normalizedLabel.includes("percentage")) {
-      const percentage = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
-      return `${percentage.toLocaleString("en-US", {
-        maximumFractionDigits: 2,
-      })}%`;
-    }
-  }
-
-  return value;
-}
 
 export function ApplicationReferenceBar({
   links = [],
@@ -134,7 +103,7 @@ export function ApplicationReferenceBar({
         </div>
       </div>
 
-      {activePanel && (
+      {activePanel && createPortal(
         <div
           className="application-reference-modal-backdrop"
           onMouseDown={(event) => {
@@ -187,7 +156,10 @@ export function ApplicationReferenceBar({
                           >
                             <dt>{item.label}</dt>
                             <dd>
-                              {formatValue(item.label, item.value)}
+                              {formatApplicationReferenceValue(
+                                item.label,
+                                item.value,
+                              )}
                             </dd>
                           </div>
                         ))}
@@ -210,7 +182,8 @@ export function ApplicationReferenceBar({
               )}
             </div>
           </section>
-        </div>
+        </div>,
+        document.querySelector(".portal-shell") ?? document.body,
       )}
     </>
   );
