@@ -358,7 +358,6 @@ function CategoryScoreSection({
   const isOverallProduction =
     category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
 
-  const [expanded, setExpanded] = useState(true);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(
     ownApproval?.response === "disputed",
@@ -385,21 +384,6 @@ function CategoryScoreSection({
         ]),
       ),
   );
-
-  useEffect(() => {
-    const openFromHash = () => {
-      if (window.location.hash === `#category-${category.id}`) {
-        setExpanded(true);
-      }
-    };
-
-    openFromHash();
-    window.addEventListener("hashchange", openFromHash);
-
-    return () => {
-      window.removeEventListener("hashchange", openFromHash);
-    };
-  }, [category.id]);
 
   const numericScores = categoryCriteria
     .map((criterion) => Number(scoreValues[criterion.id]))
@@ -542,7 +526,7 @@ function CategoryScoreSection({
     <section
       className={[
         "panel score-category-panel",
-        expanded ? "score-category-panel-expanded" : "score-category-panel-collapsed",
+        "score-category-panel-expanded",
         rangeMismatch ? "score-category-panel-range-error" : "",
         `score-category-panel-decision-${decisionResponseState}`,
       ]
@@ -570,20 +554,6 @@ function CategoryScoreSection({
           />
         )}
 
-      <div className="scoring-category-sticky-title">
-        <button
-          aria-expanded={expanded}
-          className="category-collapse-toggle"
-          onClick={() => setExpanded((current) => !current)}
-          type="button"
-        >
-          <span className="category-collapse-icon" aria-hidden="true">
-            {expanded ? "−" : "+"}
-          </span>
-          <strong className="category-collapse-title">{category.title}</strong>
-        </button>
-      </div>
-
       <div className="panel-header scoring-category-header">
         <div className="scoring-category-heading-copy scoring-category-context">
           <span className="section-order">
@@ -609,7 +579,6 @@ function CategoryScoreSection({
               average={average}
               decision={currentDecision}
               onReviewScores={() => {
-                setExpanded(true);
                 setReviewOpen(true);
               }}
               rangeMismatch={rangeMismatch}
@@ -618,7 +587,7 @@ function CategoryScoreSection({
         </div>
       </div>
 
-      <div className="panel-body" hidden={!expanded}>
+      <div className="panel-body">
         {category.subject_label && (
           <div className="field category-subject-field">
             <label htmlFor={`subject_name_display_${category.id}`}>

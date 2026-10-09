@@ -15805,14 +15805,30 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 }
 
 .portal-shell .portal-main .application-reference-buttons {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: clamp(3px, 0.45vw, 8px);
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .portal-shell .portal-main .application-reference-button,
 .portal-shell .portal-main .application-category-jump-select {
+  min-width: 0;
   max-width: 100%;
+  min-height: 32px;
+  padding: 6px clamp(6px, 0.55vw, 12px);
+  font-size: clamp(0.58rem, 0.64vw, 0.78rem);
+  white-space: nowrap;
+}
+
+.portal-shell .portal-main .application-category-jump-select {
+  width: clamp(150px, 13vw, 230px);
+  padding-right: 26px;
+}
+
+.portal-shell .portal-main .application-reference-divider {
+  height: 24px;
+  margin: 0;
 }
 
 @media (max-width: 1320px) {
@@ -15820,12 +15836,36 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
     position: sticky;
   }
 
-  .portal-shell .portal-main .application-reference-button {
-    white-space: normal;
+}
+
+@media (max-width: 1100px) {
+  .portal-shell .portal-main .application-reference-bar {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .portal-shell .portal-main .application-reference-buttons {
+    gap: 2px;
+  }
+
+  .portal-shell .portal-main .application-reference-button,
+  .portal-shell .portal-main .application-category-jump-select {
+    min-height: 30px;
+    padding: 5px 4px;
+    font-size: 0.52rem;
+  }
+
+  .portal-shell .portal-main .application-category-jump-select {
+    width: 128px;
+    padding-right: 18px;
+  }
+
+  .portal-shell .portal-main .application-reference-divider {
+    display: none;
   }
 }
 
-/* Keep category jumps and pinned titles below the ribbon at any wrapped height. */
+/* Keep category jump targets below the action ribbon. */
 .portal-shell .portal-main .score-category-panel {
   scroll-margin-top: calc(
     var(--application-reference-bar-sticky-bottom, 130px) + 10px
