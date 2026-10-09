@@ -41,6 +41,7 @@ type ReferenceRow = {
   label: string;
   value: string;
   order: number;
+  imported?: boolean;
 };
 
 function normalize(value: string) {
@@ -247,6 +248,7 @@ function buildRows({
       ),
       label: question.source_label || question.label,
       value: displayValue(answerMap.get(question.id)),
+      imported: question.imported,
       order:
         question.source_column_index ??
         question.sort_order ??
@@ -448,6 +450,7 @@ export function buildApplicationReferencePanels(
   const popupRows =
     input.application.source_system === "acceptd-api-v2"
       ? rows.filter((row) =>
+          row.imported ||
           CURRENT_ACCEPTD_EXPORT_QUESTION_LABELS.has(normalize(row.label)),
         )
       : rows;
@@ -649,10 +652,17 @@ export function buildApplicationReferencePanels(
     });
   }
 
+  const requiredToolbarPanels = new Set([
+    "full-application",
+    "eligibility",
+    "acting-candidates",
+    "musical-budget",
+    "program-vision",
+  ]);
+
   return panels.filter(
     (panel) =>
-      panel.key === "full-application" ||
-      panel.key === "eligibility" ||
+      requiredToolbarPanels.has(panel.key) ||
       panel.groups.some((section) => section.items.length > 0),
   );
 }

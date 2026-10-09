@@ -859,6 +859,7 @@ export default async function AdjudicationApplicationPage({
   const compactConsensusControls =
     showConsensusControls &&
     (profile.role === "adjudicator" || profile.role === "advisory_member");
+  const scorecardFormId = `adjudication-scorecard-${id}`;
 
   return (
     <>
@@ -906,6 +907,18 @@ export default async function AdjudicationApplicationPage({
                 profile.role === "advisory_member" && canPanelReview,
             }
           : undefined}
+        scorecardSubmitControl={
+          isScoringParticipant && !readOnly ? (
+            <ScorecardSubmitControls
+              applicationId={id}
+              categories={scoreableCategories}
+              compact
+              criteria={scoreableCriteria}
+              formId={scorecardFormId}
+              requireComments={canComment}
+            />
+          ) : undefined
+        }
       />
 
       {showConsensusControls && (
@@ -954,7 +967,7 @@ export default async function AdjudicationApplicationPage({
         <div className="adjudication-score-content">
       {isScoringParticipant ? (
         <>
-        <form className="scorecard-form">
+        <form className="scorecard-form" id={scorecardFormId}>
           <AdjudicatorAutosave
             applicationId={id}
             disabled={readOnly}
@@ -1036,16 +1049,6 @@ export default async function AdjudicationApplicationPage({
             scoreOptions={scoreChoices}
           />
 
-          {!readOnly && (
-            <div className="application-action-bar scorecard-action-bar">
-              <ScorecardSubmitControls
-                applicationId={id}
-                categories={scoreableCategories}
-                requireComments={canComment}
-                criteria={scoreableCriteria}
-              />
-            </div>
-          )}
         </form>
         {profile.role === "advisory_member" && canPanelReview && (
           <OwnerLiveAdjudicationReview

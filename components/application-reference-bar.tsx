@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -36,6 +36,7 @@ export function ApplicationReferenceBar({
   links = [],
   panels,
   reviewActions,
+  scorecardSubmitControl,
 }: {
   categoryNavigation?: {
     categories: CategoryJumpOption[];
@@ -48,6 +49,7 @@ export function ApplicationReferenceBar({
     showCategoryReview: boolean;
     showPanelReview: boolean;
   };
+  scorecardSubmitControl?: ReactNode;
 }) {
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
@@ -133,13 +135,14 @@ export function ApplicationReferenceBar({
             </>
           ) : null}
 
-          {reviewActions?.showCategoryReview ? (
+          {scorecardSubmitControl || reviewActions?.showCategoryReview ? (
             <>
               <span
                 aria-hidden="true"
                 className="application-reference-divider"
               />
-              {reviewActions.showPanelReview ? (
+              {scorecardSubmitControl}
+              {reviewActions?.showPanelReview ? (
                 <button
                   className="application-reference-button application-reference-review-button"
                   onClick={() =>
@@ -150,15 +153,17 @@ export function ApplicationReferenceBar({
                   Panel review
                 </button>
               ) : null}
-              <button
-                className="application-reference-button application-reference-review-button"
-                onClick={() =>
-                  window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
-                }
-                type="button"
-              >
-                Review all categories
-              </button>
+              {reviewActions?.showCategoryReview ? (
+                <button
+                  className="application-reference-button application-reference-review-button"
+                  onClick={() =>
+                    window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
+                  }
+                  type="button"
+                >
+                  Review all categories
+                </button>
+              ) : null}
             </>
           ) : null}
         </div>

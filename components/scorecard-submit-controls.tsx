@@ -115,12 +115,16 @@ function evaluateCompletion(
 export function ScorecardSubmitControls({
   applicationId,
   categories,
+  compact = false,
   criteria,
+  formId,
   requireComments = true,
 }: {
   applicationId: string;
   categories: ScoringCategory[];
+  compact?: boolean;
   criteria: ScoringCriterion[];
+  formId?: string;
   requireComments?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -131,29 +135,41 @@ export function ScorecardSubmitControls({
   const [online, setOnline] = useState(true);
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
 
+  const findForm = useCallback(() => {
+    if (formId) {
+      const form = document.getElementById(formId);
+      return form instanceof HTMLFormElement ? form : null;
+    }
+
+    return hostRef.current?.closest("form") ?? null;
+  }, [formId]);
+
   const updateCompletion = useCallback(() => {
-    const form = hostRef.current?.closest("form");
+    const form = findForm();
     if (!form) return;
     setCompletion(evaluateCompletion(form, categories, criteria, requireComments));
-  }, [categories, criteria, requireComments]);
+  }, [categories, criteria, findForm, requireComments]);
 
   useEffect(() => {
-    const form = hostRef.current?.closest("form");
+    const form = findForm();
     if (!form) return;
 
+    let updateTimer: number | undefined;
     const scheduleUpdate = () => {
-      window.setTimeout(updateCompletion, 0);
+      if (updateTimer) window.clearTimeout(updateTimer);
+      updateTimer = window.setTimeout(updateCompletion, 0);
     };
 
-    updateCompletion();
+    scheduleUpdate();
     form.addEventListener("input", scheduleUpdate);
     form.addEventListener("change", scheduleUpdate);
 
     return () => {
+      if (updateTimer) window.clearTimeout(updateTimer);
       form.removeEventListener("input", scheduleUpdate);
       form.removeEventListener("change", scheduleUpdate);
     };
-  }, [updateCompletion]);
+  }, [findForm, updateCompletion]);
 
   useEffect(() => {
     const updateSyncState = () => {
@@ -186,32 +202,52 @@ export function ScorecardSubmitControls({
 
   const blockedBySync = !online || hasOfflineDraft;
   const canSubmit = completion.complete && !blockedBySync;
+  const helpMessage = !online
+    ? "Final submission is available once you are back online."
+    : hasOfflineDraft
+      ? "Final submission unlocks after the saved scorecard finishes syncing."
+      : completion.complete
+        ? "All required fields are complete."
+        : `${completion.missingCount} required field${
+            completion.missingCount === 1 ? "" : "s"
+          } remaining.`;
+  const helpId = `scorecard-submit-help-${applicationId}`;
 
   return (
-    <div className="scorecard-submit-control" ref={hostRef}>
+    <div
+      className={`scorecard-submit-control${
+        compact ? " scorecard-submit-control-compact" : ""
+      }`}
+      ref={hostRef}
+    >
       <button
-        className="button button-dark"
+        aria-describedby={helpId}
+        className={
+          compact
+            ? "application-reference-button application-reference-submit-button"
+            : "button button-dark"
+        }
         disabled={!canSubmit}
+        form={formId}
         formAction={saveAdjudicatorScorecard.bind(
           null,
           applicationId,
           true,
         )}
+        title={compact ? helpMessage : undefined}
         type="submit"
       >
         Submit scorecard
       </button>
 
-      <small aria-live="polite" className="scorecard-submit-help">
-        {!online
-          ? "Final submission is available once you are back online."
-          : hasOfflineDraft
-            ? "Final submission unlocks after the saved scorecard finishes syncing."
-            : completion.complete
-          ? "All required fields are complete."
-          : `${completion.missingCount} required field${
-              completion.missingCount === 1 ? "" : "s"
-            } remaining.`}
+      <small
+        aria-live="polite"
+        className={`scorecard-submit-help${
+          compact ? " scorecard-submit-help-compact" : ""
+        }`}
+        id={helpId}
+      >
+        {helpMessage}
       </small>
     </div>
   );

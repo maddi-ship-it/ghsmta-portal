@@ -44,6 +44,7 @@ describe("ApplicationReferenceBar", () => {
           showCategoryReview: true,
           showPanelReview: false,
         }}
+        scorecardSubmitControl={<span>SUBMIT SCORECARD</span>}
       />,
     );
 
@@ -56,6 +57,7 @@ describe("ApplicationReferenceBar", () => {
       "SCORING GUIDE",
       "EVALUTIVE GLOSSARY",
       "FULL APPLICATION",
+      "SUBMIT SCORECARD",
       "Review all categories",
     ];
     const positions = labels.map((label) => html.indexOf(label));

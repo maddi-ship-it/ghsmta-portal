@@ -73,7 +73,7 @@ const legacyApplication = {
 >;
 
 describe("buildApplicationReferencePanels", () => {
-  it("adds a full-application panel and removes portal-only questions from current Acceptd data", () => {
+  it("keeps required toolbar panels and removes portal-only questions from current Acceptd data", () => {
     const panels = buildApplicationReferencePanels({
       application,
       questions: [
@@ -104,7 +104,16 @@ describe("buildApplicationReferencePanels", () => {
     expect(panels.map((panel) => panel.key)).toEqual([
       "full-application",
       "eligibility",
+      "acting-candidates",
+      "musical-budget",
+      "program-vision",
     ]);
+    expect(
+      panels.find((panel) => panel.key === "acting-candidates")?.groups,
+    ).toEqual([]);
+    expect(
+      panels.find((panel) => panel.key === "musical-budget")?.groups,
+    ).toEqual([]);
   });
 
   it("keeps every eligibility response and renders 1/0 as True/False", () => {
@@ -137,6 +146,66 @@ describe("buildApplicationReferencePanels", () => {
         formatApplicationReferenceValue(item.label, item.value),
       ),
     ).toEqual(["True", "False", "False", "True"]);
+  });
+
+  it("includes populated Acceptd-imported acting and budget fields", () => {
+    const panels = buildApplicationReferencePanels({
+      application,
+      questions: [
+        question("leading-actress-name", "Leading Actress Name", 1, {
+          imported: true,
+        }),
+        question("leading-actress-role", "Leading Actress Role", 2, {
+          imported: true,
+        }),
+        question("funding", "Please describe all sources of funding that apply to you:", 3, {
+          imported: true,
+        }),
+        question("production-cost", "Total $ amount spent on production costs?", 4, {
+          imported: true,
+        }),
+      ],
+      answers: [
+        answer("leading-actress-name", "Mikayla Shoemaker"),
+        answer("leading-actress-role", "Witch"),
+        answer("funding", "Ticket Sales"),
+        answer("production-cost", 4336.25),
+      ],
+    });
+
+    expect(
+      panels.find((panel) => panel.key === "acting-candidates")?.groups,
+    ).toEqual([
+      {
+        title: "Leading Actress",
+        items: [
+          { label: "Leading Actress Name", value: "Mikayla Shoemaker" },
+          { label: "Leading Actress Role", value: "Witch" },
+        ],
+      },
+    ]);
+    expect(
+      panels.find((panel) => panel.key === "musical-budget")?.groups,
+    ).toEqual([
+      {
+        title: "Funding sources",
+        items: [
+          {
+            label: "Please describe all sources of funding that apply to you:",
+            value: "Ticket Sales",
+          },
+        ],
+      },
+      {
+        title: "Production expenses",
+        items: [
+          {
+            label: "Total $ amount spent on production costs?",
+            value: "4336.25",
+          },
+        ],
+      },
+    ]);
   });
 
   it("provides adjudicator eligibility defaults from application data", () => {

@@ -2100,6 +2100,24 @@ html[data-theme="light"] .notification-popover-row.is-unread {
   font-size: .76rem;
 }
 
+.scorecard-submit-control.scorecard-submit-control-compact {
+  display: inline-flex;
+  width: auto;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.scorecard-submit-help-compact {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .button:disabled,
 .button[aria-disabled="true"] {
   cursor: not-allowed;
@@ -15504,6 +15522,28 @@ html[data-theme="light"] .application-category-jump-select {
 
 html[data-theme="light"] .portal-shell .portal-main .score-guide-panel .score-scale-grid strong {
   color: var(--navy-800, #18347d);
+}
+
+.portal-shell .application-reference-bar .application-reference-submit-button {
+  color: #071328;
+  border-color: color-mix(in srgb, var(--portal-gold, #d5b14f) 72%, var(--app-line));
+  background: var(--portal-gold, #d5b14f);
+}
+
+.portal-shell .application-reference-bar .application-reference-submit-button:hover:not(:disabled),
+.portal-shell .application-reference-bar .application-reference-submit-button:focus-visible:not(:disabled) {
+  color: #071328;
+  border-color: var(--portal-gold-bright, #f2d889);
+  background: var(--portal-gold-bright, #f2d889);
+}
+
+.portal-shell .application-reference-bar .application-reference-submit-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  color: var(--portal-muted, #98a2b3);
+  border-color: var(--portal-line, rgba(255, 255, 255, 0.14));
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: none;
 }
 
 .portal-shell .portal-main .score-guide-panel .score-scale-grid span {
