@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -53,6 +53,7 @@ export function ApplicationReferenceBar({
 }) {
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const panelByKey = new Map(panels.map((panel) => [panel.key, panel]));
   const primaryPanels = PRIMARY_PANEL_ORDER.flatMap((key) => {
     const panel = panelByKey.get(key);
@@ -89,11 +90,40 @@ export function ApplicationReferenceBar({
     };
   }, [activePanel]);
 
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+
+    const root = document.documentElement;
+    const updateStickyOffset = () => {
+      const stickyTop = Number.parseFloat(window.getComputedStyle(bar).top) || 0;
+      const stickyBottom = Math.ceil(
+        stickyTop + bar.getBoundingClientRect().height,
+      );
+      root.style.setProperty(
+        "--application-reference-bar-sticky-bottom",
+        `${stickyBottom}px`,
+      );
+    };
+
+    updateStickyOffset();
+    const resizeObserver = new ResizeObserver(updateStickyOffset);
+    resizeObserver.observe(bar);
+    window.addEventListener("resize", updateStickyOffset);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateStickyOffset);
+      root.style.removeProperty("--application-reference-bar-sticky-bottom");
+    };
+  }, []);
+
   return (
     <>
       <div
         className="application-reference-bar"
         aria-label="Application reference views"
+        ref={barRef}
       >
         <div className="application-reference-buttons">
           {categoryNavigation ? (

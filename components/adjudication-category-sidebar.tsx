@@ -24,6 +24,7 @@ export function AdjudicationCategoryJumpMenu({
   const [completedCategoryIds, setCompletedCategoryIds] = useState(
     () => new Set(initialCompletedCategoryIds),
   );
+  const [activeCategoryId, setActiveCategoryId] = useState("");
 
   useEffect(() => {
     if (!showCompletion) return;
@@ -59,6 +60,49 @@ export function AdjudicationCategoryJumpMenu({
     };
   }, [showCompletion]);
 
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateActiveCategory = () => {
+      animationFrame = 0;
+
+      const ribbonBottom =
+        document
+          .querySelector<HTMLElement>(".application-reference-bar")
+          ?.getBoundingClientRect().bottom ?? 0;
+      const sectionMarker = ribbonBottom + 12;
+      let currentCategoryId = categories[0]?.id ?? "";
+
+      categories.forEach((category) => {
+        const section = document.getElementById(`category-${category.id}`);
+        if (section && section.getBoundingClientRect().top <= sectionMarker) {
+          currentCategoryId = category.id;
+        }
+      });
+
+      setActiveCategoryId((current) =>
+        current === currentCategoryId ? current : currentCategoryId,
+      );
+    };
+
+    const scheduleUpdate = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(updateActiveCategory);
+    };
+
+    updateActiveCategory();
+    window.addEventListener("hashchange", scheduleUpdate);
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+
+    return () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("hashchange", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("scroll", scheduleUpdate);
+    };
+  }, [categories]);
+
   const jumpToCategory = (categoryId: string) => {
     if (!categoryId) return;
 
@@ -80,13 +124,14 @@ export function AdjudicationCategoryJumpMenu({
     <select
       aria-label="Jump to category"
       className="application-reference-button application-category-jump-select"
-      defaultValue=""
+      value={activeCategoryId}
       onChange={(event) => {
-        jumpToCategory(event.currentTarget.value);
-        event.currentTarget.value = "";
+        const categoryId = event.currentTarget.value;
+        setActiveCategoryId(categoryId);
+        jumpToCategory(categoryId);
       }}
     >
-      <option value="">JUMP TO CATEGORY</option>
+      <option disabled value="">JUMP TO CATEGORY</option>
       {categories.map((category, index) => {
         const complete =
           showCompletion && completedCategoryIds.has(category.id);

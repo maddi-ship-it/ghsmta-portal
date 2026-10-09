@@ -4038,14 +4038,20 @@ html[data-theme="light"] .notification-popover-row.is-unread {
 
 /* GHSMTA application-sourced category names — START */
 .category-subject-field {
-  max-width: 960px;
+  width: 100%;
+  max-width: none;
 }
 
-.category-subject-input[readonly] {
+.category-subject-display {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 2px 0 0;
   color: var(--navy-900);
-  background: var(--surface-soft, #f6f7fa);
   font-weight: 800;
-  cursor: default;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 /* GHSMTA application-sourced category names — END */
 
@@ -11159,9 +11165,8 @@ html[data-theme="light"] .theme-setting-icon {
   color: var(--portal-muted);
 }
 
-.portal-shell .portal-main .category-subject-input[readonly] {
-  color: var(--portal-muted);
-  background: var(--portal-surface-3);
+.portal-shell .portal-main .category-subject-display {
+  color: var(--portal-text);
 }
 
 .portal-shell .portal-main .school-file-list {
@@ -15564,7 +15569,10 @@ html[data-theme="light"] .portal-shell .portal-main .score-guide-panel .score-sc
 /* Keep only the active category name visible while its scorecard scrolls. */
 .portal-shell .portal-main .scoring-category-sticky-title {
   position: sticky;
-  top: calc(130px + env(safe-area-inset-top));
+  top: var(
+    --application-reference-bar-sticky-bottom,
+    calc(130px + env(safe-area-inset-top))
+  );
   z-index: 28;
   display: flex;
   min-height: 52px;
@@ -15614,7 +15622,6 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 
 @media (max-width: 900px) {
   .portal-shell .portal-main .scoring-category-sticky-title {
-    top: calc(120px + env(safe-area-inset-top));
     min-height: 44px;
     padding: 6px 9px;
     border-radius: 10px;
@@ -15810,11 +15817,17 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 
 @media (max-width: 1320px) {
   .portal-shell .portal-main .application-reference-bar {
-    position: relative;
-    top: auto;
+    position: sticky;
   }
 
   .portal-shell .portal-main .application-reference-button {
     white-space: normal;
   }
+}
+
+/* Keep category jumps and pinned titles below the ribbon at any wrapped height. */
+.portal-shell .portal-main .score-category-panel {
+  scroll-margin-top: calc(
+    var(--application-reference-bar-sticky-bottom, 130px) + 10px
+  );
 }

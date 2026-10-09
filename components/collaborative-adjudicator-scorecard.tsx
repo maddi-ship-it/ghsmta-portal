@@ -621,14 +621,20 @@ function CategoryScoreSection({
       <div className="panel-body" hidden={!expanded}>
         {category.subject_label && (
           <div className="field category-subject-field">
-            <label htmlFor={`subject_name_${category.id}`}>
+            <label htmlFor={`subject_name_display_${category.id}`}>
               {category.subject_label}
             </label>
+            <output
+              className="category-subject-display"
+              id={`subject_name_display_${category.id}`}
+            >
+              {categoryComment?.subject_name ??
+                categorySubjectName ??
+                "Not provided in the school application."}
+            </output>
             <input
-              className="input category-subject-input"
-              id={`subject_name_${category.id}`}
               name={`subject_name_${category.id}`}
-              readOnly
+              type="hidden"
               value={
                 categoryComment?.subject_name ??
                 categorySubjectName
