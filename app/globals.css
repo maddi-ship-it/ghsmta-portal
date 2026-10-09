@@ -4061,7 +4061,7 @@ html[data-theme="light"] .notification-popover-row.is-unread {
   align-items: center;
   gap: 12px;
   padding: 9px clamp(12px, 2vw, 32px);
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid rgba(201, 210, 226, .92);
   border-right: 0;
   border-left: 0;
@@ -4086,9 +4086,9 @@ html[data-theme="light"] .notification-popover-row.is-unread {
   min-width: 0;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  overflow: visible;
 }
 
 .application-reference-button {
@@ -4318,7 +4318,7 @@ html[data-theme="light"] .notification-popover-row.is-unread {
 
 @media (max-width: 1320px) {
   .application-reference-buttons {
-    justify-content: flex-start;
+    justify-content: center;
   }
 }
 
@@ -15785,5 +15785,32 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
   .adjudication-brain-dump-summary-hint::after {
     content: "Toggle";
     font-size: 0.78rem;
+  }
+}
+
+/* Keep the full adjudication ribbon visible without horizontal scrolling. */
+.portal-shell .portal-main .application-reference-bar {
+  overflow: visible;
+}
+
+.portal-shell .portal-main .application-reference-buttons {
+  flex-wrap: wrap;
+  justify-content: center;
+  overflow: visible;
+}
+
+.portal-shell .portal-main .application-reference-button,
+.portal-shell .portal-main .application-category-jump-select {
+  max-width: 100%;
+}
+
+@media (max-width: 1320px) {
+  .portal-shell .portal-main .application-reference-bar {
+    position: relative;
+    top: auto;
+  }
+
+  .portal-shell .portal-main .application-reference-button {
+    white-space: normal;
   }
 }
