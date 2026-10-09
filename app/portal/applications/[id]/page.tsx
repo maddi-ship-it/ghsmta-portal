@@ -16,6 +16,7 @@ import type {
   ApplicationStage,
   ApplicationStageProgress,
   AwardCycle,
+  ScoringCategory,
 } from "@/lib/types";
 
 import {
@@ -116,6 +117,18 @@ export default async function ApplicationDetailPage({
         ];
 
   const formVersion = versionResult.data as ApplicationFormVersion | null;
+  const { data: eligibilityCategoryData, error: eligibilityCategoryError } =
+    formVersion?.scoring_rubric_id
+      ? await supabase
+          .from("scoring_categories")
+          .select("category_key,title")
+          .eq("rubric_id", formVersion.scoring_rubric_id)
+          .eq("active", true)
+          .order("sort_order")
+      : { data: [], error: null };
+  if (eligibilityCategoryError) {
+    throw new Error(eligibilityCategoryError.message);
+  }
   const allStages = (stagesResult.data ?? []) as ApplicationStage[];
   const stages =
     profile.role === "applicant"
@@ -133,6 +146,9 @@ export default async function ApplicationDetailPage({
     application,
     questions: allQuestions,
     answers,
+    eligibilityCategories: (eligibilityCategoryData ?? []) as Array<
+      Pick<ScoringCategory, "category_key" | "title">
+    >,
   });
 
   const selectedStage =

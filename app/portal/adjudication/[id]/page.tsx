@@ -323,12 +323,6 @@ export default async function AdjudicationApplicationPage({
     answers: applicationAnswers,
   });
 
-  const applicationReferencePanels = buildApplicationReferencePanels({
-    application,
-    questions: applicationQuestions,
-    answers: applicationAnswers,
-  });
-
   const { data: cycleData } = await supabase.from("award_cycles").select("*").eq("id", application.cycle_id).single();
   const cycle = cycleData as AwardCycle | null;
 
@@ -445,6 +439,12 @@ export default async function AdjudicationApplicationPage({
   ]);
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
+  const applicationReferencePanels = buildApplicationReferencePanels({
+    application,
+    questions: applicationQuestions,
+    answers: applicationAnswers,
+    eligibilityCategories: categories,
+  });
   const scale = (scaleResult.data ?? []) as ScoringScaleLevel[];
   const scoreOptions = quarterScoreOptions(
     Number(rubric.score_min),

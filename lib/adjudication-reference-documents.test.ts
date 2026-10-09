@@ -21,7 +21,7 @@ function document(
 describe("matchAdjudicationReferenceDocuments", () => {
   it("matches the uploaded scoring guide and the handbook glossary", () => {
     const matches = matchAdjudicationReferenceDocuments([
-      document("guide", "2026-2027 Adjudication Scoring Guide:Rubric:Criteria.pdf"),
+      document("guide", "2026-2027 GHSMTA Adjudicator Scoring Reference Guide.pdf"),
       document("handbook", "2026-2027 Adjudicator Handbook FINAL.pdf"),
     ]);
 

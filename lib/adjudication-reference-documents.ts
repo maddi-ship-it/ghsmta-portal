@@ -34,9 +34,13 @@ function searchableDocumentName(document: AdjudicationReferenceDocument) {
 export function matchAdjudicationReferenceDocuments(
   documents: AdjudicationReferenceDocument[],
 ): MatchedReferenceDocument[] {
-  const scoringGuide = documents.find((document) =>
-    searchableDocumentName(document).includes("scoring guide"),
-  );
+  const scoringGuide = documents.find((document) => {
+    const searchableName = searchableDocumentName(document);
+    return (
+      searchableName.includes("scoring guide") ||
+      searchableName.includes("scoring reference guide")
+    );
+  });
   const dedicatedGlossary = documents.find((document) => {
     const searchableName = searchableDocumentName(document);
     return (

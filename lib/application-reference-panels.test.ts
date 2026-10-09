@@ -50,6 +50,7 @@ function answer(questionId: string, value: unknown): ApplicationAnswer {
 }
 
 const application = {
+  source_system: "acceptd-api-v2",
   form_data: {
     acceptd: {
       application_id: 2346317,
@@ -57,14 +58,25 @@ const application = {
     },
   },
   archived_payload: {},
-} as Pick<Application, "form_data" | "archived_payload">;
+} as Pick<
+  Application,
+  "form_data" | "archived_payload" | "source_system"
+>;
+
+const legacyApplication = {
+  ...application,
+  source_system: null,
+} as Pick<
+  Application,
+  "form_data" | "archived_payload" | "source_system"
+>;
 
 describe("buildApplicationReferencePanels", () => {
-  it("adds a full-application panel for every school and includes inactive submitted fields", () => {
+  it("adds a full-application panel and removes portal-only questions from current Acceptd data", () => {
     const panels = buildApplicationReferencePanels({
       application,
       questions: [
-        question("school-address", "School Address", 1, { active: false }),
+        question("school-name", "School Name", 1, { active: false }),
         question("directions", "Directions", 2),
         question("optional-note", "Optional Note", 3),
         question("instructions", "Instructions", 4, {
@@ -72,7 +84,7 @@ describe("buildApplicationReferencePanels", () => {
         }),
       ],
       answers: [
-        answer("school-address", "123 Main Street"),
+        answer("school-name", "Rainey-McCullers School of the Arts"),
         answer("directions", "Use the stage entrance"),
       ],
     });
@@ -80,17 +92,23 @@ describe("buildApplicationReferencePanels", () => {
     expect(panels[0]?.key).toBe("full-application");
     expect(panels[0]?.shortTitle).toBe("FULL APPLICATION");
     expect(panels[0]?.groups[0]?.items).toEqual([
-      { label: "School Address", value: "123 Main Street" },
-      { label: "Directions", value: "Use the stage entrance" },
+      {
+        label: "School Name",
+        value: "Rainey-McCullers School of the Arts",
+      },
     ]);
     expect(panels[0]?.groups[0]?.items).not.toContainEqual(
       expect.objectContaining({ label: "Application Id" }),
     );
+    expect(panels.map((panel) => panel.key)).toEqual([
+      "full-application",
+      "eligibility",
+    ]);
   });
 
   it("keeps every eligibility response and renders 1/0 as True/False", () => {
     const panels = buildApplicationReferencePanels({
-      application,
+      application: legacyApplication,
       questions: [
         question("direction", "Direction - Award Eligible", 1, {
           question_type: "yes_no",
@@ -100,23 +118,54 @@ describe("buildApplicationReferencePanels", () => {
         }),
       ],
       answers: [answer("direction", 1), answer("choreography", 0)],
+      eligibilityCategories: [
+        { category_key: "direction", title: "DIRECTION" },
+        { category_key: "choreography", title: "CHOREOGRAPHY" },
+        { category_key: "costume_design", title: "COSTUMES" },
+        { category_key: "overall_production", title: "OVERALL PRODUCTION" },
+      ],
     });
 
     const eligibilityItems = panels.find(
       (panel) => panel.key === "eligibility",
     )?.groups[0]?.items;
 
-    expect(eligibilityItems).toHaveLength(2);
+    expect(eligibilityItems).toHaveLength(4);
     expect(
       eligibilityItems?.map((item) =>
         formatApplicationReferenceValue(item.label, item.value),
       ),
-    ).toEqual(["True", "False"]);
+    ).toEqual(["True", "False", "False", "True"]);
+  });
+
+  it("calculates overall production as false at five ineligible categories", () => {
+    const panels = buildApplicationReferencePanels({
+      application,
+      questions: [],
+      answers: [],
+      eligibilityCategories: [
+        { category_key: "music_direction", title: "MUSIC DIRECTION" },
+        { category_key: "orchestra", title: "ORCHESTRA" },
+        { category_key: "ensemble", title: "ENSEMBLE" },
+        { category_key: "costume_design", title: "COSTUMES" },
+        { category_key: "direction", title: "DIRECTION" },
+        { category_key: "overall_production", title: "OVERALL PRODUCTION" },
+      ],
+    });
+
+    const eligibilityItems = panels.find(
+      (panel) => panel.key === "eligibility",
+    )?.groups[0]?.items;
+
+    expect(eligibilityItems?.at(-1)).toEqual({
+      label: "Overall Production - Award Eligible",
+      value: "0",
+    });
   });
 
   it("includes structured addresses and uploaded file names in the full application", () => {
     const panels = buildApplicationReferencePanels({
-      application,
+      application: legacyApplication,
       questions: [
         question("address", "School Address", 1, {
           question_type: "long_text",

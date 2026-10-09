@@ -3,6 +3,7 @@ import type {
   ApplicationAnswer,
   ApplicationQuestion,
 } from "@/lib/types";
+import { CURRENT_ACCEPTD_EXPORT_QUESTION_LABELS } from "./acceptd-current-export-question-labels";
 
 export type ApplicationReferenceItem = {
   label: string;
@@ -23,9 +24,16 @@ export type ApplicationReferencePanel = {
 };
 
 type ReferenceInput = {
-  application: Pick<Application, "form_data" | "archived_payload">;
+  application: Pick<
+    Application,
+    "form_data" | "archived_payload" | "source_system"
+  >;
   questions: ApplicationQuestion[];
   answers: ApplicationAnswer[];
+  eligibilityCategories?: Array<{
+    category_key: string;
+    title: string;
+  }>;
 };
 
 type ReferenceRow = {
@@ -289,6 +297,61 @@ function allItems(rows: ReferenceRow[]) {
   return rows.map((row) => ({ label: row.label, value: row.value }));
 }
 
+function categoryEligibilityItems(
+  rows: ReferenceRow[],
+  categories: NonNullable<ReferenceInput["eligibilityCategories"]>,
+) {
+  const usedRows = new Set<ReferenceRow>();
+  const categoryItems = categories.map((category) => {
+    const categoryKey = normalize(category.category_key);
+    const aliases = new Set([categoryKey, normalize(category.title)]);
+    if (categoryKey.endsWith("_design")) {
+      aliases.add(categoryKey.slice(0, -"_design".length));
+    }
+
+    const matchingRow = rows.find((row) => {
+      if (usedRows.has(row)) return false;
+      const haystack = `${row.key}_${normalize(row.label)}`;
+      return [...aliases].some((alias) => haystack.includes(alias));
+    });
+
+    if (matchingRow) {
+      usedRows.add(matchingRow);
+      return {
+        categoryKey,
+        label: matchingRow.label,
+        value: matchingRow.value,
+      };
+    }
+
+    return {
+      categoryKey,
+      label: `${humanize(normalize(category.title))} - Award Eligible`,
+      value: "0",
+    };
+  });
+
+  const ineligibleCategoryCount = categoryItems.filter((item) => {
+    if (item.categoryKey === "overall_production") return false;
+    return !["1", "true", "yes"].includes(item.value.trim().toLowerCase());
+  }).length;
+
+  const items = categoryItems.map(({ categoryKey, label, value }) => ({
+    label,
+    value:
+      categoryKey === "overall_production"
+        ? ineligibleCategoryCount >= 5
+          ? "0"
+          : "1"
+        : value,
+  }));
+
+  return [
+    ...items,
+    ...allItems(rows.filter((row) => !usedRows.has(row))),
+  ];
+}
+
 function group(
   title: string,
   rows: ReferenceRow[],
@@ -339,28 +402,43 @@ export function buildApplicationReferencePanels(
   input: ReferenceInput,
 ): ApplicationReferencePanel[] {
   const rows = buildRows(input);
+  const popupRows =
+    input.application.source_system === "acceptd-api-v2"
+      ? rows.filter((row) =>
+          CURRENT_ACCEPTD_EXPORT_QUESTION_LABELS.has(normalize(row.label)),
+        )
+      : rows;
+  const populatedPopupRows = popupRows.filter(
+    (row) => row.value.trim().length > 0,
+  );
 
   const eligibilityRows = rows.filter((row) =>
     `${row.key}_${normalize(row.label)}`.includes("eligib"),
   );
+  const eligibilityItems = input.eligibilityCategories?.length
+    ? categoryEligibilityItems(
+        eligibilityRows,
+        input.eligibilityCategories,
+      )
+    : allItems(eligibilityRows);
 
   const actingGroups = [
-    candidateGroup(rows, "Leading Actress", ["leading actress"]),
-    candidateGroup(rows, "Leading Actor", ["leading actor"]),
-    candidateGroup(rows, "Supporting Performer A", [
+    candidateGroup(populatedPopupRows, "Leading Actress", ["leading actress"]),
+    candidateGroup(populatedPopupRows, "Leading Actor", ["leading actor"]),
+    candidateGroup(populatedPopupRows, "Supporting Performer A", [
       "supporting performer a",
       "supporting performer 1",
     ]),
-    candidateGroup(rows, "Supporting Performer B", [
+    candidateGroup(populatedPopupRows, "Supporting Performer B", [
       "supporting performer b",
       "supporting performer 2",
     ]),
-    candidateGroup(rows, "Featured Performer", [
+    candidateGroup(populatedPopupRows, "Featured Performer", [
       "featured performer",
     ]),
   ].filter((candidate) => candidate.items.length > 0);
 
-  const budgetFunding = rows.filter((row) =>
+  const budgetFunding = populatedPopupRows.filter((row) =>
     rowMatches(row, [
       "sources of funding",
       "amount supplied",
@@ -374,11 +452,11 @@ export function buildApplicationReferencePanels(
     ]),
   );
 
-  const budgetCompensation = rows.filter((row) =>
+  const budgetCompensation = populatedPopupRows.filter((row) =>
     rowMatches(row, ["compensation", "compensations"]),
   );
 
-  const budgetExpenses = rows.filter((row) =>
+  const budgetExpenses = populatedPopupRows.filter((row) =>
     rowMatches(row, [
       "total amount spent",
       "total $ amount spent",
@@ -390,7 +468,7 @@ export function buildApplicationReferencePanels(
     ]),
   );
 
-  const budgetResources = rows.filter((row) =>
+  const budgetResources = populatedPopupRows.filter((row) =>
     rowMatches(row, [
       "percentage",
       "rented",
@@ -406,7 +484,7 @@ export function buildApplicationReferencePanels(
     ]),
   );
 
-  const participationRows = rows.filter((row) =>
+  const participationRows = populatedPopupRows.filter((row) =>
     rowMatches(row, [
       "total number of high school students",
       "total number of parents",
@@ -425,7 +503,7 @@ export function buildApplicationReferencePanels(
     ]),
   );
 
-  const ideaRows = rows.filter((row) =>
+  const ideaRows = populatedPopupRows.filter((row) =>
     rowMatches(row, [
       "diverse equitable inclusive accessible",
       "i.d.e.a",
@@ -433,7 +511,7 @@ export function buildApplicationReferencePanels(
     ]),
   );
 
-  const visionRows = rows.filter((row) =>
+  const visionRows = populatedPopupRows.filter((row) =>
     rowMatches(row, [
       "why did you choose this musical",
       "director s vision",
@@ -457,7 +535,7 @@ export function buildApplicationReferencePanels(
       groups: [
         {
           title: "All application responses",
-          items: allItems(rows.filter((row) => row.value.trim().length > 0)),
+          items: allItems(populatedPopupRows),
         },
       ],
     },
@@ -470,7 +548,7 @@ export function buildApplicationReferencePanels(
       groups: [
         {
           title: "Application eligibility",
-          items: allItems(eligibilityRows),
+          items: eligibilityItems,
         },
       ],
     },
@@ -528,5 +606,10 @@ export function buildApplicationReferencePanels(
     });
   }
 
-  return panels;
+  return panels.filter(
+    (panel) =>
+      panel.key === "full-application" ||
+      panel.key === "eligibility" ||
+      panel.groups.some((section) => section.items.length > 0),
+  );
 }
