@@ -14,7 +14,10 @@ import {
   OPEN_CATEGORY_REVIEW_EVENT,
   OPEN_PANEL_REVIEW_EVENT,
 } from "@/components/application-reference-bar";
-import { formatTwoPointRangeStart } from "@/lib/adjudication-ranges";
+import {
+  formatTwoPointRangeStart,
+  isValidTwoPointRange,
+} from "@/lib/adjudication-ranges";
 import { createClient } from "@/lib/supabase/client";
 import type { AppRole, ScoringCategory } from "@/lib/types";
 
@@ -71,6 +74,10 @@ function statusLabel(value: string) {
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function proposalHasValidRange(proposal: Proposal | undefined) {
+  return isValidTwoPointRange(proposal?.range_min, proposal?.range_max);
 }
 
 const rangeOptions = Array.from(
@@ -172,7 +179,11 @@ export function AdjudicationConsensusBar({
   );
   const unresolved = categories.filter((category) => {
     const proposal = proposalByCategory.get(category.id);
-    return !proposal || !["approved", "overridden"].includes(proposal.status);
+    return (
+      !proposal ||
+      !proposalHasValidRange(proposal) ||
+      !["approved", "overridden"].includes(proposal.status)
+    );
   }).length;
   const disputed = proposals.filter(
     (proposal) => proposal.status === "disputed",
@@ -417,13 +428,12 @@ export function AdjudicationConsensusBar({
                             )}
                           </td>
                           <td>
-                            {proposal?.is_eligible &&
-                            proposal.range_min != null &&
+                            {proposal?.range_min != null &&
                             proposal.range_max != null
                               ? `${Number(proposal.range_min).toFixed(2)}–${Number(
                                   proposal.range_max,
                                 ).toFixed(2)}`
-                              : "No range"}
+                              : "Committee range required"}
                           </td>
                           <td>
                             <div
@@ -470,6 +480,11 @@ export function AdjudicationConsensusBar({
                               <span className="field-help">
                                 Available after Advisory saves the category.
                               </span>
+                            ) : !proposalHasValidRange(proposal) ? (
+                              <span className="field-help">
+                                The Committee must add a 2-point range before
+                                adjudicators can respond.
+                              </span>
                             ) : finalizedByOwner ? (
                               <span className="badge badge-complete">
                                 Owner override
@@ -500,7 +515,7 @@ export function AdjudicationConsensusBar({
                                     formNoValidate
                                     type="submit"
                                   >
-                                    Approve range
+                                    Approve eligibility &amp; range
                                   </button>
                                 </div>
                                 <details className="range-review-dispute">
@@ -637,7 +652,8 @@ export function AdjudicationConsensusBar({
                   <strong>Eligible</strong> controls awards consideration.
                   <strong> Applicable</strong> controls whether scoring fields
                   appear and whether the category counts toward Overall
-                  Production.
+                  Production. Every applicable category requires a 2-point
+                  range, even when it is not award eligible.
                 </p>
                 <span aria-live="polite" className="range-review-live-status">
                   <span
@@ -794,8 +810,9 @@ export function AdjudicationConsensusBar({
                               )}
                               id={`range_${category.id}`}
                               name={`range_${category.id}`}
+                              required
                             >
-                              <option value="">No range</option>
+                              <option value="">Select range</option>
                               {rangeOptions.map((value) => (
                                 <option key={value} value={value.toFixed(2)}>
                                   {value.toFixed(2)}–{(value + 2).toFixed(2)}
@@ -903,9 +920,9 @@ export function AdjudicationConsensusBar({
                 </button>
                 <ScheduleSubmitButton
                   className="button button-gold"
-                  pendingLabel="Saving all decisions & assignments…"
+                  pendingLabel="Saving and sending decisions…"
                 >
-                  Save all decisions &amp; assignments
+                  Save &amp; send decisions for approval
                 </ScheduleSubmitButton>
                 </div>
               </div>

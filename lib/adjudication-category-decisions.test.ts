@@ -50,6 +50,32 @@ describe("categoryDecisionHasChanges", () => {
     ).toBe(true);
   });
 
+  it("keeps the range when a category is not award eligible", () => {
+    const ineligibleDecision = {
+      ...baseDecision,
+      is_eligible: false,
+    };
+    const ineligibleProposal = {
+      ...baseProposal,
+      is_eligible: false,
+    };
+
+    expect(
+      categoryDecisionHasChanges(
+        ineligibleDecision,
+        undefined,
+        "advisory_member",
+      ),
+    ).toBe(true);
+    expect(
+      categoryDecisionHasChanges(
+        ineligibleDecision,
+        ineligibleProposal,
+        "advisory_member",
+      ),
+    ).toBe(false);
+  });
+
   it("recognizes an unchanged stored range even when Postgres returns decimals as strings", () => {
     expect(
       categoryDecisionHasChanges(

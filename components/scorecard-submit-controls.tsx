@@ -29,27 +29,23 @@ function evaluateCompletion(
   for (const category of categories) {
     const isOverallProduction =
       category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
-    const usesEligibilityControl =
-      formData.get(`eligibility_control_${category.id}`) === "1";
-
-    const eligible = usesEligibilityControl
-      ? formData.get(`eligible_${category.id}`) === "on"
-      : !(
-          category.allow_not_applicable &&
-          formData.get(`not_applicable_${category.id}`) === "on"
-        );
 
     if (
       !isOverallProduction &&
-      eligible &&
       !formText(formData, `score_range_start_${category.id}`)
     ) {
       missingCount += 1;
     }
 
     if (
+      !isOverallProduction &&
+      formData.get(`category_decision_finalized_${category.id}`) !== "1"
+    ) {
+      missingCount += 1;
+    }
+
+    if (
       category.subject_label &&
-      eligible &&
       !formText(formData, `subject_name_${category.id}`)
     ) {
       missingCount += 1;
@@ -90,7 +86,6 @@ function evaluateCompletion(
 
     if (
       !isOverallProduction &&
-      eligible &&
       rangeStart != null &&
       categoryScores.length === categoryCriteria.length &&
       categoryCriteria.length > 0

@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
-import { twoPointRangeFromStart } from "@/lib/adjudication-ranges";
+import {
+  isValidTwoPointRange,
+  twoPointRangeFromStart,
+} from "@/lib/adjudication-ranges";
 import {
   categoryDecisionHasChanges,
   type CategoryDecision,
@@ -427,13 +430,13 @@ export async function saveAllCategoryProposals(
   const decisions: CategoryDecision[] = categoryIds.map((categoryId) => {
     const eligible = formData.get(`eligible_${categoryId}`) === "on";
     const rangeText = text(formData, `range_${categoryId}`);
-    const range = eligible ? twoPointRangeFromStart(rangeText) : null;
+    const range = twoPointRangeFromStart(rangeText);
 
     return {
       category_id: categoryId,
       is_eligible: eligible,
-      range_min: range?.rangeMinimum ?? (eligible ? Number.NaN : null),
-      range_max: range?.rangeMaximum ?? (eligible ? Number.NaN : null),
+      range_min: range?.rangeMinimum ?? Number.NaN,
+      range_max: range?.rangeMaximum ?? Number.NaN,
       advisory_note: text(formData, `note_${categoryId}`) || null,
       owner_override: formData.get(`override_${categoryId}`) === "on",
       owner_override_note:
@@ -536,16 +539,16 @@ export async function saveAllCategoryProposals(
   });
 
   if (
-    changedDecisions.some(
+    decisions.some(
       (decision) =>
-        decision.is_eligible &&
-        (!Number.isFinite(decision.range_min) ||
-          !Number.isFinite(decision.range_max)),
+        !Number.isFinite(decision.range_min) ||
+        !Number.isFinite(decision.range_max),
     )
   ) {
     return {
       ok: false,
-      error: "Each changed eligible category needs a valid two-point range.",
+      error:
+        "Every category needs a valid two-point range, even when it is not award eligible.",
       attemptId,
     };
   }
@@ -712,6 +715,24 @@ export async function respondCategoryProposal(
   }
 
   const supabase = await createClient();
+  const { data: proposal, error: proposalError } = await supabase
+    .from("adjudication_category_proposals")
+    .select("application_id,range_min,range_max")
+    .eq("id", proposalId)
+    .eq("application_id", applicationId)
+    .maybeSingle();
+
+  if (proposalError) throw new Error(proposalError.message);
+
+  if (
+    !proposal ||
+    !isValidTwoPointRange(proposal.range_min, proposal.range_max)
+  ) {
+    throw new Error(
+      "The Advisory Committee must set a valid two-point range before this decision can be approved.",
+    );
+  }
+
   if (response === "disputed") {
     const { data: assignment, error: assignmentError } = await supabase
       .from("adjudicator_assignments")

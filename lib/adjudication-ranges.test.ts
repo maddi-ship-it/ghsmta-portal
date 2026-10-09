@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatTwoPointRangeStart,
+  isValidTwoPointRange,
   twoPointRangeFromStart,
 } from "./adjudication-ranges";
 
@@ -23,5 +24,13 @@ describe("adjudication two-point ranges", () => {
     });
     expect(twoPointRangeFromStart("8.25")).toBeNull();
     expect(twoPointRangeFromStart("5.10")).toBeNull();
+  });
+
+  it("requires both endpoints to form an exact two-point range", () => {
+    expect(isValidTwoPointRange(5, 7)).toBe(true);
+    expect(isValidTwoPointRange("6.25", "8.25")).toBe(true);
+    expect(isValidTwoPointRange(5, null)).toBe(false);
+    expect(isValidTwoPointRange(5, 7.25)).toBe(false);
+    expect(isValidTwoPointRange(8.25, 10.25)).toBe(false);
   });
 });

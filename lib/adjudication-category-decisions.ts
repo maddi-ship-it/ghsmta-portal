@@ -35,17 +35,6 @@ function rangesMatch(
   existing: ExistingCategoryProposal,
   decision: CategoryDecision,
 ) {
-  const submittedRangeIsValid =
-    Number.isFinite(decision.range_min) &&
-    Number.isFinite(decision.range_max);
-
-  // Preserve an existing legacy blank range when the row was not edited. If
-  // the user clears a previously valid range, the non-null stored values make
-  // this return false so normal validation can report the problem.
-  if (decision.is_eligible && !submittedRangeIsValid) {
-    return existing.range_min == null && existing.range_max == null;
-  }
-
   return (
     numbersMatch(existing.range_min, decision.range_min) &&
     numbersMatch(existing.range_max, decision.range_max)

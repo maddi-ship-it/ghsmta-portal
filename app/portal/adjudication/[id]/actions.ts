@@ -16,6 +16,7 @@ import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
+import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import {
@@ -227,33 +228,15 @@ async function persistAdjudicatorScorecard(
     }
 
     const officialProposal = officialProposalMap.get(category.id);
-    const usesEligibilityControl =
-      formData.get(`eligibility_control_${category.id}`) === "1";
-
-    const isEligible = officialProposal
-      ? Boolean(officialProposal.is_eligible)
-      : usesEligibilityControl
-        ? formData.get(`eligible_${category.id}`) === "on"
-        : !(
-            category.allow_not_applicable &&
-            formData.get(`not_applicable_${category.id}`) === "on"
-          );
-
-    const rawRangeStart = officialProposal?.range_min != null
-      ? String(officialProposal.range_min)
-      : formText(formData, `score_range_start_${category.id}`);
-
-    const rangeMinimum = officialProposal?.range_min != null
-      ? Number(officialProposal.range_min)
-      : rawRangeStart
-        ? Number(rawRangeStart)
-        : null;
-
-    const rangeMaximum = officialProposal?.range_max != null
-      ? Number(officialProposal.range_max)
-      : rangeMinimum == null
+    const isEligible = Boolean(officialProposal?.is_eligible ?? true);
+    const rangeMinimum =
+      officialProposal?.range_min == null
         ? null
-        : Number((rangeMinimum + 2).toFixed(2));
+        : Number(officialProposal.range_min);
+    const rangeMaximum =
+      officialProposal?.range_max == null
+        ? null
+        : Number(officialProposal.range_max);
 
     const validRange =
       rangeMinimum != null &&
@@ -263,9 +246,18 @@ async function persistAdjudicatorScorecard(
         scoreMinimum,
         scoreMaximum - 2,
       ) &&
-      rangeMaximum <= scoreMaximum;
+      isValidTwoPointRange(
+        rangeMinimum,
+        rangeMaximum,
+        scoreMinimum,
+        scoreMaximum,
+      );
 
-    if (rawRangeStart && !validRange) {
+    if (
+      (officialProposal?.range_min != null ||
+        officialProposal?.range_max != null) &&
+      !validRange
+    ) {
       throw new Error(
         `The ${category.title} range must span exactly two points within the scoring scale.`,
       );
@@ -278,13 +270,12 @@ async function persistAdjudicatorScorecard(
       missing.push(`${category.title}: eligibility and range approval`);
     }
 
-    if (submit && isEligible && !validRange) {
-      missing.push(`${category.title}: select a 2-point scoring range`);
+    if (submit && !validRange) {
+      missing.push(`${category.title}: Committee must set a 2-point scoring range`);
     }
 
     if (
       submit &&
-      isEligible &&
       category.subject_label &&
       !formText(formData, `subject_name_${category.id}`)
     ) {
@@ -300,8 +291,8 @@ async function persistAdjudicatorScorecard(
       is_applicable: true,
       is_eligible: isEligible,
       not_applicable_reason: null,
-      score_range_min: isEligible && validRange ? rangeMinimum : null,
-      score_range_max: isEligible && validRange ? rangeMaximum : null,
+      score_range_min: validRange ? rangeMinimum : null,
+      score_range_max: validRange ? rangeMaximum : null,
     };
     if (canComment) {
       commentRow.private_notes =
@@ -363,7 +354,6 @@ async function persistAdjudicatorScorecard(
 
     if (
       submit &&
-      isEligible &&
       validRange &&
       rangeMinimum != null &&
       rangeMaximum != null &&

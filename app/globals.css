@@ -8862,7 +8862,7 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   z-index: 35;
 }
 
-/* Place approval controls directly with the locked eligibility/range controls. */
+/* Category decision status and approval controls. */
 .portal-shell .portal-main .category-decision-controls-stack {
   display: grid;
   min-width: 330px;
@@ -9988,6 +9988,10 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 .portal-shell .portal-main .category-decision-response-copy small {
   color: var(--portal-muted);
   line-height: 1.35;
+}
+
+.portal-shell .portal-main .category-decision-response-after-comments {
+  margin: 18px 0;
 }
 
 .portal-shell .portal-main .category-decision-response-approved {

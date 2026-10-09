@@ -40,3 +40,25 @@ export function twoPointRangeFromStart(
     rangeMaximum,
   };
 }
+
+export function isValidTwoPointRange(
+  minimum: number | string | null | undefined,
+  maximum: number | string | null | undefined,
+  scoreMinimum = 1,
+  scoreMaximum = 10,
+) {
+  if (maximum == null || maximum === "") return false;
+
+  const range = twoPointRangeFromStart(
+    minimum,
+    scoreMinimum,
+    scoreMaximum,
+  );
+  const numericMaximum = Number(maximum);
+
+  return Boolean(
+    range &&
+      Number.isFinite(numericMaximum) &&
+      Math.abs(range.rangeMaximum - numericMaximum) < 0.0001,
+  );
+}

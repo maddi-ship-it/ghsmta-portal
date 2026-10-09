@@ -12,7 +12,6 @@ import {
 } from "react";
 
 import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow-actions";
-import { CategoryScoringControls } from "@/components/category-scoring-controls";
 import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
 import {
@@ -23,6 +22,7 @@ import {
   ADJUDICATION_SCORE_CHANGE_EVENT,
   type AdjudicationScoreChangeDetail,
 } from "@/lib/adjudication-score-events";
+import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
@@ -63,7 +63,6 @@ type PanelMember = {
 };
 
 type CategoryDecision = {
-  eligible: boolean;
   rangeStart: number | null;
 };
 
@@ -178,10 +177,8 @@ function CategoryAverageSummary({
       <span>Your category average</span>
       <strong>{formatAverage(average)}</strong>
 
-      {!decision.eligible ? (
-        <small>Category marked ineligible</small>
-      ) : decision.rangeStart == null || rangeEnd == null ? (
-        <small>Select a 2-point range</small>
+      {decision.rangeStart == null || rangeEnd == null ? (
+        <small>Awaiting the Committee&apos;s 2-point range</small>
       ) : !allScoresEntered ? (
         <small>
           Target {decision.rangeStart.toFixed(2)}–{rangeEnd.toFixed(2)} ·
@@ -316,7 +313,6 @@ function CategoryScoreSection({
   categoryIndex,
   categoryCriteria,
   categoryComment,
-  applicationDefaultEligible,
   categorySubjectName,
   officialProposal,
   ownApproval,
@@ -340,7 +336,6 @@ function CategoryScoreSection({
   categoryIndex: number;
   categoryCriteria: ScoringCriterion[];
   categoryComment: AdjudicationCategoryComment | undefined;
-  applicationDefaultEligible: boolean | undefined;
   categorySubjectName: string;
   officialProposal?: CategoryProposal;
   ownApproval?: CategoryApproval;
@@ -362,12 +357,6 @@ function CategoryScoreSection({
 }) {
   const isOverallProduction =
     category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
-  const initialEligible =
-    officialProposal?.is_eligible ??
-    categoryComment?.is_eligible ??
-    categoryComment?.is_applicable ??
-    applicationDefaultEligible ??
-    true;
 
   const [expanded, setExpanded] = useState(true);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -375,15 +364,6 @@ function CategoryScoreSection({
     ownApproval?.response === "disputed",
   );
   const previousMismatchRef = useRef(false);
-  const [decision, setDecision] = useState<CategoryDecision>({
-    eligible: initialEligible,
-    rangeStart:
-      officialProposal?.range_min != null
-        ? Number(officialProposal.range_min)
-        : categoryComment?.score_range_min == null
-          ? null
-          : Number(categoryComment.score_range_min),
-  });
   const [scoreValues, setScoreValues] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
@@ -439,15 +419,12 @@ function CategoryScoreSection({
             numericScores.length,
         );
 
-  const currentDecision = officialProposal
-    ? {
-        eligible: officialProposal.is_eligible,
-        rangeStart:
-          officialProposal.range_min == null
-            ? null
-            : Number(officialProposal.range_min),
-      }
-    : decision;
+  const currentDecision: CategoryDecision = {
+    rangeStart:
+      officialProposal?.range_min == null
+        ? null
+        : Number(officialProposal.range_min),
+  };
 
   const rangeEnd =
     currentDecision.rangeStart == null
@@ -456,13 +433,17 @@ function CategoryScoreSection({
 
   const rangeMismatch = Boolean(
     !isOverallProduction &&
-      currentDecision.eligible &&
       allScoresEntered &&
       average != null &&
       currentDecision.rangeStart != null &&
       rangeEnd != null &&
       (average < currentDecision.rangeStart - 0.0001 ||
         average > rangeEnd + 0.0001),
+  );
+
+  const proposalRangeIsValid = isValidTwoPointRange(
+    officialProposal?.range_min,
+    officialProposal?.range_max,
   );
 
   useEffect(() => {
@@ -503,7 +484,7 @@ function CategoryScoreSection({
   };
 
   const decisionResponseState =
-    !officialProposal
+    !officialProposal || !proposalRangeIsValid
       ? "awaiting"
       : officialProposal.status === "overridden"
         ? "approved"
@@ -520,9 +501,9 @@ function CategoryScoreSection({
         : "Approved"
       : decisionResponseState === "disputed"
         ? "Disputed"
-        : decisionResponseState === "pending"
+      : decisionResponseState === "pending"
           ? "Needs approval"
-          : "Awaiting panel decision";
+          : "Awaiting Committee";
 
   const decisionResponseDetail =
     decisionResponseState === "approved"
@@ -531,16 +512,19 @@ function CategoryScoreSection({
         : "You approved the eligibility and 2-point range."
       : decisionResponseState === "disputed"
         ? "You disputed the eligibility or 2-point range."
-        : decisionResponseState === "pending"
+      : decisionResponseState === "pending"
           ? "Review and approve or dispute this panel decision."
-          : "The Advisory Committee has not finalized this category.";
+          : officialProposal
+            ? "The Advisory Committee must add a valid 2-point range before this decision can be approved."
+            : "The Advisory Committee has not pushed this category decision for approval.";
 
   const categoryComplete = isAdjudicationCategoryComplete({
     comments: categoryCriteria.map(
       (criterion) => commentValues[criterion.id],
     ),
     rangeApproved:
-      isOverallProduction || decisionResponseState === "approved",
+      isOverallProduction ||
+      (proposalRangeIsValid && decisionResponseState === "approved"),
   });
 
   useEffect(() => {
@@ -566,6 +550,26 @@ function CategoryScoreSection({
         .join(" ")}
       id={`category-${category.id}`}
     >
+      {!isOverallProduction &&
+        proposalRangeIsValid &&
+        officialProposal?.range_min != null && (
+          <input
+            name={`score_range_start_${category.id}`}
+            type="hidden"
+            value={Number(officialProposal.range_min).toFixed(2)}
+          />
+        )}
+      {!isOverallProduction &&
+        proposalRangeIsValid &&
+        officialProposal &&
+        ["approved", "overridden"].includes(officialProposal.status) && (
+          <input
+            name={`category_decision_finalized_${category.id}`}
+            type="hidden"
+            value="1"
+          />
+        )}
+
       <div className="scoring-category-sticky-title">
         <button
           aria-expanded={expanded}
@@ -611,147 +615,10 @@ function CategoryScoreSection({
               rangeMismatch={rangeMismatch}
             />
           )}
-
-          {!isOverallProduction && (
-          <div className="category-decision-controls-stack">
-            <CategoryScoringControls
-              categoryId={category.id}
-              defaultEligible={initialEligible}
-              defaultRangeStart={
-                officialProposal?.range_min ?? categoryComment?.score_range_min
-              }
-              disabled={readOnly}
-              key={`${officialProposal?.id ?? "draft"}:${officialProposal?.is_eligible ?? initialEligible}:${officialProposal?.range_min ?? categoryComment?.score_range_min ?? "none"}`}
-              locked={Boolean(officialProposal)}
-              onStateChange={setDecision}
-              scoreValues={scoreOptions.map((option) => option.value)}
-            />
-
-            <div
-              className={[
-                "category-decision-response-card",
-                `category-decision-response-${decisionResponseState}`,
-              ].join(" ")}
-            >
-              <span
-                aria-hidden="true"
-                className="category-decision-state-dot"
-              />
-
-              <div className="category-decision-response-copy">
-                <span>Eligibility and 2-point range</span>
-                <strong>{decisionResponseLabel}</strong>
-                <small>{decisionResponseDetail}</small>
-              </div>
-
-              <div className="category-decision-response-status">
-                <span
-                  className={`badge badge-decision-${decisionResponseState}`}
-                >
-                  {decisionResponseLabel}
-                </span>
-              </div>
-
-              <div className="owner-category-decision-summary">
-                <span>Final comment writer</span>
-                <strong>{assignedReviewerName ?? "Not assigned yet"}</strong>
-              </div>
-
-              {officialProposal &&
-                officialProposal.status !== "overridden" && (
-                  <div className="category-decision-response-actions">
-                    <button
-                      className="button button-gold button-compact"
-                      formAction={respondCategoryProposal.bind(
-                        null,
-                        applicationId,
-                        officialProposal.id,
-                        "approved",
-                        `proposal_comment_${category.id}`,
-                      )}
-                      formNoValidate
-                      type="submit"
-                    >
-                      Approve
-                    </button>
-                    {canComment && (
-                      <button
-                        aria-expanded={disputeOpen}
-                        className="button button-danger button-compact"
-                        onClick={() =>
-                          setDisputeOpen((current) => !current)
-                        }
-                        type="button"
-                      >
-                        Dispute
-                      </button>
-                    )}
-                  </div>
-                )}
-            </div>
-          </div>
-          )}
         </div>
       </div>
 
       <div className="panel-body" hidden={!expanded}>
-        {canComment &&
-          officialProposal &&
-          officialProposal.status !== "overridden" &&
-          disputeOpen && (
-            <section className="category-dispute-editor">
-              <div>
-                <p className="eyebrow">Dispute panel decision</p>
-                <strong>{officialProposal.is_eligible ? "Eligible" : "Not eligible"}</strong>
-                <small>
-                  {officialProposal.is_eligible &&
-                  officialProposal.range_min != null &&
-                  officialProposal.range_max != null
-                    ? `${Number(officialProposal.range_min).toFixed(2)}–${Number(officialProposal.range_max).toFixed(2)} range`
-                    : "No score range applies"}
-                </small>
-              </div>
-
-              <div className="field category-dispute-comment-field">
-                <label htmlFor={`proposal_comment_${category.id}`}>
-                  Why do you disagree?
-                </label>
-                <input
-                  className="input"
-                  defaultValue={ownApproval?.comment ?? ""}
-                  id={`proposal_comment_${category.id}`}
-                  minLength={3}
-                  name={`proposal_comment_${category.id}`}
-                  placeholder="Explain the eligibility or range concern"
-                  required
-                />
-              </div>
-
-              <div className="category-dispute-editor-actions">
-                <button
-                  className="button button-danger button-compact"
-                  formAction={respondCategoryProposal.bind(
-                    null,
-                    applicationId,
-                    officialProposal.id,
-                    "disputed",
-                    `proposal_comment_${category.id}`,
-                  )}
-                  formNoValidate
-                  type="submit"
-                >
-                  Submit dispute
-                </button>
-                <button
-                  className="button button-secondary button-compact"
-                  onClick={() => setDisputeOpen(false)}
-                  type="button"
-                >
-                  Cancel
-                </button>
-              </div>
-            </section>
-          )}
         {category.subject_label && (
           <div className="field category-subject-field">
             <label htmlFor={`subject_name_${category.id}`}>
@@ -897,6 +764,141 @@ function CategoryScoreSection({
           })}
         </div>
 
+        {!isOverallProduction && (
+          <section
+            aria-labelledby={`category-decision-${category.id}`}
+            className={[
+              "category-decision-response-card",
+              "category-decision-response-after-comments",
+              `category-decision-response-${decisionResponseState}`,
+            ].join(" ")}
+          >
+            <span
+              aria-hidden="true"
+              className="category-decision-state-dot"
+            />
+
+            <div className="category-decision-response-copy">
+              <span>Committee decision for your approval</span>
+              <strong id={`category-decision-${category.id}`}>
+                {officialProposal
+                  ? officialProposal.is_eligible
+                    ? "Eligible"
+                    : "Not eligible"
+                  : decisionResponseLabel}
+              </strong>
+              <small>
+                {proposalRangeIsValid && officialProposal
+                  ? `${Number(officialProposal.range_min).toFixed(2)}–${Number(
+                      officialProposal.range_max,
+                    ).toFixed(2)} required scoring range · ${decisionResponseDetail}`
+                  : decisionResponseDetail}
+              </small>
+            </div>
+
+            <div className="category-decision-response-status">
+              <span
+                className={`badge badge-decision-${decisionResponseState}`}
+              >
+                {decisionResponseLabel}
+              </span>
+            </div>
+
+            {officialProposal &&
+              proposalRangeIsValid &&
+              officialProposal.status !== "overridden" && (
+                <div className="category-decision-response-actions">
+                  <button
+                    className="button button-gold button-compact"
+                    disabled={readOnly}
+                    formAction={respondCategoryProposal.bind(
+                      null,
+                      applicationId,
+                      officialProposal.id,
+                      "approved",
+                      `proposal_comment_${category.id}`,
+                    )}
+                    formNoValidate
+                    type="submit"
+                  >
+                    Approve eligibility &amp; range
+                  </button>
+                  {canComment && (
+                    <button
+                      aria-expanded={disputeOpen}
+                      className="button button-danger button-compact"
+                      disabled={readOnly}
+                      onClick={() =>
+                        setDisputeOpen((current) => !current)
+                      }
+                      type="button"
+                    >
+                      Dispute
+                    </button>
+                  )}
+                </div>
+              )}
+          </section>
+        )}
+
+        {canComment &&
+          officialProposal &&
+          proposalRangeIsValid &&
+          officialProposal.status !== "overridden" &&
+          disputeOpen && (
+            <section className="category-dispute-editor">
+              <div>
+                <p className="eyebrow">Dispute Committee decision</p>
+                <strong>
+                  {officialProposal.is_eligible ? "Eligible" : "Not eligible"}
+                </strong>
+                <small>
+                  {Number(officialProposal.range_min).toFixed(2)}–
+                  {Number(officialProposal.range_max).toFixed(2)} range
+                </small>
+              </div>
+
+              <div className="field category-dispute-comment-field">
+                <label htmlFor={`proposal_comment_${category.id}`}>
+                  Why do you disagree?
+                </label>
+                <input
+                  className="input"
+                  defaultValue={ownApproval?.comment ?? ""}
+                  id={`proposal_comment_${category.id}`}
+                  minLength={3}
+                  name={`proposal_comment_${category.id}`}
+                  placeholder="Explain the eligibility or range concern"
+                  required
+                />
+              </div>
+
+              <div className="category-dispute-editor-actions">
+                <button
+                  className="button button-danger button-compact"
+                  formAction={respondCategoryProposal.bind(
+                    null,
+                    applicationId,
+                    officialProposal.id,
+                    "disputed",
+                    `proposal_comment_${category.id}`,
+                  )}
+                  formNoValidate
+                  type="submit"
+                >
+                  Submit dispute
+                </button>
+                <button
+                  className="button button-secondary button-compact"
+                  onClick={() => setDisputeOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </section>
+          )}
+
         {!isOverallProduction && <InlinePanelNarrativeReview
           applicationId={applicationId}
           assignedReviewerName={assignedReviewerName}
@@ -1035,7 +1037,6 @@ function CategoryScoreSection({
 
 export function CollaborativeAdjudicatorScorecard({
   applicationId,
-  applicationEligibilityDefaults,
   currentUserId,
   currentUserName,
   categories,
@@ -1057,7 +1058,6 @@ export function CollaborativeAdjudicatorScorecard({
   afterCategoryTitle,
 }: {
   applicationId: string;
-  applicationEligibilityDefaults: Record<string, boolean>;
   currentUserId: string;
   currentUserName: string;
   categories: ScoringCategory[];
@@ -1324,9 +1324,6 @@ export function CollaborativeAdjudicatorScorecard({
           <CategoryScoreSection
             category={category}
             categoryComment={ownCommentMap.get(category.id)}
-            applicationDefaultEligible={
-              applicationEligibilityDefaults[category.category_key]
-            }
             categoryCriteria={criteria.filter(
               (criterion) => criterion.category_id === category.id,
             )}

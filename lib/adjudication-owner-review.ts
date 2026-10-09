@@ -1,5 +1,7 @@
 import "server-only";
 
+import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { isPanelNarrativeApprovalComplete } from "@/lib/panel-narrative";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -44,7 +46,7 @@ export async function queuePanelReviewForOwnersIfReady(
   ] = await Promise.all([
     admin
       .from("scoring_categories")
-      .select("id")
+      .select("id,category_key")
       .eq("rubric_id", formVersion.scoring_rubric_id)
       .eq("active", true),
     admin
@@ -58,7 +60,7 @@ export async function queuePanelReviewForOwnersIfReady(
       .eq("application_id", applicationId),
     admin
       .from("adjudication_category_proposals")
-      .select("category_id,status")
+      .select("category_id,status,range_min,range_max")
       .eq("application_id", applicationId),
     admin
       .from("adjudication_panel_feedback")
@@ -82,6 +84,10 @@ export async function queuePanelReviewForOwnersIfReady(
   if (firstError) throw new Error(firstError.message);
 
   const categories = categoriesResult.data ?? [];
+  const decisionCategories = categories.filter(
+    (category) =>
+      category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
+  );
   const assignments = assignmentsResult.data ?? [];
   const scoringAssignments = assignments.filter(
     (assignment) => assignment.can_score,
@@ -112,9 +118,13 @@ export async function queuePanelReviewForOwnersIfReady(
     (proposalsResult.data ?? []).map((proposal) => [proposal.category_id, proposal]),
   );
   if (
-    categories.some((category) => {
+    decisionCategories.some((category) => {
       const proposal = proposalByCategory.get(category.id);
-      return !proposal || !["approved", "overridden"].includes(proposal.status);
+      return (
+        !proposal ||
+        !isValidTwoPointRange(proposal.range_min, proposal.range_max) ||
+        !["approved", "overridden"].includes(proposal.status)
+      );
     })
   ) {
     return "not_ready";
@@ -124,7 +134,7 @@ export async function queuePanelReviewForOwnersIfReady(
     (feedbackResult.data ?? []).map((feedback) => [feedback.category_id, feedback]),
   );
   if (
-    categories.some((category) => {
+    decisionCategories.some((category) => {
       const feedback = feedbackByCategory.get(category.id);
       return (
         feedback?.status !== "approved" ||

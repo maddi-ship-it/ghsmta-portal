@@ -7,7 +7,6 @@ import {
 } from "@/lib/adjudication";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import {
-  buildApplicationCategoryEligibilityDefaults,
   buildApplicationReferencePanels,
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
@@ -27,6 +26,7 @@ import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace"
 import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -445,13 +445,6 @@ export default async function AdjudicationApplicationPage({
     answers: applicationAnswers,
     eligibilityCategories: categories,
   });
-  const applicationEligibilityDefaults =
-    buildApplicationCategoryEligibilityDefaults({
-      application,
-      questions: applicationQuestions,
-      answers: applicationAnswers,
-      eligibilityCategories: categories,
-    });
   const scale = (scaleResult.data ?? []) as ScoringScaleLevel[];
   const scoreOptions = quarterScoreOptions(
     Number(rubric.score_min),
@@ -848,8 +841,12 @@ export default async function AdjudicationApplicationPage({
                 ),
               rangeApproved:
                 category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY ||
-                proposal?.status === "overridden" ||
-                approval?.response === "approved",
+                (isValidTwoPointRange(
+                  proposal?.range_min,
+                  proposal?.range_max,
+                ) &&
+                  (proposal?.status === "overridden" ||
+                    approval?.response === "approved")),
             });
           })
           .map((category) => category.id)
@@ -1007,7 +1004,6 @@ export default async function AdjudicationApplicationPage({
             }
             afterCategoryTitle="Direction"
             applicationId={id}
-            applicationEligibilityDefaults={applicationEligibilityDefaults}
             categories={narrativeCategories}
             categorySubjectDefaults={categorySubjectDefaults}
             criteria={scoreableCriteria}
