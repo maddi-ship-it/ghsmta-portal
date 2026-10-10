@@ -7,6 +7,7 @@ import {
   AdjudicationCategoryJumpMenu,
   type CategoryJumpOption,
 } from "@/components/adjudication-category-sidebar";
+import { ApplicationReferenceMenu } from "@/components/application-reference-menu";
 import { AdjudicationReferenceDocumentModal } from "@/components/adjudication-reference-document-modal";
 import type {
   ApplicationReferencePanel,
@@ -126,27 +127,22 @@ export function ApplicationReferenceBar({
           ) : null}
 
           {primaryPanels.length > 0 || fullApplicationPanel ? (
-            <select
-              aria-label="Open application data"
-              className="application-reference-button application-reference-compact-control application-reference-panel-select"
-              onChange={(event) => {
-                const panel = panelByKey.get(event.currentTarget.value);
+            <ApplicationReferenceMenu
+              ariaLabel="Open adjudicator view"
+              className="application-reference-panel-menu"
+              items={[
+                ...primaryPanels,
+                ...(fullApplicationPanel ? [fullApplicationPanel] : []),
+              ].map((panel) => ({
+                key: panel.key,
+                label: panel.shortTitle,
+              }))}
+              label="ADJUDICATOR VIEWS"
+              onSelect={(key) => {
+                const panel = panelByKey.get(key);
                 if (panel) setActivePanel(panel);
               }}
-              value=""
-            >
-              <option value="">ADJUDICATOR VIEWS</option>
-              {primaryPanels.map((panel) => (
-                <option key={panel.key} value={panel.key}>
-                  {panel.shortTitle}
-                </option>
-              ))}
-              {fullApplicationPanel ? (
-                <option value={fullApplicationPanel.key}>
-                  {fullApplicationPanel.shortTitle}
-                </option>
-              ) : null}
-            </select>
+            />
           ) : null}
 
           {links.length > 0 ? (
