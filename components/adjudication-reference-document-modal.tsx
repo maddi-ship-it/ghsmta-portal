@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { ApplicationReferenceMenu } from "@/components/application-reference-menu";
 import type { AdjudicationReferenceLink } from "@/lib/adjudication-reference-documents";
 
 export function AdjudicationReferenceDocumentModal({
@@ -11,7 +10,7 @@ export function AdjudicationReferenceDocumentModal({
   buttonLabels,
   links,
 }: {
-  buttonClassName?: string;
+  buttonClassName: string;
   buttonLabels?: Partial<
     Record<AdjudicationReferenceLink["key"], string>
   >;
@@ -41,34 +40,17 @@ export function AdjudicationReferenceDocumentModal({
 
   return (
     <>
-      {buttonClassName ? (
-        links.map((link) => (
-          <button
-            className={buttonClassName}
-            key={link.key}
-            onClick={() => setActiveLink(link)}
-            title={link.fileName}
-            type="button"
-          >
-            {buttonLabels?.[link.key] ?? link.label}
-          </button>
-        ))
-      ) : (
-        <ApplicationReferenceMenu
-          ariaLabel="Open scoring tool"
-          className="application-reference-document-menu"
-          items={links.map((link) => ({
-            key: link.key,
-            label: buttonLabels?.[link.key] ?? link.label,
-            title: link.fileName,
-          }))}
-          label="SCORING TOOLS"
-          onSelect={(key) => {
-            const link = links.find((candidate) => candidate.key === key);
-            if (link) setActiveLink(link);
-          }}
-        />
-      )}
+      {links.map((link) => (
+        <button
+          className={buttonClassName}
+          key={link.key}
+          onClick={() => setActiveLink(link)}
+          title={link.fileName}
+          type="button"
+        >
+          {buttonLabels?.[link.key] ?? link.label}
+        </button>
+      ))}
 
       {activeLink && createPortal(
         <div

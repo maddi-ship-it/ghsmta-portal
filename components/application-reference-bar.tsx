@@ -4,10 +4,9 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
-  AdjudicationCategoryJumpMenu,
+  AdjudicationCategoryNavigator,
   type CategoryJumpOption,
 } from "@/components/adjudication-category-sidebar";
-import { ApplicationReferenceMenu } from "@/components/application-reference-menu";
 import { AdjudicationReferenceDocumentModal } from "@/components/adjudication-reference-document-modal";
 import type {
   ApplicationReferencePanel,
@@ -61,6 +60,17 @@ export function ApplicationReferenceBar({
     return panel ? [panel] : [];
   });
   const fullApplicationPanel = panelByKey.get("full-application");
+
+  const panelButton = (panel: ApplicationReferencePanel) => (
+    <button
+      className="application-reference-button"
+      key={panel.key}
+      onClick={() => setActivePanel(panel)}
+      type="button"
+    >
+      {panel.shortTitle}
+    </button>
+  );
 
   useEffect(() => {
     if (!activePanel) return;
@@ -117,72 +127,73 @@ export function ApplicationReferenceBar({
       >
         <div className="application-reference-buttons">
           {categoryNavigation ? (
-            <>
-              <AdjudicationCategoryJumpMenu {...categoryNavigation} />
-              <span
-                aria-hidden="true"
-                className="application-reference-divider"
-              />
-            </>
+            <AdjudicationCategoryNavigator {...categoryNavigation} />
           ) : null}
 
-          {primaryPanels.length > 0 || fullApplicationPanel ? (
-            <ApplicationReferenceMenu
-              ariaLabel="Open adjudicator view"
-              className="application-reference-panel-menu"
-              items={[
-                ...primaryPanels,
-                ...(fullApplicationPanel ? [fullApplicationPanel] : []),
-              ].map((panel) => ({
-                key: panel.key,
-                label: panel.shortTitle,
-              }))}
-              label="ADJUDICATOR VIEWS"
-              onSelect={(key) => {
-                const panel = panelByKey.get(key);
-                if (panel) setActivePanel(panel);
-              }}
-            />
-          ) : null}
+          <div className="application-reference-action-groups">
+            {primaryPanels.length > 0 || fullApplicationPanel ? (
+              <div
+                aria-label="Adjudicator views"
+                className="application-reference-action-group"
+              >
+                <span className="application-reference-group-label">
+                  ADJUDICATOR VIEWS
+                </span>
+                <div className="application-reference-group-buttons">
+                  {primaryPanels.map(panelButton)}
+                  {fullApplicationPanel
+                    ? panelButton(fullApplicationPanel)
+                    : null}
+                </div>
+              </div>
+            ) : null}
 
-          {links.length > 0 ? (
-            <AdjudicationReferenceDocumentModal
-              buttonLabels={REFERENCE_DOCUMENT_BUTTON_LABELS}
-              links={links}
-            />
-          ) : null}
+            {links.length > 0 ? (
+              <div
+                aria-label="Scoring tools"
+                className="application-reference-action-group"
+              >
+                <span className="application-reference-group-label">
+                  SCORING TOOLS
+                </span>
+                <div className="application-reference-group-buttons">
+                  <AdjudicationReferenceDocumentModal
+                    buttonClassName="application-reference-button"
+                    buttonLabels={REFERENCE_DOCUMENT_BUTTON_LABELS}
+                    links={links}
+                  />
+                </div>
+              </div>
+            ) : null}
 
-          {scorecardSubmitControl || reviewActions?.showCategoryReview ? (
-            <>
-              <span
-                aria-hidden="true"
-                className="application-reference-divider"
-              />
-              {reviewActions?.showPanelReview ? (
-                <button
-                  className="application-reference-button application-reference-review-button"
-                  onClick={() =>
-                    window.dispatchEvent(new Event(OPEN_PANEL_REVIEW_EVENT))
-                  }
-                  type="button"
-                >
-                  Panel review
-                </button>
-              ) : null}
-              {reviewActions?.showCategoryReview ? (
-                <button
-                  className="application-reference-button application-reference-review-button"
-                  onClick={() =>
-                    window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
-                  }
-                  type="button"
-                >
-                  Review all categories
-                </button>
-              ) : null}
-              {scorecardSubmitControl}
-            </>
-          ) : null}
+            {scorecardSubmitControl || reviewActions?.showCategoryReview ? (
+              <div className="application-reference-action-group application-reference-workflow-actions">
+                {reviewActions?.showPanelReview ? (
+                  <button
+                    className="application-reference-button application-reference-review-button"
+                    onClick={() =>
+                      window.dispatchEvent(new Event(OPEN_PANEL_REVIEW_EVENT))
+                    }
+                    type="button"
+                  >
+                    Panel review
+                  </button>
+                ) : null}
+                {reviewActions?.showCategoryReview ? (
+                  <button
+                    className="application-reference-button application-reference-review-button"
+                    onClick={() =>
+                      window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
+                    }
+                    type="button"
+                  >
+                    Review all categories
+                  </button>
+                ) : null}
+                {scorecardSubmitControl}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 

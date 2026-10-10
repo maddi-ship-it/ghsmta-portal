@@ -12,7 +12,7 @@ export type CategoryJumpOption = {
   title: string;
 };
 
-export function AdjudicationCategoryJumpMenu({
+export function AdjudicationCategoryNavigator({
   categories,
   initialCompletedCategoryIds = [],
   showCompletion,
@@ -120,29 +120,63 @@ export function AdjudicationCategoryJumpMenu({
     });
   };
 
-  return (
-    <select
-      aria-label="Jump to category"
-      className="application-reference-button application-category-jump-select"
-      value={activeCategoryId}
-      onChange={(event) => {
-        const categoryId = event.currentTarget.value;
-        setActiveCategoryId(categoryId);
-        jumpToCategory(categoryId);
-      }}
-    >
-      <option disabled value="">JUMP TO CATEGORY</option>
-      {categories.map((category, index) => {
-        const complete =
-          showCompletion && completedCategoryIds.has(category.id);
+  const activeCategoryIndex = Math.max(
+    0,
+    categories.findIndex((category) => category.id === activeCategoryId),
+  );
+  const activeCategory = categories[activeCategoryIndex];
+  const activeCategoryComplete = Boolean(
+    activeCategory &&
+      showCompletion &&
+      completedCategoryIds.has(activeCategory.id),
+  );
 
-        return (
-          <option key={category.id} value={category.id}>
-            {complete ? "✓ " : ""}
-            {index + 1}. {category.title}
-          </option>
-        );
-      })}
-    </select>
+  return (
+    <div
+      aria-label="Category navigation"
+      className="application-category-navigator"
+    >
+      <button
+        aria-label="Previous category"
+        className="application-reference-button application-category-nav-button"
+        disabled={activeCategoryIndex <= 0}
+        onClick={() => {
+          const category = categories[activeCategoryIndex - 1];
+          if (!category) return;
+          setActiveCategoryId(category.id);
+          jumpToCategory(category.id);
+        }}
+        type="button"
+      >
+        ←
+      </button>
+
+      <div aria-live="polite" className="application-category-current">
+        <span>CURRENT CATEGORY</span>
+        <strong>
+          {activeCategoryComplete ? "✓ " : ""}
+          {activeCategory
+            ? `${activeCategoryIndex + 1}. ${activeCategory.title}`
+            : "No categories"}
+        </strong>
+      </div>
+
+      <button
+        aria-label="Next category"
+        className="application-reference-button application-category-nav-button"
+        disabled={
+          !activeCategory || activeCategoryIndex >= categories.length - 1
+        }
+        onClick={() => {
+          const category = categories[activeCategoryIndex + 1];
+          if (!category) return;
+          setActiveCategoryId(category.id);
+          jumpToCategory(category.id);
+        }}
+        type="button"
+      >
+        →
+      </button>
+    </div>
   );
 }
