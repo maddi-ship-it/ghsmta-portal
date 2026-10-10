@@ -15855,31 +15855,35 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 .portal-shell .portal-main .application-reference-action-groups {
   display: flex;
   min-width: 0;
-  flex-wrap: nowrap;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: center;
   gap: 10px;
 }
 
 .portal-shell .portal-main .application-reference-action-group {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  max-width: 100%;
   padding: 4px;
   border: 1px solid var(--portal-line);
-  border-radius: 999px;
+  border-radius: 14px;
   background: rgba(5, 10, 22, 0.28);
 }
 
-.portal-shell .portal-main .application-reference-group-label {
+.portal-shell .portal-main .application-reference-action-group:not(
+    .application-reference-workflow-actions
+  ) {
+  display: grid;
   flex: 0 0 auto;
-  padding: 0 5px 0 9px;
+  gap: 3px;
+}
+
+.portal-shell .portal-main .application-reference-group-label {
+  padding: 2px 8px 0;
   color: var(--portal-gold-bright);
   font-size: 0.56rem;
   font-weight: 900;
   letter-spacing: 0.075em;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -15893,7 +15897,12 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 }
 
 .portal-shell .portal-main .application-reference-workflow-actions {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 999px;
 }
 
 html[data-theme="light"] .portal-shell .portal-main .application-category-current,
@@ -15920,9 +15929,6 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
     padding: 0;
   }
 
-  .portal-shell .portal-main .application-reference-action-groups {
-    flex-wrap: wrap;
-  }
 }
 
 @media (max-width: 1100px) {
@@ -15933,7 +15939,6 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
 
   .portal-shell .portal-main .application-reference-action-group {
     width: 100%;
-    flex-wrap: wrap;
     border-radius: 14px;
   }
 
