@@ -24,7 +24,9 @@ export function AdjudicationCategoryNavigator({
   const [completedCategoryIds, setCompletedCategoryIds] = useState(
     () => new Set(initialCompletedCategoryIds),
   );
-  const [activeCategoryId, setActiveCategoryId] = useState("");
+  const [activeCategoryId, setActiveCategoryId] = useState(
+    () => categories[0]?.id ?? "",
+  );
 
   useEffect(() => {
     if (!showCompletion) return;
@@ -125,11 +127,6 @@ export function AdjudicationCategoryNavigator({
     categories.findIndex((category) => category.id === activeCategoryId),
   );
   const activeCategory = categories[activeCategoryIndex];
-  const activeCategoryComplete = Boolean(
-    activeCategory &&
-      showCompletion &&
-      completedCategoryIds.has(activeCategory.id),
-  );
 
   return (
     <div
@@ -151,14 +148,36 @@ export function AdjudicationCategoryNavigator({
         ←
       </button>
 
-      <div aria-live="polite" className="application-category-current">
-        <span>CURRENT CATEGORY</span>
-        <strong>
-          {activeCategoryComplete ? "✓ " : ""}
-          {activeCategory
-            ? `${activeCategoryIndex + 1}. ${activeCategory.title}`
-            : "No categories"}
-        </strong>
+      <div className="application-category-current">
+        <span className="application-category-current-label">
+          CURRENT CATEGORY
+        </span>
+        <select
+          aria-label="Jump to category"
+          className="application-category-current-select"
+          disabled={categories.length === 0}
+          onChange={(event) => {
+            const categoryId = event.currentTarget.value;
+            setActiveCategoryId(categoryId);
+            jumpToCategory(categoryId);
+          }}
+          value={activeCategory?.id ?? ""}
+        >
+          {categories.map((category, index) => {
+            const complete =
+              showCompletion && completedCategoryIds.has(category.id);
+
+            return (
+              <option key={category.id} value={category.id}>
+                {complete ? "✓ " : ""}
+                {index + 1}. {category.title}
+              </option>
+            );
+          })}
+        </select>
+        <span aria-hidden="true" className="application-category-current-chevron">
+          ▾
+        </span>
       </div>
 
       <button

@@ -15821,12 +15821,13 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 }
 
 .portal-shell .portal-main .application-category-current {
+  position: relative;
   display: grid;
   min-width: 0;
   align-content: center;
   justify-items: center;
   gap: 1px;
-  padding: 5px 14px;
+  padding: 5px 38px 5px 14px;
   border: 1px solid var(--portal-line);
   border-radius: 999px;
   color: var(--portal-text);
@@ -15834,22 +15835,52 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
   text-align: center;
 }
 
-.portal-shell .portal-main .application-category-current span {
+.portal-shell .portal-main .application-category-current:focus-within {
+  border-color: var(--portal-gold-bright);
+  box-shadow: 0 0 0 3px rgba(213, 177, 79, 0.14);
+}
+
+.portal-shell .portal-main .application-category-current-label {
   color: var(--portal-gold-bright);
   font-size: 0.56rem;
   font-weight: 900;
   letter-spacing: 0.09em;
 }
 
-.portal-shell .portal-main .application-category-current strong {
+.portal-shell .portal-main .application-category-current-select {
+  width: 100%;
   max-width: 100%;
   overflow: hidden;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--portal-text);
+  background: transparent;
+  appearance: none;
+  color-scheme: dark;
+  font: inherit;
   font-size: 0.76rem;
   font-weight: 800;
   line-height: 1.2;
+  text-align: center;
+  text-align-last: center;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.portal-shell .portal-main .application-category-current-chevron {
+  position: absolute;
+  right: 17px;
+  bottom: 8px;
+  color: var(--portal-gold-bright);
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+html[data-theme="light"] .portal-shell .portal-main .application-category-current-select {
+  color-scheme: light;
 }
 
 .portal-shell .portal-main .application-reference-action-groups {
