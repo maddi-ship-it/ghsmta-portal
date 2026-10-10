@@ -776,7 +776,12 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 .criterion-list { display: grid; margin: 22px -22px 0; border-top: 1px solid var(--line); }
 .criterion-card { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, .7fr); gap: 24px; padding: 24px 22px; border-bottom: 1px solid var(--line); }
 .criterion-copy h3 { margin: 0 0 9px; font-size: 1rem; line-height: 1.45; }
-.criterion-copy p { margin: 0; color: var(--muted); line-height: 1.6; }
+.criterion-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  white-space: pre-line;
+}
 .criterion-entry { display: grid; gap: 12px; }
 .score-select { font-weight: 800; }
 .compact-textarea { min-height: 84px; }
