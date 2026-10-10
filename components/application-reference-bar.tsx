@@ -61,17 +61,6 @@ export function ApplicationReferenceBar({
   });
   const fullApplicationPanel = panelByKey.get("full-application");
 
-  const panelButton = (panel: ApplicationReferencePanel) => (
-    <button
-      className="application-reference-button"
-      key={panel.key}
-      onClick={() => setActivePanel(panel)}
-      type="button"
-    >
-      {panel.shortTitle}
-    </button>
-  );
-
   useEffect(() => {
     if (!activePanel) return;
 
@@ -136,33 +125,35 @@ export function ApplicationReferenceBar({
             </>
           ) : null}
 
-          {primaryPanels.map(panelButton)}
-
-          {primaryPanels.length > 0 && fullApplicationPanel ? (
-            <span
-              aria-hidden="true"
-              className="application-reference-divider"
-            />
+          {primaryPanels.length > 0 || fullApplicationPanel ? (
+            <select
+              aria-label="Open application data"
+              className="application-reference-button application-reference-compact-control application-reference-panel-select"
+              onChange={(event) => {
+                const panel = panelByKey.get(event.currentTarget.value);
+                if (panel) setActivePanel(panel);
+              }}
+              value=""
+            >
+              <option value="">ADJUDICATOR VIEWS</option>
+              {primaryPanels.map((panel) => (
+                <option key={panel.key} value={panel.key}>
+                  {panel.shortTitle}
+                </option>
+              ))}
+              {fullApplicationPanel ? (
+                <option value={fullApplicationPanel.key}>
+                  {fullApplicationPanel.shortTitle}
+                </option>
+              ) : null}
+            </select>
           ) : null}
 
           {links.length > 0 ? (
             <AdjudicationReferenceDocumentModal
-              buttonClassName="application-reference-button"
               buttonLabels={REFERENCE_DOCUMENT_BUTTON_LABELS}
               links={links}
             />
-          ) : null}
-
-          {fullApplicationPanel ? (
-            <>
-              {links.length > 0 ? (
-                <span
-                  aria-hidden="true"
-                  className="application-reference-divider"
-                />
-              ) : null}
-              {panelButton(fullApplicationPanel)}
-            </>
           ) : null}
 
           {scorecardSubmitControl || reviewActions?.showCategoryReview ? (
@@ -171,7 +162,6 @@ export function ApplicationReferenceBar({
                 aria-hidden="true"
                 className="application-reference-divider"
               />
-              {scorecardSubmitControl}
               {reviewActions?.showPanelReview ? (
                 <button
                   className="application-reference-button application-reference-review-button"
@@ -194,6 +184,7 @@ export function ApplicationReferenceBar({
                   Review all categories
                 </button>
               ) : null}
+              {scorecardSubmitControl}
             </>
           ) : null}
         </div>

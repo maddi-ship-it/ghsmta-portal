@@ -48,21 +48,23 @@ describe("ApplicationReferenceBar", () => {
       />,
     );
 
-    const labels = [
+    const controlLabels = [
       "JUMP TO CATEGORY",
-      "ELIGIBILITY",
-      "ACTING CANDIDATES",
-      "BUDGET",
-      "PROGRAM MATURITY, VISION, SUPPORT VIEW",
-      "SCORING GUIDE",
-      "EVALUTIVE GLOSSARY",
-      "FULL APPLICATION",
-      "SUBMIT SCORECARD",
+      "ADJUDICATOR VIEWS",
+      "SCORING TOOLS",
       "Review all categories",
+      "SUBMIT SCORECARD",
     ];
-    const positions = labels.map((label) => html.indexOf(label));
+    const positions = controlLabels.map((label) => html.indexOf(label));
 
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
+    expect(html).toContain("ELIGIBILITY");
+    expect(html).toContain("ACTING CANDIDATES");
+    expect(html).toContain("BUDGET");
+    expect(html).toContain("PROGRAM MATURITY, VISION, SUPPORT VIEW");
+    expect(html).toContain("FULL APPLICATION");
+    expect(html).toContain("SCORING GUIDE");
+    expect(html).toContain("EVALUTIVE GLOSSARY");
   });
 });

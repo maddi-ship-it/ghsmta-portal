@@ -15806,58 +15806,87 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 
 .portal-shell .portal-main .application-reference-buttons {
   flex-wrap: nowrap;
-  gap: clamp(3px, 0.45vw, 8px);
+  gap: 8px;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .portal-shell .portal-main .application-reference-button,
 .portal-shell .portal-main .application-category-jump-select {
-  min-width: 0;
   max-width: 100%;
-  min-height: 32px;
-  padding: 6px clamp(6px, 0.55vw, 12px);
-  font-size: clamp(0.58rem, 0.64vw, 0.78rem);
   white-space: nowrap;
 }
 
 .portal-shell .portal-main .application-category-jump-select {
-  width: clamp(150px, 13vw, 230px);
+  width: clamp(170px, 15vw, 250px);
   padding-right: 26px;
 }
 
-.portal-shell .portal-main .application-reference-divider {
-  height: 24px;
-  margin: 0;
+.portal-shell .portal-main .application-reference-panel-select {
+  width: clamp(210px, 20vw, 310px);
+  padding-right: 28px;
 }
 
-@media (max-width: 1320px) {
+.portal-shell .portal-main .application-reference-document-select {
+  width: clamp(170px, 15vw, 220px);
+  padding-right: 28px;
+}
+
+.portal-shell .portal-main .application-reference-compact-control {
+  display: inline-flex;
+  color-scheme: dark;
+  text-overflow: ellipsis;
+}
+
+html[data-theme="light"] .portal-shell .portal-main .application-reference-compact-control {
+  color-scheme: light;
+}
+
+@media (max-width: 1700px) {
   .portal-shell .portal-main .application-reference-bar {
     position: sticky;
-  }
-
-}
-
-@media (max-width: 1100px) {
-  .portal-shell .portal-main .application-reference-bar {
-    padding-right: 6px;
-    padding-left: 6px;
-  }
-
-  .portal-shell .portal-main .application-reference-buttons {
-    gap: 2px;
+    padding-right: clamp(8px, 1.5vw, 22px);
+    padding-left: clamp(8px, 1.5vw, 22px);
   }
 
   .portal-shell .portal-main .application-reference-button,
   .portal-shell .portal-main .application-category-jump-select {
-    min-height: 30px;
-    padding: 5px 4px;
-    font-size: 0.52rem;
+    min-width: 0;
+    min-height: 32px;
+    padding: 6px clamp(7px, 0.8vw, 12px);
+    font-size: clamp(0.66rem, 0.72vw, 0.76rem);
   }
 
   .portal-shell .portal-main .application-category-jump-select {
-    width: 128px;
-    padding-right: 18px;
+    width: clamp(150px, 21vw, 250px);
+    padding-right: 25px;
+  }
+
+  .portal-shell .portal-main .application-reference-panel-select,
+  .portal-shell .portal-main .application-reference-document-select {
+    width: clamp(130px, 15vw, 190px);
+    padding-right: 24px;
+  }
+
+  .portal-shell .portal-main .application-reference-divider {
+    height: 24px;
+    margin: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .portal-shell .portal-main .application-reference-bar {
+    padding-right: 6px;
+    padding-left: 6px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .portal-shell .portal-main .application-reference-buttons {
+    width: max-content;
+    min-width: 100%;
+    justify-content: flex-start;
+    gap: 4px;
   }
 
   .portal-shell .portal-main .application-reference-divider {

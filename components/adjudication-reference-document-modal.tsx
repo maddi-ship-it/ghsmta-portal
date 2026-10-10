@@ -10,7 +10,7 @@ export function AdjudicationReferenceDocumentModal({
   buttonLabels,
   links,
 }: {
-  buttonClassName: string;
+  buttonClassName?: string;
   buttonLabels?: Partial<
     Record<AdjudicationReferenceLink["key"], string>
   >;
@@ -40,17 +40,38 @@ export function AdjudicationReferenceDocumentModal({
 
   return (
     <>
-      {links.map((link) => (
-        <button
-          className={buttonClassName}
-          key={link.key}
-          onClick={() => setActiveLink(link)}
-          title={link.fileName}
-          type="button"
+      {buttonClassName ? (
+        links.map((link) => (
+          <button
+            className={buttonClassName}
+            key={link.key}
+            onClick={() => setActiveLink(link)}
+            title={link.fileName}
+            type="button"
+          >
+            {buttonLabels?.[link.key] ?? link.label}
+          </button>
+        ))
+      ) : (
+        <select
+          aria-label="Open reference material"
+          className="application-reference-button application-reference-compact-control application-reference-document-select"
+          onChange={(event) => {
+            const link = links.find(
+              (candidate) => candidate.key === event.currentTarget.value,
+            );
+            if (link) setActiveLink(link);
+          }}
+          value=""
         >
-          {buttonLabels?.[link.key] ?? link.label}
-        </button>
-      ))}
+          <option value="">SCORING TOOLS</option>
+          {links.map((link) => (
+            <option key={link.key} value={link.key}>
+              {buttonLabels?.[link.key] ?? link.label}
+            </option>
+          ))}
+        </select>
+      )}
 
       {activeLink && createPortal(
         <div
