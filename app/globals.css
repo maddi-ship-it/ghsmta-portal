@@ -15840,6 +15840,29 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
   box-shadow: 0 0 0 3px rgba(213, 177, 79, 0.14);
 }
 
+.portal-shell .portal-main .application-category-current.is-complete {
+  border-color: color-mix(
+    in srgb,
+    var(--portal-success, #2ca06c) 72%,
+    var(--portal-line)
+  );
+  background: color-mix(
+    in srgb,
+    var(--portal-success, #2ca06c) 18%,
+    rgba(5, 10, 22, 0.72)
+  );
+  box-shadow: 0 0 0 3px color-mix(
+    in srgb,
+    var(--portal-success, #2ca06c) 12%,
+    transparent
+  );
+}
+
+.portal-shell .portal-main .application-category-current.is-complete
+  .application-category-current-label {
+  color: #8ce0b5;
+}
+
 .portal-shell .portal-main .application-category-current-label {
   color: var(--portal-gold-bright);
   font-size: 0.56rem;
@@ -15881,6 +15904,19 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 
 html[data-theme="light"] .portal-shell .portal-main .application-category-current-select {
   color-scheme: light;
+}
+
+html[data-theme="light"] .portal-shell .portal-main .application-category-current.is-complete {
+  background: color-mix(
+    in srgb,
+    var(--portal-success, #2ca06c) 12%,
+    #ffffff
+  );
+}
+
+html[data-theme="light"] .portal-shell .portal-main .application-category-current.is-complete
+  .application-category-current-label {
+  color: #176b48;
 }
 
 .portal-shell .portal-main .application-reference-action-groups {
@@ -16012,4 +16048,15 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
   scroll-margin-top: calc(
     var(--application-reference-bar-sticky-bottom, 130px) + 10px
   );
+}
+
+/* Keep the rubric visible immediately below the responsive action ribbon. */
+@media (min-width: 901px) {
+  .portal-shell .portal-main .score-guide-panel {
+    position: sticky;
+    top: calc(
+      var(--application-reference-bar-sticky-bottom, 130px) + 8px
+    );
+    z-index: 28;
+  }
 }

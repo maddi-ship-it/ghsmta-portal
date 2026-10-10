@@ -127,6 +127,11 @@ export function AdjudicationCategoryNavigator({
     categories.findIndex((category) => category.id === activeCategoryId),
   );
   const activeCategory = categories[activeCategoryIndex];
+  const activeCategoryComplete = Boolean(
+    activeCategory &&
+      showCompletion &&
+      completedCategoryIds.has(activeCategory.id),
+  );
 
   return (
     <div
@@ -148,7 +153,11 @@ export function AdjudicationCategoryNavigator({
         ←
       </button>
 
-      <div className="application-category-current">
+      <div
+        className={`application-category-current${
+          activeCategoryComplete ? " is-complete" : ""
+        }`}
+      >
         <span className="application-category-current-label">
           CURRENT CATEGORY
         </span>

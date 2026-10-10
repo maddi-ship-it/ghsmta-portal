@@ -23,6 +23,7 @@ describe("ApplicationReferenceBar", () => {
       <ApplicationReferenceBar
         categoryNavigation={{
           categories: [{ id: "direction", title: "Direction" }],
+          initialCompletedCategoryIds: ["direction"],
           showCompletion: true,
         }}
         links={[
@@ -67,5 +68,6 @@ describe("ApplicationReferenceBar", () => {
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('aria-label="Jump to category"');
+    expect(html).toContain("application-category-current is-complete");
   });
 });
