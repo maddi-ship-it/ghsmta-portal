@@ -42,6 +42,7 @@ export type ChannelType =
   | "applicant_community"
   | "general"
   | "networking"
+  | "scheduling"
   | "advisory_committee"
   | "portal_updates"
   | "direct_message"
@@ -317,6 +318,7 @@ const GROUP_FALLBACKS: Record<
   },
   general: { key: "staff", label: ADJUDICATOR_CHANNELS_LABEL, order: 20 },
   networking: { key: "staff", label: ADJUDICATOR_CHANNELS_LABEL, order: 20 },
+  scheduling: { key: "staff", label: ADJUDICATOR_CHANNELS_LABEL, order: 20 },
   advisory_committee: {
     key: "committee",
     label: "Advisory Committee",
@@ -375,6 +377,8 @@ function channelIcon(type: ChannelType) {
       return "GA";
     case "networking":
       return "NW";
+    case "scheduling":
+      return "SC";
     case "advisory_committee":
       return "AC";
     case "direct_message":

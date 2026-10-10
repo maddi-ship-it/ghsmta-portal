@@ -317,6 +317,20 @@ export default async function SchedulePage({
   const applicantAvailabilityResultPromise = profile.role === "applicant"
     ? supabase.rpc("get_schedule_slot_availability")
     : Promise.resolve({ data: [], error: null });
+  const staffCanUseSchedulingChat = [
+    "owner",
+    "advisory_member",
+    "adjudicator",
+  ].includes(profile.role);
+  const schedulingChatResultPromise = staffCanUseSchedulingChat
+    ? supabase
+        .from("chat_channels")
+        .select("id")
+        .eq("channel_type", "scheduling")
+        .is("application_id", null)
+        .eq("active", true)
+        .maybeSingle()
+    : Promise.resolve({ data: null, error: null });
 
   const cycleQuery = supabase
     .from("award_cycles")
@@ -335,11 +349,13 @@ export default async function SchedulePage({
     serverTimeResult,
     applicantApplicationResult,
     applicantAvailabilityResult,
+    schedulingChatResult,
   ] = await Promise.all([
     cycleResultPromise,
     supabase.rpc("get_schedule_server_time"),
     applicantApplicationResultPromise,
     applicantAvailabilityResultPromise,
+    schedulingChatResultPromise,
   ]);
 
   if (cycleResult.error) throw new Error(cycleResult.error.message);
@@ -350,6 +366,10 @@ export default async function SchedulePage({
   if (applicantAvailabilityResult.error) {
     throw new Error(applicantAvailabilityResult.error.message);
   }
+
+  const schedulingChatHref = schedulingChatResult.data?.id
+    ? `/portal/chat?channel=${schedulingChatResult.data.id}`
+    : "/portal/chat";
 
   const applicantApplications = (applicantApplicationResult.data ?? []) as Application[];
   const availability = (applicantAvailabilityResult.data ?? []) as SlotAvailability[];
@@ -865,10 +885,20 @@ export default async function SchedulePage({
                 : "Join the active schedule slots you can attend and see the other participating reviewers."}
           </p>
         </div>
-        {profile.role === "owner" && (
-          <Link className="button button-secondary" href="/portal/admin/archive#schedule-archive">
-            View archived schedule
-          </Link>
+        {staffCanUseSchedulingChat && (
+          <div className="heading-actions">
+            <Link className="button button-gold" href={schedulingChatHref}>
+              Open scheduling chat
+            </Link>
+            {profile.role === "owner" && (
+              <Link
+                className="button button-secondary"
+                href="/portal/admin/archive#schedule-archive"
+              >
+                View archived schedule
+              </Link>
+            )}
+          </div>
         )}
       </div>
 

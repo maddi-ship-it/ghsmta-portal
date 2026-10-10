@@ -10,14 +10,31 @@ export type AdjudicationCategoryCompletionDetail = {
 
 export function isAdjudicationCategoryComplete({
   comments,
-  rangeApproved,
+  requireComments = true,
+  scores,
 }: {
   comments: Array<string | null | undefined>;
-  rangeApproved: boolean;
+  requireComments?: boolean;
+  scores: Array<number | string | null | undefined>;
 }) {
+  const allScoresEntered =
+    scores.length > 0 &&
+    scores.every((score) => {
+      if (score == null || String(score).trim() === "") return false;
+
+      const numericScore = Number(score);
+      return (
+        Number.isFinite(numericScore) &&
+        numericScore >= 1 &&
+        numericScore <= 10
+      );
+    });
+
+  if (!allScoresEntered) return false;
+  if (!requireComments) return true;
+
   return (
-    rangeApproved &&
-    comments.length > 0 &&
+    comments.length === scores.length &&
     comments.every((comment) => richTextHasContent(comment))
   );
 }

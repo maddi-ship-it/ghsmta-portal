@@ -16,10 +16,16 @@ describe("chat terminology", () => {
     expect(chatChannelDisplayName("general", "General")).toBe(
       GENERAL_ANNOUNCEMENTS_LABEL,
     );
+    expect(chatChannelDisplayName("scheduling", "Schedule coordination")).toBe(
+      "Scheduling Chat",
+    );
   });
 
   it("brands the adjudicator channel group without changing unrelated groups", () => {
     expect(chatChannelGroupLabel("networking", "Staff channels")).toBe(
+      ADJUDICATOR_CHANNELS_LABEL,
+    );
+    expect(chatChannelGroupLabel("scheduling", "Scheduling")).toBe(
       ADJUDICATOR_CHANNELS_LABEL,
     );
     expect(chatChannelGroupLabel("school", "Panel Channels")).toBe(

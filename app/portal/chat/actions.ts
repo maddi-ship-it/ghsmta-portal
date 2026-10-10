@@ -24,6 +24,7 @@ type ChannelMode = {
     | "applicant_community"
     | "general"
     | "networking"
+    | "scheduling"
     | "advisory_committee"
     | "portal_updates";
 };

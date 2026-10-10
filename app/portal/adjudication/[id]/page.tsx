@@ -26,7 +26,6 @@ import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace"
 import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
-import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -775,12 +774,6 @@ export default async function AdjudicationApplicationPage({
   const ownScoreByCriterion = new Map(
     ownScores.map((score) => [score.criterion_id, score]),
   );
-  const proposalByCategory = new Map(
-    (proposalResult.data ?? []).map((proposal) => [
-      proposal.category_id,
-      proposal,
-    ]),
-  );
   const categoryScoreability = (scoreabilityResult.data ?? []) as Array<{
     category_id: string;
     is_scoreable: boolean;
@@ -818,35 +811,23 @@ export default async function AdjudicationApplicationPage({
     (category) =>
       category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
   );
-  const ownApprovalByProposal = new Map(
-    (approvalResult.data ?? [])
-      .filter((approval) => approval.adjudicator_user_id === profile.id)
-      .map((approval) => [approval.proposal_id, approval]),
-  );
   const initiallyCompletedCategoryIds =
     isScoringParticipant
-      ? scoreableCategories
+      ? narrativeCategories
           .filter((category) => {
-            const proposal = proposalByCategory.get(category.id);
-            const approval = proposal
-              ? ownApprovalByProposal.get(proposal.id)
-              : undefined;
+            const categoryCriteria = criteria.filter(
+              (criterion) => criterion.category_id === category.id,
+            );
 
             return isAdjudicationCategoryComplete({
-              comments: criteria
-                .filter((criterion) => criterion.category_id === category.id)
-                .map(
-                  (criterion) =>
-                    ownScoreByCriterion.get(criterion.id)?.observation,
-                ),
-              rangeApproved:
-                category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY ||
-                (isValidTwoPointRange(
-                  proposal?.range_min,
-                  proposal?.range_max,
-                ) &&
-                  (proposal?.status === "overridden" ||
-                    approval?.response === "approved")),
+              comments: categoryCriteria.map(
+                (criterion) =>
+                  ownScoreByCriterion.get(criterion.id)?.observation,
+              ),
+              requireComments: canComment,
+              scores: categoryCriteria.map(
+                (criterion) => ownScoreByCriterion.get(criterion.id)?.score,
+              ),
             });
           })
           .map((category) => category.id)

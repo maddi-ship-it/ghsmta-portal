@@ -1,6 +1,7 @@
 export const SCHOOL_COMMUNITY_CHAT_LABEL = "School Community Chat";
 export const GENERAL_ANNOUNCEMENTS_LABEL = "General Announcements";
 export const ADJUDICATOR_CHANNELS_LABEL = "Adjudicator Channels";
+export const SCHEDULING_CHAT_LABEL = "Scheduling Chat";
 
 export function chatChannelDisplayName(
   channelType: string,
@@ -11,6 +12,9 @@ export function chatChannelDisplayName(
   }
   if (channelType === "general") {
     return GENERAL_ANNOUNCEMENTS_LABEL;
+  }
+  if (channelType === "scheduling") {
+    return SCHEDULING_CHAT_LABEL;
   }
   if (channelType === "direct_message") {
     return storedName || "Direct Chat";
@@ -25,7 +29,11 @@ export function chatChannelGroupLabel(
   channelType: string,
   storedLabel: string,
 ) {
-  if (channelType === "general" || channelType === "networking") {
+  if (
+    channelType === "general" ||
+    channelType === "networking" ||
+    channelType === "scheduling"
+  ) {
     return ADJUDICATOR_CHANNELS_LABEL;
   }
   if (channelType === "direct_message" || channelType === "group_direct_message") {

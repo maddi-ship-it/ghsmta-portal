@@ -198,6 +198,11 @@
   background: #53617f;
 }
 
+.channelIcon_scheduling {
+  color: #071328;
+  background: #d5b14f;
+}
+
 .channelIcon_advisory_committee {
   color: #001699;
   background: #f1d98a;
@@ -1536,6 +1541,11 @@
   background: #53617f;
 }
 
+.channelIcon_scheduling {
+  color: #080b13;
+  background: #f0d37e;
+}
+
 .channelIcon_advisory_committee {
   color: #080b13;
   background: #f0d37e;
@@ -2097,6 +2107,7 @@
 }
 
 .channelIcon_school_dm,
+.channelIcon_scheduling,
 .channelIcon_advisory_committee {
   color: #071328;
   background: var(--portal-gold, #d5b14f);

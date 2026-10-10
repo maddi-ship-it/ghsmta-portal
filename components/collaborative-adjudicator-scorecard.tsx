@@ -506,9 +506,8 @@ function CategoryScoreSection({
     comments: categoryCriteria.map(
       (criterion) => commentValues[criterion.id],
     ),
-    rangeApproved:
-      isOverallProduction ||
-      (proposalRangeIsValid && decisionResponseState === "approved"),
+    requireComments: canComment,
+    scores: categoryCriteria.map((criterion) => scoreValues[criterion.id]),
   });
 
   useEffect(() => {

@@ -261,7 +261,10 @@ async function loadChannelRecipientIds(
     ]);
   }
 
-  if (channel.channel_type === "networking") {
+  if (
+    channel.channel_type === "networking" ||
+    channel.channel_type === "scheduling"
+  ) {
     await addActiveRoleRecipients(admin, recipientIds, [
       "adjudicator",
       "advisory_member",

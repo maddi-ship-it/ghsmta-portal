@@ -43,6 +43,7 @@ function fallbackChannelGroup(
       };
     case "general":
     case "networking":
+    case "scheduling":
       return {
         key: "staff",
         label: ADJUDICATOR_CHANNELS_LABEL,
@@ -75,6 +76,8 @@ function fallbackVisibilityLabel(channelType: ChatChannel["channel_type"]) {
     case "general":
     case "networking":
       return "Adjudicators + Advisory + Owners";
+    case "scheduling":
+      return "ACMs + Adjudicators + Owners";
     case "advisory_committee":
       return "Advisory + Owners";
     case "school_dm":
