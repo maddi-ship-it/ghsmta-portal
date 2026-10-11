@@ -1,11 +1,16 @@
 import { requireProfile } from "@/lib/auth";
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
 import { roleLabel } from "@/lib/format";
+import {
+  canOwnerImpersonateProfile,
+  IMPERSONATABLE_ROLES,
+  impersonationRoleName,
+} from "@/lib/impersonation-access";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Profile } from "@/lib/types";
 
 import { bulkUpdateUsers, forcePasswordReset, updateUserAccess } from "./actions";
-import { startApplicantImpersonation } from "@/app/portal/impersonation/actions";
+import { startUserImpersonation } from "@/app/portal/impersonation/actions";
 
 type UserSort = "name" | "email" | "role" | "status";
 type Direction = "asc" | "desc";
@@ -165,7 +170,7 @@ export default async function UsersPage({
       <div className="page-heading"><div><h1>Portal users</h1><p>Search, filter, sort, and update access in bulk. Passwords remain private; Owners can only send secure reset links.</p></div></div>
       {params.updated && <div className="notice page-message">Updated {params.updated} user accounts.</div>}
       {params.reset_sent && <div className="notice page-message">Password-reset email sent and reset required at the next portal visit.</div>}
-      {params.impersonation_ended && <div className="notice page-message">Applicant impersonation ended. Your Owner session has been restored.</div>}
+      {params.impersonation_ended && <div className="notice page-message">Impersonation ended. Your Owner session has been restored.</div>}
       {params.message_sent && (
         <div className="notice page-message">
           Sent {params.message_mode === "individual" ? "individual" : "group"} chat message to {params.message_sent} user{params.message_sent === "1" ? "" : "s"}.
@@ -247,25 +252,25 @@ export default async function UsersPage({
             <td><span className="user-email-cell">{profile.email ?? "No email"}</span></td>
             <td>
               <div className="user-row-action-stack">
-              {profile.role === "applicant" &&
-              profile.active &&
-              profile.email &&
-              !profile.force_password_reset &&
-              profile.id !== owner.id ? (
-                <form action={startApplicantImpersonation.bind(null, profile.id)}>
+              {canOwnerImpersonateProfile(profile, owner.id) ? (
+                <form action={startUserImpersonation.bind(null, profile.id)}>
                   <ConfirmedSubmitButton
                     className="button button-secondary button-compact"
                     description={`This will temporarily open the portal as ${profile.full_name ?? profile.email}. Your Owner session will be restored when you end impersonation.`}
                     label="View as"
                     reasonLabel="Support reason"
                     reasonName="impersonation_reason"
-                    reasonPlaceholder="Example: verifying applicant messaging access"
+                    reasonPlaceholder={`Example: verifying ${impersonationRoleName(profile.role)} access`}
                     requireReason
-                    title="View as this applicant?"
+                    title={`View as this ${impersonationRoleName(profile.role)}?`}
                   />
                 </form>
               ) : (
-                <small>Applicant only</small>
+                <small>
+                  {IMPERSONATABLE_ROLES.includes(profile.role)
+                    ? "Unavailable"
+                    : "Applicant, Adjudicator, or Advisory Committee only"}
+                </small>
               )}
 
                 <details className="user-edit-details">

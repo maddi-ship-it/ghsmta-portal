@@ -1,5 +1,11 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import {
+  IMPERSONATION_COOKIE_NAME,
+  readImpersonationCookieValue,
+} from "@/lib/impersonation";
+import { isActiveOwnerImpersonation } from "@/lib/impersonation-access";
 import { createClient } from "@/lib/supabase/server";
 import {
   isMfaEnforcementActive,
@@ -57,7 +63,16 @@ export async function requireProfile(
     redirect("/portal");
   }
 
-  if (options.enforceSecurity !== false) {
+  const cookieStore = await cookies();
+  const impersonation = readImpersonationCookieValue(
+    cookieStore.get(IMPERSONATION_COOKIE_NAME)?.value,
+  );
+  const isOwnerImpersonation = isActiveOwnerImpersonation(
+    impersonation,
+    typedProfile.id,
+  );
+
+  if (options.enforceSecurity !== false && !isOwnerImpersonation) {
     if (
       PHONE_VERIFICATION_ENABLED &&
       typedProfile.phone_required_at &&

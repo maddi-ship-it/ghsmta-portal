@@ -2,6 +2,8 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import type { AppRole } from "@/lib/types";
+
 export const IMPERSONATION_COOKIE_NAME = "ghsmta-owner-impersonation";
 export const IMPERSONATION_MAX_AGE_SECONDS = 60 * 60;
 
@@ -15,6 +17,7 @@ export type ImpersonationCookiePayload = {
   targetId: string;
   targetEmail: string | null;
   targetName: string | null;
+  targetRole?: AppRole;
   startedAt: string;
   reason: string;
 };
@@ -28,6 +31,7 @@ export type ImpersonationBannerState = Pick<
   | "targetId"
   | "targetEmail"
   | "targetName"
+  | "targetRole"
   | "startedAt"
   | "reason"
 >;
@@ -102,6 +106,7 @@ export function bannerStateFromImpersonation(
     targetId: payload.targetId,
     targetEmail: payload.targetEmail,
     targetName: payload.targetName,
+    targetRole: payload.targetRole,
     startedAt: payload.startedAt,
     reason: payload.reason,
   };

@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
 import {
+  canOwnerImpersonateProfile,
+  impersonationRoleName,
+} from "@/lib/impersonation-access";
+import {
   IMPERSONATION_COOKIE_NAME,
   IMPERSONATION_MAX_AGE_SECONDS,
   readImpersonationCookieValue,
@@ -13,6 +17,7 @@ import {
 import { portalSiteUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import type { AppRole } from "@/lib/types";
 
 function displayName(profile: {
   email: string | null;
@@ -43,12 +48,12 @@ function parseSessionFromMagicLinkRedirect(location: string, siteUrl: string) {
   };
 }
 
-export async function startApplicantImpersonation(targetUserId: string, formData: FormData) {
+export async function startUserImpersonation(targetUserId: string, formData: FormData) {
   const owner = await requireProfile(["owner"]);
   const reason = String(formData.get("impersonation_reason") ?? "").trim();
 
   if (reason.length < 3) {
-    throw new Error("Enter a reason before impersonating an applicant.");
+    throw new Error("Enter a reason before impersonating this user.");
   }
 
   if (owner.id === targetUserId) {
@@ -73,16 +78,25 @@ export async function startApplicantImpersonation(targetUserId: string, formData
     .single();
 
   if (targetError || !target) {
-    throw new Error(targetError?.message ?? "Applicant account not found.");
-  }
-
-  if (!target.active || target.role !== "applicant" || !target.email) {
-    throw new Error("Only active applicant accounts with email sign-in can be impersonated.");
+    throw new Error(targetError?.message ?? "Portal account not found.");
   }
 
   if (target.force_password_reset) {
-    throw new Error("This applicant must reset their password before impersonation is available.");
+    throw new Error("This user must reset their password before impersonation is available.");
   }
+
+  const targetRole = target.role as AppRole;
+  if (
+    !canOwnerImpersonateProfile(
+      { ...target, role: targetRole },
+      owner.id,
+    )
+  ) {
+    throw new Error(
+      "Only active applicant, adjudicator, and Advisory Committee accounts with email sign-in can be impersonated.",
+    );
+  }
+  const targetRoleName = impersonationRoleName(targetRole);
 
   const headerStore = await headers();
   const siteUrl = portalSiteUrl(headerStore.get("origin"));
@@ -110,13 +124,14 @@ export async function startApplicantImpersonation(targetUserId: string, formData
 
   await admin.from("owner_activity_log").insert({
     activity_type: "impersonation_started",
-    title: `${displayName(owner)} started applicant impersonation`,
+    title: `${displayName(owner)} started ${targetRoleName} impersonation`,
     detail: `Viewing as ${displayName(target)}. Reason: ${reason.slice(0, 500)}`,
     actor_id: owner.id,
     metadata: {
       impersonation_session_id: audit.id,
       target_user_id: target.id,
       target_email: target.email,
+      target_role: targetRole,
     },
   });
 
@@ -156,6 +171,7 @@ export async function startApplicantImpersonation(targetUserId: string, formData
       targetId: target.id,
       targetEmail: target.email,
       targetName: displayName(target),
+      targetRole,
       startedAt,
       reason: reason.slice(0, 1_000),
     }),
@@ -214,13 +230,14 @@ export async function stopImpersonation() {
     activity_type: error ? "impersonation_restore_failed" : "impersonation_ended",
     title: error
       ? `${payload.ownerName ?? payload.ownerEmail ?? "Owner"} could not restore Owner session`
-      : `${payload.ownerName ?? payload.ownerEmail ?? "Owner"} ended applicant impersonation`,
-    detail: `Viewed as ${payload.targetName ?? payload.targetEmail ?? "applicant"}.`,
+      : `${payload.ownerName ?? payload.ownerEmail ?? "Owner"} ended ${payload.targetRole ? impersonationRoleName(payload.targetRole) : "portal user"} impersonation`,
+    detail: `Viewed as ${payload.targetName ?? payload.targetEmail ?? "portal user"}.`,
     actor_id: payload.ownerId,
     metadata: {
       impersonation_session_id: payload.auditId,
       target_user_id: payload.targetId,
       target_email: payload.targetEmail,
+      target_role: payload.targetRole ?? null,
     },
   });
 
