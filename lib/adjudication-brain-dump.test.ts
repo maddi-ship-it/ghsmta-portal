@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   findExactBrainDumpDuplicates,
   groupAdjudicationBrainDumpAssignments,
+  selectAutomaticallyApplicableBrainDumpNotes,
   segmentAdjudicationBrainDump,
 } from "./adjudication-brain-dump";
 
@@ -83,5 +84,56 @@ describe("adjudication brain-dump review", () => {
       ["note-2", "note-1"],
     ]);
     expect(notes).toHaveLength(2);
+  });
+
+  it("auto-applies every categorized observation except duplicates", () => {
+    const notes = [
+      {
+        id: "note-1",
+        number: 1,
+        text: "A clear lighting observation.",
+        criterionId: "lighting-1",
+        confidence: "high" as const,
+        status: "placed" as const,
+        rationale: "Clear match.",
+        duplicateOfNoteId: null,
+      },
+      {
+        id: "note-2",
+        number: 2,
+        text: "A lower-confidence sound observation.",
+        criterionId: "sound-2",
+        confidence: "medium" as const,
+        status: "needs_review" as const,
+        rationale: "Best available match.",
+        duplicateOfNoteId: null,
+      },
+      {
+        id: "note-3",
+        number: 3,
+        text: "A repeated lighting observation.",
+        criterionId: "lighting-1",
+        confidence: "high" as const,
+        status: "needs_review" as const,
+        rationale: "Duplicate.",
+        duplicateOfNoteId: "note-1",
+      },
+      {
+        id: "note-4",
+        number: 4,
+        text: "No destination found.",
+        criterionId: null,
+        confidence: "low" as const,
+        status: "unsorted" as const,
+        rationale: "No reliable match.",
+        duplicateOfNoteId: null,
+      },
+    ];
+
+    expect(
+      selectAutomaticallyApplicableBrainDumpNotes(notes).map(
+        (note) => note.id,
+      ),
+    ).toEqual(["note-1", "note-2"]);
   });
 });

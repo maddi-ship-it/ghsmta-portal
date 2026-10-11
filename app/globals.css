@@ -16670,9 +16670,9 @@ html[data-theme="light"] .portal-shell .portal-main :where(input, select, textar
   background: var(--portal-surface-2);
 }
 
-/* Numbered, review-before-apply workflow for adjudication brain dumps. */
+/* Manual placement for brain-dump observations that could not be categorized. */
 .portal-shell .brain-dump-review-modal {
-  width: min(1440px, 96vw);
+  width: min(1120px, 96vw);
   height: min(92vh, 1080px);
   height: min(92dvh, 1080px);
   max-height: min(92vh, 1080px);
@@ -16682,47 +16682,6 @@ html[data-theme="light"] .portal-shell .portal-main :where(input, select, textar
 
 .portal-shell .brain-dump-review-body {
   gap: 24px;
-}
-
-.brain-dump-review-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.brain-dump-review-summary > div {
-  display: grid;
-  gap: 2px;
-  padding: 13px 16px;
-  border: 1px solid var(--portal-line);
-  border-radius: 12px;
-  background: var(--portal-surface-2);
-}
-
-.brain-dump-review-summary strong {
-  color: var(--portal-ivory);
-  font-size: 1.4rem;
-}
-
-.brain-dump-review-summary span {
-  color: var(--portal-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.brain-dump-review-summary > div[data-status="placed"] strong {
-  color: var(--portal-success, #86d5aa);
-}
-
-.brain-dump-review-summary > div[data-status="needs_review"] strong {
-  color: var(--portal-gold-bright, #f0c96b);
-}
-
-.brain-dump-review-section {
-  display: grid;
-  gap: 12px;
 }
 
 .brain-dump-review-section-heading {
@@ -16758,14 +16717,6 @@ html[data-theme="light"] .portal-shell .portal-main :where(input, select, textar
   contain-intrinsic-size: 210px;
 }
 
-.brain-dump-review-note[data-status="needs_review"] {
-  border-color: color-mix(
-    in srgb,
-    var(--portal-gold-bright, #f0c96b) 42%,
-    var(--portal-line)
-  );
-}
-
 .brain-dump-review-note-source {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -16797,13 +16748,6 @@ html[data-theme="light"] .portal-shell .portal-main :where(input, select, textar
   font-weight: 900;
 }
 
-.brain-dump-review-note-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-
 .brain-dump-review-destination {
   display: grid;
   align-content: start;
@@ -16830,13 +16774,6 @@ html[data-theme="light"] .portal-shell .portal-main :where(input, select, textar
   gap: 8px;
   margin-top: 7px;
   font-weight: 750;
-}
-
-.brain-dump-review-empty {
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px dashed var(--portal-line);
-  border-radius: 12px;
 }
 
 .brain-dump-review-footer {
@@ -16868,10 +16805,6 @@ html[data-theme="light"] .portal-shell .portal-main :where(input, select, textar
 }
 
 @media (max-width: 620px) {
-  .brain-dump-review-summary {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .brain-dump-review-footer {
     align-items: stretch;
     flex-direction: column;

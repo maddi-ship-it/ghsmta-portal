@@ -109,6 +109,17 @@ export function groupAdjudicationBrainDumpAssignments(
   );
 }
 
+export function selectAutomaticallyApplicableBrainDumpNotes<
+  T extends Pick<
+    AdjudicationBrainDumpReviewNote,
+    "criterionId" | "duplicateOfNoteId"
+  >,
+>(notes: T[]) {
+  return notes.filter(
+    (note) => Boolean(note.criterionId) && !note.duplicateOfNoteId,
+  );
+}
+
 export function findExactBrainDumpDuplicates(
   notes: AdjudicationBrainDumpSourceNote[],
 ) {

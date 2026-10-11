@@ -14,8 +14,8 @@ import {
   APPLY_ADJUDICATION_BRAIN_DUMP_EVENT,
   groupAdjudicationBrainDumpAssignments,
   RESTORE_ADJUDICATION_BRAIN_DUMP_EVENT,
+  selectAutomaticallyApplicableBrainDumpNotes,
   type AdjudicationBrainDumpReviewNote,
-  type AdjudicationBrainDumpReviewStatus,
   type AdjudicationBrainDumpTarget,
 } from "@/lib/adjudication-brain-dump";
 
@@ -29,6 +29,7 @@ type SortResponse = {
 type EditableReviewNote = AdjudicationBrainDumpReviewNote & {
   applied: boolean;
   categoryId: string;
+  requiresManualPlacement: boolean;
   selected: boolean;
 };
 
@@ -39,37 +40,6 @@ type BrainDumpReview = {
   targets: AdjudicationBrainDumpTarget[];
   undoValues: Record<string, string> | null;
 };
-
-const REVIEW_SECTIONS: Array<{
-  description: string;
-  status: AdjudicationBrainDumpReviewStatus;
-  title: string;
-}> = [
-  {
-    status: "placed",
-    title: "Placed",
-    description:
-      "High-confidence matches. They are selected, but nothing enters the scorecard until you apply them.",
-  },
-  {
-    status: "needs_review",
-    title: "Needs review",
-    description:
-      "Ambiguous or possibly repeated observations. Confirm or change the destination before applying.",
-  },
-  {
-    status: "unsorted",
-    title: "Unsorted",
-    description:
-      "No reliable destination was found. The complete source text remains visible here and in the brain dump.",
-  },
-];
-
-function statusLabel(status: AdjudicationBrainDumpReviewStatus) {
-  if (status === "needs_review") return "Needs review";
-  if (status === "unsorted") return "Unsorted";
-  return "Placed";
-}
 
 function isStoredReview(value: unknown): value is BrainDumpReview {
   if (!value || typeof value !== "object") return false;
@@ -119,9 +89,24 @@ function buildReview(payload: SortResponse): BrainDumpReview | null {
       categoryId: note.criterionId
         ? (targetByCriterionId.get(note.criterionId)?.categoryId ?? "")
         : "",
-      selected: note.status === "placed" && Boolean(note.criterionId),
+      requiresManualPlacement: !note.criterionId,
+      selected: false,
     })),
   };
+}
+
+function captureUndoValues(
+  assignments: Array<{ criterionId: string }>,
+): Record<string, string> {
+  const undoValues: Record<string, string> = {};
+  for (const criterionId of new Set(
+    assignments.map((assignment) => assignment.criterionId),
+  )) {
+    const fieldName = `observation_${criterionId}`;
+    const field = document.getElementsByName(fieldName)[0];
+    undoValues[fieldName] = field instanceof HTMLInputElement ? field.value : "";
+  }
+  return undoValues;
 }
 
 function BrainDumpReviewModal({
@@ -211,15 +196,14 @@ function BrainDumpReviewModal({
 
   if (!open || !review) return null;
 
-  const selectedCount = review.notes.filter(
-    (note) => note.selected && note.criterionId && !note.applied,
+  const unresolvedNotes = review.notes.filter(
+    (note) => note.requiresManualPlacement && !note.applied,
+  );
+  if (unresolvedNotes.length === 0) return null;
+
+  const selectedCount = unresolvedNotes.filter(
+    (note) => note.selected && note.criterionId,
   ).length;
-  const counts = Object.fromEntries(
-    REVIEW_SECTIONS.map((section) => [
-      section.status,
-      review.notes.filter((note) => note.status === section.status).length,
-    ]),
-  ) as Record<AdjudicationBrainDumpReviewStatus, number>;
 
   return createPortal(
     <div
@@ -237,16 +221,16 @@ function BrainDumpReviewModal({
       >
         <header className="application-reference-modal-header">
           <div>
-            <span className="eyebrow">Review before applying</span>
-            <h2 id={titleId}>Brain-dump sorting review</h2>
+            <span className="eyebrow">Manual placement needed</span>
+            <h2 id={titleId}>Uncategorized observations</h2>
             <p>
-              {review.productionTitle} · Every numbered source observation is
-              shown. Confirm the destinations, then apply only the notes you
-              want added to the scorecard.
+              {review.productionTitle} · The matched observations have already
+              populated the scorecard. Choose a destination only for the
+              observations the sorter could not categorize.
             </p>
           </div>
           <button
-            aria-label="Close brain-dump sorting review"
+            aria-label="Close uncategorized observations"
             className="application-reference-close"
             onClick={onClose}
             ref={closeButtonRef}
@@ -257,166 +241,115 @@ function BrainDumpReviewModal({
         </header>
 
         <div className="application-reference-modal-body brain-dump-review-body">
-          <div className="brain-dump-review-summary" aria-label="Sort summary">
-            {REVIEW_SECTIONS.map((section) => (
-              <div data-status={section.status} key={section.status}>
-                <strong>{counts[section.status]}</strong>
-                <span>{section.title}</span>
-              </div>
-            ))}
+          <div className="brain-dump-review-section-heading">
+            <div>
+              <h3>Could not be categorized</h3>
+              <p>
+                The original wording and source number are preserved. Select a
+                category and criterion for any observation you want to add.
+              </p>
+            </div>
+            <span className="badge">{unresolvedNotes.length}</span>
           </div>
 
-          {REVIEW_SECTIONS.map((section) => {
-            const sectionNotes = review.notes.filter(
-              (note) => note.status === section.status,
-            );
+          <div className="brain-dump-review-list">
+            {unresolvedNotes.map((note) => {
+              const categoryTargets =
+                targetsByCategoryId.get(note.categoryId) ?? [];
+              const canSelect = Boolean(note.criterionId);
 
-            return (
-              <section
-                className="brain-dump-review-section"
-                key={section.status}
-              >
-                <div className="brain-dump-review-section-heading">
-                  <div>
-                    <h3>{section.title}</h3>
-                    <p>{section.description}</p>
+              return (
+                <article className="brain-dump-review-note" key={note.id}>
+                  <div className="brain-dump-review-note-source">
+                    <span className="brain-dump-review-note-number">
+                      {note.number}
+                    </span>
+                    <div>
+                      <p>{note.text}</p>
+                      <small>{note.rationale}</small>
+                    </div>
                   </div>
-                  <span className="badge">{sectionNotes.length}</span>
-                </div>
 
-                {sectionNotes.length === 0 ? (
-                  <p className="brain-dump-review-empty">
-                    No observations in this section.
-                  </p>
-                ) : (
-                  <div className="brain-dump-review-list">
-                    {sectionNotes.map((note) => {
-                      const categoryTargets =
-                        targetsByCategoryId.get(note.categoryId) ?? [];
-                      const canSelect = Boolean(note.criterionId) && !note.applied;
+                  <div className="brain-dump-review-destination">
+                    <label htmlFor={`brain-category-${note.id}`}>
+                      Category
+                    </label>
+                    <select
+                      className="select"
+                      id={`brain-category-${note.id}`}
+                      onChange={(event) => {
+                        onNoteChange(note.id, {
+                          categoryId: event.target.value,
+                          criterionId: null,
+                          confidence: "low",
+                          rationale: event.target.value
+                            ? "Category selected; choose the matching criterion."
+                            : "No destination selected.",
+                          selected: false,
+                          status: "unsorted",
+                        });
+                      }}
+                      value={note.categoryId}
+                    >
+                      <option value="">Choose category</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.order}. {category.title}
+                          {category.subject ? ` — ${category.subject}` : ""}
+                        </option>
+                      ))}
+                    </select>
 
-                      return (
-                        <article
-                          className="brain-dump-review-note"
-                          data-status={note.status}
-                          key={note.id}
+                    <label htmlFor={`brain-criterion-${note.id}`}>
+                      Criterion
+                    </label>
+                    <select
+                      className="select"
+                      disabled={!note.categoryId}
+                      id={`brain-criterion-${note.id}`}
+                      onChange={(event) => {
+                        const criterionId = event.target.value || null;
+                        onNoteChange(note.id, {
+                          criterionId,
+                          confidence: criterionId ? "high" : "low",
+                          rationale: criterionId
+                            ? "Destination selected by the adjudicator."
+                            : "Choose a criterion before applying this note.",
+                          selected: Boolean(criterionId),
+                          status: criterionId ? "placed" : "unsorted",
+                        });
+                      }}
+                      value={note.criterionId ?? ""}
+                    >
+                      <option value="">Choose criterion</option>
+                      {categoryTargets.map((target) => (
+                        <option
+                          key={target.criterionId}
+                          value={target.criterionId}
                         >
-                          <div className="brain-dump-review-note-source">
-                            <span className="brain-dump-review-note-number">
-                              {note.number}
-                            </span>
-                            <div>
-                              <p>{note.text}</p>
-                              <div className="brain-dump-review-note-badges">
-                                <span className="badge">
-                                  {statusLabel(note.status)}
-                                </span>
-                                <span className="badge">
-                                  {note.confidence} confidence
-                                </span>
-                                {note.duplicateOfNoteId ? (
-                                  <span className="badge badge-warning">
-                                    Possible duplicate of #
-                                    {note.duplicateOfNoteId.replace("note-", "")}
-                                  </span>
-                                ) : null}
-                                {note.applied ? (
-                                  <span className="badge badge-complete">Applied</span>
-                                ) : null}
-                              </div>
-                              <small>{note.rationale}</small>
-                            </div>
-                          </div>
+                          {target.criterionOrder}. {target.criterionTitle}
+                        </option>
+                      ))}
+                    </select>
 
-                          <div className="brain-dump-review-destination">
-                            <label htmlFor={`brain-category-${note.id}`}>
-                              Category
-                            </label>
-                            <select
-                              className="select"
-                              disabled={note.applied}
-                              id={`brain-category-${note.id}`}
-                              onChange={(event) => {
-                                onNoteChange(note.id, {
-                                  categoryId: event.target.value,
-                                  criterionId: null,
-                                  confidence: "low",
-                                  rationale: event.target.value
-                                    ? "Category selected; choose the matching criterion."
-                                    : "Left unsorted by the adjudicator.",
-                                  selected: false,
-                                  status: event.target.value
-                                    ? note.status
-                                    : "unsorted",
-                                });
-                              }}
-                              value={note.categoryId}
-                            >
-                              <option value="">Leave unsorted</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.order}. {category.title}
-                                  {category.subject
-                                    ? ` — ${category.subject}`
-                                    : ""}
-                                </option>
-                              ))}
-                            </select>
-
-                            <label htmlFor={`brain-criterion-${note.id}`}>
-                              Criterion
-                            </label>
-                            <select
-                              className="select"
-                              disabled={!note.categoryId || note.applied}
-                              id={`brain-criterion-${note.id}`}
-                              onChange={(event) => {
-                                const criterionId = event.target.value || null;
-                                onNoteChange(note.id, {
-                                  criterionId,
-                                  confidence: criterionId ? "high" : "low",
-                                  rationale: criterionId
-                                    ? "Destination confirmed by the adjudicator."
-                                    : "Choose a criterion before applying this note.",
-                                  selected: Boolean(criterionId),
-                                  status: criterionId ? "placed" : "unsorted",
-                                });
-                              }}
-                              value={note.criterionId ?? ""}
-                            >
-                              <option value="">Choose criterion</option>
-                              {categoryTargets.map((target) => (
-                                <option
-                                  key={target.criterionId}
-                                  value={target.criterionId}
-                                >
-                                  {target.criterionOrder}. {target.criterionTitle}
-                                </option>
-                              ))}
-                            </select>
-
-                            <label className="brain-dump-review-apply-choice">
-                              <input
-                                checked={note.selected}
-                                disabled={!canSelect}
-                                onChange={(event) => {
-                                  onNoteChange(note.id, {
-                                    selected: event.target.checked,
-                                  });
-                                }}
-                                type="checkbox"
-                              />
-                              Add this observation
-                            </label>
-                          </div>
-                        </article>
-                      );
-                    })}
+                    <label className="brain-dump-review-apply-choice">
+                      <input
+                        checked={note.selected}
+                        disabled={!canSelect}
+                        onChange={(event) => {
+                          onNoteChange(note.id, {
+                            selected: event.target.checked,
+                          });
+                        }}
+                        type="checkbox"
+                      />
+                      Add this observation
+                    </label>
                   </div>
-                )}
-              </section>
-            );
-          })}
+                </article>
+              );
+            })}
+          </div>
         </div>
 
         <footer className="brain-dump-review-footer">
@@ -437,7 +370,7 @@ function BrainDumpReviewModal({
               onClick={onClose}
               type="button"
             >
-              Cancel
+              Close
             </button>
             <button
               className="button button-gold"
@@ -445,7 +378,7 @@ function BrainDumpReviewModal({
               onClick={onApply}
               type="button"
             >
-              Apply {selectedCount} selected
+              Add {selectedCount} categorized
             </button>
           </div>
         </footer>
@@ -466,7 +399,7 @@ export function AdjudicationBrainDump({
   canComment: boolean;
   readOnly: boolean;
 }) {
-  const storageKey = `ghsmta:brain-dump-sort-review:v2:${applicationId}`;
+  const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}`;
   const [value, setValue] = useState(defaultValue ?? "");
   const [expanded, setExpanded] = useState(!(defaultValue ?? "").trim());
   const [sorting, setSorting] = useState(false);
@@ -509,7 +442,7 @@ export function AdjudicationBrainDump({
     if (!notes || sorting || readOnly || !canComment) return;
 
     setSorting(true);
-    setMessage("Separating and reviewing every source observation…");
+    setMessage("Separating and categorizing every source observation…");
 
     try {
       const response = await fetch("/api/writing-assist/adjudication-sort", {
@@ -530,21 +463,46 @@ export function AdjudicationBrainDump({
         throw new Error("The sorter did not return a reviewable result.");
       }
 
-      const placedCount = nextReview.notes.filter(
-        (note) => note.status === "placed",
+      const automaticallyPlaced =
+        selectAutomaticallyApplicableBrainDumpNotes(nextReview.notes);
+      const assignments =
+        groupAdjudicationBrainDumpAssignments(automaticallyPlaced);
+      const undoValues =
+        assignments.length > 0 ? captureUndoValues(assignments) : null;
+
+      if (assignments.length > 0) {
+        window.dispatchEvent(
+          new CustomEvent(APPLY_ADJUDICATION_BRAIN_DUMP_EVENT, {
+            detail: { assignments },
+          }),
+        );
+      }
+
+      const appliedNoteIds = new Set(
+        automaticallyPlaced.map((note) => note.id),
+      );
+      const populatedReview: BrainDumpReview = {
+        ...nextReview,
+        lastAppliedNoteIds: [...appliedNoteIds],
+        undoValues,
+        notes: nextReview.notes.map((note) =>
+          appliedNoteIds.has(note.id)
+            ? { ...note, applied: true, selected: false }
+            : note,
+        ),
+      };
+      const uncategorizedCount = populatedReview.notes.filter(
+        (note) => note.requiresManualPlacement && !note.applied,
       ).length;
-      const reviewCount = nextReview.notes.filter(
-        (note) => note.status === "needs_review",
-      ).length;
-      const unsortedCount = nextReview.notes.filter(
-        (note) => note.status === "unsorted",
+      const duplicateCount = populatedReview.notes.filter(
+        (note) => Boolean(note.duplicateOfNoteId),
       ).length;
 
-      saveReview(nextReview);
+      saveReview(populatedReview);
       setMessage(
-        `${nextReview.notes.length} source observations found: ${placedCount} placed, ${reviewCount} need review, and ${unsortedCount} unsorted. Nothing has been added yet.`,
+        `${assignments.length} categorized observation${assignments.length === 1 ? " was" : "s were"} added automatically. ${uncategorizedCount} observation${uncategorizedCount === 1 ? " could" : "s could"} not be categorized${uncategorizedCount > 0 ? " and need manual placement" : ""}.${duplicateCount > 0 ? ` ${duplicateCount} exact duplicate${duplicateCount === 1 ? " was" : "s were"} skipped.` : ""}`,
       );
-      setReviewOpen(true);
+      setReviewOpen(uncategorizedCount > 0);
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -572,20 +530,16 @@ export function AdjudicationBrainDump({
   const applySelectedNotes = () => {
     if (!review) return;
     const selectedNotes = review.notes.filter(
-      (note) => note.selected && note.criterionId && !note.applied,
+      (note) =>
+        note.requiresManualPlacement &&
+        note.selected &&
+        note.criterionId &&
+        !note.applied,
     );
     const assignments = groupAdjudicationBrainDumpAssignments(selectedNotes);
     if (assignments.length === 0) return;
 
-    const undoValues: Record<string, string> = {};
-    for (const criterionId of new Set(
-      assignments.map((assignment) => assignment.criterionId),
-    )) {
-      const fieldName = `observation_${criterionId}`;
-      const field = document.getElementsByName(fieldName)[0];
-      undoValues[fieldName] =
-        field instanceof HTMLInputElement ? field.value : "";
-    }
+    const undoValues = captureUndoValues(assignments);
 
     window.dispatchEvent(
       new CustomEvent(APPLY_ADJUDICATION_BRAIN_DUMP_EVENT, {
@@ -607,10 +561,10 @@ export function AdjudicationBrainDump({
     saveReview(nextReview);
 
     const remainingCount = nextReview.notes.filter(
-      (note) => !note.applied,
+      (note) => note.requiresManualPlacement && !note.applied,
     ).length;
     setMessage(
-      `${assignments.length} selected observation${assignments.length === 1 ? " was" : "s were"} sent to the scorecard; existing exact duplicates were skipped. ${remainingCount} source observation${remainingCount === 1 ? " remains" : "s remain"} unapplied.`,
+      `${assignments.length} observation${assignments.length === 1 ? " was" : "s were"} added to the scorecard. ${remainingCount} uncategorized observation${remainingCount === 1 ? " still needs" : "s still need"} a destination.`,
     );
     closeReview();
   };
@@ -632,7 +586,8 @@ export function AdjudicationBrainDump({
           ? {
               ...note,
               applied: false,
-              selected: note.status === "placed" && Boolean(note.criterionId),
+              selected:
+                note.requiresManualPlacement && Boolean(note.criterionId),
             }
           : note,
       ),
@@ -641,6 +596,11 @@ export function AdjudicationBrainDump({
       "The latest applied brain-dump comments were removed. The sorting review is still available.",
     );
   };
+
+  const uncategorizedCount =
+    review?.notes.filter(
+      (note) => note.requiresManualPlacement && !note.applied,
+    ).length ?? 0;
 
   return (
     <>
@@ -685,9 +645,10 @@ export function AdjudicationBrainDump({
               </div>
             )}
             <small className="field-help">
-              These private notes autosave with your scorecard. Auto-sort first
-              opens a numbered review and never assigns scores or removes the
-              original brain dump.
+              These private notes autosave with your scorecard. Auto-sort adds
+              matched observations to their criterion comments and opens a
+              placement window only for observations it cannot categorize. It
+              never assigns scores or removes the original brain dump.
             </small>
           </div>
 
@@ -700,15 +661,15 @@ export function AdjudicationBrainDump({
                 ref={sortButtonRef}
                 type="button"
               >
-                {sorting ? "Reviewing…" : "Review auto-sort"}
+                {sorting ? "Sorting…" : "Auto-sort comments"}
               </button>
-              {review ? (
+              {uncategorizedCount > 0 ? (
                 <button
                   className="button button-secondary"
                   onClick={() => setReviewOpen(true)}
                   type="button"
                 >
-                  Review last sort
+                  Place {uncategorizedCount} uncategorized
                 </button>
               ) : null}
               {review?.undoValues ? (
@@ -720,7 +681,10 @@ export function AdjudicationBrainDump({
                   Undo latest apply
                 </button>
               ) : null}
-              <small>Nothing is added until you review and apply it.</small>
+              <small>
+                Matched comments populate automatically; only unmatched notes
+                need your review.
+              </small>
             </div>
           ) : null}
 
