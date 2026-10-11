@@ -315,10 +315,7 @@ export function ActingCandidateReviewPanel({
         {state.status === "approved" && (
           <p className="acting-candidate-action-note acting-candidate-action-note-complete">
             The full panel approved revision {state.revision}. The confirmation
-            message was posted to the school channel
-            {state.sectionOpened
-              ? ", and Section C was opened."
-              : ". Section C will open when GHSMTA adds it to this cycle’s form."}
+            message was posted to the school channel.
           </p>
         )}
         {hasRequestedChanges && state.status === "pending" && (

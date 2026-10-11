@@ -4,6 +4,7 @@ import {
   buildActingCandidateSchoolMessage,
   changedActingCandidateSlots,
   extractActingCandidates,
+  extractDirectorName,
 } from "./acting-candidate-review";
 import type { ApplicationReferencePanel } from "./application-reference-panels";
 
@@ -30,6 +31,24 @@ const actingPanel: ApplicationReferencePanel = {
         { label: "Featured Performer Pronouns", value: "Other" },
         { label: "Featured Performer Pronouns Other", value: "they/them" },
         { label: "Featured Performer Role", value: "Widow Corney" },
+      ],
+    },
+  ],
+};
+
+const fullApplicationPanel: ApplicationReferencePanel = {
+  key: "full-application",
+  title: "Full Application",
+  shortTitle: "FULL APPLICATION",
+  description: "All responses",
+  groups: [
+    {
+      title: "All application responses",
+      items: [
+        { label: "Music Director Name", value: "Aleshia Samuel" },
+        { label: "Technical Director Name", value: "William Rich" },
+        { label: "Director Name", value: "Courtney McClendon" },
+        { label: "Director Phonetic Name", value: "Court-nee" },
       ],
     },
   ],
@@ -68,6 +87,12 @@ describe("acting candidate review", () => {
     ]);
   });
 
+  it("auto-populates the school director without selecting another director field", () => {
+    expect(extractDirectorName([fullApplicationPanel, actingPanel])).toBe(
+      "Courtney McClendon",
+    );
+  });
+
   it("builds the school message with portal resources and the pronunciation requirement", () => {
     const candidates = extractActingCandidates([actingPanel]).map(
       (candidate) =>
@@ -76,7 +101,7 @@ describe("acting candidate review", () => {
           : candidate,
     );
     const message = buildActingCandidateSchoolMessage({
-      contactName: "Wesley Smith",
+      directorName: "Wesley Smith",
       coordinatorName: "Beth",
       candidates,
       changedSlots: ["featured_performer"],
@@ -94,5 +119,6 @@ describe("acting candidate review", () => {
     expect(message).toContain("re-upload");
     expect(message).toContain("School Files:");
     expect(message).not.toContain("drive.google.com");
+    expect(message).not.toContain("Section C");
   });
 });

@@ -5,7 +5,6 @@ import {
   type SchoolFileRecord,
 } from "@/components/school-file-library";
 import {
-  ACTING_CANDIDATE_REVIEW_ACTIONS,
   parseActingCandidateReviewState,
 } from "@/lib/acting-candidate-review";
 import { requireProfile } from "@/lib/auth";
@@ -102,39 +101,35 @@ export default async function SchoolFilesPage() {
         .is("archived_at", null)
         .order("created_at", { ascending: false }),
       admin
-        .from("application_audit_log")
-        .select("subject_application_id,new_record,created_at")
-        .in("subject_application_id", applicationIds)
-        .in("action", [...ACTING_CANDIDATE_REVIEW_ACTIONS])
-        .order("created_at", { ascending: false }),
+        .from("acting_candidate_reviews")
+        .select("application_id,state,updated_at")
+        .in("application_id", applicationIds),
     ]);
     const { data: fileData, error: fileError } = fileResult;
 
     if (fileError) {
       throw new Error(`School files could not be loaded: ${fileError.message}`);
     }
+    // Pronunciation reminders should never prevent the underlying school-file
+    // library from loading if the optional candidate audit lookup is degraded.
     if (candidateReviewResult.error) {
-      throw new Error(
-        `Candidate pronunciation requirements could not be loaded: ${candidateReviewResult.error.message}`,
-      );
+      console.error("Candidate pronunciation requirements could not be loaded", {
+        code: candidateReviewResult.error.code,
+        message: candidateReviewResult.error.message,
+      });
     }
 
     files = (fileData ?? []) as SchoolFileRecord[];
-    const latestStateByApplication = new Map<string, unknown>();
+    const stateByApplication = new Map<string, unknown>();
     for (const row of candidateReviewResult.data ?? []) {
-      if (!latestStateByApplication.has(row.subject_application_id)) {
-        latestStateByApplication.set(
-          row.subject_application_id,
-          row.new_record,
-        );
-      }
+      stateByApplication.set(row.application_id, row.state);
     }
     const normalizeName = (value: string | null | undefined) =>
       value?.trim().toLocaleLowerCase() ?? "";
 
     pronunciationRequirements = applicationIds.flatMap((applicationId) => {
       const state = parseActingCandidateReviewState(
-        latestStateByApplication.get(applicationId),
+        stateByApplication.get(applicationId),
       );
       if (
         !state ||

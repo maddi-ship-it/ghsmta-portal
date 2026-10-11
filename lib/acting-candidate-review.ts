@@ -40,6 +40,7 @@ export type ActingCandidateReviewState = {
   changedSlots: ActingCandidateSlot[];
   requiredApproverIds: string[];
   approvals: ActingCandidateApproval[];
+  directorName: string | null;
   coordinatorId: string | null;
   coordinatorName: string | null;
   submittedAt: string | null;
@@ -122,6 +123,26 @@ export function extractActingCandidates(
   });
 }
 
+export function extractDirectorName(
+  panels: ApplicationReferencePanel[],
+): string | null {
+  const fullApplication = panels.find(
+    (panel) => panel.key === "full-application",
+  );
+  const directorItem = fullApplication?.groups
+    .flatMap((group) => group.items)
+    .find((item) => {
+      const label = normalize(item.label);
+      return (
+        ["director_name", "name_of_director"].includes(label) &&
+        !label.includes("music") &&
+        !label.includes("technical") &&
+        !label.includes("phonetic")
+      );
+    });
+  return directorItem?.value?.trim() || null;
+}
+
 export function changedActingCandidateSlots(
   originalCandidates: ActingCandidate[],
   candidates: ActingCandidate[],
@@ -147,10 +168,12 @@ export function createInitialActingCandidateReviewState({
   applicationId,
   candidates,
   requiredApproverIds,
+  directorName = null,
 }: {
   applicationId: string;
   candidates: ActingCandidate[];
   requiredApproverIds: string[];
+  directorName?: string | null;
 }): ActingCandidateReviewState {
   return {
     schemaVersion: 1,
@@ -162,6 +185,7 @@ export function createInitialActingCandidateReviewState({
     changedSlots: [],
     requiredApproverIds,
     approvals: [],
+    directorName,
     coordinatorId: null,
     coordinatorName: null,
     submittedAt: null,
@@ -187,7 +211,12 @@ export function parseActingCandidateReviewState(
   ) {
     return null;
   }
-  return state as ActingCandidateReviewState;
+  return {
+    ...(state as ActingCandidateReviewState),
+    directorName:
+      typeof state.directorName === "string" ? state.directorName : null,
+    sectionOpened: state.sectionOpened === true,
+  };
 }
 
 export function actingCandidateReviewIsComplete(
@@ -213,31 +242,29 @@ function changedCandidateLine(candidate: ActingCandidate) {
 }
 
 export function buildActingCandidateSchoolMessage({
-  contactName,
+  directorName,
   coordinatorName,
   candidates,
   changedSlots,
   sectionDeadline,
-  sectionOpened = true,
   referenceFilesUrl,
   schoolFilesUrl,
 }: {
-  contactName: string | null;
+  directorName: string | null;
   coordinatorName: string;
   candidates: ActingCandidate[];
   changedSlots: ActingCandidateSlot[];
   sectionDeadline: string | null;
-  sectionOpened?: boolean;
   referenceFilesUrl: string;
   schoolFilesUrl: string;
 }) {
   const hasChanges = changedSlots.length > 0;
-  const greeting = contactName?.trim()
-    ? `Hi ${contactName.trim().split(/\s+/)[0]}!`
+  const greeting = directorName?.trim()
+    ? `Hi ${directorName.trim().split(/\s+/)[0]}!`
     : "Hello!";
   const deadline = sectionDeadline
-    ? `Please remember that Section C is due on ${sectionDeadline}.`
-    : "Please complete Section C by the deadline shown in the portal.";
+    ? `Please remember that the required post-production materials are due on ${sectionDeadline}.`
+    : "Please complete the required post-production materials by the deadline shown in the portal.";
   const changedCandidates = candidates.filter((candidate) =>
     changedSlots.includes(candidate.slot),
   );
@@ -248,20 +275,13 @@ export function buildActingCandidateSchoolMessage({
     "Congratulations on a successful run of your production! We are so proud to have your program and students as part of the Shulers. You and your students have a lot to be proud of!",
     "",
     hasChanges
-      ? sectionOpened
-        ? "I have moved you to Section C. There have been changes to your acting candidates. The full adjudication panel approved the following substitutions:"
-        : "The full adjudication panel confirmed your acting candidates for Section C. There have been changes to your acting candidates, and the panel approved the following substitutions:"
-      : sectionOpened
-        ? "I have moved you to Section C. There are no changes to your acting candidates."
-        : "The full adjudication panel confirmed your acting candidates for Section C. There are no changes to your acting candidates.",
+      ? "There have been changes to your acting candidates. The full adjudication panel approved the following substitutions:"
+      : "The full adjudication panel confirmed your acting candidates. There are no changes to your acting candidates.",
     ...(hasChanges
       ? ["", ...changedCandidates.map(changedCandidateLine)]
       : []),
     "",
     deadline,
-    ...(!sectionOpened
-      ? ["Section C will appear in the portal when GHSMTA opens it for this application cycle."]
-      : []),
     "This includes the Leading Actress and Leading Actor Virtual Audition Packets.",
     `Instructions, supporting materials, and the solo song library are available in Reference Files: ${referenceFilesUrl}`,
     ...(hasChanges

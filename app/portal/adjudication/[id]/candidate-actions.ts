@@ -8,6 +8,7 @@ import {
   changedActingCandidateSlots,
   createInitialActingCandidateReviewState,
   extractActingCandidates,
+  extractDirectorName,
   parseActingCandidateReviewState,
   type ActingCandidate,
   type ActingCandidateApproval,
@@ -77,12 +78,9 @@ async function loadActingCandidateContext(applicationId: string) {
         .select("*")
         .eq("application_id", applicationId),
       admin
-        .from("application_audit_log")
-        .select("new_record,created_at")
-        .eq("subject_application_id", applicationId)
-        .in("action", [...ACTING_CANDIDATE_REVIEW_ACTIONS])
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .from("acting_candidate_reviews")
+        .select("state,updated_at")
+        .eq("application_id", applicationId)
         .maybeSingle(),
       admin
         .from("adjudicator_assignments")
@@ -123,8 +121,9 @@ async function loadActingCandidateContext(applicationId: string) {
     answers: (answersResult.data ?? []) as ApplicationAnswer[],
   });
   const originalCandidates = extractActingCandidates(panels);
+  const directorName = extractDirectorName(panels);
   const savedState = parseActingCandidateReviewState(
-    auditResult.data?.new_record,
+    auditResult.data?.state,
   );
 
   return {
@@ -138,6 +137,7 @@ async function loadActingCandidateContext(applicationId: string) {
         applicationId,
         candidates: originalCandidates,
         requiredApproverIds: activePanelMemberIds,
+        directorName,
       }),
   };
 }
@@ -156,15 +156,25 @@ async function saveState({
   nextState: ActingCandidateReviewState;
 }) {
   const admin = createAdminClient();
-  const { error } = await admin.from("application_audit_log").insert({
-    application_id: applicationId,
-    subject_application_id: applicationId,
-    actor_user_id: actorId,
-    action,
-    old_record: previousState,
-    new_record: nextState,
-  });
-  if (error) throw new Error(error.message);
+  const [stateResult, auditResult] = await Promise.all([
+    admin.from("acting_candidate_reviews").upsert(
+      {
+        application_id: applicationId,
+        state: nextState,
+      },
+      { onConflict: "application_id" },
+    ),
+    admin.from("application_audit_log").insert({
+      application_id: applicationId,
+      subject_application_id: applicationId,
+      actor_user_id: actorId,
+      action,
+      old_record: previousState,
+      new_record: nextState,
+    }),
+  ]);
+  if (stateResult.error) throw new Error(stateResult.error.message);
+  if (auditResult.error) throw new Error(auditResult.error.message);
 }
 
 function submittedCandidates(
@@ -241,6 +251,7 @@ export async function submitActingCandidateReview(
     approvals: context.activePanelMemberIds.includes(profile.id)
       ? [currentUserApproval]
       : [],
+    directorName: context.state.directorName,
     coordinatorId: profile.id,
     coordinatorName:
       profile.full_name?.trim() || profile.email || "GHSMTA Advisory Committee",
@@ -355,18 +366,18 @@ async function publishApprovedCandidates({
 
   const siteUrl = portalSiteUrl();
   const body = buildActingCandidateSchoolMessage({
-    contactName: application.external_applicant_name,
+    directorName:
+      state.directorName || application.external_applicant_name,
     coordinatorName: state.coordinatorName ?? "GHSMTA Advisory Committee",
     candidates: state.candidates,
     changedSlots: state.changedSlots,
     sectionDeadline: formatDeadline(stage?.closes_at),
-    sectionOpened: Boolean(stage),
     referenceFilesUrl: `${siteUrl}/portal/reference-documents`,
     schoolFilesUrl: `${siteUrl}/portal/files`,
   });
   const subject = state.changedSlots.length
-    ? "Section C opened: acting candidate changes approved"
-    : "Section C opened: acting candidates confirmed";
+    ? "Acting candidate changes approved"
+    : "Acting candidates confirmed";
   const authorId = state.coordinatorId ?? actorId;
   const { data: post, error: postError } = await admin
     .from("chat_posts")

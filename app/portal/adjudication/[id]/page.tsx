@@ -13,10 +13,10 @@ import {
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import {
-  ACTING_CANDIDATE_REVIEW_ACTIONS,
   actingCandidateReviewIsComplete,
   createInitialActingCandidateReviewState,
   extractActingCandidates,
+  extractDirectorName,
   parseActingCandidateReviewState,
 } from "@/lib/acting-candidate-review";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
@@ -333,12 +333,9 @@ export default async function AdjudicationApplicationPage({
       .eq("appeal_type", "eligibility")
       .order("submitted_at", { ascending: false }),
     admin
-      .from("application_audit_log")
-      .select("new_record,created_at")
-      .eq("subject_application_id", id)
-      .in("action", [...ACTING_CANDIDATE_REVIEW_ACTIONS])
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .from("acting_candidate_reviews")
+      .select("state,updated_at")
+      .eq("application_id", id)
       .maybeSingle(),
   ]);
 
@@ -372,8 +369,15 @@ export default async function AdjudicationApplicationPage({
   if (panelAssignmentsResult.error) {
     throw new Error(panelAssignmentsResult.error.message);
   }
+  // Candidate confirmation is an add-on to the adjudication workspace. If its
+  // audit lookup is unavailable, keep the scorecard usable and start from the
+  // application roster instead of sending the entire route to the error page.
   if (candidateReviewResult.error) {
-    throw new Error(candidateReviewResult.error.message);
+    console.error("Acting candidate review history could not be loaded", {
+      applicationId: id,
+      code: candidateReviewResult.error.code,
+      message: candidateReviewResult.error.message,
+    });
   }
 
   const panelReviewerIds = [
@@ -684,14 +688,18 @@ export default async function AdjudicationApplicationPage({
   const originalActingCandidates = extractActingCandidates(
     applicationReferencePanels,
   );
+  const applicationDirectorName = extractDirectorName(
+    applicationReferencePanels,
+  );
   const actingCandidateReview =
-    parseActingCandidateReviewState(candidateReviewResult.data?.new_record) ??
+    parseActingCandidateReviewState(candidateReviewResult.data?.state) ??
     createInitialActingCandidateReviewState({
       applicationId: id,
       candidates: originalActingCandidates,
       requiredApproverIds: candidatePanelReviewers.map(
         (reviewer) => reviewer.id,
       ),
+      directorName: applicationDirectorName,
     });
   const ownScorecard = showEditableScorecard
     ? scorecards.find((scorecard) => scorecard.adjudicator_user_id === profile.id) ?? null
