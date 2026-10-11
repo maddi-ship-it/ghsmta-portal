@@ -16954,3 +16954,387 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
   background: var(--portal-surface-3);
   opacity: 0.82;
 }
+
+/* Adjudication sandbox ---------------------------------------------------- */
+.adjudication-sandbox {
+  display: grid;
+  gap: 22px;
+}
+
+.sandbox-safety-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--portal-gold) 48%, var(--portal-line));
+  border-radius: 18px;
+  color: var(--portal-text);
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--portal-gold) 12%, transparent), transparent 58%),
+    var(--portal-surface);
+  box-shadow: var(--portal-shadow);
+}
+
+.sandbox-safety-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid var(--portal-gold);
+  border-radius: 50%;
+  color: var(--portal-gold-bright);
+  font-size: 1.35rem;
+}
+
+.sandbox-safety-notice strong {
+  color: var(--portal-gold-bright);
+  font-size: 0.8rem;
+  letter-spacing: 0.09em;
+}
+
+.sandbox-safety-notice p {
+  margin: 5px 0 0;
+  color: var(--portal-muted);
+  line-height: 1.5;
+}
+
+.sandbox-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sandbox-overview-card {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  padding: 18px;
+  border: 1px solid var(--portal-line);
+  border-radius: 16px;
+  background: var(--portal-surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.13);
+}
+
+.sandbox-overview-card > span,
+.sandbox-range-status > span {
+  color: var(--portal-gold-bright);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.sandbox-overview-card > strong {
+  overflow-wrap: anywhere;
+  color: var(--portal-ivory);
+  font-size: 1.05rem;
+}
+
+.sandbox-overview-card:nth-child(3) > strong,
+.sandbox-overview-card:nth-child(4) > strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sandbox-overview-card small {
+  line-height: 1.45;
+}
+
+.sandbox-category-navigator {
+  display: grid;
+  grid-template-columns: 48px minmax(260px, 1fr) 48px auto;
+  align-items: end;
+  gap: 12px;
+  padding: 16px;
+}
+
+.sandbox-category-navigator .field {
+  min-width: 0;
+}
+
+.sandbox-category-navigator .field label {
+  color: var(--portal-gold-bright);
+  letter-spacing: 0.08em;
+}
+
+.sandbox-category-select {
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sandbox-category-select.is-complete {
+  border-color: var(--portal-success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--portal-success) 18%, transparent);
+}
+
+.sandbox-category-arrow {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid var(--portal-line);
+  border-radius: 50%;
+  color: var(--portal-ivory);
+  background: var(--portal-surface-2);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.sandbox-category-arrow:hover:not(:disabled) {
+  color: var(--portal-gold-bright);
+  border-color: var(--portal-gold);
+}
+
+.sandbox-category-arrow:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.sandbox-review-button {
+  white-space: nowrap;
+}
+
+.sandbox-committee-panel .panel-header,
+.sandbox-scoring-panel .panel-header {
+  align-items: flex-start;
+}
+
+.sandbox-committee-panel .panel-header > div,
+.sandbox-scoring-panel .panel-header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.sandbox-committee-panel .panel-header p,
+.sandbox-scoring-panel .panel-header p {
+  margin: 0;
+  color: var(--portal-muted);
+  line-height: 1.5;
+}
+
+.sandbox-committee-fields {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(220px, 0.8fr) minmax(250px, 1fr);
+  align-items: end;
+  gap: 16px;
+  padding: 20px 22px 22px;
+}
+
+.sandbox-committee-fields .select:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.sandbox-range-status {
+  display: grid;
+  min-height: 80px;
+  align-content: center;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+  padding: 13px 16px;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  background: var(--portal-surface-2);
+}
+
+.sandbox-range-status strong {
+  grid-row: span 2;
+  align-self: center;
+  color: var(--portal-ivory);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sandbox-range-status small {
+  line-height: 1.35;
+}
+
+.sandbox-range-status.is-inside {
+  border-color: color-mix(in srgb, var(--portal-success) 65%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-success) 10%, var(--portal-surface-2));
+}
+
+.sandbox-range-status.is-inside :where(strong, small) {
+  color: var(--portal-success);
+}
+
+.sandbox-range-status.is-outside {
+  border-color: color-mix(in srgb, var(--portal-danger) 65%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-danger) 10%, var(--portal-surface-2));
+}
+
+.sandbox-range-status.is-outside :where(strong, small) {
+  color: var(--portal-danger);
+}
+
+.sandbox-criterion-list {
+  display: grid;
+}
+
+.sandbox-criterion-card {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(420px, 1.15fr);
+  gap: 24px;
+  padding: 22px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.sandbox-criterion-card:last-child {
+  border-bottom: 0;
+}
+
+.sandbox-criterion-copy h3 {
+  margin: 6px 0 10px;
+  color: var(--portal-ivory);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.sandbox-criterion-copy p {
+  margin: 0;
+  color: var(--portal-muted);
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.sandbox-criterion-entry {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.42fr) minmax(260px, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.sandbox-criterion-entry .textarea {
+  min-height: 108px;
+}
+
+.sandbox-review-modal {
+  width: min(880px, 100%);
+}
+
+.sandbox-review-modal .modal-header p {
+  max-width: 620px;
+  margin: 6px 0 0;
+  color: var(--portal-muted);
+}
+
+.sandbox-review-list {
+  display: grid;
+  max-height: min(58vh, 610px);
+  margin: 0 -8px 20px;
+  padding: 0 8px;
+  overflow-y: auto;
+}
+
+.sandbox-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 15px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--portal-line);
+  color: var(--portal-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sandbox-review-row:hover {
+  background: var(--portal-surface-hover);
+}
+
+.sandbox-review-row > span {
+  display: grid;
+  gap: 5px;
+}
+
+.sandbox-review-row > span:last-child {
+  justify-items: end;
+}
+
+.sandbox-review-row strong {
+  color: var(--portal-ivory);
+}
+
+.sandbox-review-row small {
+  color: var(--portal-muted);
+  text-transform: capitalize;
+}
+
+.sandbox-review-row small.is-complete {
+  color: var(--portal-success);
+  font-weight: 900;
+}
+
+@media (max-width: 1050px) {
+  .sandbox-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sandbox-category-navigator {
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+  }
+
+  .sandbox-review-button {
+    grid-column: 1 / -1;
+  }
+
+  .sandbox-committee-fields,
+  .sandbox-criterion-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .sandbox-safety-notice {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .sandbox-safety-notice .button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .sandbox-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sandbox-category-navigator {
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .sandbox-category-arrow {
+    width: 42px;
+    height: 42px;
+    margin-bottom: 3px;
+  }
+
+  .sandbox-committee-panel .panel-header,
+  .sandbox-scoring-panel .panel-header {
+    flex-direction: column;
+  }
+
+  .sandbox-committee-fields,
+  .sandbox-criterion-card {
+    padding: 18px;
+  }
+
+  .sandbox-criterion-entry {
+    grid-template-columns: 1fr;
+  }
+
+  .sandbox-review-row {
+    grid-template-columns: 1fr;
+  }
+
+  .sandbox-review-row > span:last-child {
+    justify-items: start;
+  }
+}

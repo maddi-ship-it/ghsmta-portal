@@ -65,15 +65,29 @@ function buildNavigation(profile: Profile) {
           },
         ];
 
-  if (
-    profile.role === "adjudicator" ||
-    profile.role === "advisory_member"
-  ) {
+  if (profile.role === "adjudicator" || profile.role === "advisory_member") {
+    resources.splice(
+      2,
+      0,
+      {
+        href: "/portal/adjudication-sandbox",
+        label: "Adjudication sandbox",
+        shortLabel: "Sandbox",
+        icon: "◇",
+      },
+      {
+        href: "/portal/digital-signing",
+        label: "Digital signing",
+        shortLabel: "Sign",
+        icon: "✎",
+      },
+    );
+  } else if (profile.role === "owner") {
     resources.splice(2, 0, {
-      href: "/portal/digital-signing",
-      label: "Digital signing",
-      shortLabel: "Sign",
-      icon: "✎",
+      href: "/portal/adjudication-sandbox",
+      label: "Adjudication sandbox",
+      shortLabel: "Sandbox",
+      icon: "◇",
     });
   }
 
