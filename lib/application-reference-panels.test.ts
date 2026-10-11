@@ -311,7 +311,7 @@ describe("buildApplicationReferencePanels", () => {
         {
           label: "⚑ DIRECTION ELIGIBILITY APPEAL",
           value:
-            "SUBMITTED — CURRENT ELIGIBILITY REMAINS IN EFFECT",
+            "SUBMITTED — CURRENT ELIGIBILITY STATUS REMAINS IN EFFECT",
         },
       ],
     });
@@ -403,7 +403,7 @@ describe("buildApplicationReferencePanels", () => {
       ?.items.at(0);
 
     expect(eligibilityPanel?.groups[0]?.items[0]?.value).toBe(
-      "DENIED — CURRENT ELIGIBILITY RETAINED",
+      "DENIED — CURRENT ELIGIBILITY STATUS REMAINS IN EFFECT",
     );
     expect(
       formatApplicationReferenceValue(

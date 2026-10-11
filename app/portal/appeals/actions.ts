@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export type AppealActionResult = { ok: boolean; id?: string; error?: string };
@@ -17,8 +18,95 @@ function amountToCents(value: FormDataEntryValue | null) {
   return Math.round(Number(normalized) * 100);
 }
 
+async function postEligibilityAppealToPanel(
+  appealId: string,
+  applicantId: string,
+) {
+  const admin = createAdminClient();
+  const { data: appeal, error: appealError } = await admin
+    .from("appeals")
+    .select(
+      "application_id,category_id,current_eligibility,requested_eligibility,explanation",
+    )
+    .eq("id", appealId)
+    .eq("appeal_type", "eligibility")
+    .single();
+
+  if (appealError || !appeal) {
+    console.error("Unable to load the submitted eligibility appeal for the panel channel.", {
+      appealId,
+      appealError,
+    });
+    return;
+  }
+
+  const [channelResult, categoryResult] = await Promise.all([
+    admin
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", appeal.application_id)
+      .eq("channel_type", "school")
+      .eq("active", true)
+      .maybeSingle(),
+    appeal.category_id
+      ? admin
+          .from("scoring_categories")
+          .select("title")
+          .eq("id", appeal.category_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  if (channelResult.error || !channelResult.data) {
+    console.error("Unable to locate the panel channel for an eligibility appeal.", {
+      appealId,
+      applicationId: appeal.application_id,
+      channelError: channelResult.error,
+    });
+    return;
+  }
+
+  if (categoryResult.error) {
+    console.error("Unable to resolve the eligibility appeal category for the panel post.", {
+      appealId,
+      categoryError: categoryResult.error,
+    });
+  }
+
+  const categoryTitle = categoryResult.data?.title?.trim() || "Category";
+  const appealExplanation = appeal.explanation.trim().slice(0, 4400);
+  const body = [
+    `An eligibility appeal was submitted for ${categoryTitle}.`,
+    `Current eligibility status: ${appeal.current_eligibility ? "YES" : "NO"}`,
+    `Requested eligibility status: ${appeal.requested_eligibility ? "YES" : "NO"}`,
+    "",
+    "Appeal explanation:",
+    appealExplanation,
+    "",
+    "Review this appeal in School Requests.",
+    `Appeal reference: ${appealId}`,
+  ].join("\n");
+  const { error: postError } = await admin.from("chat_posts").insert({
+    channel_id: channelResult.data.id,
+    author_id: applicantId,
+    subject: `Eligibility appeal submitted: ${categoryTitle}`.slice(0, 180),
+    body,
+  });
+
+  if (postError) {
+    console.error("Unable to post the eligibility appeal in the panel channel.", {
+      appealId,
+      postError,
+    });
+    return;
+  }
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+}
+
 export async function createEligibilityAppeal(formData: FormData): Promise<AppealActionResult> {
-  await requireProfile(["applicant"]);
+  const profile = await requireProfile(["applicant"]);
   const supabase = await createClient();
   const applicationId = String(formData.get("application_id") ?? "");
   const { data, error } = await supabase.rpc("submit_eligibility_appeal", {
@@ -32,6 +120,7 @@ export async function createEligibilityAppeal(formData: FormData): Promise<Appea
     p_certification_accepted: formData.get("certification_accepted") === "on",
   });
   if (error) return { ok: false, error: error.message };
+  await postEligibilityAppealToPanel(String(data), profile.id);
   revalidatePath("/portal/appeals");
   revalidatePath(`/portal/applications/${applicationId}`);
   revalidatePath(`/portal/adjudication/${applicationId}`);

@@ -443,12 +443,12 @@ function eligibilityAppealItems(
             appeal.requested_eligibility ? "YES" : "NO"
           }`
         : status === "denied"
-          ? "DENIED — CURRENT ELIGIBILITY RETAINED"
+          ? "DENIED — CURRENT ELIGIBILITY STATUS REMAINS IN EFFECT"
           : status === "owner_review"
-            ? "UNDER OWNER REVIEW — CURRENT ELIGIBILITY REMAINS IN EFFECT"
+            ? "UNDER OWNER REVIEW — CURRENT ELIGIBILITY STATUS REMAINS IN EFFECT"
             : status === "advisory_review"
-              ? "UNDER ADVISORY REVIEW — CURRENT ELIGIBILITY REMAINS IN EFFECT"
-              : "SUBMITTED — CURRENT ELIGIBILITY REMAINS IN EFFECT";
+              ? "UNDER ADVISORY REVIEW — CURRENT ELIGIBILITY STATUS REMAINS IN EFFECT"
+              : "SUBMITTED — CURRENT ELIGIBILITY STATUS REMAINS IN EFFECT";
 
       return [
         {
