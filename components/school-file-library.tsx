@@ -36,6 +36,9 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
   const [dropActive, setDropActive] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [pending, startTransition] = useTransition();
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const application = applications.find((item) => item.application_id === applicationId);
@@ -43,6 +46,62 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
   const personFields = ["name_pronunciation", "headshot", "resume"].includes(fileType);
 
   const visibleFiles = initialFiles.filter((file) => file.application_id === applicationId && [file.original_name, file.generated_name, file.person_name, file.award_category, file.document_category].join(" ").toLowerCase().includes(search.trim().toLowerCase()));
+  const allVisibleSelected =
+    visibleFiles.length > 0 &&
+    visibleFiles.every((file) => selectedFileIds.has(file.id));
+
+  function chooseApplication(nextApplicationId: string) {
+    setApplicationId(nextApplicationId);
+    setSelectedFileIds(new Set());
+  }
+
+  function toggleFileSelection(fileId: string) {
+    setSelectedFileIds((current) => {
+      const next = new Set(current);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  }
+
+  function toggleVisibleFiles() {
+    setSelectedFileIds((current) => {
+      const next = new Set(current);
+      for (const file of visibleFiles) {
+        if (allVisibleSelected) next.delete(file.id);
+        else next.add(file.id);
+      }
+      return next;
+    });
+  }
+
+  function downloadFiles(fileIds: string[]) {
+    if (fileIds.length === 0) {
+      setError("Choose at least one school file to download.");
+      return;
+    }
+
+    const form = document.createElement("form");
+    const selection = document.createElement("input");
+    form.action = "/api/school-files/download";
+    form.method = "post";
+    form.hidden = true;
+    selection.name = "file_ids";
+    selection.type = "hidden";
+    selection.value = JSON.stringify(fileIds);
+    form.append(selection);
+    document.body.append(form);
+    form.submit();
+    form.remove();
+
+    setError(null);
+    setMessage(
+      fileIds.length === 1
+        ? "Your file download has started."
+        : `Your ZIP download with ${fileIds.length} files has started.`,
+    );
+    setSelectedFileIds(new Set());
+  }
 
   function uploadFiles(
     files: File[],
@@ -113,6 +172,11 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
     startTransition(async () => {
       try {
         await archiveSchoolFile(data);
+        setSelectedFileIds((current) => {
+          const next = new Set(current);
+          next.delete(pendingRemovalId);
+          return next;
+        });
         setPendingRemovalId(null);
         setMessage("File removed from the active school library.");
         router.refresh();
@@ -139,7 +203,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
             <button
               className={item.application_id === applicationId ? "school-file-application active" : "school-file-application"}
               key={item.application_id}
-              onClick={() => setApplicationId(item.application_id)}
+              onClick={() => chooseApplication(item.application_id)}
               type="button"
             >
               <span className="school-file-application-icon" aria-hidden="true">▰</span>
@@ -178,6 +242,22 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            <button
+              className="button button-secondary button-compact"
+              disabled={visibleFiles.length === 0}
+              onClick={toggleVisibleFiles}
+              type="button"
+            >
+              {allVisibleSelected ? "Clear visible" : "Select visible"}
+            </button>
+            <button
+              className="button button-secondary button-compact"
+              disabled={selectedFileIds.size === 0}
+              onClick={() => downloadFiles(Array.from(selectedFileIds))}
+              type="button"
+            >
+              Download selected{selectedFileIds.size > 0 ? ` (${selectedFileIds.size})` : ""}
+            </button>
             {application?.can_upload && (
               <details className="reference-action-drawer school-file-upload-drawer">
                 <summary>Upload files</summary>
@@ -223,12 +303,32 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
           {message && <div className="notice-banner success-banner">{message}</div>}
 
           <div className="school-file-list">
-            <div className="school-file-list-heading" aria-hidden="true"><span>Name</span><span>Access</span><span>Actions</span></div>
+            <div className="school-file-list-heading">
+              <label className="school-file-select-all">
+                <input
+                  checked={allVisibleSelected}
+                  disabled={visibleFiles.length === 0}
+                  onChange={toggleVisibleFiles}
+                  type="checkbox"
+                />
+                <span>Select all</span>
+              </label>
+              <span>Access</span>
+              <span>Actions</span>
+            </div>
             {visibleFiles.length === 0 ? (
               <div className="empty-state"><strong>No files uploaded yet.</strong><p>{application?.can_upload ? "Drop files above or use Upload files to add the first item." : "This school has not shared any files yet."}</p></div>
             ) : visibleFiles.map((file) => (
               <article className="school-file-row" key={file.id}>
-                <span className="school-file-icon">▱</span>
+                <label className="school-file-select">
+                  <input
+                    aria-label={`Select ${file.display_name || file.person_name || file.original_name}`}
+                    checked={selectedFileIds.has(file.id)}
+                    onChange={() => toggleFileSelection(file.id)}
+                    type="checkbox"
+                  />
+                  <span className="school-file-icon" aria-hidden="true">▱</span>
+                </label>
                 <div className="school-file-copy">
                   <strong>{file.display_name || file.person_name || file.original_name}</strong>
                   <span>{labelFor(file.document_category)}{file.award_category ? ` · ${file.award_category}` : ""}{file.person_name ? ` · ${file.person_name}` : ""}</span>
@@ -236,6 +336,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
                 </div>
                 <span className="school-file-access">{file.reviewer_visible ? "Assigned reviewers" : "School + Owners"}</span>
                 <div className="school-file-actions">
+                  <button className="button button-secondary button-compact" type="button" onClick={() => downloadFiles([file.id])}>Download</button>
                   <button className="button button-secondary button-compact" type="button" onClick={() => void openFile(file)}>Open</button>
                   {(profile.role === "owner" || application?.can_upload) && <button className="text-button danger-text" type="button" onClick={() => setPendingRemovalId(file.id)}>Remove</button>}
                 </div>

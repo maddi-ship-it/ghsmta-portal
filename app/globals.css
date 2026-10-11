@@ -6276,6 +6276,29 @@ body.modal-open {
   width: 2.5rem;
 }
 
+.school-file-select,
+.school-file-select-all {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.school-file-select input,
+.school-file-select-all input {
+  accent-color: #001699;
+  cursor: pointer;
+  height: 1rem;
+  margin: 0;
+  width: 1rem;
+}
+
+.school-file-select-all {
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
 .school-file-copy {
   display: grid;
   gap: 0.12rem;
@@ -15822,7 +15845,7 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
 .portal-shell .portal-main .application-category-navigator {
   display: grid;
   width: min(100%, 508px);
-  flex: 1 1 430px;
+  flex: 0 1 508px;
   grid-template-columns: 38px minmax(210px, 420px) 38px;
   align-items: stretch;
   justify-content: center;
