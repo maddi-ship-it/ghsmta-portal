@@ -8,6 +8,7 @@ import {
 
 import {
   richTextHasContent,
+  richTextToPlainText,
   sanitizeRichTextHtml,
 } from "@/lib/rich-text";
 import {
@@ -129,13 +130,39 @@ export function RichTextField({
       const detail = (event as CustomEvent<ApplyAdjudicationBrainDumpDetail>)
         .detail;
       const criterionId = name.slice("observation_".length);
-      const assignment = detail?.assignments?.find(
+      const assignments = detail?.assignments?.filter(
         (item) => item.criterionId === criterionId,
       );
-      if (!assignment?.text.trim()) return;
+      if (!assignments?.length) return;
 
-      const addition = sanitizeRichTextHtml(assignment.text);
       const current = sanitizeRichTextHtml(editor.innerHTML);
+      const existingText = richTextToPlainText(current)
+        .normalize("NFKC")
+        .toLocaleLowerCase()
+        .replace(/\s+/g, " ");
+      const additions = assignments
+        .map((assignment) => assignment.text.trim())
+        .filter(Boolean)
+        .filter((text, index, allTexts) => {
+          const normalized = text
+            .normalize("NFKC")
+            .toLocaleLowerCase()
+            .replace(/\s+/g, " ");
+          return (
+            !existingText.includes(normalized) &&
+            allTexts.findIndex(
+              (candidate) =>
+                candidate
+                  .normalize("NFKC")
+                  .toLocaleLowerCase()
+                  .replace(/\s+/g, " ") === normalized,
+            ) === index
+          );
+        })
+        .map((text) => sanitizeRichTextHtml(text));
+      if (additions.length === 0) return;
+
+      const addition = additions.join("");
       const nextValue = richTextHasContent(current)
         ? `${current}${addition}`
         : addition;
