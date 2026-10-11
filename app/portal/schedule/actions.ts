@@ -871,6 +871,56 @@ export async function ownerAddStaff(slotId: string, formData: FormData) {
   scheduleRedirect("success", "Reviewer assignment updated. Owners will see the change in their daily review.");
 }
 
+export async function ownerUpdateScoringPermissions(
+  slotId: string,
+  formData: FormData,
+) {
+  await requireProfile(["owner"]);
+
+  const userId = text(formData, "user_id");
+  if (!userId) scheduleRedirect("error", "Choose a reviewer.");
+
+  const supabase = await createClient();
+  const [bookingResult, participantResult] = await Promise.all([
+    supabase
+      .from("schedule_school_bookings")
+      .select("application_id")
+      .eq("slot_id", slotId)
+      .maybeSingle(),
+    supabase
+      .from("schedule_slot_staff")
+      .select("id")
+      .eq("slot_id", slotId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
+
+  if (bookingResult.error) {
+    scheduleRedirect("error", bookingResult.error.message);
+  }
+  if (participantResult.error) {
+    scheduleRedirect("error", participantResult.error.message);
+  }
+  if (!bookingResult.data?.application_id) {
+    scheduleRedirect("error", "Assign a school before changing scoring permissions.");
+  }
+  if (!participantResult.data) {
+    scheduleRedirect("error", "This reviewer is not assigned to the schedule slot.");
+  }
+
+  const { error } = await supabase.rpc("owner_set_scoring_participant", {
+    p_application_id: bookingResult.data.application_id,
+    p_user_id: userId,
+    p_can_score: formData.get("can_score") === "on",
+    p_can_comment: formData.get("can_comment") === "on",
+  });
+
+  if (error) scheduleRedirect("error", error.message);
+
+  revalidateSchedule();
+  scheduleRedirect("success", "Scoring and commenting permissions updated.");
+}
+
 export async function removeScheduleSchoolBooking(bookingId: string) {
   await requireProfile(["owner"]);
 

@@ -43,6 +43,7 @@ import {
   ownerOfferNextSlotWaitlist,
   ownerConfirmScheduleBooking,
   ownerDeclineScheduleBooking,
+  ownerUpdateScoringPermissions,
   removeScheduleSchoolBooking,
   removeScheduleStaff,
   updateOwnScheduleSchoolDetails,
@@ -1538,14 +1539,12 @@ export default async function SchedulePage({
                                       </form>
                                       {profile.role === "owner" && (
                                           <form
-                                            action={ownerAddStaff.bind(null, slot.id)}
+                                            action={ownerUpdateScoringPermissions.bind(null, slot.id)}
                                             aria-label={`Scoring permissions for ${personName(participant)}`}
                                             className="schedule-participant-permissions-form"
                                             title={booking ? undefined : "Assign a school before changing scoring permissions."}
                                           >
                                             <input name="user_id" type="hidden" value={participant.user_id} />
-                                            <input name="participation_mode" type="hidden" value={participant.participation_mode} />
-                                            <input name="override_scoring_permissions" type="hidden" value="true" />
                                             <label className="schedule-participant-permission">
                                               <input
                                                 defaultChecked={scoringPermission?.can_score ?? participant.participation_mode === "panel"}
