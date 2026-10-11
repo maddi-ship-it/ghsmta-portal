@@ -127,8 +127,8 @@ export function formatApplicationReferenceValue(
   const normalizedValue = value.toLowerCase();
 
   if (normalizedLabel.includes("eligib")) {
-    if (["1", "true", "yes"].includes(normalizedValue)) return "True";
-    if (["0", "false", "no"].includes(normalizedValue)) return "False";
+    if (["1", "true", "yes"].includes(normalizedValue)) return "YES";
+    if (["0", "false", "no"].includes(normalizedValue)) return "NO";
   }
 
   const numeric = Number(value.replace(/[$,%\s,]/g, ""));
@@ -411,7 +411,9 @@ function candidateGroup(
 ) {
   return group(
     title,
-    rows.filter((row) => rowMatches(row, aliases)),
+    rows.filter(
+      (row) => rowMatches(row, aliases) && !rowMatches(row, ["phonetic"]),
+    ),
   );
 }
 

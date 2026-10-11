@@ -116,7 +116,7 @@ describe("buildApplicationReferencePanels", () => {
     ).toEqual([]);
   });
 
-  it("keeps every eligibility response and renders 1/0 as True/False", () => {
+  it("keeps every eligibility response and renders 1/0 as YES/NO", () => {
     const panels = buildApplicationReferencePanels({
       application: legacyApplication,
       questions: [
@@ -145,7 +145,7 @@ describe("buildApplicationReferencePanels", () => {
       eligibilityItems?.map((item) =>
         formatApplicationReferenceValue(item.label, item.value),
       ),
-    ).toEqual(["True", "False", "False", "True"]);
+    ).toEqual(["YES", "NO", "NO", "YES"]);
   });
 
   it("includes populated Acceptd-imported acting and budget fields", () => {
@@ -158,16 +158,23 @@ describe("buildApplicationReferencePanels", () => {
         question("leading-actress-role", "Leading Actress Role", 2, {
           imported: true,
         }),
-        question("funding", "Please describe all sources of funding that apply to you:", 3, {
+        question(
+          "leading-actress-phonetic",
+          "Leading Actress Phonetic Spelling",
+          3,
+          { imported: true },
+        ),
+        question("funding", "Please describe all sources of funding that apply to you:", 4, {
           imported: true,
         }),
-        question("production-cost", "Total $ amount spent on production costs?", 4, {
+        question("production-cost", "Total $ amount spent on production costs?", 5, {
           imported: true,
         }),
       ],
       answers: [
         answer("leading-actress-name", "Mikayla Shoemaker"),
         answer("leading-actress-role", "Witch"),
+        answer("leading-actress-phonetic", "mih-KAY-luh"),
         answer("funding", "Ticket Sales"),
         answer("production-cost", 4336.25),
       ],
@@ -184,6 +191,10 @@ describe("buildApplicationReferencePanels", () => {
         ],
       },
     ]);
+    expect(panels[0]?.groups[0]?.items).toContainEqual({
+      label: "Leading Actress Phonetic Spelling",
+      value: "mih-KAY-luh",
+    });
     expect(
       panels.find((panel) => panel.key === "musical-budget")?.groups,
     ).toEqual([

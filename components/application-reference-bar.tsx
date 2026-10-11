@@ -306,9 +306,9 @@ export function ApplicationReferenceBar({
                                 className={
                                   isEligibility
                                     ? `application-reference-status ${
-                                        formattedValue === "True"
+                                        formattedValue === "YES"
                                           ? "is-true"
-                                          : formattedValue === "False"
+                                          : formattedValue === "NO"
                                             ? "is-false"
                                             : "is-neutral"
                                       }`
