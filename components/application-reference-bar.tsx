@@ -127,7 +127,28 @@ export function ApplicationReferenceBar({
       >
         <div className="application-reference-buttons">
           {categoryNavigation ? (
-            <AdjudicationCategoryNavigator {...categoryNavigation} />
+            <div className="application-category-navigation-row">
+              <AdjudicationCategoryNavigator {...categoryNavigation} />
+
+              {scorecardSubmitControl || reviewActions?.showCategoryReview ? (
+                <div className="application-reference-action-group application-reference-workflow-actions application-category-workflow-actions">
+                  {reviewActions?.showCategoryReview ? (
+                    <button
+                      className="application-reference-button application-reference-review-button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new Event(OPEN_CATEGORY_REVIEW_EVENT),
+                        )
+                      }
+                      type="button"
+                    >
+                      Review all categories
+                    </button>
+                  ) : null}
+                  {scorecardSubmitControl}
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           <div className="application-reference-action-groups">
@@ -166,7 +187,9 @@ export function ApplicationReferenceBar({
               </div>
             ) : null}
 
-            {scorecardSubmitControl || reviewActions?.showCategoryReview ? (
+            {reviewActions?.showPanelReview ||
+            (!categoryNavigation &&
+              (scorecardSubmitControl || reviewActions?.showCategoryReview)) ? (
               <div className="application-reference-action-group application-reference-workflow-actions">
                 {reviewActions?.showPanelReview ? (
                   <button
@@ -179,7 +202,7 @@ export function ApplicationReferenceBar({
                     Panel review
                   </button>
                 ) : null}
-                {reviewActions?.showCategoryReview ? (
+                {!categoryNavigation && reviewActions?.showCategoryReview ? (
                   <button
                     className="application-reference-button application-reference-review-button"
                     onClick={() =>
@@ -190,7 +213,7 @@ export function ApplicationReferenceBar({
                     Review all categories
                   </button>
                 ) : null}
-                {scorecardSubmitControl}
+                {!categoryNavigation ? scorecardSubmitControl : null}
               </div>
             ) : null}
           </div>

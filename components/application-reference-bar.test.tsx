@@ -51,6 +51,8 @@ describe("ApplicationReferenceBar", () => {
 
     const controlLabels = [
       "CURRENT CATEGORY",
+      "Review all categories",
+      "SUBMIT SCORECARD",
       "ADJUDICATOR VIEWS",
       "ELIGIBILITY",
       "ACTING CANDIDATES",
@@ -60,8 +62,6 @@ describe("ApplicationReferenceBar", () => {
       "SCORING TOOLS",
       "SCORING GUIDE",
       "EVALUTIVE GLOSSARY",
-      "Review all categories",
-      "SUBMIT SCORECARD",
     ];
     const positions = controlLabels.map((label) => html.indexOf(label));
 
@@ -69,5 +69,6 @@ describe("ApplicationReferenceBar", () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('aria-label="Jump to category"');
     expect(html).toContain("application-category-current is-complete");
+    expect(html).toContain("application-category-workflow-actions");
   });
 });

@@ -15810,8 +15810,19 @@ html[data-theme="light"] .portal-shell .portal-main .scoring-category-sticky-tit
   white-space: nowrap;
 }
 
+.portal-shell .portal-main .application-category-navigation-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px 10px;
+}
+
 .portal-shell .portal-main .application-category-navigator {
   display: grid;
+  width: min(100%, 508px);
+  flex: 1 1 430px;
   grid-template-columns: 38px minmax(210px, 420px) 38px;
   align-items: stretch;
   justify-content: center;
@@ -15977,6 +15988,12 @@ html[data-theme="light"] .portal-shell .portal-main .application-category-curren
   border-radius: 999px;
 }
 
+.portal-shell .portal-main .application-category-navigation-row
+  .application-category-workflow-actions {
+  width: auto;
+  align-self: stretch;
+}
+
 html[data-theme="light"] .portal-shell .portal-main .application-category-current,
 html[data-theme="light"] .portal-shell .portal-main .application-reference-action-group {
   background: rgba(231, 220, 195, 0.35);
@@ -16026,6 +16043,9 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
   }
 
   .portal-shell .portal-main .application-category-navigator {
+    width: 100%;
+    max-width: none;
+    flex-basis: 100%;
     grid-template-columns: 34px minmax(0, 1fr) 34px;
   }
 
@@ -16045,6 +16065,12 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
 
   .portal-shell .portal-main .application-reference-workflow-actions {
     flex-direction: row;
+  }
+
+  .portal-shell .portal-main .application-category-navigation-row
+    .application-category-workflow-actions {
+    width: auto;
+    justify-self: center;
   }
 }
 
@@ -16094,6 +16120,7 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
   letter-spacing: .09em;
   line-height: 1;
   text-transform: uppercase;
+  white-space: nowrap;
   cursor: pointer;
 }
 

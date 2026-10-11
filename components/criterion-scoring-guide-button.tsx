@@ -15,10 +15,12 @@ export function CriterionScoringGuideButton({
   categoryTitle,
   criterionId,
   criterionTitle,
+  productionTitle,
 }: {
   categoryTitle: string;
   criterionId: string;
   criterionTitle: string;
+  productionTitle: string;
 }) {
   const reactId = useId();
   const titleId = `criterion-guide-title-${reactId.replaceAll(":", "")}`;
@@ -109,7 +111,7 @@ export function CriterionScoringGuideButton({
         type="button"
         ref={triggerRef}
       >
-        Guide
+        Criterion scoring guide
       </button>
 
       {open &&
@@ -132,8 +134,9 @@ export function CriterionScoringGuideButton({
                   <span className="eyebrow">Scoring guide</span>
                   <h2 id={titleId}>{guide?.title ?? criterionTitle}</h2>
                   <p>
-                    {categoryTitle} · Observable benchmarks and practical
-                    examples for scores 10 through 1.
+                    Show: {productionTitle} · Category: {categoryTitle} ·
+                    Observable benchmarks and practical examples for scores 10
+                    through 1.
                   </p>
                 </div>
                 <button

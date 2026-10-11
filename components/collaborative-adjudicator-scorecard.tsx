@@ -331,6 +331,7 @@ function CategoryScoreSection({
   currentUserId,
   commentColumnsStyle,
   overallProductionScore,
+  productionTitle,
   onScoreChange,
 }: {
   category: ScoringCategory;
@@ -354,6 +355,7 @@ function CategoryScoreSection({
   currentUserId: string;
   commentColumnsStyle: CSSProperties;
   overallProductionScore: OverallProductionScore;
+  productionTitle: string;
   onScoreChange: (criterionId: string, value: number | null) => void;
 }) {
   const isOverallProduction =
@@ -651,6 +653,7 @@ function CategoryScoreSection({
                         categoryTitle={category.title}
                         criterionId={criterion.id}
                         criterionTitle={criterion.title}
+                        productionTitle={productionTitle}
                       />
                     ) : null}
                   </div>
@@ -1040,6 +1043,7 @@ export function CollaborativeAdjudicatorScorecard({
   readOnly,
   afterCategory,
   afterCategoryTitle,
+  productionTitle,
 }: {
   applicationId: string;
   currentUserId: string;
@@ -1061,6 +1065,7 @@ export function CollaborativeAdjudicatorScorecard({
   readOnly: boolean;
   afterCategory?: ReactNode;
   afterCategoryTitle?: string;
+  productionTitle: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [panelRows, setPanelRows] = useState(initialPanelRows);
@@ -1335,6 +1340,7 @@ export function CollaborativeAdjudicatorScorecard({
             readOnly={readOnly}
             scoreOptions={scoreOptions}
             overallProductionScore={overallProductionScore}
+            productionTitle={productionTitle}
             onScoreChange={updateLiveOwnScore}
           />
           {afterCategory &&

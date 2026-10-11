@@ -1024,6 +1024,9 @@ export default async function AdjudicationApplicationPage({
             canComment={canComment}
             readOnly={readOnly}
             scoreOptions={scoreChoices}
+            productionTitle={
+              application.production_title ?? "Untitled production"
+            }
           />
 
         </form>
