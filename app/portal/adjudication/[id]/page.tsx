@@ -872,6 +872,22 @@ export default async function AdjudicationApplicationPage({
 
       {showConsensusControls && (
       <AdjudicationConsensusBar
+        adjudicatorCategoryScores={
+          profile.role === "adjudicator"
+            ? visibleDecisionCategories.map((category) => ({
+                category_id: category.id,
+                criteria: criteria
+                  .filter(
+                    (criterion) => criterion.category_id === category.id,
+                  )
+                  .map((criterion) => ({
+                    criterion_id: criterion.id,
+                    score:
+                      ownScoreByCriterion.get(criterion.id)?.score ?? null,
+                  })),
+              }))
+            : undefined
+        }
         applicationId={id}
         approvals={(approvalResult.data ?? []) as Array<{
           id: string;

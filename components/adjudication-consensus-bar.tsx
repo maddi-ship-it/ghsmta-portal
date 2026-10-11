@@ -1,6 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   ownerUpdateAdjudicationReview,
@@ -70,6 +76,47 @@ type LivePanelAverage = {
   updated_at: string | null;
 };
 
+type AdjudicatorCategoryScoreSource = {
+  category_id: string;
+  criteria: Array<{
+    criterion_id: string;
+    score: number | null;
+  }>;
+};
+
+type AdjudicatorCategoryAverage = {
+  category_id: string;
+  average_score: number | null;
+  score_count: number;
+  criterion_count: number;
+};
+
+function calculateAdjudicatorCategoryAverage(
+  source: AdjudicatorCategoryScoreSource,
+  useScorecardControls = false,
+): AdjudicatorCategoryAverage {
+  const scores = source.criteria.flatMap((criterion) => {
+    const control = useScorecardControls
+      ? document.getElementById(`score_${criterion.criterion_id}`)
+      : null;
+    const rawValue =
+      control instanceof HTMLSelectElement ? control.value : criterion.score;
+    const score = rawValue === "" || rawValue == null ? null : Number(rawValue);
+
+    return score != null && Number.isFinite(score) ? [score] : [];
+  });
+
+  return {
+    category_id: source.category_id,
+    average_score:
+      scores.length === 0
+        ? null
+        : scores.reduce((total, score) => total + score, 0) / scores.length,
+    score_count: scores.length,
+    criterion_count: source.criteria.length,
+  };
+}
+
 function statusLabel(value: string) {
   return value
     .replaceAll("_", " ")
@@ -99,6 +146,7 @@ export function AdjudicationConsensusBar({
   role,
   currentUserId,
   approvals,
+  adjudicatorCategoryScores = [],
   compact = false,
 }: {
   applicationId: string;
@@ -108,6 +156,7 @@ export function AdjudicationConsensusBar({
   proposals: Proposal[];
   scoreability: CategoryScoreability[];
   approvals: CategoryApproval[];
+  adjudicatorCategoryScores?: AdjudicatorCategoryScoreSource[];
   review: Review;
   narrativesReady: boolean;
   narrativeAssignments: NarrativeAssignment[];
@@ -125,6 +174,12 @@ export function AdjudicationConsensusBar({
   >("loading");
   const [liveAverageUpdatedAt, setLiveAverageUpdatedAt] =
     useState<Date | null>(null);
+  const [adjudicatorCategoryAverages, setAdjudicatorCategoryAverages] =
+    useState<AdjudicatorCategoryAverage[]>(() =>
+      adjudicatorCategoryScores.map((source) =>
+        calculateAdjudicatorCategoryAverage(source),
+      ),
+    );
   const supabase = useMemo(() => createClient(), []);
   const saveCategoryAction = useMemo(
     () => saveAllCategoryProposals.bind(null, applicationId),
@@ -177,6 +232,16 @@ export function AdjudicationConsensusBar({
       ),
     [livePanelAverages],
   );
+  const adjudicatorAverageByCategory = useMemo(
+    () =>
+      new Map(
+        adjudicatorCategoryAverages.map((average) => [
+          average.category_id,
+          average,
+        ]),
+      ),
+    [adjudicatorCategoryAverages],
+  );
   const unresolved = categories.filter((category) => {
     const proposal = proposalByCategory.get(category.id);
     return (
@@ -190,13 +255,21 @@ export function AdjudicationConsensusBar({
   ).length;
   const canSetDecisions = role === "advisory_member" || role === "owner";
   const canReviewRanges = role === "adjudicator";
+  const openRangeReview = useCallback(() => {
+    setAdjudicatorCategoryAverages(
+      adjudicatorCategoryScores.map((source) =>
+        calculateAdjudicatorCategoryAverage(source, true),
+      ),
+    );
+    setRangeReviewOpen(true);
+  }, [adjudicatorCategoryScores]);
 
   useEffect(() => {
     if (!compact) return;
 
     const openCategoryReview = () => {
       if (canReviewRanges) {
-        setRangeReviewOpen(true);
+        openRangeReview();
       } else if (canSetDecisions) {
         setMatrixOpen(true);
       }
@@ -212,12 +285,10 @@ export function AdjudicationConsensusBar({
       window.removeEventListener(OPEN_CATEGORY_REVIEW_EVENT, openCategoryReview);
       window.removeEventListener(OPEN_PANEL_REVIEW_EVENT, openPanelReview);
     };
-  }, [canReviewRanges, canSetDecisions, compact]);
+  }, [canReviewRanges, canSetDecisions, compact, openRangeReview]);
 
   useEffect(() => {
-    const shouldLoadLiveAverages =
-      (rangeReviewOpen && canReviewRanges) ||
-      (matrixOpen && canSetDecisions);
+    const shouldLoadLiveAverages = matrixOpen && canSetDecisions;
     if (!shouldLoadLiveAverages) return;
 
     let disposed = false;
@@ -284,7 +355,7 @@ export function AdjudicationConsensusBar({
           {canReviewRanges && (
             <button
               className="button button-secondary button-compact"
-              onClick={() => setRangeReviewOpen(true)}
+              onClick={openRangeReview}
               type="button"
             >
               Review ranges
@@ -344,7 +415,7 @@ export function AdjudicationConsensusBar({
                   <p className="eyebrow">Adjudicator review</p>
                   <h2 id="range-review-title">Two-point range review</h2>
                   <p>
-                    Compare each proposed range with the live panel average,
+                    Compare each proposed range with your category average,
                     then approve it or ask that it be revisited.
                   </p>
                 </div>
@@ -365,7 +436,7 @@ export function AdjudicationConsensusBar({
                       <th>Category</th>
                       <th>Eligibility</th>
                       <th>Two-point range</th>
-                      <th>Live panel average</th>
+                      <th>Your average</th>
                       <th>Final comment writer</th>
                       <th>Your approval</th>
                     </tr>
@@ -380,13 +451,13 @@ export function AdjudicationConsensusBar({
                       const assignedReviewer = assigneeId
                         ? reviewerById.get(assigneeId)
                         : undefined;
-                      const panelAverage = panelAverageByCategory.get(
+                      const adjudicatorAverage = adjudicatorAverageByCategory.get(
                         category.id,
                       );
                       const average =
-                        panelAverage?.average_score == null
+                        adjudicatorAverage?.average_score == null
                           ? null
-                          : Number(panelAverage.average_score);
+                          : Number(adjudicatorAverage.average_score);
                       const rangeMin =
                         proposal?.range_min == null
                           ? null
@@ -446,20 +517,12 @@ export function AdjudicationConsensusBar({
                               }
                             >
                               <strong>
-                                {liveAverageStatus === "loading" && average == null
-                                  ? "Loading…"
-                                  : average == null
-                                    ? "—"
-                                    : average.toFixed(5)}
+                                {average == null ? "—" : average.toFixed(5)}
                               </strong>
                               <small>
-                                {panelAverage
-                                  ? `${Number(panelAverage.score_count)} scores · ${Number(
-                                      panelAverage.scoring_member_count,
-                                    )}/${Number(
-                                      panelAverage.assigned_scorer_count,
-                                    )} scorers`
-                                  : "Updates as scores are entered"}
+                                {adjudicatorAverage
+                                  ? `${adjudicatorAverage.score_count}/${adjudicatorAverage.criterion_count} scores entered`
+                                  : "Enter scores on your scorecard"}
                               </small>
                               {averageWithinRange != null && (
                                 <small>
@@ -575,24 +638,9 @@ export function AdjudicationConsensusBar({
               </div>
 
               <div className="sticky-modal-footer range-review-footer">
-                <span aria-live="polite" className="range-review-live-status">
-                  <span
-                    aria-hidden="true"
-                    className={`range-review-live-dot range-review-live-dot-${liveAverageStatus}`}
-                  />
-                  {liveAverageStatus === "error"
-                    ? "Live averages temporarily unavailable"
-                    : liveAverageStatus === "loading"
-                      ? "Loading live panel averages…"
-                      : `Live panel averages${
-                          liveAverageUpdatedAt
-                            ? ` · updated ${liveAverageUpdatedAt.toLocaleTimeString([], {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                second: "2-digit",
-                              })}`
-                            : ""
-                        }`}
+                <span className="range-review-live-status">
+                  Your averages use only the scores currently entered on your
+                  scorecard.
                 </span>
                 <button
                   className="button button-dark"
