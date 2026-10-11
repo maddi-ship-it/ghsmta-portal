@@ -879,11 +879,6 @@ export default async function AdjudicationApplicationPage({
             applicationId={id}
             disabled={readOnly}
           />
-          <AdjudicationOverallProduction
-            categories={scoreableCategories}
-            criteria={scoreableCriteria}
-            ownScores={ownScores}
-          />
           <AdjudicationBrainDump
             applicationId={id}
             canComment={canComment}
@@ -899,20 +894,26 @@ export default async function AdjudicationApplicationPage({
 
           <CollaborativeAdjudicatorScorecard
             afterCategory={
-              <AdjudicationBigPictureComment
-                canComment={canComment}
-                categories={scoreableCategories}
-                criteria={scoreableCriteria}
-                ownScores={ownScores}
-                privateNotes={comments.find(
-                  (comment) =>
-                    comment.scorecard_id === ownScorecard?.id &&
-                    comment.category_id === overallProductionCategory?.id,
-                )?.private_notes}
-                readOnly={readOnly}
-              />
+              <>
+                <AdjudicationBigPictureComment
+                  canComment={canComment}
+                  categories={scoreableCategories}
+                  criteria={scoreableCriteria}
+                  ownScores={ownScores}
+                  privateNotes={comments.find(
+                    (comment) =>
+                      comment.scorecard_id === ownScorecard?.id &&
+                      comment.category_id === overallProductionCategory?.id,
+                  )?.private_notes}
+                  readOnly={readOnly}
+                />
+                <AdjudicationOverallProduction
+                  categories={scoreableCategories}
+                  criteria={scoreableCriteria}
+                  ownScores={ownScores}
+                />
+              </>
             }
-            afterCategoryTitle="Direction"
             applicationId={id}
             categories={narrativeCategories}
             categorySubjectDefaults={categorySubjectDefaults}

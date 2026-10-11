@@ -158,23 +158,39 @@ describe("buildApplicationReferencePanels", () => {
         question("leading-actress-role", "Leading Actress Role", 2, {
           imported: true,
         }),
+        question("leading-actress-pronouns", "Leading Actress Pronouns", 3, {
+          imported: true,
+        }),
         question(
           "leading-actress-phonetic",
           "Leading Actress Phonetic Spelling",
-          3,
+          4,
           { imported: true },
         ),
-        question("funding", "Please describe all sources of funding that apply to you:", 4, {
+        question("leading-actor-name", "Leading Actor Name", 5, {
           imported: true,
         }),
-        question("production-cost", "Total $ amount spent on production costs?", 5, {
+        question("leading-actor-pronouns", "Leading Actor Pronouns", 6, {
+          imported: true,
+        }),
+        question("leading-actor-role", "Leading Actor Role", 7, {
+          imported: true,
+        }),
+        question("funding", "Please describe all sources of funding that apply to you:", 8, {
+          imported: true,
+        }),
+        question("production-cost", "Total $ amount spent on production costs?", 9, {
           imported: true,
         }),
       ],
       answers: [
         answer("leading-actress-name", "Mikayla Shoemaker"),
         answer("leading-actress-role", "Witch"),
+        answer("leading-actress-pronouns", "She/Her"),
         answer("leading-actress-phonetic", "mih-KAY-luh"),
+        answer("leading-actor-name", "Reid Washington"),
+        answer("leading-actor-pronouns", "He/Him/His"),
+        answer("leading-actor-role", "Baker"),
         answer("funding", "Ticket Sales"),
         answer("production-cost", 4336.25),
       ],
@@ -184,10 +200,21 @@ describe("buildApplicationReferencePanels", () => {
       panels.find((panel) => panel.key === "acting-candidates")?.groups,
     ).toEqual([
       {
-        title: "Leading Actress",
+        title: "Name of Leading Actress",
         items: [
-          { label: "Leading Actress Name", value: "Mikayla Shoemaker" },
-          { label: "Leading Actress Role", value: "Witch" },
+          {
+            label: "Name | Pronouns | Role",
+            value: "Mikayla Shoemaker | She/Her | Witch",
+          },
+        ],
+      },
+      {
+        title: "Name of Leading Actor",
+        items: [
+          {
+            label: "Name | Pronouns | Role",
+            value: "Reid Washington | He/Him/His | Baker",
+          },
         ],
       },
     ]);
