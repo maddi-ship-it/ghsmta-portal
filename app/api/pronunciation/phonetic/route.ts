@@ -4,8 +4,8 @@ import { extractOpenAIText } from "@/lib/adjudication";
 import { consumeApiQuota } from "@/lib/api-quota";
 import { requireProfile } from "@/lib/auth";
 import {
+  DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
-  resolveOpenAITextModel,
 } from "@/lib/openai-model";
 import { createClient } from "@/lib/supabase/server";
 
@@ -200,9 +200,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const configuredModel = resolveOpenAITextModel(
-    process.env.OPENAI_PHONETIC_MODEL,
-  );
   const responsePrompt = [
     "Create a clear, school-program-friendly phonetic respelling of a person's name.",
     "Use ordinary English letters only, hyphens between syllables, and CAPITAL letters for the stressed syllable.",
@@ -214,7 +211,7 @@ export async function POST(request: Request) {
 
   let lastError = "";
 
-  for (const model of [configuredModel]) {
+  for (const model of [DEFAULT_OPENAI_TEXT_MODEL]) {
     const suggestion = await requestPhoneticSuggestion(
       apiKey,
       model,

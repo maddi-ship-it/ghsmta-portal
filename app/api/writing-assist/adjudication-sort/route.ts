@@ -25,8 +25,8 @@ import {
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import {
+  DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
-  resolveOpenAITextModel,
 } from "@/lib/openai-model";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -302,9 +302,7 @@ export async function POST(request: Request) {
   const allowedNoteIds = new Set(sourceNotes.map((note) => note.id));
 
   try {
-    const modelId = resolveOpenAITextModel(
-      process.env.OPENAI_ADJUDICATION_SORT_MODEL,
-    );
+    const modelId = DEFAULT_OPENAI_TEXT_MODEL;
     const safetyIdentifier = createHash("sha256")
       .update(user.id)
       .digest("hex")

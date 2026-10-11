@@ -69,9 +69,6 @@ For the complete production release, also configure these server-only values:
 - `SMTP_FROM_NAME` and `SMTP_REPLY_TO` (optional)
 - `OPENAI_API_KEY` — portal transcription, phonetic, handwriting, brain-dump, and final-comment assistance
 - `OPENAI_TRANSCRIBE_MODEL` (optional; defaults to `gpt-4o-mini-transcribe`)
-- `OPENAI_PHONETIC_MODEL` (optional; defaults to `gpt-6-astra`)
-- `OPENAI_HANDWRITING_MODEL` (optional; defaults to `gpt-6-astra`)
-- `OPENAI_ADJUDICATION_SORT_MODEL` (optional; defaults to `gpt-6-astra`)
 - `ADOBE_SIGN_ADJUDICATOR_EMBED_URL` — adjudicator Adobe Sign Web Form URL
 - `ADOBE_SIGN_ADVISORY_MEMBER_EMBED_URL` — Advisory Committee Adobe Sign Web Form URL
 
@@ -178,9 +175,6 @@ For AI narrative generation, add these server-only variables locally and in Verc
 
 ```env
 OPENAI_API_KEY=sk-YOUR_OPENAI_API_KEY
-OPENAI_PHONETIC_MODEL=gpt-6-astra
-OPENAI_HANDWRITING_MODEL=gpt-6-astra
-OPENAI_ADJUDICATION_SORT_MODEL=gpt-6-astra
 ```
 
 Never prefix the OpenAI key with `NEXT_PUBLIC_`.

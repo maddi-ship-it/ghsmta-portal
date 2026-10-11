@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 import { extractOpenAIText } from "@/lib/adjudication";
 import { consumeApiQuota } from "@/lib/api-quota";
 import {
+  DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
-  resolveOpenAITextModel,
 } from "@/lib/openai-model";
 import { createClient } from "@/lib/supabase/server";
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: resolveOpenAITextModel(process.env.OPENAI_HANDWRITING_MODEL),
+      model: DEFAULT_OPENAI_TEXT_MODEL,
       store: false,
       safety_identifier: createHash("sha256").update(user.id).digest("hex").slice(0, 64),
       max_output_tokens: 6000,

@@ -6,7 +6,3 @@ export const OPENAI_REASONING_EFFORT = {
   panelComment: "high",
   phonetic: "low",
 } as const;
-
-export function resolveOpenAITextModel(override?: string | null) {
-  return override?.trim() || DEFAULT_OPENAI_TEXT_MODEL;
-}
