@@ -89,7 +89,7 @@ function buildReview(payload: SortResponse): BrainDumpReview | null {
       categoryId: note.criterionId
         ? (targetByCriterionId.get(note.criterionId)?.categoryId ?? "")
         : "",
-      requiresManualPlacement: !note.criterionId,
+      requiresManualPlacement: !note.criterionId && !note.duplicateOfNoteId,
       selected: false,
     })),
   };

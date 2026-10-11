@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  chunkAdjudicationBrainDumpNotes,
   findExactBrainDumpDuplicates,
   groupAdjudicationBrainDumpAssignments,
   selectAutomaticallyApplicableBrainDumpNotes,
@@ -135,5 +136,19 @@ describe("adjudication brain-dump review", () => {
         (note) => note.id,
       ),
     ).toEqual(["note-1", "note-2"]);
+  });
+
+  it("breaks a large brain dump into bounded model requests", () => {
+    const notes = Array.from({ length: 211 }, (_, index) => index + 1);
+    const batches = chunkAdjudicationBrainDumpNotes(notes, 40);
+
+    expect(batches.map((batch) => batch.length)).toEqual([
+      40, 40, 40, 40, 40, 11,
+    ]);
+    expect(batches.flat()).toEqual(notes);
+  });
+
+  it("rejects an invalid model batch size", () => {
+    expect(() => chunkAdjudicationBrainDumpNotes([1], 0)).toThrow(RangeError);
   });
 });

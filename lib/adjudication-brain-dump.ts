@@ -120,6 +120,21 @@ export function selectAutomaticallyApplicableBrainDumpNotes<
   );
 }
 
+export function chunkAdjudicationBrainDumpNotes<T>(
+  notes: T[],
+  batchSize: number,
+) {
+  if (!Number.isInteger(batchSize) || batchSize < 1) {
+    throw new RangeError("Brain-dump batch size must be a positive integer.");
+  }
+
+  const batches: T[][] = [];
+  for (let index = 0; index < notes.length; index += batchSize) {
+    batches.push(notes.slice(index, index + batchSize));
+  }
+  return batches;
+}
+
 export function findExactBrainDumpDuplicates(
   notes: AdjudicationBrainDumpSourceNote[],
 ) {
