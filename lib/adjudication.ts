@@ -2,6 +2,7 @@ import type {
   AdjudicationCategoryComment,
   AdjudicationScore,
   AdjudicationScorecard,
+  AppRole,
   ScoringCategory,
   ScoringCriterion,
 } from "@/lib/types";
@@ -10,6 +11,32 @@ import { richTextToPlainText } from "./rich-text";
 
 
 export const SCORE_AVERAGE_DECIMALS = 5;
+
+export type AdjudicationWorkspaceMode =
+  | "personal_scorecard"
+  | "panel_review"
+  | "access_notice";
+
+export function resolveAdjudicationWorkspaceMode({
+  role,
+  isScoringParticipant,
+  canPanelReview,
+}: {
+  role: AppRole;
+  isScoringParticipant: boolean;
+  canPanelReview: boolean;
+}): AdjudicationWorkspaceMode {
+  if (
+    role === "owner" ||
+    (role === "advisory_member" && canPanelReview)
+  ) {
+    return "panel_review";
+  }
+
+  if (isScoringParticipant) return "personal_scorecard";
+
+  return "access_notice";
+}
 
 export function roundScoreAverage(
   value: number | null | undefined,

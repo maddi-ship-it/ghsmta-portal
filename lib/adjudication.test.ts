@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCommentContext } from "./adjudication";
+import {
+  buildCommentContext,
+  resolveAdjudicationWorkspaceMode,
+} from "./adjudication";
 import type {
   AdjudicationCategoryComment,
   AdjudicationScore,
@@ -98,5 +101,47 @@ describe("buildCommentContext", () => {
     );
     expect(context.rawComments).toContain("Clear musical storytelling.");
     expect(context.rawComments).not.toContain("Student Name");
+  });
+});
+
+describe("resolveAdjudicationWorkspaceMode", () => {
+  it("shows an adjudicator's personal scorecard", () => {
+    expect(
+      resolveAdjudicationWorkspaceMode({
+        role: "adjudicator",
+        isScoringParticipant: true,
+        canPanelReview: false,
+      }),
+    ).toBe("personal_scorecard");
+  });
+
+  it("prioritizes one panel-review workspace for an ACM who can also score", () => {
+    expect(
+      resolveAdjudicationWorkspaceMode({
+        role: "advisory_member",
+        isScoringParticipant: true,
+        canPanelReview: true,
+      }),
+    ).toBe("panel_review");
+  });
+
+  it("preserves a personal scorecard for an ACM without panel-review access", () => {
+    expect(
+      resolveAdjudicationWorkspaceMode({
+        role: "advisory_member",
+        isScoringParticipant: true,
+        canPanelReview: false,
+      }),
+    ).toBe("personal_scorecard");
+  });
+
+  it("shows the panel review for an owner", () => {
+    expect(
+      resolveAdjudicationWorkspaceMode({
+        role: "owner",
+        isScoringParticipant: false,
+        canPanelReview: true,
+      }),
+    ).toBe("panel_review");
   });
 });

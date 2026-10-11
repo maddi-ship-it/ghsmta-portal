@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import {
   formatScore,
   quarterScoreOptions,
+  resolveAdjudicationWorkspaceMode,
 } from "@/lib/adjudication";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import {
@@ -382,6 +383,12 @@ export default async function AdjudicationApplicationPage({
     profile.role === "owner" ||
     (profile.role === "advisory_member" &&
       Boolean(advisoryReviewAccessResult.data));
+  const workspaceMode = resolveAdjudicationWorkspaceMode({
+    role: profile.role,
+    isScoringParticipant,
+    canPanelReview,
+  });
+  const showPersonalScorecard = workspaceMode === "personal_scorecard";
 
   if (!rubric) {
     return (
@@ -733,7 +740,7 @@ export default async function AdjudicationApplicationPage({
   }
 
   const sharedObservationResult =
-    isScoringParticipant
+    showPersonalScorecard
       ? await supabase.rpc("get_shared_adjudication_observations", {
           p_application_id: id,
         })
@@ -763,7 +770,7 @@ export default async function AdjudicationApplicationPage({
       role: reviewer.role as PanelNarrativeReviewer["role"],
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
-  const ownScorecard = isScoringParticipant
+  const ownScorecard = showPersonalScorecard
     ? scorecards.find((scorecard) => scorecard.adjudicator_user_id === profile.id) ?? null
     : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
@@ -812,7 +819,7 @@ export default async function AdjudicationApplicationPage({
       category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
   );
   const initiallyCompletedCategoryIds =
-    isScoringParticipant
+    showPersonalScorecard
       ? narrativeCategories
           .filter((category) => {
             const categoryCriteria = criteria.filter(
@@ -833,7 +840,7 @@ export default async function AdjudicationApplicationPage({
           .map((category) => category.id)
       : [];
   const referenceLinks = await referenceLinksPromise;
-  const showConsensusControls = isScoringParticipant || canPanelReview;
+  const showConsensusControls = showPersonalScorecard || canPanelReview;
   const compactConsensusControls =
     showConsensusControls &&
     (profile.role === "adjudicator" || profile.role === "advisory_member");
@@ -848,7 +855,7 @@ export default async function AdjudicationApplicationPage({
           <p>{application.production_title ?? "Untitled production"}</p>
         </div>
         <div className="heading-actions">
-          {isScoringParticipant && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
+          {showPersonalScorecard && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
           <Link className="button button-secondary" href="/portal/adjudication">Back to adjudication</Link>
         </div>
       </div>
@@ -860,7 +867,7 @@ export default async function AdjudicationApplicationPage({
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field and score{canComment ? ", including criterion comments," : ""} before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
       {query.error === "assignment" && <div className="form-error page-message">The final comment assignment could not be saved. Refresh the page and try again.</div>}
 
-      {isScoringParticipant && !canComment && (
+      {showPersonalScorecard && !canComment && (
         <div className="comment-permission-banner" role="status">
           <span aria-hidden="true">◇</span>
           <div>
@@ -874,7 +881,7 @@ export default async function AdjudicationApplicationPage({
         categoryNavigation={{
           categories: narrativeCategories,
           initialCompletedCategoryIds: initiallyCompletedCategoryIds,
-          showCompletion: isScoringParticipant,
+          showCompletion: showPersonalScorecard,
         }}
         links={referenceLinks}
         panels={referencePanels}
@@ -886,7 +893,7 @@ export default async function AdjudicationApplicationPage({
             }
           : undefined}
         scorecardSubmitControl={
-          isScoringParticipant && !readOnly ? (
+          showPersonalScorecard && !readOnly ? (
             <ScorecardSubmitControls
               applicationId={id}
               categories={scoreableCategories}
@@ -943,7 +950,7 @@ export default async function AdjudicationApplicationPage({
 
       <div className="adjudication-score-layout adjudication-score-layout-single">
         <div className="adjudication-score-content">
-      {isScoringParticipant ? (
+      {workspaceMode === "personal_scorecard" ? (
         <>
         <form className="scorecard-form" id={scorecardFormId}>
           <AdjudicatorAutosave
@@ -1030,23 +1037,8 @@ export default async function AdjudicationApplicationPage({
           />
 
         </form>
-        {profile.role === "advisory_member" && canPanelReview && (
-          <OwnerLiveAdjudicationReview
-            applicationId={id}
-            isOwner={false}
-            categories={scoreableCategories}
-            criteria={scoreableCriteria}
-            assignments={assignments}
-            profiles={adjudicatorProfiles}
-            initialScorecards={scorecards}
-            initialScores={scores}
-            initialComments={comments}
-            initialFeedback={panelVisibleFeedback}
-            release={release}
-          />
-        )}
         </>
-      ) : profile.role === "advisory_member" && !canPanelReview ? (
+      ) : workspaceMode === "access_notice" ? (
         <section className="panel advisory-read-only-panel">
           <div className="panel-header">
             <div>
