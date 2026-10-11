@@ -11452,6 +11452,29 @@ html[data-theme="light"] .theme-setting-icon {
   background: color-mix(in srgb, var(--portal-gold) 8%, var(--portal-surface-2));
 }
 
+.portal-shell .application-reference-appeal-group {
+  border-color: color-mix(in srgb, var(--portal-gold) 58%, var(--portal-line));
+}
+
+.portal-shell .application-reference-appeal-group h3 {
+  color: var(--portal-gold-bright);
+}
+
+.portal-shell .application-reference-eligibility-group .application-reference-row.is-appeal {
+  grid-column: 1 / -1;
+  border-color: color-mix(in srgb, var(--portal-gold) 58%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-gold) 9%, var(--portal-surface-2));
+}
+
+.portal-shell .application-reference-row.is-appeal dt {
+  color: var(--portal-gold-bright);
+}
+
+.portal-shell .application-reference-row.is-appeal dd.application-reference-status {
+  max-width: min(520px, 58vw);
+  white-space: normal;
+}
+
 .portal-shell .application-reference-row dd.application-reference-status {
   min-width: 72px;
   justify-self: end;
@@ -11475,6 +11498,11 @@ html[data-theme="light"] .theme-setting-icon {
   background: color-mix(in srgb, var(--portal-danger) 10%, transparent);
 }
 
+.portal-shell .application-reference-row dd.application-reference-status.is-pending {
+  color: var(--portal-gold-bright);
+  background: color-mix(in srgb, var(--portal-gold) 12%, transparent);
+}
+
 @media (max-width: 760px) {
   .portal-shell .application-reference-eligibility-group .application-reference-list {
     grid-template-columns: 1fr;
@@ -11483,6 +11511,16 @@ html[data-theme="light"] .theme-setting-icon {
 
   .portal-shell .application-reference-eligibility-group .application-reference-row.is-overall-eligibility {
     grid-column: auto;
+  }
+
+  .portal-shell .application-reference-eligibility-group .application-reference-row.is-appeal {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .portal-shell .application-reference-row.is-appeal dd.application-reference-status {
+    max-width: 100%;
+    justify-self: start;
   }
 }
 

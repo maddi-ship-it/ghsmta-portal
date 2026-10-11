@@ -23,6 +23,14 @@ export type ApplicationReferencePanel = {
   groups: ApplicationReferenceGroup[];
 };
 
+export type ApplicationEligibilityAppeal = {
+  category_id: string | null;
+  current_eligibility: boolean | null;
+  requested_eligibility: boolean;
+  status: string;
+  submitted_at: string;
+};
+
 type ReferenceInput = {
   application: Pick<
     Application,
@@ -31,9 +39,11 @@ type ReferenceInput = {
   questions: ApplicationQuestion[];
   answers: ApplicationAnswer[];
   eligibilityCategories?: Array<{
+    id?: string;
     category_key: string;
     title: string;
   }>;
+  eligibilityAppeals?: ApplicationEligibilityAppeal[];
 };
 
 type ReferenceRow = {
@@ -302,7 +312,25 @@ function allItems(rows: ReferenceRow[]) {
 function categoryEligibilitySelections(
   rows: ReferenceRow[],
   categories: NonNullable<ReferenceInput["eligibilityCategories"]>,
+  appeals: ApplicationEligibilityAppeal[] = [],
 ) {
+  const latestApprovedAppealByCategoryId = new Map<
+    string,
+    ApplicationEligibilityAppeal
+  >();
+  for (const appeal of [...appeals].sort((left, right) =>
+    right.submitted_at.localeCompare(left.submitted_at),
+  )) {
+    if (
+      !appeal.category_id ||
+      !["approved", "resolved"].includes(appeal.status.toLowerCase()) ||
+      latestApprovedAppealByCategoryId.has(appeal.category_id)
+    ) {
+      continue;
+    }
+    latestApprovedAppealByCategoryId.set(appeal.category_id, appeal);
+  }
+
   const usedRows = new Set<ReferenceRow>();
   const categoryItems = categories.map((category) => {
     const categoryKey = normalize(category.category_key);
@@ -317,19 +345,29 @@ function categoryEligibilitySelections(
       return [...aliases].some((alias) => haystack.includes(alias));
     });
 
+    const applicationValue = matchingRow?.value ?? "0";
+    const latestApprovedAppeal = category.id
+      ? latestApprovedAppealByCategoryId.get(category.id)
+      : undefined;
+    const effectiveValue = latestApprovedAppeal
+      ? latestApprovedAppeal.requested_eligibility
+        ? "1"
+        : "0"
+      : applicationValue;
+
     if (matchingRow) {
       usedRows.add(matchingRow);
       return {
         categoryKey,
         label: matchingRow.label,
-        value: matchingRow.value,
+        value: effectiveValue,
       };
     }
 
     return {
       categoryKey,
       label: `${humanize(normalize(category.title))} - Award Eligible`,
-      value: "0",
+      value: effectiveValue,
     };
   });
 
@@ -355,16 +393,75 @@ function categoryEligibilitySelections(
 function categoryEligibilityItems(
   rows: ReferenceRow[],
   categories: NonNullable<ReferenceInput["eligibilityCategories"]>,
+  appeals: ApplicationEligibilityAppeal[] = [],
 ) {
   const { selections, usedRows } = categoryEligibilitySelections(
     rows,
     categories,
+    appeals,
   );
 
   return [
     ...selections.map(({ label, value }) => ({ label, value })),
     ...allItems(rows.filter((row) => !usedRows.has(row))),
   ];
+}
+
+function eligibilityAppealItems(
+  appeals: ApplicationEligibilityAppeal[],
+  categories: NonNullable<ReferenceInput["eligibilityCategories"]>,
+) {
+  const categoryById = new Map(
+    categories.flatMap((category) =>
+      category.id ? [[category.id, category] as const] : [],
+    ),
+  );
+  const seenAppealKeys = new Set<string>();
+
+  return [...appeals]
+    .sort((left, right) =>
+      right.submitted_at.localeCompare(left.submitted_at),
+    )
+    .flatMap((appeal) => {
+      const appealKey =
+        appeal.category_id ?? `unassigned:${appeal.submitted_at}`;
+      if (
+        seenAppealKeys.has(appealKey) ||
+        ["draft", "withdrawn"].includes(appeal.status.toLowerCase())
+      ) {
+        return [];
+      }
+
+      const category = appeal.category_id
+        ? categoryById.get(appeal.category_id)
+        : undefined;
+      seenAppealKeys.add(appealKey);
+
+      const status = appeal.status.toLowerCase();
+      const value = ["approved", "resolved"].includes(status)
+        ? `APPROVED — ELIGIBILITY UPDATED TO ${
+            appeal.requested_eligibility ? "YES" : "NO"
+          }`
+        : status === "denied"
+          ? "DENIED — CURRENT ELIGIBILITY RETAINED"
+          : status === "owner_review"
+            ? "UNDER OWNER REVIEW — CURRENT ELIGIBILITY REMAINS IN EFFECT"
+            : status === "advisory_review"
+              ? "UNDER ADVISORY REVIEW — CURRENT ELIGIBILITY REMAINS IN EFFECT"
+              : "SUBMITTED — CURRENT ELIGIBILITY REMAINS IN EFFECT";
+
+      return [
+        {
+          label: `⚑ ${
+            category?.title ??
+            (appeal.category_id
+              ? "CATEGORY NOT IN CURRENT RUBRIC"
+              : "CATEGORY NOT RECORDED")
+          } ELIGIBILITY APPEAL`,
+          value,
+        },
+      ];
+    });
 }
 
 export function buildApplicationCategoryEligibilityDefaults(
@@ -379,6 +476,7 @@ export function buildApplicationCategoryEligibilityDefaults(
   const { selections } = categoryEligibilitySelections(
     eligibilityRows,
     categories,
+    input.eligibilityAppeals,
   );
   const eligibilityByNormalizedKey = new Map(
     selections.map((selection) => [
@@ -467,8 +565,15 @@ export function buildApplicationReferencePanels(
     ? categoryEligibilityItems(
         eligibilityRows,
         input.eligibilityCategories,
+        input.eligibilityAppeals,
       )
     : allItems(eligibilityRows);
+  const appealItems = input.eligibilityCategories?.length
+    ? eligibilityAppealItems(
+        input.eligibilityAppeals ?? [],
+        input.eligibilityCategories,
+      )
+    : [];
 
   const actingGroups = [
     candidateGroup(populatedPopupRows, "Leading Actress", ["leading actress"]),
@@ -592,10 +697,18 @@ export function buildApplicationReferencePanels(
       title: "Category Eligibility View",
       shortTitle: "ELIGIBILITY",
       description:
-        "Award eligibility selections submitted by the school.",
+        "Current award eligibility, including any submitted appeal and final decision.",
       groups: [
+        ...(appealItems.length > 0
+          ? [
+              {
+                title: "Eligibility appeals",
+                items: appealItems,
+              },
+            ]
+          : []),
         {
-          title: "Application eligibility",
+          title: "Current eligibility",
           items: eligibilityItems,
         },
       ],

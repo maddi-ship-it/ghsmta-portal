@@ -3,9 +3,13 @@ import { notFound } from "next/navigation";
 
 import { ApplicationQuestionField } from "@/components/application-question-field";
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
-import { buildApplicationReferencePanels } from "@/lib/application-reference-panels";
+import {
+  buildApplicationReferencePanels,
+  type ApplicationEligibilityAppeal,
+} from "@/lib/application-reference-panels";
 import { requireProfile } from "@/lib/auth";
 import { formatDate, statusLabel } from "@/lib/format";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Application,
@@ -50,10 +54,19 @@ export default async function ApplicationDetailPage({
   const { id } = await params;
   const query = await searchParams;
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const { data } = await supabase.from("applications").select("*").eq("id", id).single();
   if (!data) notFound();
   const application = data as Application;
+  const eligibilityAppealsPromise = admin
+    .from("appeals")
+    .select(
+      "category_id,current_eligibility,requested_eligibility,status,submitted_at",
+    )
+    .eq("application_id", id)
+    .eq("appeal_type", "eligibility")
+    .order("submitted_at", { ascending: false });
 
   let applicantCanEdit = false;
   if (profile.role === "applicant") {
@@ -117,17 +130,26 @@ export default async function ApplicationDetailPage({
         ];
 
   const formVersion = versionResult.data as ApplicationFormVersion | null;
-  const { data: eligibilityCategoryData, error: eligibilityCategoryError } =
+  const [eligibilityCategoryResult, eligibilityAppealResult] = await Promise.all([
     formVersion?.scoring_rubric_id
-      ? await supabase
+      ? supabase
           .from("scoring_categories")
-          .select("category_key,title")
+          .select("id,category_key,title")
           .eq("rubric_id", formVersion.scoring_rubric_id)
           .eq("active", true)
           .order("sort_order")
-      : { data: [], error: null };
+      : Promise.resolve({ data: [], error: null }),
+    eligibilityAppealsPromise,
+  ]);
+  const { data: eligibilityCategoryData, error: eligibilityCategoryError } =
+    eligibilityCategoryResult;
   if (eligibilityCategoryError) {
     throw new Error(eligibilityCategoryError.message);
+  }
+  const { data: eligibilityAppealData, error: eligibilityAppealError } =
+    eligibilityAppealResult;
+  if (eligibilityAppealError) {
+    throw new Error(eligibilityAppealError.message);
   }
   const allStages = (stagesResult.data ?? []) as ApplicationStage[];
   const stages =
@@ -147,8 +169,9 @@ export default async function ApplicationDetailPage({
     questions: allQuestions,
     answers,
     eligibilityCategories: (eligibilityCategoryData ?? []) as Array<
-      Pick<ScoringCategory, "category_key" | "title">
+      Pick<ScoringCategory, "id" | "category_key" | "title">
     >,
+    eligibilityAppeals: (eligibilityAppealData ?? []) as ApplicationEligibilityAppeal[],
   });
 
   const selectedStage =

@@ -280,6 +280,11 @@ export function ApplicationReferenceBar({
                       activePanel.key === "eligibility"
                         ? " application-reference-eligibility-group"
                         : ""
+                    }${
+                      activePanel.key === "eligibility" &&
+                      group.title === "Eligibility appeals"
+                        ? " application-reference-appeal-group"
+                        : ""
                     }`}
                     key={`${activePanel.key}-${group.title}`}
                   >
@@ -300,6 +305,9 @@ export function ApplicationReferenceBar({
                             item.label
                               .toLowerCase()
                               .includes("overall production");
+                          const isEligibilityAppeal =
+                            isEligibility &&
+                            item.label.includes("ELIGIBILITY APPEAL");
 
                           return (
                             <div
@@ -307,6 +315,8 @@ export function ApplicationReferenceBar({
                                 isOverallEligibility
                                   ? " is-overall-eligibility"
                                   : ""
+                              }${
+                                isEligibilityAppeal ? " is-appeal" : ""
                               }`}
                               key={`${item.label}-${index}`}
                             >
@@ -319,6 +329,16 @@ export function ApplicationReferenceBar({
                                           ? "is-true"
                                           : formattedValue === "NO"
                                             ? "is-false"
+                                            : formattedValue.startsWith(
+                                                  "APPROVED",
+                                                )
+                                              ? "is-true"
+                                              : formattedValue.startsWith(
+                                                    "DENIED",
+                                                  )
+                                                ? "is-false"
+                                                : isEligibilityAppeal
+                                                  ? "is-pending"
                                             : "is-neutral"
                                       }`
                                     : undefined

@@ -278,6 +278,179 @@ describe("buildApplicationReferencePanels", () => {
     });
   });
 
+  it("flags submitted appeals without changing the original eligibility", () => {
+    const panels = buildApplicationReferencePanels({
+      application: legacyApplication,
+      questions: [
+        question("direction", "Direction - Award Eligible", 1, {
+          question_type: "yes_no",
+        }),
+      ],
+      answers: [answer("direction", 0)],
+      eligibilityCategories: [
+        { id: "direction-id", category_key: "direction", title: "DIRECTION" },
+      ],
+      eligibilityAppeals: [
+        {
+          category_id: "direction-id",
+          current_eligibility: false,
+          requested_eligibility: true,
+          status: "submitted",
+          submitted_at: "2026-10-11T16:00:00Z",
+        },
+      ],
+    });
+
+    const eligibilityPanel = panels.find(
+      (panel) => panel.key === "eligibility",
+    );
+
+    expect(eligibilityPanel?.groups[0]).toEqual({
+      title: "Eligibility appeals",
+      items: [
+        {
+          label: "⚑ DIRECTION ELIGIBILITY APPEAL",
+          value:
+            "SUBMITTED — CURRENT ELIGIBILITY REMAINS IN EFFECT",
+        },
+      ],
+    });
+    expect(
+      formatApplicationReferenceValue(
+        eligibilityPanel?.groups[1]?.items[0]?.label ?? "",
+        eligibilityPanel?.groups[1]?.items[0]?.value ?? "",
+      ),
+    ).toBe("NO");
+  });
+
+  it("changes eligibility after approval and retains it after denial", () => {
+    const buildWithStatus = (status: "resolved" | "denied") =>
+      buildApplicationReferencePanels({
+        application: legacyApplication,
+        questions: [
+          question("direction", "Direction - Award Eligible", 1, {
+            question_type: "yes_no",
+          }),
+        ],
+        answers: [answer("direction", 0)],
+        eligibilityCategories: [
+          {
+            id: "direction-id",
+            category_key: "direction",
+            title: "DIRECTION",
+          },
+        ],
+        eligibilityAppeals: [
+          {
+            category_id: "direction-id",
+            current_eligibility: false,
+            requested_eligibility: true,
+            status,
+            submitted_at: "2026-10-11T16:00:00Z",
+          },
+        ],
+      });
+
+    const currentEligibility = (status: "resolved" | "denied") => {
+      const eligibilityPanel = buildWithStatus(status).find(
+        (panel) => panel.key === "eligibility",
+      );
+      const item = eligibilityPanel?.groups[1]?.items[0];
+      return formatApplicationReferenceValue(
+        item?.label ?? "",
+        item?.value ?? "",
+      );
+    };
+
+    expect(currentEligibility("resolved")).toBe("YES");
+    expect(currentEligibility("denied")).toBe("NO");
+  });
+
+  it("keeps a prior approved eligibility when a later appeal is denied", () => {
+    const panels = buildApplicationReferencePanels({
+      application: legacyApplication,
+      questions: [
+        question("direction", "Direction - Award Eligible", 1, {
+          question_type: "yes_no",
+        }),
+      ],
+      answers: [answer("direction", 0)],
+      eligibilityCategories: [
+        { id: "direction-id", category_key: "direction", title: "DIRECTION" },
+      ],
+      eligibilityAppeals: [
+        {
+          category_id: "direction-id",
+          current_eligibility: false,
+          requested_eligibility: true,
+          status: "resolved",
+          submitted_at: "2026-10-10T16:00:00Z",
+        },
+        {
+          category_id: "direction-id",
+          current_eligibility: true,
+          requested_eligibility: false,
+          status: "denied",
+          submitted_at: "2026-10-11T16:00:00Z",
+        },
+      ],
+    });
+    const eligibilityPanel = panels.find(
+      (panel) => panel.key === "eligibility",
+    );
+    const currentEligibilityItem = eligibilityPanel?.groups
+      .find((group) => group.title === "Current eligibility")
+      ?.items.at(0);
+
+    expect(eligibilityPanel?.groups[0]?.items[0]?.value).toBe(
+      "DENIED — CURRENT ELIGIBILITY RETAINED",
+    );
+    expect(
+      formatApplicationReferenceValue(
+        currentEligibilityItem?.label ?? "",
+        currentEligibilityItem?.value ?? "",
+      ),
+    ).toBe("YES");
+  });
+
+  it("recalculates overall production after an approved appeal", () => {
+    const categories = [
+      { id: "music-id", category_key: "music_direction", title: "MUSIC DIRECTION" },
+      { id: "orchestra-id", category_key: "orchestra", title: "ORCHESTRA" },
+      { id: "ensemble-id", category_key: "ensemble", title: "ENSEMBLE" },
+      { id: "costume-id", category_key: "costume_design", title: "COSTUMES" },
+      { id: "direction-id", category_key: "direction", title: "DIRECTION" },
+      {
+        id: "overall-id",
+        category_key: "overall_production",
+        title: "OVERALL PRODUCTION",
+      },
+    ];
+    const panels = buildApplicationReferencePanels({
+      application,
+      questions: [],
+      answers: [],
+      eligibilityCategories: categories,
+      eligibilityAppeals: [
+        {
+          category_id: "direction-id",
+          current_eligibility: false,
+          requested_eligibility: true,
+          status: "resolved",
+          submitted_at: "2026-10-11T16:00:00Z",
+        },
+      ],
+    });
+    const currentEligibilityItems = panels.find(
+      (panel) => panel.key === "eligibility",
+    )?.groups.find((group) => group.title === "Current eligibility")?.items;
+
+    expect(currentEligibilityItems?.at(-1)).toEqual({
+      label: "Overall Production - Award Eligible",
+      value: "1",
+    });
+  });
+
   it("includes structured addresses and uploaded file names in the full application", () => {
     const panels = buildApplicationReferencePanels({
       application: legacyApplication,

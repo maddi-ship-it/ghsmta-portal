@@ -9,6 +9,7 @@ import {
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import {
   buildApplicationReferencePanels,
+  type ApplicationEligibilityAppeal,
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
@@ -280,6 +281,7 @@ export default async function AdjudicationApplicationPage({
     scheduleBookingsResult,
     scheduleStaffResult,
     panelAssignmentsResult,
+    appealsResult,
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
@@ -313,6 +315,14 @@ export default async function AdjudicationApplicationPage({
           .eq("can_comment", true)
           .is("removed_at", null)
       : Promise.resolve({ data: [], error: null }),
+    admin
+      .from("appeals")
+      .select(
+        "category_id,current_eligibility,requested_eligibility,status,submitted_at",
+      )
+      .eq("application_id", id)
+      .eq("appeal_type", "eligibility")
+      .order("submitted_at", { ascending: false }),
   ]);
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
@@ -321,6 +331,7 @@ export default async function AdjudicationApplicationPage({
     questions: applicationQuestions,
     answers: applicationAnswers,
     eligibilityCategories: categories,
+    eligibilityAppeals: (appealsResult.data ?? []) as ApplicationEligibilityAppeal[],
   });
   const scale = (scaleResult.data ?? []) as ScoringScaleLevel[];
   const scoreOptions = quarterScoreOptions(
@@ -340,6 +351,7 @@ export default async function AdjudicationApplicationPage({
   const release = releaseResult.data as AdjudicationRelease | null;
 
   if (feedbackResult.error) throw new Error(feedbackResult.error.message);
+  if (appealsResult.error) throw new Error(appealsResult.error.message);
   if (panelAssignmentsResult.error) {
     throw new Error(panelAssignmentsResult.error.message);
   }
