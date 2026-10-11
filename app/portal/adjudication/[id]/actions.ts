@@ -10,6 +10,7 @@ import {
   extractOpenAIText,
   isQuarterPointScore,
 } from "@/lib/adjudication";
+import { categoryBelongsToApplicationRubric } from "@/lib/application-rubric";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
 import {
@@ -765,10 +766,22 @@ async function generatePanelCommentDraft(
       .eq("rubric_id", category.rubric_id)
       .order("score", { ascending: false }),
   ]);
+  const { data: applicationForm, error: applicationFormError } =
+    application.form_version_id
+      ? await admin
+          .from("application_form_versions")
+          .select("scoring_rubric_id")
+          .eq("id", application.form_version_id)
+          .maybeSingle()
+      : { data: null, error: null };
   if (
     rubricResult.error ||
     !rubricResult.data ||
-    rubricResult.data.cycle_id !== application.cycle_id
+    applicationFormError ||
+    !categoryBelongsToApplicationRubric({
+      applicationFormRubricId: applicationForm?.scoring_rubric_id,
+      categoryRubricId: category.rubric_id,
+    })
   ) {
     throw new Error("This scoring category does not belong to the application.");
   }
@@ -911,8 +924,6 @@ async function generatePanelCommentDraft(
       },
       reasoning: {
         effort: "high",
-        mode: "pro",
-        summary: null,
       },
     }),
   });
@@ -934,6 +945,7 @@ async function generatePanelCommentDraft(
   });
 
   const requestId = response.headers.get("x-request-id");
+  const generatedAt = new Date().toISOString();
   const { data: savedFeedback, error: saveError } = await admin
     .from("adjudication_panel_feedback")
     .update({
@@ -947,7 +959,7 @@ async function generatePanelCommentDraft(
       model,
       openai_request_id: requestId,
       generated_by: generatedBy,
-      generated_at: new Date().toISOString(),
+      generated_at: generatedAt,
       approved_by: null,
       approved_at: null,
     })
@@ -976,6 +988,7 @@ async function generatePanelCommentDraft(
   return {
     generated: true as const,
     generatedComment,
+    generatedAt,
     preservedOwnerDraft: resolvedNarrative.preservedOwnerDraft,
   };
 }
@@ -1000,7 +1013,7 @@ async function refreshLivePanelNarratives(
     await Promise.all([
       admin
         .from("scoring_categories")
-        .select("id")
+        .select("id,category_key")
         .eq("rubric_id", rubricId)
         .eq("active", true)
         .order("sort_order"),
@@ -1024,7 +1037,10 @@ async function refreshLivePanelNarratives(
   ].find(Boolean);
   if (firstError) throw new Error(firstError.message);
 
-  const categories = categoriesResult.data ?? [];
+  const categories = (categoriesResult.data ?? []).filter(
+    (category) =>
+      category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
+  );
   const categoryIds = categories.map((category) => category.id);
   const { data: criteria, error: criteriaError } = categoryIds.length
     ? await admin
@@ -1164,14 +1180,18 @@ async function refreshLivePanelNarratives(
   revalidatePath(`/portal/adjudication/${applicationId}`);
 }
 
-export async function generatePanelNarrativeNow(
+async function generateOwnerPanelNarrative(
   applicationId: string,
   categoryId: string,
+  ownerId: string,
 ) {
-  const owner = await requireProfile(["owner"]);
   const admin = createAdminClient();
   const [applicationResult, categoryResult] = await Promise.all([
-    admin.from("applications").select("cycle_id").eq("id", applicationId).single(),
+    admin
+      .from("applications")
+      .select("form_version_id")
+      .eq("id", applicationId)
+      .single(),
     admin.from("scoring_categories").select("rubric_id").eq("id", categoryId).single(),
   ]);
 
@@ -1179,12 +1199,21 @@ export async function generatePanelNarrativeNow(
     throw new Error("The application or scoring category could not be found.");
   }
 
-  const { data: rubric, error: rubricError } = await admin
-    .from("scoring_rubrics")
-    .select("cycle_id")
-    .eq("id", categoryResult.data.rubric_id)
-    .single();
-  if (rubricError || rubric?.cycle_id !== applicationResult.data.cycle_id) {
+  const { data: applicationForm, error: applicationFormError } =
+    applicationResult.data.form_version_id
+      ? await admin
+          .from("application_form_versions")
+          .select("scoring_rubric_id")
+          .eq("id", applicationResult.data.form_version_id)
+          .maybeSingle()
+      : { data: null, error: null };
+  if (
+    applicationFormError ||
+    !categoryBelongsToApplicationRubric({
+      applicationFormRubricId: applicationForm?.scoring_rubric_id,
+      categoryRubricId: categoryResult.data.rubric_id,
+    })
+  ) {
     throw new Error("This scoring category does not belong to the application.");
   }
 
@@ -1203,7 +1232,7 @@ export async function generatePanelNarrativeNow(
       .from("adjudication_panel_feedback")
       .update({
         status: "draft",
-        generated_by: owner.id,
+        generated_by: ownerId,
         generated_at: claimedAt,
       })
       .eq("id", existingFeedback.id)
@@ -1219,7 +1248,7 @@ export async function generatePanelNarrativeNow(
         application_id: applicationId,
         category_id: categoryId,
         status: "draft",
-        generated_by: owner.id,
+        generated_by: ownerId,
         generated_at: claimedAt,
       })
       .select("id")
@@ -1234,26 +1263,347 @@ export async function generatePanelNarrativeNow(
     );
   }
 
+  const result = await generatePanelCommentDraft(
+    applicationId,
+    categoryId,
+    ownerId,
+    claimedAt,
+    true,
+  );
+  if (!result.generated) {
+    throw new Error("The Owner draft changed while it was being generated. Try again.");
+  }
+  return result;
+}
+
+export async function generatePanelNarrativeNow(
+  applicationId: string,
+  categoryId: string,
+) {
   try {
-    const result = await generatePanelCommentDraft(
+    const owner = await requireProfile(["owner"]);
+    const result = await generateOwnerPanelNarrative(
       applicationId,
       categoryId,
       owner.id,
-      claimedAt,
-      true,
     );
-    if (!result.generated) {
-      throw new Error("The Owner draft changed while it was being generated. Try again.");
-    }
     revalidatePath(`/portal/adjudication/${applicationId}`);
-    return result;
+    return { ok: true as const, ...result };
   } catch (error) {
     console.error("[adjudication:narrative] Manual Owner draft generation failed.", {
       applicationId,
       categoryId,
       error: errorMessage(error),
     });
-    throw error;
+    return { ok: false as const, error: errorMessage(error) };
+  }
+}
+
+export async function generateAllPanelNarrativesNow(applicationId: string) {
+  try {
+    const owner = await requireProfile(["owner"]);
+    const admin = createAdminClient();
+    const { data: application, error: applicationError } = await admin
+      .from("applications")
+      .select("form_version_id")
+      .eq("id", applicationId)
+      .single();
+    if (applicationError || !application?.form_version_id) {
+      throw new Error("The application form could not be found.");
+    }
+
+    const { data: applicationForm, error: applicationFormError } = await admin
+      .from("application_form_versions")
+      .select("scoring_rubric_id")
+      .eq("id", application.form_version_id)
+      .single();
+    if (applicationFormError || !applicationForm?.scoring_rubric_id) {
+      throw new Error("No scoring rubric is assigned to this application.");
+    }
+
+    const [categoriesResult, scoreabilityResult, feedbackResult] =
+      await Promise.all([
+        admin
+          .from("scoring_categories")
+          .select("id,title,category_key")
+          .eq("rubric_id", applicationForm.scoring_rubric_id)
+          .eq("active", true)
+          .order("sort_order"),
+        admin
+          .from("adjudication_category_scoreability")
+          .select("category_id,is_scoreable")
+          .eq("application_id", applicationId),
+        admin
+          .from("adjudication_panel_feedback")
+          .select("category_id,status")
+          .eq("application_id", applicationId),
+      ]);
+    const firstError = [
+      categoriesResult.error,
+      scoreabilityResult.error,
+      feedbackResult.error,
+    ].find(Boolean);
+    if (firstError) throw new Error(firstError.message);
+
+    const unscoreableCategoryIds = new Set(
+      (scoreabilityResult.data ?? [])
+        .filter((decision) => !decision.is_scoreable)
+        .map((decision) => decision.category_id),
+    );
+    const feedbackByCategory = new Map(
+      (feedbackResult.data ?? []).map((item) => [item.category_id, item]),
+    );
+    const categories = (categoriesResult.data ?? []).filter(
+      (category) =>
+        category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY &&
+        !unscoreableCategoryIds.has(category.id),
+    );
+
+    const results: Array<{
+      categoryId: string;
+      error?: string;
+      generatedAt?: string;
+      generatedComment?: string;
+      status: "error" | "generated" | "skipped";
+      title: string;
+    }> = [];
+    const generationBatchSize = 3;
+    for (let index = 0; index < categories.length; index += generationBatchSize) {
+      const batch = categories.slice(index, index + generationBatchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (category) => {
+          if (feedbackByCategory.get(category.id)?.status === "approved") {
+            return {
+              categoryId: category.id,
+              error: "Already sent to the panel.",
+              status: "skipped" as const,
+              title: category.title,
+            };
+          }
+
+          try {
+            const result = await generateOwnerPanelNarrative(
+              applicationId,
+              category.id,
+              owner.id,
+            );
+            return {
+              categoryId: category.id,
+              generatedAt: result.generatedAt,
+              generatedComment: result.generatedComment,
+              status: "generated" as const,
+              title: category.title,
+            };
+          } catch (error) {
+            console.error("[adjudication:narrative] Batch Owner draft generation failed.", {
+              applicationId,
+              categoryId: category.id,
+              error: errorMessage(error),
+            });
+            return {
+              categoryId: category.id,
+              error: errorMessage(error),
+              status: "error" as const,
+              title: category.title,
+            };
+          }
+        }),
+      );
+      results.push(...batchResults);
+    }
+
+    revalidatePath(`/portal/adjudication/${applicationId}`);
+    return { ok: true as const, results };
+  } catch (error) {
+    console.error("[adjudication:narrative] Batch Owner generation failed.", {
+      applicationId,
+      error: errorMessage(error),
+    });
+    return { ok: false as const, error: errorMessage(error) };
+  }
+}
+
+export async function sendAllPanelNarrativesToPanel(
+  applicationId: string,
+  comments: Array<{
+    categoryId: string;
+    finalComment: string;
+    generatedAt: string;
+  }>,
+) {
+  try {
+    const owner = await requireProfile(["owner"]);
+    if (comments.length === 0) {
+      throw new Error("Generate at least one Owner comment before sending to the panel.");
+    }
+    if (new Set(comments.map((comment) => comment.categoryId)).size !== comments.length) {
+      throw new Error("A comment category was included more than once.");
+    }
+
+    const admin = createAdminClient();
+    const { data: application, error: applicationError } = await admin
+      .from("applications")
+      .select("form_version_id,school_name,production_title")
+      .eq("id", applicationId)
+      .single();
+    if (applicationError || !application?.form_version_id) {
+      throw new Error("The application form could not be found.");
+    }
+
+    const { data: applicationForm, error: applicationFormError } = await admin
+      .from("application_form_versions")
+      .select("scoring_rubric_id")
+      .eq("id", application.form_version_id)
+      .single();
+    if (applicationFormError || !applicationForm?.scoring_rubric_id) {
+      throw new Error("No scoring rubric is assigned to this application.");
+    }
+
+    const categoryIds = comments.map((comment) => comment.categoryId);
+    const [
+      categoriesResult,
+      feedbackResult,
+      panelAssignmentsResult,
+      scoreabilityResult,
+    ] =
+      await Promise.all([
+        admin
+          .from("scoring_categories")
+          .select("id,category_key,rubric_id")
+          .in("id", categoryIds)
+          .eq("active", true),
+        admin
+          .from("adjudication_panel_feedback")
+          .select("id,category_id,status,generated_at")
+          .eq("application_id", applicationId)
+          .in("category_id", categoryIds),
+        admin
+          .from("adjudicator_assignments")
+          .select("adjudicator_user_id")
+          .eq("application_id", applicationId)
+          .eq("can_comment", true)
+          .is("removed_at", null),
+        admin
+          .from("adjudication_category_scoreability")
+          .select("category_id,is_scoreable")
+          .eq("application_id", applicationId)
+          .in("category_id", categoryIds),
+      ]);
+    const firstError = [
+      categoriesResult.error,
+      feedbackResult.error,
+      panelAssignmentsResult.error,
+      scoreabilityResult.error,
+    ].find(Boolean);
+    if (firstError) throw new Error(firstError.message);
+
+    const validCategoryIds = new Set(
+      (categoriesResult.data ?? [])
+        .filter(
+          (category) =>
+            category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY &&
+            categoryBelongsToApplicationRubric({
+              applicationFormRubricId: applicationForm.scoring_rubric_id,
+              categoryRubricId: category.rubric_id,
+            }),
+        )
+        .map((category) => category.id),
+    );
+    const unscoreableCategoryIds = new Set(
+      (scoreabilityResult.data ?? [])
+        .filter((decision) => !decision.is_scoreable)
+        .map((decision) => decision.category_id),
+    );
+    if (comments.some((comment) => !validCategoryIds.has(comment.categoryId))) {
+      throw new Error("A comment category does not belong to this application rubric.");
+    }
+    if (comments.some((comment) => unscoreableCategoryIds.has(comment.categoryId))) {
+      throw new Error("An ineligible category cannot be sent to the panel.");
+    }
+
+    const feedbackByCategory = new Map(
+      (feedbackResult.data ?? []).map((item) => [item.category_id, item]),
+    );
+    for (const comment of comments) {
+      const feedback = feedbackByCategory.get(comment.categoryId);
+      if (!comment.finalComment.trim()) {
+        throw new Error("Every Owner comment must include text before it is sent.");
+      }
+      if (
+        !feedback ||
+        feedback.status === "approved" ||
+        !comment.generatedAt ||
+        feedback.generated_at !== comment.generatedAt
+      ) {
+        throw new Error(
+          "One or more comments changed after the review window opened. Refresh the drafts before sending them.",
+        );
+      }
+    }
+
+    const panelUserIds = [
+      ...new Set(
+        (panelAssignmentsResult.data ?? []).map(
+          (assignment) => assignment.adjudicator_user_id,
+        ),
+      ),
+    ];
+    if (panelUserIds.length === 0) {
+      throw new Error("No commenting panel members are assigned to this application.");
+    }
+
+    const approvedAt = new Date().toISOString();
+    for (const comment of comments) {
+      const feedback = feedbackByCategory.get(comment.categoryId)!;
+      const { data: savedFeedback, error: saveError } = await admin
+        .from("adjudication_panel_feedback")
+        .update({
+          final_comment: comment.finalComment.trim(),
+          status: "approved",
+          approved_by: owner.id,
+          approved_at: approvedAt,
+        })
+        .eq("id", feedback.id)
+        .eq("generated_at", comment.generatedAt)
+        .in("status", ["draft", "generated"])
+        .select("id")
+        .maybeSingle();
+      if (saveError) throw new Error(saveError.message);
+      if (!savedFeedback) {
+        throw new Error(
+          "A comment changed while it was being sent. Refresh the drafts and try again.",
+        );
+      }
+    }
+
+    const { error: notificationError } = await admin
+      .from("user_notifications")
+      .insert(
+        panelUserIds.map((userId) => ({
+          user_id: userId,
+          notification_type: "panel_narrative_ready",
+          title: "Final comments ready for panel review",
+          body: `${application.school_name} — ${application.production_title ?? "Untitled production"}`,
+          href: `/portal/adjudication/${applicationId}`,
+          related_application_id: applicationId,
+        })),
+      );
+    if (notificationError) {
+      console.error("Unable to notify the panel about the batch of final comments.", {
+        applicationId,
+        notificationError,
+      });
+    }
+
+    revalidatePath(`/portal/adjudication/${applicationId}`);
+    revalidatePath("/portal/chat");
+    return { ok: true as const, sentCount: comments.length };
+  } catch (error) {
+    console.error("[adjudication:narrative] Batch send to panel failed.", {
+      applicationId,
+      error: errorMessage(error),
+    });
+    return { ok: false as const, error: errorMessage(error) };
   }
 }
 
@@ -1278,7 +1628,7 @@ export async function savePanelFeedback(
         .single(),
       admin
         .from("applications")
-        .select("cycle_id,school_name,production_title")
+        .select("form_version_id,school_name,production_title")
         .eq("id", applicationId)
         .single(),
       admin
@@ -1293,22 +1643,25 @@ export async function savePanelFeedback(
   const { data: application, error: applicationError } = applicationResult;
   const { data: existingFeedback, error: existingFeedbackError } =
     existingFeedbackResult;
-  const { data: rubric, error: rubricError } = category?.rubric_id
-    ? await admin
-        .from("scoring_rubrics")
-        .select("cycle_id")
-        .eq("id", category.rubric_id)
-        .single()
+  const { data: applicationForm, error: applicationFormError } =
+    application?.form_version_id
+      ? await admin
+          .from("application_form_versions")
+          .select("scoring_rubric_id")
+          .eq("id", application.form_version_id)
+          .maybeSingle()
     : { data: null, error: null };
 
   if (
     categoryError ||
     applicationError ||
     existingFeedbackError ||
-    rubricError ||
+    applicationFormError ||
     !application ||
-    !rubric ||
-    rubric.cycle_id !== application.cycle_id
+    !categoryBelongsToApplicationRubric({
+      applicationFormRubricId: applicationForm?.scoring_rubric_id,
+      categoryRubricId: category?.rubric_id,
+    })
   ) {
     throw new Error("This scoring category does not belong to the application.");
   }

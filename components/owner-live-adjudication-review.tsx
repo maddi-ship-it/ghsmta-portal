@@ -9,6 +9,7 @@ import {
   savePanelFeedback,
 } from "@/app/portal/adjudication/[id]/actions";
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
+import { OwnerCommentReviewModal } from "@/components/owner-comment-review-modal";
 import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
 import {
@@ -527,6 +528,10 @@ function LivePanelFeedbackEditor({
                         applicationId,
                         category.id,
                       );
+                      if (!result.ok) {
+                        setGenerationMessage(result.error);
+                        return;
+                      }
                       setFollowingLiveDraft(false);
                       setManualValue(result.generatedComment);
                       setGenerationMessage("Owner draft generated from the latest saved comments.");
@@ -700,6 +705,20 @@ export function OwnerLiveAdjudicationReview({
     () =>
       new Set(advisoryNarrativeReview?.panelApprovedCategoryIds ?? []),
     [advisoryNarrativeReview?.panelApprovedCategoryIds],
+  );
+  const ownerPanelApprovedCategoryIds = useMemo(
+    () =>
+      feedback
+        .filter(
+          (item) =>
+            item.status === "approved" &&
+            item.approved_by &&
+            ["adjudicator", "advisory_member"].includes(
+              profileMap.get(item.approved_by)?.role ?? "",
+            ),
+        )
+        .map((item) => item.category_id),
+    [feedback, profileMap],
   );
   const refreshData = useCallback(async () => {
     if (practiceMode) return;
@@ -949,6 +968,27 @@ export function OwnerLiveAdjudicationReview({
           </article>
         ) : null}
       </section>
+
+      {isOwner ? (
+        <section className="panel owner-comment-review-launcher">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">Owner workflow</span>
+              <h2>Comment review</h2>
+              <p>
+                Generate every category comment, review the complete set in one
+                window, and send all finished comments to the panel together.
+              </p>
+            </div>
+            <OwnerCommentReviewModal
+              applicationId={applicationId}
+              categories={categories}
+              feedback={feedback}
+              panelApprovedCategoryIds={ownerPanelApprovedCategoryIds}
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section className="panel panel-progress-section">
         <div className="panel-header">

@@ -65,6 +65,8 @@ import type {
 
 import { releaseAdjudicationResults } from "./actions";
 
+export const maxDuration = 800;
+
 type ScheduleBookingReference = {
   slot_id: string;
   application_id: string;
