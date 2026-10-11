@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow-actions";
+import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
 import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
 import {
@@ -643,7 +644,16 @@ function CategoryScoreSection({
                 key={criterion.id}
               >
                 <div className="criterion-copy">
-                  <h3>{criterion.title}</h3>
+                  <div className="criterion-heading-row">
+                    <h3>{criterion.title}</h3>
+                    {!isOverallProduction ? (
+                      <CriterionScoringGuideButton
+                        categoryTitle={category.title}
+                        criterionId={criterion.id}
+                        criterionTitle={criterion.title}
+                      />
+                    ) : null}
+                  </div>
                   {criterion.description && <p>{criterion.description}</p>}
                 </div>
 
