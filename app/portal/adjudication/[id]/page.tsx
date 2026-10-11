@@ -20,6 +20,7 @@ import {
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
+import { CompleteAdjudicationControl } from "@/components/complete-adjudication-control";
 import {
   OwnerLiveAdjudicationReview,
   type PanelNarrativeReviewer,
@@ -29,6 +30,7 @@ import { SpecialtyAwardModal } from "@/components/specialty-award-modal";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
+import { outstandingAssignedFinalComments } from "@/lib/adjudication-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
@@ -292,7 +294,7 @@ export default async function AdjudicationApplicationPage({
           .from("adjudicator_assignments")
           .select("*")
           .eq("application_id", id)
-          .is("removed_at", null)
+          .or("removed_at.is.null,status.eq.complete")
           .order("assigned_at"),
     profile.role === "adjudicator"
       ? supabase.from("adjudication_scorecards").select("*").eq("application_id", id).eq("adjudicator_user_id", profile.id)
@@ -643,6 +645,10 @@ export default async function AdjudicationApplicationPage({
     ? scorecards.find((scorecard) => scorecard.adjudicator_user_id === profile.id) ?? null
     : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
+  const outstandingAssignedCommentCount =
+    profile.role === "adjudicator"
+      ? outstandingAssignedFinalComments(feedback, profile.id).length
+      : 0;
   const canComment = Boolean(ownParticipantResult.data?.can_comment);
   const ownScores = scores.filter(
     (score) => score.scorecard_id === ownScorecard?.id,
@@ -802,7 +808,7 @@ export default async function AdjudicationApplicationPage({
       </div>
 
       {query.saved && <div className="notice page-message">Your scorecard draft was saved.</div>}
-      {query.submitted && <div className="notice page-message">Your scorecard was submitted and is now read-only.</div>}
+      {query.submitted && <div className="notice page-message">Your scorecard was submitted. Scores and brain-dump tools are now locked while you finish any assigned final comments.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
       {query.assigned && <div className="notice page-message">The final comment assignment was saved.</div>}
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field and score{canComment ? ", including criterion comments," : ""} before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
@@ -854,6 +860,11 @@ export default async function AdjudicationApplicationPage({
               criteria={scoreableCriteria}
               formId={scorecardFormId}
               requireComments={canComment}
+            />
+          ) : profile.role === "adjudicator" && readOnly ? (
+            <CompleteAdjudicationControl
+              applicationId={id}
+              outstandingCommentCount={outstandingAssignedCommentCount}
             />
           ) : undefined
         }

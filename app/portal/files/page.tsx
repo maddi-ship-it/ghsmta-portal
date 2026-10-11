@@ -51,6 +51,33 @@ export default async function SchoolFilesPage() {
     applications = (applicationData ?? []) as SchoolFileApplication[];
   }
 
+  if (profile.role === "adjudicator" && applications.length > 0) {
+    const { data: activeAssignments, error: assignmentError } = await supabase
+      .from("adjudicator_assignments")
+      .select("application_id")
+      .eq("adjudicator_user_id", profile.id)
+      .in(
+        "application_id",
+        applications.map((application) => application.application_id),
+      )
+      .is("removed_at", null);
+
+    if (assignmentError) {
+      throw new Error(
+        `School file access could not be verified: ${assignmentError.message}`,
+      );
+    }
+
+    const activeApplicationIds = new Set(
+      (activeAssignments ?? []).map(
+        (assignment) => assignment.application_id,
+      ),
+    );
+    applications = applications.filter((application) =>
+      activeApplicationIds.has(application.application_id),
+    );
+  }
+
   const applicationIds = applications.map((application) => application.application_id);
 
   let files: SchoolFileRecord[] = [];

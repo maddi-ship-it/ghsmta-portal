@@ -13,6 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type DownloadFile = {
+  application_id: string | null;
   id: string;
   original_name: string;
   storage_path: string;
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("active")
+    .select("active,role")
     .eq("id", user.id)
     .single();
   if (!profile?.active) return errorResponse("Portal access is required.", 403);
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("portal_files")
-    .select("id,original_name,storage_path")
+    .select("id,application_id,original_name,storage_path")
     .in("id", fileIds)
     .eq("context_type", "application")
     .is("archived_at", null);
@@ -89,6 +90,44 @@ export async function POST(request: Request) {
 
   if (files.length !== fileIds.length) {
     return errorResponse("One or more school files are no longer available.", 404);
+  }
+
+  if (profile.role === "adjudicator") {
+    const applicationIds = [
+      ...new Set(
+        files
+          .map((file) => file.application_id)
+          .filter((applicationId): applicationId is string =>
+            Boolean(applicationId),
+          ),
+      ),
+    ];
+    const { data: activeAssignments, error: assignmentError } =
+      applicationIds.length > 0
+        ? await supabase
+            .from("adjudicator_assignments")
+            .select("application_id")
+            .eq("adjudicator_user_id", user.id)
+            .in("application_id", applicationIds)
+            .is("removed_at", null)
+        : { data: [], error: null };
+
+    if (assignmentError) {
+      return errorResponse("School file access could not be verified.", 500);
+    }
+
+    const activeApplicationIds = new Set(
+      (activeAssignments ?? []).map(
+        (assignment) => assignment.application_id,
+      ),
+    );
+    if (
+      applicationIds.some(
+        (applicationId) => !activeApplicationIds.has(applicationId),
+      )
+    ) {
+      return errorResponse("One or more school files are no longer available.", 404);
+    }
   }
 
   try {

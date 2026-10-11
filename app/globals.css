@@ -16894,3 +16894,63 @@ html[data-theme="light"] .portal-shell .portal-main :where(input, select, textar
     width: 100%;
   }
 }
+
+/* Keep the score-range correction dialog native to the dark scoring workspace. */
+html:not([data-theme="light"]) .portal-shell .score-range-modal {
+  color-scheme: dark;
+  border-color: color-mix(in srgb, var(--portal-gold) 34%, var(--portal-line));
+  background:
+    radial-gradient(circle at top left, rgba(213, 177, 79, 0.08), transparent 34%),
+    var(--portal-surface);
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-average {
+  border-width: 1px;
+  color: var(--portal-text);
+  background: var(--portal-surface-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-average-error {
+  border-color: color-mix(in srgb, var(--portal-danger) 60%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-danger) 9%, var(--portal-surface-2));
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-average-error span {
+  color: var(--portal-danger);
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-average-error strong {
+  color: var(--portal-ivory);
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-average-error small {
+  color: var(--portal-text);
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-average-resolved {
+  border-color: color-mix(in srgb, var(--portal-success) 55%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-success) 9%, var(--portal-surface-2));
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-average-resolved :where(span, strong) {
+  color: var(--portal-success);
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-actions > strong:not(.score-range-modal-resolved) {
+  color: var(--portal-danger);
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button {
+  color: #0a1020;
+  border-color: var(--portal-gold);
+  background: linear-gradient(135deg, var(--portal-gold-bright), var(--portal-gold));
+  box-shadow: none;
+}
+
+html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:disabled {
+  color: var(--portal-muted);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-3);
+  opacity: 0.82;
+}

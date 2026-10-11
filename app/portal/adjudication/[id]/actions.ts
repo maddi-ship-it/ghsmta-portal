@@ -16,6 +16,10 @@ import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
+import {
+  canCompleteAdjudication,
+  outstandingAssignedFinalComments,
+} from "@/lib/adjudication-completion";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
@@ -543,6 +547,102 @@ export async function saveAdjudicatorScorecard(
   revalidatePath(`/portal/adjudication/${applicationId}`);
   revalidatePath("/portal/adjudication");
   redirect(`/portal/adjudication/${applicationId}?${result.submitted ? "submitted" : "saved"}=1`);
+}
+
+export async function completeAdjudication(
+  applicationId: string,
+  formData: FormData,
+) {
+  void formData;
+  const adjudicator = await requireProfile(["adjudicator"]);
+  const admin = createAdminClient();
+
+  const { data: assignment, error: assignmentError } = await admin
+    .from("adjudicator_assignments")
+    .select("id,status,removed_at")
+    .eq("application_id", applicationId)
+    .eq("adjudicator_user_id", adjudicator.id)
+    .is("removed_at", null)
+    .maybeSingle();
+
+  if (assignmentError) throw new Error(assignmentError.message);
+  if (!assignment) {
+    throw new Error("This adjudication assignment is no longer active.");
+  }
+
+  const [scorecardResult, feedbackResult] = await Promise.all([
+    admin
+      .from("adjudication_scorecards")
+      .select("id,status")
+      .eq("assignment_id", assignment.id)
+      .eq("application_id", applicationId)
+      .eq("adjudicator_user_id", adjudicator.id)
+      .maybeSingle(),
+    admin
+      .from("adjudication_panel_feedback")
+      .select("id,assigned_to,approved_by,status")
+      .eq("application_id", applicationId)
+      .eq("assigned_to", adjudicator.id),
+  ]);
+
+  if (scorecardResult.error) throw new Error(scorecardResult.error.message);
+  if (feedbackResult.error) throw new Error(feedbackResult.error.message);
+  if (!scorecardResult.data) {
+    throw new Error("Submit your scorecard before completing adjudication.");
+  }
+
+  const feedback = feedbackResult.data ?? [];
+  const outstandingComments = outstandingAssignedFinalComments(
+    feedback,
+    adjudicator.id,
+  );
+
+  if (
+    !canCompleteAdjudication({
+      adjudicatorUserId: adjudicator.id,
+      feedback,
+      scorecardStatus: scorecardResult.data.status,
+    })
+  ) {
+    if (!["submitted", "locked"].includes(scorecardResult.data.status)) {
+      throw new Error("Submit your scorecard before completing adjudication.");
+    }
+
+    throw new Error(
+      `Return ${outstandingComments.length} assigned final comment${
+        outstandingComments.length === 1 ? "" : "s"
+      } to the Owners before completing adjudication.`,
+    );
+  }
+
+  const completedAt = new Date().toISOString();
+  const { error: scorecardLockError } = await admin
+    .from("adjudication_scorecards")
+    .update({ status: "locked" })
+    .eq("id", scorecardResult.data.id)
+    .in("status", ["submitted", "locked"]);
+
+  if (scorecardLockError) throw new Error(scorecardLockError.message);
+
+  const { data: completedAssignment, error: completionError } = await admin
+    .from("adjudicator_assignments")
+    .update({ status: "complete", removed_at: completedAt })
+    .eq("id", assignment.id)
+    .eq("adjudicator_user_id", adjudicator.id)
+    .is("removed_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (completionError) throw new Error(completionError.message);
+  if (!completedAssignment) {
+    throw new Error("This adjudication assignment is no longer active.");
+  }
+
+  revalidatePath(`/portal/adjudication/${applicationId}`);
+  revalidatePath("/portal/adjudication");
+  revalidatePath("/portal/files");
+  revalidatePath("/portal/chat");
+  redirect("/portal/adjudication?completed=1");
 }
 
 export async function reopenAdjudicatorScorecard(

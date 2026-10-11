@@ -12,6 +12,7 @@ import type {
 } from "@/lib/types";
 
 type AdjudicationSearchParams = {
+  completed?: string;
   q?: string;
 };
 
@@ -48,6 +49,7 @@ export default async function AdjudicationDashboard({
       .from("adjudicator_assignments")
       .select("*")
       .eq("adjudicator_user_id", profile.id)
+      .is("removed_at", null)
       .order("assigned_at", { ascending: false });
     if (assignmentError) throw new Error(assignmentError.message);
     const candidateAssignments = (assignmentData ?? []) as AdjudicatorAssignment[];
@@ -222,6 +224,12 @@ export default async function AdjudicationDashboard({
       </div>
 
       <AdjudicationReferenceLinks links={referenceLinks} />
+
+      {params.completed && (
+        <div className="notice page-message">
+          Adjudication completed. Your access to that school has been removed.
+        </div>
+      )}
 
       <section className="metric-grid" aria-label="Adjudication overview">
         <article className="metric-card"><span className="metric-label">Productions</span><strong className="metric-value">{applications.length}</strong></article>

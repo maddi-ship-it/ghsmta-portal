@@ -962,7 +962,14 @@ function CategoryScoreSection({
               </button>
             </div>
 
-            <div className="score-range-modal-average">
+            <div
+              className={[
+                "score-range-modal-average",
+                rangeMismatch
+                  ? "score-range-modal-average-error"
+                  : "score-range-modal-average-resolved",
+              ].join(" ")}
+            >
               <span>Current average</span>
               <strong>{formatAverage(average)}</strong>
               <small>
