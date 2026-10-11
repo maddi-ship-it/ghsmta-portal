@@ -24,6 +24,10 @@ import {
 } from "@/lib/adjudication-brain-dump";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
+import {
+  OPENAI_REASONING_EFFORT,
+  resolveOpenAITextModel,
+} from "@/lib/openai-model";
 import { createClient } from "@/lib/supabase/server";
 import type {
   ApplicationAnswer,
@@ -298,10 +302,9 @@ export async function POST(request: Request) {
   const allowedNoteIds = new Set(sourceNotes.map((note) => note.id));
 
   try {
-    const modelId =
-      process.env.OPENAI_ADJUDICATION_SORT_MODEL?.trim() ||
-      process.env.OPENAI_MODEL?.trim() ||
-      "gpt-5.4-mini";
+    const modelId = resolveOpenAITextModel(
+      process.env.OPENAI_ADJUDICATION_SORT_MODEL,
+    );
     const safetyIdentifier = createHash("sha256")
       .update(user.id)
       .digest("hex")
@@ -411,7 +414,7 @@ export async function POST(request: Request) {
           );
           try {
             const { output } = await generateText({
-              model: openai(modelId),
+              model: openai.responses(modelId),
               output: Output.object({
                 name: "adjudication_brain_dump_sort",
                 description:
@@ -431,7 +434,7 @@ export async function POST(request: Request) {
               maxOutputTokens: MODEL_BATCH_OUTPUT_TOKENS,
               providerOptions: {
                 openai: {
-                  reasoningEffort: "low",
+                  reasoningEffort: OPENAI_REASONING_EFFORT.adjudicationSort,
                   store: false,
                   safetyIdentifier,
                   textVerbosity: "low",

@@ -1,23 +1,10 @@
-export const DEFAULT_PANEL_COMMENT_MODEL = "gpt-5-mini";
+import { DEFAULT_OPENAI_TEXT_MODEL } from "./openai-model";
 
-function isCodexModelAlias(model: string) {
-  return /-(?:sol|terra|luna)$/i.test(model);
-}
+export const DEFAULT_PANEL_COMMENT_MODEL = DEFAULT_OPENAI_TEXT_MODEL;
 
 export function resolvePanelCommentModel(
   promptModel?: string | null,
-  fallbackModel?: string | null,
 ) {
   const selectedModel = promptModel?.trim();
-  const fallback = fallbackModel?.trim();
-
-  if (selectedModel && !isCodexModelAlias(selectedModel)) {
-    return selectedModel;
-  }
-
-  if (fallback && !isCodexModelAlias(fallback)) {
-    return fallback;
-  }
-
-  return DEFAULT_PANEL_COMMENT_MODEL;
+  return selectedModel || DEFAULT_PANEL_COMMENT_MODEL;
 }

@@ -6,28 +6,16 @@ import {
 
 describe("resolvePanelCommentModel", () => {
   it("uses the model selected in the active narrative prompt", () => {
-    expect(resolvePanelCommentModel("gpt-5", "gpt-5-mini")).toBe(
-      "gpt-5",
+    expect(resolvePanelCommentModel("gpt-6.1-sol")).toBe(
+      "gpt-6.1-sol",
     );
   });
 
-  it("does not send Codex model aliases to the OpenAI API", () => {
-    expect(resolvePanelCommentModel("gpt-6-sol", "gpt-5-mini")).toBe(
-      "gpt-5-mini",
-    );
-  });
-
-  it("uses the environment fallback when the prompt has no model", () => {
-    expect(resolvePanelCommentModel("  ", "gpt-5-mini")).toBe("gpt-5-mini");
-  });
-
-  it("does not use a Codex model alias from the environment fallback", () => {
-    expect(resolvePanelCommentModel("", "gpt-5.6-sol")).toBe(
+  it("defaults final comments to GPT-6 Astra", () => {
+    expect(resolvePanelCommentModel("  ")).toBe(
       DEFAULT_PANEL_COMMENT_MODEL,
     );
-  });
-
-  it("defaults final comments to an OpenAI API model", () => {
+    expect(DEFAULT_PANEL_COMMENT_MODEL).toBe("gpt-6-astra");
     expect(resolvePanelCommentModel()).toBe(DEFAULT_PANEL_COMMENT_MODEL);
   });
 });

@@ -35,6 +35,7 @@ import {
   resolvePanelCommentScoringContext,
 } from "@/lib/panel-comment-context";
 import { resolvePanelCommentModel } from "@/lib/panel-comment-model";
+import { OPENAI_REASONING_EFFORT } from "@/lib/openai-model";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -904,7 +905,7 @@ async function generatePanelCommentDraft(
     raw_comments: rawComments,
   });
 
-  const model = resolvePanelCommentModel(prompt.model, process.env.OPENAI_MODEL);
+  const model = resolvePanelCommentModel(prompt.model);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -923,7 +924,7 @@ async function generatePanelCommentDraft(
         verbosity: "high",
       },
       reasoning: {
-        effort: "high",
+        effort: OPENAI_REASONING_EFFORT.panelComment,
       },
     }),
   });

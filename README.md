@@ -67,11 +67,11 @@ For the complete production release, also configure these server-only values:
 - `ACCEPTD_API_TOKEN` — server-only Acceptd application pull access
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
 - `SMTP_FROM_NAME` and `SMTP_REPLY_TO` (optional)
-- `OPENAI_API_KEY` — voice dictation, handwritten-note scanning, and adjudication brain-dump sorting
+- `OPENAI_API_KEY` — portal transcription, phonetic, handwriting, brain-dump, and final-comment assistance
 - `OPENAI_TRANSCRIBE_MODEL` (optional; defaults to `gpt-4o-mini-transcribe`)
-- `OPENAI_HANDWRITING_MODEL` (optional; defaults to `gpt-5.6-sol`)
-- `OPENAI_ADJUDICATION_SORT_MODEL` (optional; falls back to `OPENAI_MODEL`)
-- `OPENAI_MODEL` (optional; fallback model when an AI prompt does not specify one)
+- `OPENAI_PHONETIC_MODEL` (optional; defaults to `gpt-6-astra`)
+- `OPENAI_HANDWRITING_MODEL` (optional; defaults to `gpt-6-astra`)
+- `OPENAI_ADJUDICATION_SORT_MODEL` (optional; defaults to `gpt-6-astra`)
 - `ADOBE_SIGN_ADJUDICATOR_EMBED_URL` — adjudicator Adobe Sign Web Form URL
 - `ADOBE_SIGN_ADVISORY_MEMBER_EMBED_URL` — Advisory Committee Adobe Sign Web Form URL
 
@@ -178,7 +178,16 @@ For AI narrative generation, add these server-only variables locally and in Verc
 
 ```env
 OPENAI_API_KEY=sk-YOUR_OPENAI_API_KEY
-OPENAI_MODEL=gpt-6-sol
+OPENAI_PHONETIC_MODEL=gpt-6-astra
+OPENAI_HANDWRITING_MODEL=gpt-6-astra
+OPENAI_ADJUDICATION_SORT_MODEL=gpt-6-astra
 ```
 
 Never prefix the OpenAI key with `NEXT_PUBLIC_`.
+
+Text and image generation uses the OpenAI Responses API. The default model is
+`gpt-6-astra`, with low reasoning for phonetic respelling and brain-dump sorting,
+medium reasoning for handwriting extraction, and high reasoning for final panel
+comments. Audio transcription remains on `gpt-4o-mini-transcribe`. These are
+independent, stateless requests, so they do not change reasoning effort inside a
+continued response chain.

@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { extractOpenAIText } from "@/lib/adjudication";
 import { consumeApiQuota } from "@/lib/api-quota";
 import { requireProfile } from "@/lib/auth";
+import {
+  OPENAI_REASONING_EFFORT,
+  resolveOpenAITextModel,
+} from "@/lib/openai-model";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -11,8 +15,7 @@ export const dynamic = "force-dynamic";
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
 const TRANSCRIPTION_ENDPOINT = "https://api.openai.com/v1/audio/transcriptions";
 const RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
-const DEFAULT_PHONETIC_MODEL = "gpt-4.1-mini";
-const PHONETIC_OUTPUT_TOKEN_LIMIT = 400;
+const PHONETIC_OUTPUT_TOKEN_LIMIT = 1200;
 
 function cleanSingleLine(value: unknown) {
   return String(value ?? "")
@@ -55,6 +58,11 @@ async function requestPhoneticSuggestion(
         store: false,
         input: prompt,
         max_output_tokens: PHONETIC_OUTPUT_TOKEN_LIMIT,
+        reasoning: { effort: OPENAI_REASONING_EFFORT.phonetic },
+        text: {
+          format: { type: "text" },
+          verbosity: "low",
+        },
       }),
       cache: "no-store",
     });
@@ -192,11 +200,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // Keep this short, deterministic task independent from the adjudication
-  // narrative model. Reasoning models can spend a small output allowance on
-  // hidden reasoning and return no visible spelling at all.
-  const configuredModel =
-    process.env.OPENAI_PHONETIC_MODEL?.trim() || DEFAULT_PHONETIC_MODEL;
+  const configuredModel = resolveOpenAITextModel(
+    process.env.OPENAI_PHONETIC_MODEL,
+  );
   const responsePrompt = [
     "Create a clear, school-program-friendly phonetic respelling of a person's name.",
     "Use ordinary English letters only, hyphens between syllables, and CAPITAL letters for the stressed syllable.",
@@ -206,12 +212,9 @@ export async function POST(request: Request) {
     `What the pronunciation recording sounded like: ${transcript || "not available"}`,
   ].join("\n");
 
-  const modelCandidates = Array.from(
-    new Set([configuredModel, DEFAULT_PHONETIC_MODEL]),
-  );
   let lastError = "";
 
-  for (const model of modelCandidates) {
+  for (const model of [configuredModel]) {
     const suggestion = await requestPhoneticSuggestion(
       apiKey,
       model,
