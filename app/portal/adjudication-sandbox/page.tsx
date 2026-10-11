@@ -1,5 +1,6 @@
 import { AdjudicationSandbox } from "@/components/adjudication-sandbox";
 import { requireProfile } from "@/lib/auth";
+import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AwardCycle,
@@ -16,6 +17,7 @@ export default async function AdjudicationSandboxPage() {
     "owner",
   ]);
   const supabase = await createClient();
+  const referenceLinksPromise = loadAdjudicationReferenceLinks(supabase);
   const { data: rubricData, error: rubricError } = await supabase
     .from("scoring_rubrics")
     .select("*")
@@ -84,17 +86,21 @@ export default async function AdjudicationSandboxPage() {
     : { data: [], error: null };
 
   if (criteriaResult.error) throw new Error(criteriaResult.error.message);
+  const referenceLinks = await referenceLinksPromise;
 
   return (
     <>
-      <div className="page-heading adjudication-sandbox-heading">
+      <div className="page-heading">
         <div>
-          <span className="eyebrow">Resources · Practice workspace</span>
-          <h1>ADJUDICATION SANDBOX</h1>
-          <p>
-            Practice the complete scoring and Committee review workflow using
-            the current rubric.
-          </p>
+          <span className="eyebrow">
+            {(cycleResult.data as AwardCycle | null)?.season_year ?? "Current cycle"}
+            {" · Practice adjudication"}
+          </span>
+          <h1>GHSMTA PRACTICE SCHOOL</h1>
+          <p>Sandbox Musical</p>
+        </div>
+        <div className="heading-actions">
+          <span className="badge">Practice only</span>
         </div>
       </div>
 
@@ -102,6 +108,7 @@ export default async function AdjudicationSandboxPage() {
         categories={categories}
         criteria={(criteriaResult.data ?? []) as ScoringCriterion[]}
         cycle={(cycleResult.data as AwardCycle | null) ?? null}
+        links={referenceLinks}
         role={profile.role}
         rubric={rubric}
         scale={(scaleResult.data ?? []) as ScoringScaleLevel[]}

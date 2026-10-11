@@ -334,6 +334,8 @@ function CategoryScoreSection({
   overallProductionScore,
   productionTitle,
   onScoreChange,
+  onPracticeProposalResponse,
+  practiceMode,
 }: {
   category: ScoringCategory;
   categoryIndex: number;
@@ -358,6 +360,12 @@ function CategoryScoreSection({
   overallProductionScore: OverallProductionScore;
   productionTitle: string;
   onScoreChange: (criterionId: string, value: number | null) => void;
+  onPracticeProposalResponse?: (
+    proposalId: string,
+    response: "approved" | "disputed",
+    comment: string | null,
+  ) => void;
+  practiceMode: boolean;
 }) {
   const isOverallProduction =
     category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
@@ -810,21 +818,38 @@ function CategoryScoreSection({
                       Review all categories
                     </button>
                   ) : (
-                    <button
-                      className="button button-gold button-compact"
-                      disabled={readOnly}
-                      formAction={respondCategoryProposal.bind(
-                        null,
-                        applicationId,
-                        officialProposal.id,
-                        "approved",
-                        `proposal_comment_${category.id}`,
-                      )}
-                      formNoValidate
-                      type="submit"
-                    >
-                      Approve {category.title} eligibility &amp; range
-                    </button>
+                    practiceMode ? (
+                      <button
+                        className="button button-gold button-compact"
+                        disabled={readOnly}
+                        onClick={() =>
+                          onPracticeProposalResponse?.(
+                            officialProposal.id,
+                            "approved",
+                            null,
+                          )
+                        }
+                        type="button"
+                      >
+                        Approve {category.title} eligibility &amp; range
+                      </button>
+                    ) : (
+                      <button
+                        className="button button-gold button-compact"
+                        disabled={readOnly}
+                        formAction={respondCategoryProposal.bind(
+                          null,
+                          applicationId,
+                          officialProposal.id,
+                          "approved",
+                          `proposal_comment_${category.id}`,
+                        )}
+                        formNoValidate
+                        type="submit"
+                      >
+                        Approve {category.title} eligibility &amp; range
+                      </button>
+                    )
                   )}
                   {canComment && (
                     <button
@@ -877,20 +902,42 @@ function CategoryScoreSection({
               </div>
 
               <div className="category-dispute-editor-actions">
-                <button
-                  className="button button-danger button-compact"
-                  formAction={respondCategoryProposal.bind(
-                    null,
-                    applicationId,
-                    officialProposal.id,
-                    "disputed",
-                    `proposal_comment_${category.id}`,
-                  )}
-                  formNoValidate
-                  type="submit"
-                >
-                  Submit dispute
-                </button>
+                {practiceMode ? (
+                  <button
+                    className="button button-danger button-compact"
+                    onClick={() => {
+                      const field = document.getElementById(
+                        `proposal_comment_${category.id}`,
+                      );
+                      if (!(field instanceof HTMLInputElement)) return;
+                      if (!field.reportValidity()) return;
+                      onPracticeProposalResponse?.(
+                        officialProposal.id,
+                        "disputed",
+                        field.value.trim(),
+                      );
+                      setDisputeOpen(false);
+                    }}
+                    type="button"
+                  >
+                    Submit dispute
+                  </button>
+                ) : (
+                  <button
+                    className="button button-danger button-compact"
+                    formAction={respondCategoryProposal.bind(
+                      null,
+                      applicationId,
+                      officialProposal.id,
+                      "disputed",
+                      `proposal_comment_${category.id}`,
+                    )}
+                    formNoValidate
+                    type="submit"
+                  >
+                    Submit dispute
+                  </button>
+                )}
                 <button
                   className="button button-secondary button-compact"
                   onClick={() => setDisputeOpen(false)}
@@ -1067,6 +1114,8 @@ export function CollaborativeAdjudicatorScorecard({
   afterCategory,
   afterCategoryTitle,
   productionTitle,
+  onPracticeProposalResponse,
+  practiceMode = false,
 }: {
   applicationId: string;
   currentUserId: string;
@@ -1089,6 +1138,12 @@ export function CollaborativeAdjudicatorScorecard({
   afterCategory?: ReactNode;
   afterCategoryTitle?: string;
   productionTitle: string;
+  onPracticeProposalResponse?: (
+    proposalId: string,
+    response: "approved" | "disputed",
+    comment: string | null,
+  ) => void;
+  practiceMode?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [panelRows, setPanelRows] = useState(initialPanelRows);
@@ -1110,6 +1165,8 @@ export function CollaborativeAdjudicatorScorecard({
   const refreshTimer = useRef<number | null>(null);
 
   const refreshWorkspace = useCallback(async () => {
+    if (practiceMode) return;
+
     const [panelResult, proposalResult, feedbackResult] = await Promise.all([
       supabase.rpc("get_shared_adjudication_observations", {
         p_application_id: applicationId,
@@ -1160,7 +1217,7 @@ export function CollaborativeAdjudicatorScorecard({
     }
     setLastRefreshed(new Date());
     setRefreshError(false);
-  }, [applicationId, canComment, supabase]);
+  }, [applicationId, canComment, practiceMode, supabase]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
@@ -1171,6 +1228,8 @@ export function CollaborativeAdjudicatorScorecard({
   }, [refreshWorkspace]);
 
   useEffect(() => {
+    if (practiceMode) return;
+
     const initialRefreshTimer = window.setTimeout(
       () => void refreshWorkspace(),
       0,
@@ -1211,7 +1270,17 @@ export function CollaborativeAdjudicatorScorecard({
       if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
       void supabase.removeChannel(channel);
     };
-  }, [applicationId, refreshWorkspace, scheduleRefresh, supabase]);
+  }, [applicationId, practiceMode, refreshWorkspace, scheduleRefresh, supabase]);
+
+  const effectiveCategoryProposals = practiceMode
+    ? categoryProposals
+    : liveCategoryProposals;
+  const effectiveCategoryApprovals = practiceMode
+    ? categoryApprovals
+    : liveCategoryApprovals;
+  const effectivePanelFeedback = practiceMode
+    ? panelFeedback
+    : livePanelFeedback;
 
   const panelMembers = useMemo(
     () =>
@@ -1273,19 +1342,19 @@ export function CollaborativeAdjudicatorScorecard({
   );
 
   const proposalMap = useMemo(
-    () => new Map(liveCategoryProposals.map((proposal) => [proposal.category_id, proposal])),
-    [liveCategoryProposals],
+    () => new Map(effectiveCategoryProposals.map((proposal) => [proposal.category_id, proposal])),
+    [effectiveCategoryProposals],
   );
 
   const approvalMap = useMemo(
-    () => new Map(liveCategoryApprovals.filter((approval) => approval.adjudicator_user_id === currentUserId).map((approval) => [approval.proposal_id, approval])),
-    [currentUserId, liveCategoryApprovals],
+    () => new Map(effectiveCategoryApprovals.filter((approval) => approval.adjudicator_user_id === currentUserId).map((approval) => [approval.proposal_id, approval])),
+    [currentUserId, effectiveCategoryApprovals],
   );
 
   const feedbackMap = useMemo(
     () =>
-      new Map(livePanelFeedback.map((item) => [item.category_id, item])),
-    [livePanelFeedback],
+      new Map(effectivePanelFeedback.map((item) => [item.category_id, item])),
+    [effectivePanelFeedback],
   );
 
   const reviewerMap = useMemo(
@@ -1317,14 +1386,18 @@ export function CollaborativeAdjudicatorScorecard({
         <span className="status-dot" />
         <div>
           <strong>
-            {refreshError
+            {practiceMode
+              ? "Practice workspace"
+              : refreshError
               ? "Live refresh interrupted"
               : liveConnection
                 ? "Two-point ranges update live"
                 : "Comments and two-point ranges refresh automatically"}
           </strong>
           <small>
-            {lastRefreshed
+            {practiceMode
+              ? "Entries stay in this browser and are never saved to a school."
+              : lastRefreshed
               ? `Last refreshed ${lastRefreshed.toLocaleTimeString()}`
               : "Waiting for the next panel update…"}
           </small>
@@ -1365,6 +1438,8 @@ export function CollaborativeAdjudicatorScorecard({
             overallProductionScore={overallProductionScore}
             productionTitle={productionTitle}
             onScoreChange={updateLiveOwnScore}
+            onPracticeProposalResponse={onPracticeProposalResponse}
+            practiceMode={practiceMode}
           />
           {afterCategory &&
           category.title.trim().toLocaleLowerCase() ===

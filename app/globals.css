@@ -16999,6 +16999,53 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
   line-height: 1.5;
 }
 
+.sandbox-safety-notice small {
+  display: block;
+  margin-top: 5px;
+  color: var(--portal-muted);
+}
+
+.sandbox-practice-actions,
+.sandbox-mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sandbox-live-review-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) repeat(3, minmax(150px, auto));
+  align-items: end;
+  gap: 14px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.sandbox-live-review-row > div:first-child,
+.sandbox-live-review-row label,
+.sandbox-live-decision {
+  display: grid;
+  gap: 6px;
+}
+
+.sandbox-live-review-row label {
+  color: var(--portal-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sandbox-live-review-row > div:first-child > strong,
+.sandbox-live-decision strong {
+  color: var(--portal-ivory);
+}
+
+.sandbox-live-decision small {
+  color: var(--portal-muted);
+}
+
 .sandbox-overview-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -17272,6 +17319,10 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
 }
 
 @media (max-width: 1050px) {
+  .sandbox-live-review-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .sandbox-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -17295,9 +17346,22 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .sandbox-safety-notice .button {
+  .sandbox-practice-actions {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .sandbox-practice-actions .button,
+  .sandbox-mode-switch {
+    width: 100%;
+  }
+
+  .sandbox-mode-switch .button {
+    flex: 1 1 160px;
+  }
+
+  .sandbox-live-review-row {
+    grid-template-columns: 1fr;
   }
 
   .sandbox-overview-grid {

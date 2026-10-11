@@ -145,6 +145,9 @@ export function ScorecardSubmitControls({
   compact = false,
   criteria,
   formId,
+  onPracticeSubmit,
+  practiceMode = false,
+  practiceSubmitted = false,
   requireComments = true,
 }: {
   applicationId: string;
@@ -152,6 +155,9 @@ export function ScorecardSubmitControls({
   compact?: boolean;
   criteria: ScoringCriterion[];
   formId?: string;
+  onPracticeSubmit?: () => void;
+  practiceMode?: boolean;
+  practiceSubmitted?: boolean;
   requireComments?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -209,6 +215,8 @@ export function ScorecardSubmitControls({
   }, [findForm, updateCompletion]);
 
   useEffect(() => {
+    if (practiceMode) return;
+
     const updateSyncState = () => {
       setOnline(navigator.onLine);
       setHasOfflineDraft(
@@ -235,16 +243,18 @@ export function ScorecardSubmitControls({
       window.removeEventListener("storage", updateSyncState);
       window.removeEventListener("ghsmta:offline-scorecard-draft-changed", handleDraftChange);
     };
-  }, [applicationId]);
+  }, [applicationId, practiceMode]);
 
-  const blockedBySync = !online || hasOfflineDraft;
-  const canSubmit = completion.complete && !blockedBySync;
+  const blockedBySync = practiceMode ? false : !online || hasOfflineDraft;
+  const canSubmit = !practiceSubmitted && completion.complete && !blockedBySync;
   const visibleReasons = completion.reasons.slice(0, 8);
   const additionalReasonCount = Math.max(
     completion.reasons.length - visibleReasons.length,
     0,
   );
-  const helpMessage = !online
+  const helpMessage = practiceSubmitted
+    ? "Practice scorecard complete. Reset the sandbox to practice again."
+    : !online && !practiceMode
     ? "Final submission is available once you are back online."
     : hasOfflineDraft
       ? "Final submission unlocks after the saved scorecard finishes syncing."
@@ -274,24 +284,40 @@ export function ScorecardSubmitControls({
       ref={hostRef}
       tabIndex={!canSubmit && compact ? 0 : undefined}
     >
-      <button
-        aria-describedby={helpId}
-        className={
-          compact
-            ? "application-reference-button application-reference-submit-button"
-            : "button button-dark"
-        }
-        disabled={!canSubmit}
-        form={formId}
-        formAction={saveAdjudicatorScorecard.bind(
-          null,
-          applicationId,
-          true,
-        )}
-        type="submit"
-      >
-        Submit scorecard
-      </button>
+      {practiceMode ? (
+        <button
+          aria-describedby={helpId}
+          className={
+            compact
+              ? "application-reference-button application-reference-submit-button"
+              : "button button-dark"
+          }
+          disabled={!canSubmit}
+          onClick={onPracticeSubmit}
+          type="button"
+        >
+          {practiceSubmitted ? "Practice complete" : "Submit scorecard"}
+        </button>
+      ) : (
+        <button
+          aria-describedby={helpId}
+          className={
+            compact
+              ? "application-reference-button application-reference-submit-button"
+              : "button button-dark"
+          }
+          disabled={!canSubmit}
+          form={formId}
+          formAction={saveAdjudicatorScorecard.bind(
+            null,
+            applicationId,
+            true,
+          )}
+          type="submit"
+        >
+          Submit scorecard
+        </button>
+      )}
 
       <small
         aria-live="polite"

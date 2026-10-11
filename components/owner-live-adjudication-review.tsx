@@ -615,6 +615,7 @@ export function OwnerLiveAdjudicationReview({
   initialComments,
   initialFeedback,
   productionTitle,
+  practiceMode = false,
   release,
 }: {
   applicationId: string;
@@ -630,6 +631,7 @@ export function OwnerLiveAdjudicationReview({
   initialComments: AdjudicationCategoryComment[];
   initialFeedback: AdjudicationPanelFeedback[];
   productionTitle: string;
+  practiceMode?: boolean;
   release: AdjudicationRelease | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -700,6 +702,8 @@ export function OwnerLiveAdjudicationReview({
     [advisoryNarrativeReview?.panelApprovedCategoryIds],
   );
   const refreshData = useCallback(async () => {
+    if (practiceMode) return;
+
     const { data: scorecardData, error: scorecardError } = await supabase
       .from("adjudication_scorecards")
       .select("*")
@@ -746,7 +750,7 @@ export function OwnerLiveAdjudicationReview({
     );
     setLastUpdated(new Date());
     setConnectionState("live");
-  }, [applicationId, isOwner, supabase]);
+  }, [applicationId, isOwner, practiceMode, supabase]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
@@ -806,6 +810,8 @@ export function OwnerLiveAdjudicationReview({
   }, [advisoryScoreEntry, categories, criteria]);
 
   useEffect(() => {
+    if (practiceMode) return;
+
     const channels = [
       supabase
         .channel(`panel-review-scorecards:${applicationId}`)
@@ -877,18 +883,22 @@ export function OwnerLiveAdjudicationReview({
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
       for (const channel of channels) void supabase.removeChannel(channel);
     };
-  }, [applicationId, isOwner, refreshData, scheduleRefresh, scorecardKey, supabase]);
+  }, [applicationId, isOwner, practiceMode, refreshData, scheduleRefresh, scorecardKey, supabase]);
 
   return (
     <>
       <div
-        className={`live-review-status live-review-status-${connectionState}`}
+        className={`live-review-status live-review-status-${
+          practiceMode ? "live" : connectionState
+        }`}
         ref={workspaceRef}
       >
         <span aria-hidden="true" />
         <div>
           <strong>
-            {connectionState === "live"
+            {practiceMode
+              ? "Practice Advisory Committee review"
+              : connectionState === "live"
               ? isOwner
                 ? "Live owner review"
                 : "Live Advisory Committee review"
@@ -897,12 +907,14 @@ export function OwnerLiveAdjudicationReview({
                 : "Live connection interrupted"}
           </strong>
           <small>
-            {lastUpdated
+            {practiceMode
+              ? "Sample panel scores and comments mirror the live review workspace."
+              : lastUpdated
               ? `Last database update ${lastUpdated.toLocaleTimeString()}`
               : "Draft scores and comments will appear here as panel members save."}
           </small>
         </div>
-        {connectionState === "error" && (
+        {!practiceMode && connectionState === "error" && (
           <button className="button button-secondary button-compact" onClick={() => void refreshData()} type="button">
             Refresh now
           </button>

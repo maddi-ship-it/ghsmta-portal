@@ -392,11 +392,13 @@ export function AdjudicationBrainDump({
   applicationId,
   defaultValue,
   canComment,
+  practiceMode = false,
   readOnly,
 }: {
   applicationId: string;
   defaultValue: string | null | undefined;
   canComment: boolean;
+  practiceMode?: boolean;
   readOnly: boolean;
 }) {
   const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}`;
@@ -440,6 +442,13 @@ export function AdjudicationBrainDump({
   const sortNotes = async () => {
     const notes = value.trim();
     if (!notes || sorting || readOnly || !canComment) return;
+
+    if (practiceMode) {
+      setMessage(
+        "Practice brain-dump notes stay on this page. Auto-sort is available on an assigned school, where it can use that production's application context.",
+      );
+      return;
+    }
 
     setSorting(true);
     setMessage("Separating and categorizing every source observation…");
@@ -645,10 +654,9 @@ export function AdjudicationBrainDump({
               </div>
             )}
             <small className="field-help">
-              These private notes autosave with your scorecard. Auto-sort adds
-              matched observations to their criterion comments and opens a
-              placement window only for observations it cannot categorize. It
-              never assigns scores or removes the original brain dump.
+              {practiceMode
+                ? "These practice notes remain on this page and are cleared when you leave or reset the sandbox. Auto-sort does not send practice text to a school record."
+                : "These private notes autosave with your scorecard. Auto-sort adds matched observations to their criterion comments and opens a placement window only for observations it cannot categorize. It never assigns scores or removes the original brain dump."}
             </small>
           </div>
 
