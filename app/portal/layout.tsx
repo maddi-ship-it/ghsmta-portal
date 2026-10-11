@@ -26,7 +26,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const showMfaGrace = Boolean(profile.mfa_required && graceDeadline);
 
   return (
-    <div className="portal-shell">
+    <div className="portal-shell" data-portal-role={profile.role}>
       <ThemeProfileSync preference={profile.theme_preference ?? "system"} />
       <PortalScrollManager />
       <PortalHeader profile={profile} />

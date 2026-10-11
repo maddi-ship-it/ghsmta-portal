@@ -16279,3 +16279,313 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
     text-align: left;
   }
 }
+
+/* ========================================================================== */
+/* Cross-role light/dark reconciliation                                        */
+/*                                                                            */
+/* Several long-lived page families predate the semantic portal palette and    */
+/* still reference their original light-only variables. Keep those aliases     */
+/* theme-aware, then normalize the remaining standalone surfaces shared by     */
+/* Applicant, Adjudicator, Advisory Committee, Program Manager, and Owner.      */
+/* ========================================================================== */
+
+.portal-shell {
+  --border: var(--portal-line);
+  --brand: var(--portal-blue);
+  --blue: var(--portal-blue);
+  --navy-50: color-mix(in srgb, var(--portal-blue) 10%, var(--portal-surface));
+  --navy-500: var(--portal-blue);
+  --navy-600: var(--portal-blue-deep);
+  --page-bg: var(--portal-bg);
+  --soft: var(--portal-surface-2);
+  --soft-blue: color-mix(in srgb, var(--portal-blue) 10%, var(--portal-surface-2));
+  --soft-gray: var(--portal-surface-3);
+  --surface: var(--portal-surface);
+  --surface-muted: var(--portal-surface-2);
+  --surface-soft: var(--portal-surface-3);
+  --surface-subtle: var(--portal-surface-2);
+  --text: var(--portal-text);
+  --portal-surface-raised: var(--portal-surface);
+}
+
+.portal-shell .portal-main :where(
+  .advisory-queue-card,
+  .appeal-card,
+  .billing-history-filters,
+  .billing-price-row,
+  .billing-selected-school-summary,
+  .consensus-alert,
+  .consensus-review-checklist,
+  .dashboard-adjudication-date-card,
+  .empty-state,
+  .compact-empty-state,
+  .schedule-empty-state,
+  .report-saved-card,
+  .rubric-criterion-create,
+  .rubric-criterion-row,
+  .rubric-version-actions,
+  .schedule-owner-slot-queue,
+  .schedule-participant,
+  .schedule-participant-permissions-form,
+  .schedule-waitlist-row,
+  .schedule-owner-waitlist-row,
+  .school-team-invite-form,
+  .user-edit-panel
+) {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-line) !important;
+  background: var(--portal-surface-2) !important;
+}
+
+.portal-shell .portal-main :where(
+  .advisory-queue-status-grid > span,
+  .appeal-explanation,
+  .appeal-resolution-view,
+  .eligibility-appeal-summary > span,
+  .owner-response,
+  .schedule-slot-meta > span,
+  .user-school-chip
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-3);
+}
+
+.portal-shell .portal-main :where(
+  .advisory-queue-card,
+  .school-file-application,
+  .schedule-list-summary,
+  .schedule-view-toggle a,
+  .archive-jump-nav a,
+  .owner-schedule-section-nav a
+) {
+  color: var(--portal-text);
+}
+
+.portal-shell .portal-main :where(
+  .advisory-queue-card,
+  .school-file-application,
+  .schedule-list-summary,
+  .archive-jump-nav a,
+  .owner-schedule-section-nav a
+):hover,
+.portal-shell .portal-main :where(
+  .advisory-queue-card,
+  .school-file-application,
+  .schedule-list-summary,
+  .archive-jump-nav a,
+  .owner-schedule-section-nav a
+):focus-visible {
+  color: var(--portal-ivory);
+  border-color: var(--portal-line-strong);
+  background: var(--portal-surface-hover) !important;
+}
+
+.portal-shell .portal-main .school-file-application.active,
+.portal-shell .portal-main .schedule-view-toggle a.active,
+.portal-shell .portal-main .owner-schedule-section-nav a.active {
+  color: var(--portal-ivory);
+  border-color: var(--portal-blue);
+  background: color-mix(in srgb, var(--portal-blue) 16%, var(--portal-surface-2)) !important;
+}
+
+.portal-shell .portal-main :where(
+  .schedule-list-expand,
+  .schedule-list-metric strong,
+  .schedule-waitlist-disclosure > summary::after
+) {
+  color: var(--portal-blue);
+}
+
+.portal-shell .portal-main :where(
+  .modal-close,
+  .score-range-modal-close,
+  .schedule-tool-modal-close
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-3);
+  box-shadow: none;
+}
+
+.portal-shell .portal-main :where(
+  .modal-close,
+  .score-range-modal-close,
+  .schedule-tool-modal-close
+):hover,
+.portal-shell .portal-main :where(
+  .modal-close,
+  .score-range-modal-close,
+  .schedule-tool-modal-close
+):focus-visible {
+  color: var(--portal-ivory);
+  border-color: var(--portal-line-strong);
+  background: var(--portal-surface-hover);
+}
+
+.portal-shell .portal-main :where(
+  .score-range-modal-list label,
+  .consensus-summary > div,
+  .owner-category-decision-summary > div
+) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-2);
+}
+
+.portal-shell .portal-main :where(
+  .consensus-row-disputed,
+  .advisory-queue-status-grid .is-alert
+) {
+  color: var(--portal-danger);
+  border-color: color-mix(in srgb, var(--portal-danger) 34%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-danger) 10%, var(--portal-surface-2)) !important;
+}
+
+.portal-shell .portal-main .release-note {
+  color: var(--portal-warning);
+  border-color: color-mix(in srgb, var(--portal-warning) 32%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-warning) 10%, var(--portal-surface-2));
+}
+
+.portal-shell .portal-main :where(
+  .schedule-participant-permission,
+  .schedule-results-summary,
+  .schedule-pagination,
+  .appeal-card-summary small,
+  .user-bulk-toolbar small
+) {
+  color: var(--portal-muted);
+}
+
+.portal-shell .portal-main .schedule-pagination-pages :where(a, span) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-raised);
+}
+
+.portal-shell .portal-main .schedule-pagination-pages .active {
+  color: var(--portal-ivory);
+  border-color: var(--portal-line-strong);
+  background: color-mix(in srgb, var(--portal-gold) 16%, var(--portal-surface));
+}
+
+.portal-shell .portal-main :where(
+  .school-team-member-title span,
+  .school-file-icon
+) {
+  color: var(--portal-blue);
+  background: color-mix(in srgb, var(--portal-blue) 11%, var(--portal-surface-2));
+}
+
+.portal-shell .portal-main :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea,
+  [contenteditable="true"]
+) {
+  caret-color: var(--portal-text);
+}
+
+.portal-shell .portal-main :where(input, select, textarea):autofill,
+.portal-shell .portal-main :where(input, select, textarea):-webkit-autofill {
+  -webkit-text-fill-color: var(--portal-ivory);
+  box-shadow: 0 0 0 1000px var(--portal-input) inset !important;
+}
+
+html[data-theme="light"] .portal-shell .portal-main :where(input, select, textarea):autofill,
+html[data-theme="light"] .portal-shell .portal-main :where(input, select, textarea):-webkit-autofill {
+  -webkit-text-fill-color: var(--portal-ivory);
+}
+
+/* Portal dialogs can be rendered beside <main>, so they cannot depend on a
+   .portal-main ancestor for their resolved controls and typography. */
+.portal-shell :where(
+  .modal-card,
+  .regal-dialog-card,
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .schedule-tool-modal,
+  .score-range-modal
+) {
+  color-scheme: inherit;
+}
+
+.portal-shell :where(
+  .modal-card,
+  .regal-dialog-card,
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .schedule-tool-modal,
+  .score-range-modal
+) :where(h1, h2, h3, h4, label) {
+  color: var(--portal-ivory);
+}
+
+.portal-shell :where(
+  .modal-card,
+  .regal-dialog-card,
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .schedule-tool-modal,
+  .score-range-modal
+) :where(p, small, .privacy-note, .field-help) {
+  color: var(--portal-muted);
+}
+
+.portal-shell :where(
+  .modal-card,
+  .regal-dialog-card,
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .schedule-tool-modal,
+  .score-range-modal
+) .eyebrow {
+  color: var(--portal-gold-bright);
+}
+
+.portal-shell :where(
+  .modal-card,
+  .regal-dialog-card,
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .schedule-tool-modal,
+  .score-range-modal
+) :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea,
+  .input,
+  .select,
+  .textarea,
+  .file-input
+) {
+  color: var(--portal-ivory);
+  border-color: var(--portal-line);
+  background: var(--portal-input);
+}
+
+.portal-shell :where(
+  .modal-card,
+  .regal-dialog-card,
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .schedule-tool-modal,
+  .score-range-modal
+) :where(option, optgroup) {
+  color: var(--portal-text);
+  background: var(--portal-surface);
+}
+
+.portal-shell :where(
+  .modal-card,
+  .regal-dialog-card,
+  .application-reference-modal,
+  .consensus-matrix-modal,
+  .schedule-tool-modal,
+  .score-range-modal
+) :where(.button.button-secondary, .button.button-secondary-light) {
+  color: var(--portal-text);
+  border-color: var(--portal-line);
+  background: var(--portal-surface-2);
+}
