@@ -15,6 +15,7 @@ export type SchoolFileRecord = { id: string; application_id: string; original_na
 
 const FILE_TYPES = [
   ["playbill", "Playbill", ".pdf"],
+  ["poster", "Poster", "image/*,.pdf"],
   ["logo", "Logo", "image/*,.pdf,.svg,.eps"],
   ["scenic", "Scenic Drawings / Renderings", "image/*,.pdf"],
   ["name_pronunciation", "Name Pronunciation", "audio/*,video/*"],
