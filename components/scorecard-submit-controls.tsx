@@ -191,11 +191,20 @@ export function ScorecardSubmitControls({
     scheduleUpdate();
     form.addEventListener("input", scheduleUpdate);
     form.addEventListener("change", scheduleUpdate);
+    const observer = new MutationObserver(scheduleUpdate);
+    observer.observe(form, {
+      attributeFilter: ["checked", "disabled", "value"],
+      attributes: true,
+      characterData: true,
+      childList: true,
+      subtree: true,
+    });
 
     return () => {
       if (updateTimer) window.clearTimeout(updateTimer);
       form.removeEventListener("input", scheduleUpdate);
       form.removeEventListener("change", scheduleUpdate);
+      observer.disconnect();
     };
   }, [findForm, updateCompletion]);
 
@@ -264,7 +273,6 @@ export function ScorecardSubmitControls({
       data-tooltip={!canSubmit && compact ? helpMessage : undefined}
       ref={hostRef}
       tabIndex={!canSubmit && compact ? 0 : undefined}
-      title={!canSubmit ? helpMessage : undefined}
     >
       <button
         aria-describedby={helpId}

@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow-actions";
+import { OPEN_CATEGORY_REVIEW_EVENT } from "@/components/application-reference-bar";
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
 import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
@@ -765,7 +766,9 @@ function CategoryScoreSection({
             />
 
             <div className="category-decision-response-copy">
-              <span>Committee decision for your approval</span>
+              <span>
+                {category.title} · Committee decision for your approval
+              </span>
               <strong id={`category-decision-${category.id}`}>
                 {officialProposal
                   ? officialProposal.is_eligible
@@ -794,21 +797,35 @@ function CategoryScoreSection({
               proposalRangeIsValid &&
               officialProposal.status !== "overridden" && (
                 <div className="category-decision-response-actions">
-                  <button
-                    className="button button-gold button-compact"
-                    disabled={readOnly}
-                    formAction={respondCategoryProposal.bind(
-                      null,
-                      applicationId,
-                      officialProposal.id,
-                      "approved",
-                      `proposal_comment_${category.id}`,
-                    )}
-                    formNoValidate
-                    type="submit"
-                  >
-                    Approve eligibility &amp; range
-                  </button>
+                  {decisionResponseState === "approved" ? (
+                    <button
+                      className="button button-gold button-compact"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new Event(OPEN_CATEGORY_REVIEW_EVENT),
+                        )
+                      }
+                      type="button"
+                    >
+                      Review all categories
+                    </button>
+                  ) : (
+                    <button
+                      className="button button-gold button-compact"
+                      disabled={readOnly}
+                      formAction={respondCategoryProposal.bind(
+                        null,
+                        applicationId,
+                        officialProposal.id,
+                        "approved",
+                        `proposal_comment_${category.id}`,
+                      )}
+                      formNoValidate
+                      type="submit"
+                    >
+                      Approve {category.title} eligibility &amp; range
+                    </button>
+                  )}
                   {canComment && (
                     <button
                       aria-expanded={disputeOpen}

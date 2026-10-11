@@ -20,7 +20,6 @@ export function CompleteAdjudicationControl({
       className="scorecard-submit-control scorecard-submit-control-compact"
       data-tooltip={!canComplete ? helpMessage : undefined}
       tabIndex={!canComplete ? 0 : undefined}
-      title={helpMessage}
     >
       <button
         aria-label={helpMessage}
