@@ -1060,6 +1060,22 @@ export default async function AdjudicationApplicationPage({
         </section>
       ) : (
         <>
+          <OwnerLiveAdjudicationReview
+            applicationId={id}
+            isOwner={profile.role === "owner"}
+            categories={scoreableCategories}
+            criteria={scoreableCriteria}
+            assignments={assignments}
+            profiles={adjudicatorProfiles}
+            initialScorecards={scorecards}
+            initialScores={scores}
+            initialComments={comments}
+            initialFeedback={
+              profile.role === "owner" ? feedback : panelVisibleFeedback
+            }
+            release={release}
+          />
+
           {profile.role === "advisory_member" && (
             <PanelNarrativeWorkflow
               applicationId={id}
@@ -1082,22 +1098,6 @@ export default async function AdjudicationApplicationPage({
                 ? "owner"
                 : "advisory_member"
             }
-          />
-
-          <OwnerLiveAdjudicationReview
-            applicationId={id}
-            isOwner={profile.role === "owner"}
-            categories={scoreableCategories}
-            criteria={scoreableCriteria}
-            assignments={assignments}
-            profiles={adjudicatorProfiles}
-            initialScorecards={scorecards}
-            initialScores={scores}
-            initialComments={comments}
-            initialFeedback={
-              profile.role === "owner" ? feedback : panelVisibleFeedback
-            }
-            release={release}
           />
 
           {profile.role === "owner" && (

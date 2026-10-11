@@ -533,17 +533,6 @@ export function OwnerLiveAdjudicationReview({
       ),
     [scores],
   );
-  const commentByCardAndCategory = useMemo(
-    () =>
-      new Map(
-        comments.map((comment) => [
-          `${comment.scorecard_id}:${comment.category_id}`,
-          comment,
-        ]),
-      ),
-    [comments],
-  );
-
   const refreshData = useCallback(async () => {
     const { data: scorecardData, error: scorecardError } = await supabase
       .from("adjudication_scorecards")
@@ -718,14 +707,16 @@ export function OwnerLiveAdjudicationReview({
             ).length}
           </strong>
         </article>
-        <article className="metric-card">
-          <span className="metric-label">School release</span>
-          <strong className="metric-text">
-            {release?.scores_released_at || release?.feedback_released_at
-              ? "Released"
-              : "Not released"}
-          </strong>
-        </article>
+        {isOwner ? (
+          <article className="metric-card">
+            <span className="metric-label">School release</span>
+            <strong className="metric-text">
+              {release?.scores_released_at || release?.feedback_released_at
+                ? "Released"
+                : "Not released"}
+            </strong>
+          </article>
+        ) : null}
       </section>
 
       <section className="panel panel-progress-section">
@@ -882,114 +873,8 @@ export function OwnerLiveAdjudicationReview({
               </table>
             </div>
 
-            <div className="panel-body">
-              <h3>Live adjudicator comments</h3>
-              <div className="raw-comment-grid">
-                {panelRoster.map(({ assignment, scorecard: card }) => {
-                  const panelist = profileMap.get(
-                    assignment.adjudicator_user_id,
-                  );
-                  const comment = card
-                    ? commentByCardAndCategory.get(
-                        `${card.id}:${category.id}`,
-                      )
-                    : undefined;
-                  return (
-                    <article className="raw-comment-card" key={assignment.id}>
-                      <div className="raw-comment-card-heading">
-                        <h4>{panelist?.full_name ?? panelist?.email ?? "Adjudicator"}</h4>
-                        <span
-                          className={`badge badge-scorecard-${card?.status ?? assignment.status}`}
-                        >
-                          {card ? scorecardStatusLabel(card.status) : "Not started"}
-                        </span>
-                      </div>
-                      {!card ? (
-                        <p>No scorecard has been started yet.</p>
-                      ) : (
-                        <>
-                          {comment && (
-                            <div className="owner-category-decision-summary">
-                              <span
-                                className={[
-                                  "badge",
-                                  comment.is_eligible
-                                    ? "badge-scorecard-submitted"
-                                    : "badge-scorecard-reopened",
-                                ].join(" ")}
-                              >
-                                {comment.is_eligible
-                                  ? "Eligible"
-                                  : "Not eligible"}
-                              </span>
-
-                              {comment.score_range_min != null &&
-                                comment.score_range_max != null && (
-                                  <span>
-                                    2-point range:{" "}
-                                    {Number(
-                                      comment.score_range_min,
-                                    ).toFixed(2)}
-                                    –
-                                    {Number(
-                                      comment.score_range_max,
-                                    ).toFixed(2)}
-                                  </span>
-                                )}
-                            </div>
-                          )}
-                          {comment?.subject_name && (
-                            <p>
-                              <strong>Subject:</strong> {comment.subject_name}
-                            </p>
-                          )}
-                          {comment && !comment.is_applicable ? (
-                            <p>
-                              <strong>Not applicable:</strong>{" "}
-                              {comment.not_applicable_reason ??
-                                "No reason entered"}
-                            </p>
-                          ) : (
-                            <>
-                              <div className="raw-comment-section">
-                                <strong>Successes:</strong>
-                                <RichTextPreview value={comment?.successes} />
-                              </div>
-                              <div className="raw-comment-section">
-                                <strong>Examples:</strong>
-                                <RichTextPreview
-                                  value={comment?.success_examples}
-                                />
-                              </div>
-                              <div className="raw-comment-section">
-                                <strong>Growth:</strong>
-                                <RichTextPreview value={comment?.growth_areas} />
-                              </div>
-                              <div className="raw-comment-section">
-                                <strong>Growth examples:</strong>
-                                <RichTextPreview
-                                  value={comment?.growth_examples}
-                                />
-                              </div>
-                            </>
-                          )}
-                          {comment && (
-                            <small className="live-comment-updated">
-                              Saved{" "}
-                              {new Date(
-                                comment.updated_at,
-                              ).toLocaleTimeString()}
-                            </small>
-                          )}
-                        </>
-                      )}
-                    </article>
-                  );
-                })}
-                {panelRoster.length === 0 && <p>No panel members are assigned yet.</p>}
-              </div>
-
-              {isOwner ? (
+            {isOwner ? (
+              <div className="panel-body">
                 <LivePanelFeedbackEditor
                   key={`${category.id}:${categoryFeedback?.updated_at ?? "live"}`}
                   applicationId={applicationId}
@@ -1004,20 +889,8 @@ export function OwnerLiveAdjudicationReview({
                       ),
                   )}
                 />
-              ) : (
-                <div className="form-stack">
-                  {assignedReviewerName && (
-                    <div className="final-comment-assignee">
-                      <span>Assigned final comment writer</span>
-                      <strong>{assignedReviewerName}</strong>
-                    </div>
-                  )}
-                  <div className="narrative-preview">
-                    {categoryFeedback?.final_comment || "No panel narrative has been prepared yet."}
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : null}
           </section>
         );
       })}
