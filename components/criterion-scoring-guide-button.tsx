@@ -115,7 +115,7 @@ export function CriterionScoringGuideButton({
       {open &&
         createPortal(
           <div
-            className="application-reference-modal-backdrop criterion-guide-modal-backdrop"
+            className="application-reference-modal-backdrop"
             onMouseDown={(event) => {
               if (event.currentTarget === event.target) setOpen(false);
             }}
@@ -124,16 +124,16 @@ export function CriterionScoringGuideButton({
             <section
               aria-labelledby={titleId}
               aria-modal="true"
-              className="application-reference-modal criterion-guide-modal"
+              className="application-reference-modal"
               role="dialog"
             >
-              <header className="application-reference-modal-header criterion-guide-modal-header">
+              <header className="application-reference-modal-header">
                 <div>
-                  <span className="eyebrow">Scoring guide · {categoryTitle}</span>
+                  <span className="eyebrow">Scoring guide</span>
                   <h2 id={titleId}>{guide?.title ?? criterionTitle}</h2>
                   <p>
-                    Observable benchmarks and practical examples for scores 10
-                    through 1.
+                    {categoryTitle} · Observable benchmarks and practical
+                    examples for scores 10 through 1.
                   </p>
                 </div>
                 <button
@@ -147,7 +147,7 @@ export function CriterionScoringGuideButton({
                 </button>
               </header>
 
-              <div className="application-reference-modal-body criterion-guide-modal-body">
+              <div className="application-reference-modal-body">
                 {loading ? (
                   <div className="criterion-guide-state" role="status">
                     <span className="status-dot" />
@@ -166,49 +166,46 @@ export function CriterionScoringGuideButton({
                   </div>
                 ) : guide ? (
                   <>
-                    <section className="application-reference-group criterion-guide-focus">
+                    <section className="application-reference-group">
                       <h3>Assessment focus</h3>
-                      <ul>
+                      <ul className="criterion-guide-focus-list">
                         {guide.assessment_focus.map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                       </ul>
                     </section>
 
-                    <section className="criterion-guide-score-section">
-                      <div className="criterion-guide-section-heading">
-                        <div>
-                          <span className="eyebrow">Score descriptions</span>
-                          <h3>Choose the closest observable benchmark</h3>
-                        </div>
-                        <small>Quarter-point scores may be used between levels.</small>
-                      </div>
-
-                      <div className="criterion-guide-levels">
+                    <section className="application-reference-group">
+                      <h3>Score descriptions</h3>
+                      <dl className="application-reference-list criterion-guide-level-list">
                         {guide.levels.map((level) => (
-                          <article className="criterion-guide-level" key={level.score}>
-                            <div className="criterion-guide-score">
+                          <div
+                            className="application-reference-row criterion-guide-level-row"
+                            key={level.score}
+                          >
+                            <dt className="criterion-guide-score">
                               <strong>{level.score}</strong>
                               <span>{level.label}</span>
-                            </div>
-                            <div className="criterion-guide-level-copy">
-                              <span>Observable performance</span>
-                              <p>{level.observable}</p>
-                            </div>
-                            <div className="criterion-guide-level-copy criterion-guide-example">
-                              <span>Practical context</span>
-                              <p>{level.example}</p>
-                            </div>
-                          </article>
+                            </dt>
+                            <dd className="criterion-guide-level-copy">
+                              <div>
+                                <span>Observable performance</span>
+                                <p>{level.observable}</p>
+                              </div>
+                              <div>
+                                <span>Practical context</span>
+                                <p>{level.example}</p>
+                              </div>
+                            </dd>
+                          </div>
                         ))}
-                      </div>
+                      </dl>
                     </section>
 
-                    {sourceDocument ? (
-                      <p className="criterion-guide-source">
-                        Source: {sourceDocument}
-                      </p>
-                    ) : null}
+                    <p className="criterion-guide-source">
+                      Quarter-point scores may be used between levels.
+                      {sourceDocument ? ` Source: ${sourceDocument}` : ""}
+                    </p>
                   </>
                 ) : null}
               </div>
