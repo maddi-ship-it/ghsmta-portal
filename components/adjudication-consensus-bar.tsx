@@ -15,6 +15,7 @@ import {
   submitPanelForOwnerReview,
   type CategoryProposalSaveResult,
 } from "@/app/portal/adjudication/[id]/workflow-actions";
+import { ActingCandidateReviewPanel } from "@/components/acting-candidate-review-panel";
 import { ScheduleSubmitButton } from "@/components/schedule-submit-button";
 import {
   OPEN_CATEGORY_REVIEW_EVENT,
@@ -25,6 +26,10 @@ import {
   isValidTwoPointRange,
 } from "@/lib/adjudication-ranges";
 import { createClient } from "@/lib/supabase/client";
+import type {
+  ActingCandidateReviewer,
+  ActingCandidateReviewState,
+} from "@/lib/acting-candidate-review";
 import type { AppRole, ScoringCategory } from "@/lib/types";
 
 type Proposal = {
@@ -135,6 +140,8 @@ const rangeOptions = Array.from(
 const initialCategorySaveResult: CategoryProposalSaveResult = { ok: false };
 
 export function AdjudicationConsensusBar({
+  actingCandidateReview,
+  actingCandidateReviewers,
   applicationId,
   categories,
   narrativeAssignments,
@@ -150,6 +157,8 @@ export function AdjudicationConsensusBar({
   compact = false,
 }: {
   applicationId: string;
+  actingCandidateReview: ActingCandidateReviewState;
+  actingCandidateReviewers: ActingCandidateReviewer[];
   role: AppRole;
   currentUserId: string;
   categories: ScoringCategory[];
@@ -253,6 +262,8 @@ export function AdjudicationConsensusBar({
   const disputed = proposals.filter(
     (proposal) => proposal.status === "disputed",
   ).length;
+  const candidateApprovalComplete =
+    actingCandidateReview.status === "approved";
   const canSetDecisions = role === "advisory_member" || role === "owner";
   const canReviewRanges = role === "adjudicator";
   const openRangeReview = useCallback(() => {
@@ -349,6 +360,11 @@ export function AdjudicationConsensusBar({
           {disputed > 0 && (
             <span className="badge badge-warning">{disputed} disputed</span>
           )}
+          {!candidateApprovalComplete && (
+            <span className="badge badge-warning">
+              Acting candidates pending
+            </span>
+          )}
           {review && <span className="badge">{statusLabel(review.status)}</span>}
         </div>
         <div className="consensus-main-actions">
@@ -413,10 +429,10 @@ export function AdjudicationConsensusBar({
               <div className="modal-header sticky-modal-header">
                 <div>
                   <p className="eyebrow">Adjudicator review</p>
-                  <h2 id="range-review-title">Two-point range review</h2>
+                  <h2 id="range-review-title">Review all categories</h2>
                   <p>
-                    Compare each proposed range with your category average,
-                    then approve it or ask that it be revisited.
+                    Approve the acting candidates, then compare every proposed
+                    range with your category average.
                   </p>
                 </div>
                 <button
@@ -428,6 +444,14 @@ export function AdjudicationConsensusBar({
                   ×
                 </button>
               </div>
+
+              <ActingCandidateReviewPanel
+                applicationId={applicationId}
+                currentUserId={currentUserId}
+                reviewers={actingCandidateReviewers}
+                role={role}
+                state={actingCandidateReview}
+              />
 
               <div className="consensus-matrix-table-wrap">
                 <table className="data-table consensus-matrix-table">
@@ -677,10 +701,10 @@ export function AdjudicationConsensusBar({
                       ? "Owner category review"
                       : "Advisory Committee review"}
                   </p>
-                  <h2 id="category-decision-title">Category decisions</h2>
+                  <h2 id="category-decision-title">Review all categories</h2>
                   <p>
-                    Set eligibility, applicability, two-point ranges, and final
-                    comment writers in one place.
+                    Confirm acting candidates, eligibility, applicability,
+                    two-point ranges, and final comment writers in one place.
                   </p>
                 </div>
                 <div className="modal-header-actions">
@@ -694,6 +718,14 @@ export function AdjudicationConsensusBar({
                   </button>
                 </div>
               </div>
+
+              <ActingCandidateReviewPanel
+                applicationId={applicationId}
+                currentUserId={currentUserId}
+                reviewers={actingCandidateReviewers}
+                role={role}
+                state={actingCandidateReview}
+              />
 
               <div className="advisory-decision-help">
                 <p>
@@ -1003,6 +1035,12 @@ export function AdjudicationConsensusBar({
             </div>
             <div className="consensus-review-checklist">
               <p>
+                <strong>Acting candidates:</strong>{" "}
+                {candidateApprovalComplete
+                  ? "Full panel approved"
+                  : "Approval in progress"}
+              </p>
+              <p>
                 <strong>Category decisions:</strong>{" "}
                 {unresolved === 0 ? "Complete" : `${unresolved} unresolved`}
               </p>
@@ -1019,7 +1057,11 @@ export function AdjudicationConsensusBar({
               <form action={submitPanelForOwnerReview.bind(null, applicationId)}>
                 <button
                   className="button button-dark"
-                  disabled={unresolved > 0 || !narrativesReady}
+                  disabled={
+                    unresolved > 0 ||
+                    !narrativesReady ||
+                    !candidateApprovalComplete
+                  }
                   type="submit"
                 >
                   Send to Owners for review

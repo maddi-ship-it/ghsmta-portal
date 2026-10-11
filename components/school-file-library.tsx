@@ -12,6 +12,7 @@ import type { Profile } from "@/lib/types";
 import { PronunciationRecorder } from "@/components/pronunciation-recorder";
 export type SchoolFileApplication = { application_id: string; cycle_id: string; school_name: string; production_title: string | null; season_year: string; program_name: string; can_upload: boolean };
 export type SchoolFileRecord = { id: string; application_id: string; original_name: string; generated_name: string; storage_path: string; mime_type: string | null; file_size: number | null; uploaded_by: string; document_category: string; reviewer_visible: boolean; created_at: string; display_name?: string | null; person_name?: string | null; award_category?: string | null; role_or_character?: string | null; designer_name?: string | null; phonetic_spelling?: string | null; file_notes?: string | null; production_name?: string | null };
+export type SchoolFilePronunciationRequirement = { applicationId: string; approvedAt: string; outstandingNames: string[] };
 
 const FILE_TYPES = [
   ["playbill", "Playbill", ".pdf"],
@@ -26,7 +27,7 @@ const FILE_TYPES = [
 function labelFor(value: string) { return FILE_TYPES.find(([key]) => key === value)?.[1] ?? value; }
 function formatBytes(value: number | null) { if (!value) return "—"; if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`; return `${(value / (1024 * 1024)).toFixed(1)} MB`; }
 
-export function SchoolFileLibrary({ profile, applications, initialFiles }: { profile: Profile; applications: SchoolFileApplication[]; initialFiles: SchoolFileRecord[] }) {
+export function SchoolFileLibrary({ profile, applications, initialFiles, pronunciationRequirements = [] }: { profile: Profile; applications: SchoolFileApplication[]; initialFiles: SchoolFileRecord[]; pronunciationRequirements?: SchoolFilePronunciationRequirement[] }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [applicationId, setApplicationId] = useState(applications[0]?.application_id ?? "");
@@ -44,6 +45,9 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
   const application = applications.find((item) => item.application_id === applicationId);
   const selectedType = FILE_TYPES.find(([key]) => key === fileType) ?? FILE_TYPES[0];
   const personFields = ["name_pronunciation", "headshot", "resume"].includes(fileType);
+  const pronunciationRequirement = pronunciationRequirements.find(
+    (requirement) => requirement.applicationId === applicationId,
+  );
 
   const visibleFiles = initialFiles.filter((file) => file.application_id === applicationId && [file.original_name, file.generated_name, file.person_name, file.award_category, file.document_category].join(" ").toLowerCase().includes(search.trim().toLowerCase()));
   const allVisibleSelected =
@@ -227,6 +231,15 @@ export function SchoolFileLibrary({ profile, applications, initialFiles }: { pro
           <span className="badge">{visibleFiles.length} files</span>
         </div>
         <div className="panel-body form-stack">
+          {pronunciationRequirement && (
+            <div className="notice-banner warning-banner school-file-reupload-notice" role="status">
+              <strong>Updated name pronunciation required</strong>
+              <p>
+                The panel approved an acting-candidate change. Upload a new name
+                pronunciation file for: {pronunciationRequirement.outstandingNames.join(", ")}.
+              </p>
+            </div>
+          )}
           <div className="school-drive-toolbar">
             <div className="field school-file-type-picker">
               <label htmlFor="school_file_drop_type">File type</label>

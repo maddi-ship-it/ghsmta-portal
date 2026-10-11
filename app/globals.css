@@ -13355,6 +13355,169 @@ html[data-theme="light"] .advisory-decision-field {
   background: #ffffff;
 }
 
+/* Acting-candidate confirmation inside Review All Categories */
+.acting-candidate-review-card {
+  display: grid;
+  gap: 16px;
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--portal-gold) 38%, var(--portal-line));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--portal-gold) 5%, var(--portal-surface-2));
+}
+
+.acting-candidate-review-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: start;
+}
+
+.acting-candidate-review-header h3 {
+  margin: 0;
+  color: var(--portal-ivory);
+  font-size: 1.25rem;
+}
+
+.acting-candidate-review-header p {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: var(--portal-muted);
+  line-height: 1.45;
+}
+
+.acting-candidate-review-status {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.acting-candidate-review-status small {
+  color: var(--portal-muted);
+  font-weight: 750;
+}
+
+.acting-candidate-roster {
+  display: grid;
+  gap: 10px;
+}
+
+.acting-candidate-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.7fr) minmax(0, 3.3fr);
+  gap: 14px;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid var(--portal-line);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--portal-surface) 76%, transparent);
+}
+
+.acting-candidate-row h4 {
+  margin: 0;
+  color: var(--portal-ivory);
+}
+
+.acting-candidate-fields,
+.acting-candidate-readonly-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.acting-candidate-fields label,
+.acting-candidate-readonly-fields > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.acting-candidate-fields label > span,
+.acting-candidate-readonly-fields dt {
+  color: var(--portal-muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.acting-candidate-readonly-fields dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--portal-text);
+  font-weight: 750;
+}
+
+.acting-candidate-approval-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.acting-candidate-approval {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid var(--portal-line);
+  border-radius: 12px;
+  background: var(--portal-surface-3);
+}
+
+.acting-candidate-approval strong,
+.acting-candidate-approval small {
+  display: block;
+}
+
+.acting-candidate-approval small,
+.acting-candidate-approval p {
+  color: var(--portal-muted);
+}
+
+.acting-candidate-approval p {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+}
+
+.acting-candidate-review-actions,
+.acting-candidate-response-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.acting-candidate-action-note {
+  margin: 0;
+  color: var(--portal-muted);
+  font-weight: 700;
+}
+
+.acting-candidate-action-note-complete {
+  color: var(--portal-success);
+}
+
+.school-file-reupload-notice p {
+  margin: 5px 0 0;
+}
+
+html[data-theme="light"] .acting-candidate-review-card {
+  background: #fff9eb;
+}
+
+html[data-theme="light"] .acting-candidate-review-header h3,
+html[data-theme="light"] .acting-candidate-row h4 {
+  color: #142039;
+}
+
+html[data-theme="light"] .acting-candidate-row,
+html[data-theme="light"] .acting-candidate-approval {
+  background: #ffffff;
+}
+
 @media (max-width: 760px) {
   .range-review-modal .modal-header h2 {
     font-size: clamp(1.45rem, 7vw, 2rem);
@@ -13410,10 +13573,39 @@ html[data-theme="light"] .advisory-decision-field {
   .advisory-decision-footer .button {
     width: 100%;
   }
+
+  .acting-candidate-review-header,
+  .acting-candidate-row {
+    grid-template-columns: 1fr;
+  }
+
+  .acting-candidate-review-status {
+    justify-items: start;
+  }
+
+  .acting-candidate-fields,
+  .acting-candidate-readonly-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .acting-candidate-review-actions,
+  .acting-candidate-response-controls,
+  .acting-candidate-review-actions .button {
+    width: 100%;
+  }
 }
 
 @media (min-width: 761px) and (max-width: 1040px) {
   .advisory-decision-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .acting-candidate-row {
+    grid-template-columns: 1fr;
+  }
+
+  .acting-candidate-fields,
+  .acting-candidate-readonly-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

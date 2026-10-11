@@ -12,6 +12,13 @@ import {
   type ApplicationEligibilityAppeal,
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
+import {
+  ACTING_CANDIDATE_REVIEW_ACTIONS,
+  actingCandidateReviewIsComplete,
+  createInitialActingCandidateReviewState,
+  extractActingCandidates,
+  parseActingCandidateReviewState,
+} from "@/lib/acting-candidate-review";
 import { AdjudicatorAutosave } from "@/components/adjudicator-autosave";
 import { AdjudicationBrainDump } from "@/components/adjudication-brain-dump";
 import {
@@ -282,6 +289,7 @@ export default async function AdjudicationApplicationPage({
     scheduleStaffResult,
     panelAssignmentsResult,
     appealsResult,
+    candidateReviewResult,
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
@@ -310,9 +318,8 @@ export default async function AdjudicationApplicationPage({
     isScoringParticipant || canPanelReview
       ? admin
           .from("adjudicator_assignments")
-          .select("adjudicator_user_id")
+          .select("adjudicator_user_id,can_comment,can_score")
           .eq("application_id", id)
-          .eq("can_comment", true)
           .is("removed_at", null)
       : Promise.resolve({ data: [], error: null }),
     admin
@@ -323,6 +330,14 @@ export default async function AdjudicationApplicationPage({
       .eq("application_id", id)
       .eq("appeal_type", "eligibility")
       .order("submitted_at", { ascending: false }),
+    admin
+      .from("application_audit_log")
+      .select("new_record,created_at")
+      .eq("subject_application_id", id)
+      .in("action", [...ACTING_CANDIDATE_REVIEW_ACTIONS])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
@@ -355,6 +370,9 @@ export default async function AdjudicationApplicationPage({
   if (panelAssignmentsResult.error) {
     throw new Error(panelAssignmentsResult.error.message);
   }
+  if (candidateReviewResult.error) {
+    throw new Error(candidateReviewResult.error.message);
+  }
 
   const panelReviewerIds = [
     ...new Set(
@@ -373,6 +391,11 @@ export default async function AdjudicationApplicationPage({
           .in("role", ["adjudicator", "advisory_member"]),
       )
     : Promise.resolve({ data: [], error: null });
+  const commentingPanelMemberIds = new Set(
+    (panelAssignmentsResult.data ?? [])
+      .filter((assignment) => assignment.can_comment)
+      .map((assignment) => assignment.adjudicator_user_id),
+  );
 
   const feedbackApproverIds = [
     ...new Set(
@@ -646,13 +669,28 @@ export default async function AdjudicationApplicationPage({
   if (panelReviewerProfilesError) {
     throw new Error(panelReviewerProfilesError.message);
   }
-  const panelNarrativeReviewers = (panelReviewerProfiles ?? [])
+  const candidatePanelReviewers = (panelReviewerProfiles ?? [])
     .map((reviewer) => ({
       id: reviewer.id,
       name: reviewer.full_name ?? reviewer.email ?? "Panel member",
       role: reviewer.role as PanelNarrativeReviewer["role"],
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
+  const panelNarrativeReviewers = candidatePanelReviewers.filter((reviewer) =>
+    commentingPanelMemberIds.has(reviewer.id),
+  );
+  const originalActingCandidates = extractActingCandidates(
+    applicationReferencePanels,
+  );
+  const actingCandidateReview =
+    parseActingCandidateReviewState(candidateReviewResult.data?.new_record) ??
+    createInitialActingCandidateReviewState({
+      applicationId: id,
+      candidates: originalActingCandidates,
+      requiredApproverIds: candidatePanelReviewers.map(
+        (reviewer) => reviewer.id,
+      ),
+    });
   const ownScorecard = showEditableScorecard
     ? scorecards.find((scorecard) => scorecard.adjudicator_user_id === profile.id) ?? null
     : null;
@@ -745,7 +783,7 @@ export default async function AdjudicationApplicationPage({
       )
       .map((approval) => [approval.proposal_id, approval]),
   );
-  const categoryReviewComplete =
+  const categoryDecisionsComplete =
     visibleDecisionCategories.length > 0 &&
     visibleDecisionCategories.every((category) => {
       const proposal = proposalByCategoryId.get(category.id);
@@ -765,6 +803,12 @@ export default async function AdjudicationApplicationPage({
         ownApprovalByProposalId.get(proposal.id)?.response === "approved"
       );
     });
+  const candidateReviewComplete =
+    profile.role === "adjudicator"
+      ? actingCandidateReviewIsComplete(actingCandidateReview, profile.id)
+      : actingCandidateReview.status === "approved";
+  const categoryReviewComplete =
+    categoryDecisionsComplete && candidateReviewComplete;
   const panelReviewWorkspace = (
     <OwnerLiveAdjudicationReview
       applicationId={id}
@@ -884,6 +928,8 @@ export default async function AdjudicationApplicationPage({
 
       {showConsensusControls && (
       <AdjudicationConsensusBar
+        actingCandidateReview={actingCandidateReview}
+        actingCandidateReviewers={candidatePanelReviewers}
         adjudicatorCategoryScores={
           profile.role === "adjudicator"
             ? visibleDecisionCategories.map((category) => ({
