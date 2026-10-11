@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
@@ -30,6 +30,7 @@ export function ConfirmedSubmitButton({
 }) {
   const { pending } = useFormStatus();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const reasonId = useId();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
 
@@ -68,11 +69,11 @@ export function ConfirmedSubmitButton({
       >
         {requireReason ? (
           <div className="field regal-dialog-reason">
-            <label htmlFor={`reason-${reasonName}`}>{reasonLabel}</label>
+            <label htmlFor={reasonId}>{reasonLabel}</label>
             <textarea
               autoFocus
               className="textarea"
-              id={`reason-${reasonName}`}
+              id={reasonId}
               maxLength={reasonMaxLength}
               onChange={(event) => setReason(event.target.value)}
               placeholder={reasonPlaceholder}

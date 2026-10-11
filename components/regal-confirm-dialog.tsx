@@ -31,8 +31,15 @@ export function RegalConfirmDialog({
 }) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const cardRef = useRef<HTMLElement>(null);
+  const onCancelRef = useRef(onCancel);
+  const pendingRef = useRef(pending);
   const titleId = useId();
   const descriptionId = useId();
+
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+    pendingRef.current = pending;
+  }, [onCancel, pending]);
 
   useEffect(() => {
     if (!open) return;
@@ -42,9 +49,9 @@ export function RegalConfirmDialog({
     (preferredFocus ?? cancelButtonRef.current)?.focus();
 
     function handleKeydown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !pending) {
+      if (event.key === "Escape" && !pendingRef.current) {
         event.preventDefault();
-        onCancel();
+        onCancelRef.current();
       }
       if (event.key === "Tab") {
         const focusable = cardRef.current?.querySelectorAll<HTMLElement>(
@@ -68,7 +75,7 @@ export function RegalConfirmDialog({
       document.removeEventListener("keydown", handleKeydown);
       previouslyFocused?.focus();
     };
-  }, [onCancel, open, pending]);
+  }, [open]);
 
   if (!open) return null;
 
