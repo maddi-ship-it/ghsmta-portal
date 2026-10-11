@@ -48,6 +48,7 @@ export function ApplicationReferenceBar({
   links?: AdjudicationReferenceLink[];
   panels: ApplicationReferencePanel[];
   reviewActions?: {
+    categoryReviewStatus?: "needs-action" | "complete";
     showCategoryReview: boolean;
     showPanelReview: boolean;
   };
@@ -138,7 +139,11 @@ export function ApplicationReferenceBar({
                 <div className="application-reference-action-group application-reference-workflow-actions application-category-workflow-actions">
                   {reviewActions?.showCategoryReview ? (
                     <button
-                      className="application-reference-button application-reference-review-button"
+                      className={`application-reference-button application-reference-review-button${
+                        reviewActions.categoryReviewStatus
+                          ? ` application-reference-review-button-${reviewActions.categoryReviewStatus}`
+                          : ""
+                      }`}
                       onClick={() =>
                         window.dispatchEvent(
                           new Event(OPEN_CATEGORY_REVIEW_EVENT),
@@ -211,7 +216,11 @@ export function ApplicationReferenceBar({
                 ) : null}
                 {!categoryNavigation && reviewActions?.showCategoryReview ? (
                   <button
-                    className="application-reference-button application-reference-review-button"
+                    className={`application-reference-button application-reference-review-button${
+                      reviewActions.categoryReviewStatus
+                        ? ` application-reference-review-button-${reviewActions.categoryReviewStatus}`
+                        : ""
+                    }`}
                     onClick={() =>
                       window.dispatchEvent(new Event(OPEN_CATEGORY_REVIEW_EVENT))
                     }

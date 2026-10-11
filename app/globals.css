@@ -1532,6 +1532,32 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   background: var(--portal-gold-bright, #f2d889);
 }
 
+.application-reference-review-button.application-reference-review-button-needs-action {
+  color: #fff;
+  border-color: #ef4444;
+  background: #b42318;
+}
+
+.application-reference-review-button.application-reference-review-button-needs-action:hover,
+.application-reference-review-button.application-reference-review-button-needs-action:focus-visible {
+  color: #fff;
+  border-color: #f87171;
+  background: #d92d20;
+}
+
+.application-reference-review-button.application-reference-review-button-complete {
+  color: #fff;
+  border-color: #32d583;
+  background: #067647;
+}
+
+.application-reference-review-button.application-reference-review-button-complete:hover,
+.application-reference-review-button.application-reference-review-button-complete:focus-visible {
+  color: #fff;
+  border-color: #6ce9a6;
+  background: #079455;
+}
+
 /* Sticky adjudication rubric and compact notification inbox. */
 .portal-shell .portal-main .score-guide-panel {
   position: sticky;
@@ -2106,10 +2132,50 @@ html[data-theme="light"] .notification-popover-row.is-unread {
 }
 
 .scorecard-submit-control.scorecard-submit-control-compact {
+  position: relative;
   display: inline-flex;
   width: auto;
   flex: 0 0 auto;
   align-items: center;
+}
+
+.scorecard-submit-control-compact[data-tooltip]::after {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 9px);
+  right: 0;
+  width: min(390px, 78vw);
+  padding: 10px 12px;
+  border: 1px solid var(--portal-line-strong, rgba(255, 255, 255, 0.2));
+  border-radius: 10px;
+  color: var(--portal-text, #f8fafc);
+  background: var(--portal-surface-strong, #0b1221);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38);
+  content: attr(data-tooltip);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  text-transform: none;
+  transform: translateY(-3px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  white-space: pre-line;
+}
+
+.scorecard-submit-control-compact[data-tooltip]:hover::after,
+.scorecard-submit-control-compact[data-tooltip]:focus-visible::after,
+.scorecard-submit-control-compact[data-tooltip]:focus-within::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after {
+  color: #172033;
+  border-color: #cbd5e1;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.2);
 }
 
 .scorecard-submit-help-compact {

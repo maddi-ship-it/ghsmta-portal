@@ -190,13 +190,18 @@ function labeledValues(
 function performerSubject(
   index: AnswerIndex,
   nameAliases: string[],
+  pronounAliases: string[],
   roleAliases: string[],
 ) {
   const studentName = firstValue(index, nameAliases);
+  const pronouns = firstValue(index, pronounAliases);
   const role = firstValue(index, roleAliases);
 
-  if (studentName && role) return `${studentName} (${role})`;
-  return studentName || role;
+  if (!studentName && !pronouns && !role) return "";
+
+  return [studentName, pronouns, role]
+    .map((value) => value || "Not provided")
+    .join(" | ");
 }
 
 export function resolveScoringCategorySubjects(
@@ -275,26 +280,31 @@ export function resolveScoringCategorySubjects(
     leading_actress: performerSubject(
       index,
       ["leading_actress_name"],
+      ["leading_actress_pronouns"],
       ["leading_actress_role"],
     ),
     leading_actor: performerSubject(
       index,
       ["leading_actor_name"],
+      ["leading_actor_pronouns"],
       ["leading_actor_role"],
     ),
     supporting_performer_a: performerSubject(
       index,
       ["supporting_performer_a_name", "supporting_performer_1_name"],
+      ["supporting_performer_a_pronouns", "supporting_performer_1_pronouns"],
       ["supporting_performer_a_role", "supporting_performer_1_role"],
     ),
     supporting_performer_b: performerSubject(
       index,
       ["supporting_performer_b_name", "supporting_performer_2_name"],
+      ["supporting_performer_b_pronouns", "supporting_performer_2_pronouns"],
       ["supporting_performer_b_role", "supporting_performer_2_role"],
     ),
     featured_performer: performerSubject(
       index,
       ["featured_performer_name"],
+      ["featured_performer_pronouns"],
       ["featured_performer_role"],
     ),
     direction: firstValue(index, [

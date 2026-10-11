@@ -30,6 +30,7 @@ import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace"
 import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -719,6 +720,33 @@ export default async function AdjudicationApplicationPage({
       proposal,
     ]),
   );
+  const ownApprovalByProposalId = new Map(
+    (approvalResult.data ?? [])
+      .filter(
+        (approval) => approval.adjudicator_user_id === profile.id,
+      )
+      .map((approval) => [approval.proposal_id, approval]),
+  );
+  const categoryReviewComplete =
+    visibleDecisionCategories.length > 0 &&
+    visibleDecisionCategories.every((category) => {
+      const proposal = proposalByCategoryId.get(category.id);
+      if (
+        !proposal ||
+        !isValidTwoPointRange(proposal.range_min, proposal.range_max)
+      ) {
+        return false;
+      }
+
+      if (["approved", "overridden"].includes(proposal.status)) {
+        return true;
+      }
+
+      return (
+        profile.role === "adjudicator" &&
+        ownApprovalByProposalId.get(proposal.id)?.response === "approved"
+      );
+    });
   const panelReviewWorkspace = (
     <OwnerLiveAdjudicationReview
       applicationId={id}
@@ -809,6 +837,9 @@ export default async function AdjudicationApplicationPage({
         panels={referencePanels}
         reviewActions={compactConsensusControls
           ? {
+              categoryReviewStatus: categoryReviewComplete
+                ? "complete"
+                : "needs-action",
               showCategoryReview: true,
               showPanelReview:
                 profile.role === "advisory_member" && canPanelReview,
@@ -1014,13 +1045,12 @@ export default async function AdjudicationApplicationPage({
                         name={`subject_name_${category.id}`}
                         type="hidden"
                         value={
-                          comments.find(
+                          categorySubjectDefaults[category.category_key] ||
+                          (comments.find(
                             (comment) =>
                               comment.scorecard_id === ownScorecard?.id &&
                               comment.category_id === category.id,
-                          )?.subject_name ??
-                          categorySubjectDefaults[category.category_key] ??
-                          ""
+                          )?.subject_name ?? "")
                         }
                       />
                     ) : null}

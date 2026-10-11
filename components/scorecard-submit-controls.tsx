@@ -11,6 +11,7 @@ import type { ScoringCategory, ScoringCriterion } from "@/lib/types";
 type CompletionState = {
   complete: boolean;
   missingCount: number;
+  reasons: string[];
 };
 
 function formText(formData: FormData, name: string) {
@@ -25,23 +26,33 @@ function evaluateCompletion(
 ): CompletionState {
   const formData = new FormData(form);
   let missingCount = 0;
+  const reasons: string[] = [];
 
   for (const category of categories) {
     const isOverallProduction =
       category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
 
-    if (
-      !isOverallProduction &&
-      !formText(formData, `score_range_start_${category.id}`)
-    ) {
+    const rangeStartValue = formText(
+      formData,
+      `score_range_start_${category.id}`,
+    );
+    const decisionFinalized =
+      formData.get(`category_decision_finalized_${category.id}`) === "1";
+
+    if (!isOverallProduction && !rangeStartValue) {
       missingCount += 1;
+      reasons.push(
+        `${category.title}: the Committee has not set a two-point range.`,
+      );
     }
 
-    if (
-      !isOverallProduction &&
-      formData.get(`category_decision_finalized_${category.id}`) !== "1"
-    ) {
+    if (!isOverallProduction && !decisionFinalized) {
       missingCount += 1;
+      if (rangeStartValue) {
+        reasons.push(
+          `${category.title}: eligibility and two-point range approval is pending.`,
+        );
+      }
     }
 
     if (
@@ -49,9 +60,12 @@ function evaluateCompletion(
       !formText(formData, `subject_name_${category.id}`)
     ) {
       missingCount += 1;
+      reasons.push(`${category.title}: candidate or subject name is missing.`);
     }
 
     const categoryScores: number[] = [];
+    let missingScores = 0;
+    let missingComments = 0;
     const categoryCriteria = criteria.filter(
       (item) => item.category_id === category.id,
     );
@@ -61,6 +75,7 @@ function evaluateCompletion(
 
       if (!isOverallProduction && !rawScore) {
         missingCount += 1;
+        missingScores += 1;
       } else if (!isOverallProduction) {
         const numericScore = Number(rawScore);
         if (Number.isFinite(numericScore)) {
@@ -75,14 +90,27 @@ function evaluateCompletion(
         )
       ) {
         missingCount += 1;
+        missingComments += 1;
       }
     }
 
-    const rawRangeStart = formText(
-      formData,
-      `score_range_start_${category.id}`,
-    );
-    const rangeStart = rawRangeStart ? Number(rawRangeStart) : null;
+    if (missingScores > 0) {
+      reasons.push(
+        `${category.title}: ${missingScores} criterion score${
+          missingScores === 1 ? " is" : "s are"
+        } missing.`,
+      );
+    }
+
+    if (missingComments > 0) {
+      reasons.push(
+        `${category.title}: ${missingComments} criterion comment${
+          missingComments === 1 ? " is" : "s are"
+        } missing.`,
+      );
+    }
+
+    const rangeStart = rangeStartValue ? Number(rangeStartValue) : null;
 
     if (
       !isOverallProduction &&
@@ -97,6 +125,9 @@ function evaluateCompletion(
 
       if (average < rangeStart - 0.0001 || average > rangeEnd + 0.0001) {
         missingCount += 1;
+        reasons.push(
+          `${category.title}: the category average must be within ${rangeStart.toFixed(2)}–${rangeEnd.toFixed(2)}.`,
+        );
       }
     }
   }
@@ -104,6 +135,7 @@ function evaluateCompletion(
   return {
     complete: missingCount === 0,
     missingCount,
+    reasons,
   };
 }
 
@@ -126,6 +158,7 @@ export function ScorecardSubmitControls({
   const [completion, setCompletion] = useState<CompletionState>({
     complete: false,
     missingCount: 0,
+    reasons: ["Checking scorecard requirements…"],
   });
   const [online, setOnline] = useState(true);
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
@@ -197,15 +230,30 @@ export function ScorecardSubmitControls({
 
   const blockedBySync = !online || hasOfflineDraft;
   const canSubmit = completion.complete && !blockedBySync;
+  const visibleReasons = completion.reasons.slice(0, 8);
+  const additionalReasonCount = Math.max(
+    completion.reasons.length - visibleReasons.length,
+    0,
+  );
   const helpMessage = !online
     ? "Final submission is available once you are back online."
     : hasOfflineDraft
       ? "Final submission unlocks after the saved scorecard finishes syncing."
       : completion.complete
         ? "All required fields are complete."
-        : `${completion.missingCount} required field${
-            completion.missingCount === 1 ? "" : "s"
-          } remaining.`;
+        : completion.reasons.length > 0
+          ? `Cannot submit yet:\n${visibleReasons
+              .map((reason) => `• ${reason}`)
+              .join("\n")}${
+              additionalReasonCount > 0
+                ? `\n• ${additionalReasonCount} more requirement${
+                    additionalReasonCount === 1 ? "" : "s"
+                  } remaining.`
+                : ""
+            }`
+          : `${completion.missingCount} required field${
+              completion.missingCount === 1 ? "" : "s"
+            } remaining.`;
   const helpId = `scorecard-submit-help-${applicationId}`;
 
   return (
@@ -213,7 +261,10 @@ export function ScorecardSubmitControls({
       className={`scorecard-submit-control${
         compact ? " scorecard-submit-control-compact" : ""
       }`}
+      data-tooltip={!canSubmit && compact ? helpMessage : undefined}
       ref={hostRef}
+      tabIndex={!canSubmit && compact ? 0 : undefined}
+      title={!canSubmit ? helpMessage : undefined}
     >
       <button
         aria-describedby={helpId}
@@ -229,7 +280,6 @@ export function ScorecardSubmitControls({
           applicationId,
           true,
         )}
-        title={compact ? helpMessage : undefined}
         type="submit"
       >
         Submit scorecard

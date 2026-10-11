@@ -409,30 +409,12 @@ function candidateGroup(
   title: string,
   aliases: string[],
 ) {
-  const candidateRows = rows.filter(
-    (row) => rowMatches(row, aliases) && !rowMatches(row, ["phonetic"]),
+  return group(
+    title,
+    rows.filter(
+      (row) => rowMatches(row, aliases) && !rowMatches(row, ["phonetic"]),
+    ),
   );
-  const field = (fieldAliases: string[]) =>
-    candidateRows.find((row) => rowMatches(row, fieldAliases))?.value.trim();
-  const name = field(["name"]);
-  const pronouns = field(["pronouns"]);
-  const role = field(["role"]);
-
-  if (name || pronouns || role) {
-    return {
-      title: `Name of ${title}`,
-      items: [
-        {
-          label: "Name | Pronouns | Role",
-          value: [name, pronouns, role]
-            .map((value) => value || "Not provided")
-            .join(" | "),
-        },
-      ],
-    };
-  }
-
-  return group(title, candidateRows);
 }
 
 function buildSupplementalArchiveItems(
@@ -623,7 +605,7 @@ export function buildApplicationReferencePanels(
       title: "Individual Acting Category Candidates",
       shortTitle: "ACTING CANDIDATES",
       description:
-        "Submitted acting candidate names, pronouns, and roles.",
+        "Submitted acting candidates, roles, pronouns, and grade levels.",
       groups: actingGroups,
     },
     {

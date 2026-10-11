@@ -43,6 +43,7 @@ describe("ApplicationReferenceBar", () => {
         ]}
         panels={panels}
         reviewActions={{
+          categoryReviewStatus: "needs-action",
           showCategoryReview: true,
           showPanelReview: false,
         }}
@@ -71,6 +72,9 @@ describe("ApplicationReferenceBar", () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('aria-label="Jump to category"');
     expect(html).toContain("application-category-current is-complete");
+    expect(html).toContain(
+      "application-reference-review-button-needs-action",
+    );
     expect(html).toContain("application-category-workflow-actions");
   });
 });

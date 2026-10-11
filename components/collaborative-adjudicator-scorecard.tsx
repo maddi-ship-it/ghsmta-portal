@@ -599,16 +599,17 @@ function CategoryScoreSection({
               className="category-subject-display"
               id={`subject_name_display_${category.id}`}
             >
-              {categoryComment?.subject_name ??
-                categorySubjectName ??
+              {categorySubjectName ||
+                categoryComment?.subject_name ||
                 "Not provided in the school application."}
             </output>
             <input
               name={`subject_name_${category.id}`}
               type="hidden"
               value={
-                categoryComment?.subject_name ??
-                categorySubjectName
+                categorySubjectName ||
+                categoryComment?.subject_name ||
+                ""
               }
             />
             <small className="field-help">
