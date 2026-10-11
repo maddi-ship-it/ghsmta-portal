@@ -107,11 +107,11 @@ export function CriterionScoringGuideButton({
           setOpen(true);
           if (!guide && !loading) void loadGuide();
         }}
-        title={`Open scoring guide for ${criterionTitle}`}
+        title={`Open criterion focused scoring guide for ${criterionTitle}`}
         type="button"
         ref={triggerRef}
       >
-        Criterion scoring guide
+        CRITERION FOCUSED SCORING GUIDE
       </button>
 
       {open &&

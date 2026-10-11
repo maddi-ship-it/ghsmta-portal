@@ -16116,23 +16116,12 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
 }
 
 /* Criterion-level scoring guide */
-.criterion-heading-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 7px;
-}
-
-.collaborative-criterion-row .criterion-heading-row h3 {
-  min-width: 0;
-  margin: 0;
-}
-
 .criterion-guide-button {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 26px;
-  flex: 0 0 auto;
-  padding: 4px 9px;
+  padding: 5px 6px;
   border: 1px solid color-mix(in srgb, var(--portal-gold) 48%, var(--portal-line));
   border-radius: 999px;
   color: var(--portal-gold-bright);
@@ -16140,10 +16129,12 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
   font: inherit;
   font-size: .62rem;
   font-weight: 900;
-  letter-spacing: .09em;
-  line-height: 1;
+  letter-spacing: .045em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
   cursor: pointer;
 }
 

@@ -646,17 +646,7 @@ function CategoryScoreSection({
                 key={criterion.id}
               >
                 <div className="criterion-copy">
-                  <div className="criterion-heading-row">
-                    <h3>{criterion.title}</h3>
-                    {!isOverallProduction ? (
-                      <CriterionScoringGuideButton
-                        categoryTitle={category.title}
-                        criterionId={criterion.id}
-                        criterionTitle={criterion.title}
-                        productionTitle={productionTitle}
-                      />
-                    ) : null}
-                  </div>
+                  <h3>{criterion.title}</h3>
                   {criterion.description && <p>{criterion.description}</p>}
                 </div>
 
@@ -745,6 +735,14 @@ function CategoryScoreSection({
                     ))}
                   </select>
                   )}
+                  {!isOverallProduction ? (
+                    <CriterionScoringGuideButton
+                      categoryTitle={category.title}
+                      criterionId={criterion.id}
+                      criterionTitle={criterion.title}
+                      productionTitle={productionTitle}
+                    />
+                  ) : null}
                 </div>
               </article>
             );

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CriterionScoringGuideButton } from "./criterion-scoring-guide-button";
 
 describe("CriterionScoringGuideButton", () => {
-  it("uses the full criterion scoring guide label", () => {
+  it("uses the criterion focused scoring guide label", () => {
     const html = renderToStaticMarkup(
       <CriterionScoringGuideButton
         categoryTitle="Direction"
@@ -14,9 +14,9 @@ describe("CriterionScoringGuideButton", () => {
       />,
     );
 
-    expect(html).toContain(">Criterion scoring guide</button>");
+    expect(html).toContain(">CRITERION FOCUSED SCORING GUIDE</button>");
     expect(html).toContain(
-      'title="Open scoring guide for Concept and storytelling"',
+      'title="Open criterion focused scoring guide for Concept and storytelling"',
     );
   });
 });
