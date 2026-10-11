@@ -9,6 +9,7 @@ import {
   type ReportFormat,
 } from "@/lib/reports/report-definitions";
 import { loadReport, parseReportFilters, type ReportRow } from "@/lib/reports/report-data";
+import { storedReportHref } from "@/lib/reports/report-links";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -61,6 +62,8 @@ type ReportRun = {
   report_key: string;
   report_title: string;
   requested_format: string;
+  variant: string;
+  filters: Record<string, unknown> | null;
   row_count: number;
   created_at: string;
   file_name: string | null;
@@ -74,6 +77,7 @@ type ReportPreset = {
   format: string;
   variant: string;
   favorite: boolean;
+  filters: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -116,6 +120,17 @@ function downloadHref(params: ReportsParams, definition: ReportDefinition, forma
   next.delete("catalog_q");
   next.set("format", format);
   return `/api/admin/reports/${definition.id}?${next.toString()}`;
+}
+
+function clearReportFiltersHref(
+  definition: ReportDefinition,
+  selectedCategory: string,
+  catalogQuery: string,
+) {
+  const next = new URLSearchParams({ report: definition.id });
+  if (selectedCategory) next.set("category", selectedCategory);
+  if (catalogQuery) next.set("catalog_q", catalogQuery);
+  return `/portal/admin/reports?${next.toString()}`;
 }
 
 function formatDate(value: string | null | undefined) {
@@ -194,7 +209,7 @@ function DigestSummary({
   ownerEmail: string | null;
 }) {
   return (
-    <div className="panel-body report-digest-details">
+    <div className="report-digest-details">
       <div>
         <span>Recipient</span>
         <strong>{digest?.recipient_email || ownerEmail || "No recipient configured"}</strong>
@@ -233,9 +248,18 @@ export default async function OwnerReportsPage({
   const selectedCategory = (REPORT_CATEGORIES as string[]).includes(params.category ?? "")
     ? params.category ?? ""
     : "";
+  const urlParams = asSearchParams(params);
+  const filters = parseReportFilters(urlParams);
 
   const supabase = await createClient();
-  const [cycleResult, digestResult, runResult, presetResult, scheduleResult] = await Promise.all([
+  const [
+    cycleResult,
+    digestResult,
+    runResult,
+    presetResult,
+    scheduleResult,
+    loadedReport,
+  ] = await Promise.all([
     supabase
       .from("award_cycles")
       .select("id,name,season_year,status")
@@ -248,12 +272,14 @@ export default async function OwnerReportsPage({
       .maybeSingle(),
     supabase
       .from("report_runs")
-      .select("id,report_key,report_title,requested_format,row_count,file_name,created_at")
+      .select("id,report_key,report_title,requested_format,variant,filters,row_count,file_name,created_at", {
+        count: "exact",
+      })
       .order("created_at", { ascending: false })
       .limit(8),
     supabase
       .from("report_presets")
-      .select("id,report_key,name,description,format,variant,favorite,created_at")
+      .select("id,report_key,name,description,format,variant,favorite,filters,created_at")
       .eq("owner_user_id", owner.id)
       .order("favorite", { ascending: false })
       .order("created_at", { ascending: false })
@@ -264,6 +290,7 @@ export default async function OwnerReportsPage({
       .eq("owner_user_id", owner.id)
       .order("next_run_at", { ascending: true })
       .limit(12),
+    loadReport(supabase, selectedDefinition.id, filters),
   ]);
 
   if (cycleResult.error) throw new Error(cycleResult.error.message);
@@ -277,15 +304,37 @@ export default async function OwnerReportsPage({
     ? "Report run history, presets, and schedules will appear after the Reports Center migration is applied."
     : "";
 
-  const urlParams = asSearchParams(params);
-  const filters = parseReportFilters(urlParams);
-  const loadedReport = await loadReport(supabase, selectedDefinition.id, filters);
   const previewRows = loadedReport.rows.slice(0, 30);
   const filteredCatalog = REPORT_DEFINITIONS.filter((definition) => {
     if (selectedCategory && definition.category !== selectedCategory) return false;
     return matchesCatalogSearch(definition, catalogQuery);
   });
   const selectedSort = params.sort || loadedReport.columns[0]?.key || "";
+  const categoryCounts = new Map(
+    REPORT_CATEGORIES.map((category) => [
+      category,
+      REPORT_DEFINITIONS.filter((definition) => definition.category === category)
+        .length,
+    ]),
+  );
+  const advancedFilterCount = [
+    params.variant && params.variant !== "internal" ? params.variant : "",
+    params.sort,
+    params.direction && params.direction !== "asc" ? params.direction : "",
+    filters.includeArchived,
+    !filters.includeInternalNotes,
+    !filters.includeContactInfo,
+    !filters.includeAdjudicatorIdentities,
+    !filters.includeProtectedScores,
+  ].filter(Boolean).length;
+  const activeFilterCount =
+    [
+      params.cycle_id,
+      params.date_from,
+      params.date_to,
+      params.school,
+      params.status,
+    ].filter(Boolean).length + advancedFilterCount;
 
   return (
     <>
@@ -294,8 +343,8 @@ export default async function OwnerReportsPage({
           <span className="eyebrow">Owner administration</span>
           <h1>Reports Center</h1>
           <p>
-            Generate operational, scoring, scheduling, billing, user, audit,
-            and release reports with internal/external visibility controls.
+            Choose a report, refine the scope, preview the results, and export
+            the complete dataset.
           </p>
         </div>
       </div>
@@ -307,17 +356,79 @@ export default async function OwnerReportsPage({
       )}
       {params.error && <div className="form-error page-message">{params.error}</div>}
 
-      <section className="panel report-digest-panel">
-        <div className="panel-header">
-          <div>
+      <section className="report-overview-grid" aria-label="Reports overview">
+        <article className="metric-card report-overview-card">
+          <span className="metric-label">Available reports</span>
+          <strong className="metric-value">{REPORT_DEFINITIONS.length}</strong>
+          <small>Across {REPORT_CATEGORIES.length} categories</small>
+        </article>
+        <article className="metric-card report-overview-card">
+          <span className="metric-label">Current result</span>
+          <strong className="metric-value">{loadedReport.rows.length}</strong>
+          <small>Rows matching this setup</small>
+        </article>
+        <article className="metric-card report-overview-card">
+          <span className="metric-label">Generated exports</span>
+          <strong className="metric-value">{runResult.count ?? recentRuns.length}</strong>
+          <small>Logged export runs</small>
+        </article>
+        <article className="metric-card report-overview-card">
+          <span className="metric-label">Active filters</span>
+          <strong className="metric-value">{activeFilterCount}</strong>
+          <small>{activeFilterCount ? "Refining the current report" : "Showing the full available scope"}</small>
+        </article>
+      </section>
+
+      <nav className="report-category-nav" aria-label="Report categories">
+        <Link
+          aria-current={selectedCategory ? undefined : "page"}
+          className={selectedCategory ? "report-category-pill" : "report-category-pill is-active"}
+          href={reportsHref(params, { category: null })}
+        >
+          All <span>{REPORT_DEFINITIONS.length}</span>
+        </Link>
+        {REPORT_CATEGORIES.map((category) => (
+          <Link
+            aria-current={selectedCategory === category ? "page" : undefined}
+            className={
+              selectedCategory === category
+                ? "report-category-pill is-active"
+                : "report-category-pill"
+            }
+            href={reportsHref(params, {
+              category,
+              report:
+                REPORT_DEFINITIONS.find(
+                  (definition) => definition.category === category,
+                )?.id ?? selectedDefinition.id,
+              sort: null,
+              direction: null,
+            })}
+            key={category}
+          >
+            {category} <span>{categoryCounts.get(category)}</span>
+          </Link>
+        ))}
+      </nav>
+
+      <details className="panel report-digest-panel">
+        <summary>
+          <span>
             <span className="eyebrow">Email delivery</span>
-            <h2>Daily Owner Digest</h2>
-            <p>
-              A role-restricted owner email with action items, blocked
-              workflows, scoring gaps, schedule exceptions, appeals, and recent
-              owner activity.
-            </p>
-          </div>
+            <strong>Daily Owner Digest</strong>
+            <small>
+              {digestResult.data?.enabled
+                ? `Enabled · ${digestResult.data.delivery_hour}:00 ${digestResult.data.time_zone}`
+                : "Scheduled delivery is currently disabled"}
+            </small>
+          </span>
+          <span className="report-summary-toggle">Manage digest</span>
+        </summary>
+        <div className="report-digest-expanded">
+          <DigestSummary
+            digest={(digestResult.data as DigestSetting | null) ?? null}
+            ownerEmail={owner.email}
+          />
           <form action={sendOwnerDigestFromReports}>
             <input name="report" type="hidden" value={selectedDefinition.id} />
             <button className="button button-gold" type="submit">
@@ -325,18 +436,14 @@ export default async function OwnerReportsPage({
             </button>
           </form>
         </div>
-        <DigestSummary
-          digest={(digestResult.data as DigestSetting | null) ?? null}
-          ownerEmail={owner.email}
-        />
-      </section>
+      </details>
 
       <div className="report-center-layout">
         <aside className="panel report-catalog-panel">
           <div className="panel-header">
             <div>
               <h2>Report catalog</h2>
-              <p>{filteredCatalog.length} of {REPORT_DEFINITIONS.length} reports shown.</p>
+              <p>{filteredCatalog.length} report{filteredCatalog.length === 1 ? "" : "s"} in this view.</p>
             </div>
           </div>
           <div className="panel-body">
@@ -353,43 +460,55 @@ export default async function OwnerReportsPage({
                   type="search"
                 />
               </div>
-              <div className="field">
-                <label htmlFor="category">Category</label>
-                <select
-                  className="select"
-                  defaultValue={selectedCategory}
-                  id="category"
-                  name="category"
-                >
-                  <option value="">All categories</option>
-                  {REPORT_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <input name="category" type="hidden" value={selectedCategory} />
               <button className="button button-secondary button-compact" type="submit">
-                Filter catalog
+                Search catalog
               </button>
+              {(catalogQuery || selectedCategory) && (
+                <Link
+                  className="button button-ghost button-compact"
+                  href={reportsHref(params, { category: null, catalog_q: null })}
+                >
+                  Show all reports
+                </Link>
+              )}
             </form>
 
             <div className="report-catalog-list">
               {filteredCatalog.map((definition) => (
                 <Link
+                  aria-current={
+                    definition.id === selectedDefinition.id ? "page" : undefined
+                  }
                   className={
                     definition.id === selectedDefinition.id
                       ? "report-catalog-card is-active"
                       : "report-catalog-card"
                   }
-                  href={reportsHref(params, { report: definition.id })}
+                  href={reportsHref(params, {
+                    report: definition.id,
+                    sort: null,
+                    direction: null,
+                  })}
                   key={definition.id}
                 >
-                  <span>{definition.category}</span>
+                  <span className="report-card-kicker">{definition.category}</span>
                   <strong>{definition.title}</strong>
                   <small>{definition.description}</small>
+                  <span className="report-card-meta">
+                    {definition.formats.map((format) => (
+                      <b key={format}>{format.toUpperCase()}</b>
+                    ))}
+                    {definition.supportsBatch && <b>Batch</b>}
+                  </span>
                 </Link>
               ))}
+              {filteredCatalog.length === 0 && (
+                <div className="empty-state compact-empty-state">
+                  <h3>No matching reports</h3>
+                  <p>Try a different term or return to all categories.</p>
+                </div>
+              )}
             </div>
           </div>
         </aside>
@@ -401,6 +520,13 @@ export default async function OwnerReportsPage({
                 <span className="eyebrow">{selectedDefinition.category}</span>
                 <h2>{selectedDefinition.title}</h2>
                 <p>{selectedDefinition.description}</p>
+                <div className="report-builder-meta" aria-label="Report capabilities">
+                  {selectedDefinition.formats.map((format) => (
+                    <span key={format}>{format.toUpperCase()}</span>
+                  ))}
+                  {selectedDefinition.supportsExternalVariant && <span>Sanitized version</span>}
+                  {selectedDefinition.supportsScheduling && <span>Can be scheduled</span>}
+                </div>
               </div>
               <div className="report-download-actions">
                 {selectedDefinition.formats.includes("pdf") && (
@@ -409,7 +535,7 @@ export default async function OwnerReportsPage({
                     href={downloadHref(params, selectedDefinition, "pdf")}
                     prefetch={false}
                   >
-                    Download PDF
+                    Export PDF
                   </Link>
                 )}
                 {selectedDefinition.formats.includes("csv") && (
@@ -418,7 +544,7 @@ export default async function OwnerReportsPage({
                     href={downloadHref(params, selectedDefinition, "csv")}
                     prefetch={false}
                   >
-                    Download CSV
+                    Export CSV
                   </Link>
                 )}
               </div>
@@ -492,99 +618,115 @@ export default async function OwnerReportsPage({
                     type="date"
                   />
                 </div>
-                <div className="field">
-                  <label htmlFor="variant">Variant</label>
-                  <select
-                    className="select"
-                    defaultValue={loadedReport.filters.variant}
-                    id="variant"
-                    name="variant"
-                  >
-                    <option value="internal">Internal</option>
-                    {selectedDefinition.supportsExternalVariant && (
-                      <option value="external">External / sanitized</option>
-                    )}
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="sort">Sort</label>
-                  <select
-                    className="select"
-                    defaultValue={selectedSort}
-                    id="sort"
-                    name="sort"
-                  >
-                    {loadedReport.columns.map((column) => (
-                      <option key={column.key} value={column.key}>
-                        {column.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="direction">Direction</label>
-                  <select
-                    className="select"
-                    defaultValue={loadedReport.filters.direction}
-                    id="direction"
-                    name="direction"
-                  >
-                    <option value="asc">A to Z / oldest first</option>
-                    <option value="desc">Z to A / newest first</option>
-                  </select>
-                </div>
+                <details className="report-advanced-filters" open={advancedFilterCount > 0}>
+                  <summary>
+                    <span>
+                      <strong>Advanced options</strong>
+                      <small>Visibility, sorting, archived records, and protected fields.</small>
+                    </span>
+                    <b>{advancedFilterCount} active</b>
+                  </summary>
+                  <div className="report-advanced-filter-grid">
+                    <div className="field">
+                      <label htmlFor="variant">Version</label>
+                      <select
+                        className="select"
+                        defaultValue={loadedReport.filters.variant}
+                        id="variant"
+                        name="variant"
+                      >
+                        <option value="internal">Internal</option>
+                        {selectedDefinition.supportsExternalVariant && (
+                          <option value="external">External / sanitized</option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="sort">Sort by</label>
+                      <select
+                        className="select"
+                        defaultValue={selectedSort}
+                        id="sort"
+                        name="sort"
+                      >
+                        {loadedReport.columns.map((column) => (
+                          <option key={column.key} value={column.key}>
+                            {column.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="direction">Order</label>
+                      <select
+                        className="select"
+                        defaultValue={loadedReport.filters.direction}
+                        id="direction"
+                        name="direction"
+                      >
+                        <option value="asc">A to Z / oldest first</option>
+                        <option value="desc">Z to A / newest first</option>
+                      </select>
+                    </div>
 
-                <label className="check-card compact-check-card">
-                  <input
-                    defaultChecked={loadedReport.filters.includeArchived}
-                    name="include_archived"
-                    type="checkbox"
-                  />
-                  <span><strong>Include archived</strong><small>Bring historical applications into scope.</small></span>
-                </label>
-                <label className="check-card compact-check-card">
-                  <input
-                    defaultChecked={loadedReport.filters.includeInternalNotes}
-                    name="include_internal_notes"
-                    type="checkbox"
-                  />
-                  <input name="include_internal_notes" type="hidden" value="0" />
-                  <span><strong>Internal notes</strong><small>Owner/advisory notes in eligible reports.</small></span>
-                </label>
-                <label className="check-card compact-check-card">
-                  <input
-                    defaultChecked={loadedReport.filters.includeContactInfo}
-                    name="include_contact_info"
-                    type="checkbox"
-                  />
-                  <input name="include_contact_info" type="hidden" value="0" />
-                  <span><strong>Contact info</strong><small>Names, email, and phone fields.</small></span>
-                </label>
-                <label className="check-card compact-check-card">
-                  <input
-                    defaultChecked={loadedReport.filters.includeAdjudicatorIdentities}
-                    name="include_adjudicator_identities"
-                    type="checkbox"
-                  />
-                  <input name="include_adjudicator_identities" type="hidden" value="0" />
-                  <span><strong>Panel identities</strong><small>Adjudicator/staff identity fields.</small></span>
-                </label>
-                <label className="check-card compact-check-card">
-                  <input
-                    defaultChecked={loadedReport.filters.includeProtectedScores}
-                    name="include_protected_scores"
-                    type="checkbox"
-                  />
-                  <input name="include_protected_scores" type="hidden" value="0" />
-                  <span><strong>Protected scores</strong><small>Raw scores, comments, and observations.</small></span>
-                </label>
+                    <label className="check-card compact-check-card">
+                      <input
+                        defaultChecked={loadedReport.filters.includeArchived}
+                        name="include_archived"
+                        type="checkbox"
+                      />
+                      <span><strong>Include archived</strong><small>Bring historical applications into scope.</small></span>
+                    </label>
+                    <label className="check-card compact-check-card">
+                      <input
+                        defaultChecked={loadedReport.filters.includeInternalNotes}
+                        name="include_internal_notes"
+                        type="checkbox"
+                      />
+                      <input name="include_internal_notes" type="hidden" value="0" />
+                      <span><strong>Internal notes</strong><small>Owner/advisory notes in eligible reports.</small></span>
+                    </label>
+                    <label className="check-card compact-check-card">
+                      <input
+                        defaultChecked={loadedReport.filters.includeContactInfo}
+                        name="include_contact_info"
+                        type="checkbox"
+                      />
+                      <input name="include_contact_info" type="hidden" value="0" />
+                      <span><strong>Contact info</strong><small>Names, email, and phone fields.</small></span>
+                    </label>
+                    <label className="check-card compact-check-card">
+                      <input
+                        defaultChecked={loadedReport.filters.includeAdjudicatorIdentities}
+                        name="include_adjudicator_identities"
+                        type="checkbox"
+                      />
+                      <input name="include_adjudicator_identities" type="hidden" value="0" />
+                      <span><strong>Panel identities</strong><small>Adjudicator/staff identity fields.</small></span>
+                    </label>
+                    <label className="check-card compact-check-card">
+                      <input
+                        defaultChecked={loadedReport.filters.includeProtectedScores}
+                        name="include_protected_scores"
+                        type="checkbox"
+                      />
+                      <input name="include_protected_scores" type="hidden" value="0" />
+                      <span><strong>Protected scores</strong><small>Raw scores, comments, and observations.</small></span>
+                    </label>
+                  </div>
+                </details>
 
-                <button className="button button-dark" type="submit">
-                  Update preview
-                </button>
-                <Link className="button button-secondary" href="/portal/admin/reports">
-                  Reset
-                </Link>
+                <div className="report-filter-actions">
+                  <button className="button button-dark" type="submit">
+                    Update preview
+                  </button>
+                  <Link
+                    className="button button-secondary"
+                    href={clearReportFiltersHref(selectedDefinition, selectedCategory, catalogQuery)}
+                  >
+                    Clear report filters
+                  </Link>
+                </div>
               </form>
             </div>
           </section>
@@ -617,25 +759,74 @@ export default async function OwnerReportsPage({
             </section>
           )}
 
+          <section className="panel report-panel report-preview-panel">
+            <div className="panel-header">
+              <div>
+                <span className="eyebrow">Live result</span>
+                <h2>Report preview</h2>
+                <p>
+                  Showing {previewRows.length} of {loadedReport.rows.length} rows and all {loadedReport.columns.length} visible columns.
+                  Exports include the complete filtered dataset.
+                </p>
+              </div>
+              {loadedReport.rows.length > previewRows.length && (
+                <span className="badge">First {previewRows.length} rows</span>
+              )}
+            </div>
+            <div className="table-wrap report-table-wrap report-preview-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    {loadedReport.columns.map((column) => (
+                      <th key={column.key}>{column.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row, index) => (
+                    <tr key={`${selectedDefinition.id}-${index}`}>
+                      {loadedReport.columns.map((column) => (
+                        <td key={column.key}>
+                          {cellValue(row, column.key)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {previewRows.length === 0 && (
+                    <tr>
+                      <td colSpan={Math.max(loadedReport.columns.length, 1)}>
+                        No rows match the selected filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <section className="panel report-save-panel">
             <div className="panel-header">
               <div>
                 <h2>Save or schedule this setup</h2>
                 <p>
-                  Presets keep your current filters; schedules email the chosen
-                  export to owner-approved recipients once the schedule table is
-                  available.
+                  Presets keep the current filters for one-click reuse. Schedules
+                  email the chosen export to approved recipients each day.
                 </p>
               </div>
             </div>
             <div className="panel-body report-save-grid">
-              <form action={saveReportPreset} className="form-stack">
-                <HiddenReportFields
-                  definition={selectedDefinition}
-                  filters={loadedReport.filters}
-                  params={params}
-                  selectedSort={selectedSort}
-                />
+              <details className="report-setup-details">
+                <summary>
+                  <span><strong>Save a reusable preset</strong><small>Keep this exact report setup for later.</small></span>
+                  <b>Open</b>
+                </summary>
+                <form action={saveReportPreset} className="form-stack">
+                  <HiddenReportFields
+                    definition={selectedDefinition}
+                    filters={loadedReport.filters}
+                    params={params}
+                    selectedSort={selectedSort}
+                  />
                 <div className="field">
                   <label htmlFor="preset_name">Preset name</label>
                   <input
@@ -674,18 +865,24 @@ export default async function OwnerReportsPage({
                   <input name="favorite" type="checkbox" />
                   Mark as favorite
                 </label>
-                <button className="button button-secondary" type="submit">
-                  Save preset
-                </button>
-              </form>
+                  <button className="button button-secondary" type="submit">
+                    Save preset
+                  </button>
+                </form>
+              </details>
 
-              <form action={saveReportSchedule} className="form-stack">
-                <HiddenReportFields
-                  definition={selectedDefinition}
-                  filters={loadedReport.filters}
-                  params={params}
-                  selectedSort={selectedSort}
-                />
+              <details className="report-setup-details">
+                <summary>
+                  <span><strong>Schedule email delivery</strong><small>Send this report automatically each day.</small></span>
+                  <b>Open</b>
+                </summary>
+                <form action={saveReportSchedule} className="form-stack">
+                  <HiddenReportFields
+                    definition={selectedDefinition}
+                    filters={loadedReport.filters}
+                    params={params}
+                    selectedSort={selectedSort}
+                  />
                 <div className="field">
                   <label htmlFor="schedule_name">Schedule name</label>
                   <input
@@ -742,10 +939,11 @@ export default async function OwnerReportsPage({
                     />
                   </div>
                 </div>
-                <button className="button button-dark" type="submit">
-                  Schedule report
-                </button>
-              </form>
+                  <button className="button button-dark" type="submit">
+                    Schedule report
+                  </button>
+                </form>
+              </details>
             </div>
 
             <div className="report-saved-lists">
@@ -763,11 +961,19 @@ export default async function OwnerReportsPage({
                           {preset.favorite ? " · Favorite" : ""}
                         </small>
                       </div>
-                      <form action={deleteReportPreset.bind(null, preset.id)}>
-                        <button className="button button-ghost button-compact" type="submit">
-                          Delete
-                        </button>
-                      </form>
+                      <div className="report-saved-actions">
+                        <Link
+                          className="button button-secondary button-compact"
+                          href={storedReportHref(preset.report_key, preset.filters, preset.variant)}
+                        >
+                          Open
+                        </Link>
+                        <form action={deleteReportPreset.bind(null, preset.id)}>
+                          <button className="button button-ghost button-compact" type="submit">
+                            Delete
+                          </button>
+                        </form>
+                      </div>
                     </article>
                   ))
                 )}
@@ -798,48 +1004,6 @@ export default async function OwnerReportsPage({
             </div>
           </section>
 
-          <section className="panel report-panel">
-            <div className="panel-header">
-              <div>
-                <h2>Preview</h2>
-                <p>
-                  Showing {previewRows.length} of {loadedReport.rows.length} rows.
-                  Downloads include the selected export format’s full available
-                  dataset.
-                </p>
-              </div>
-            </div>
-            <div className="table-wrap report-table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    {loadedReport.columns.slice(0, 8).map((column) => (
-                      <th key={column.key}>{column.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewRows.map((row, index) => (
-                    <tr key={`${selectedDefinition.id}-${index}`}>
-                      {loadedReport.columns.slice(0, 8).map((column) => (
-                        <td key={column.key}>
-                          {cellValue(row, column.key)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {previewRows.length === 0 && (
-                    <tr>
-                      <td colSpan={Math.max(loadedReport.columns.slice(0, 8).length, 1)}>
-                        No rows match the selected filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
           <section className="panel">
             <div className="panel-header">
               <div>
@@ -862,7 +1026,15 @@ export default async function OwnerReportsPage({
                         {run.row_count} rows · {run.requested_format.toUpperCase()}
                         {run.file_name ? ` · ${run.file_name}` : ""}
                       </p>
-                      <small>{formatDate(run.created_at)}</small>
+                      <div className="report-run-footer">
+                        <small>{formatDate(run.created_at)}</small>
+                        <Link
+                          className="button button-secondary button-compact"
+                          href={storedReportHref(run.report_key, run.filters, run.variant)}
+                        >
+                          Run again
+                        </Link>
+                      </div>
                     </article>
                   ))}
                 </div>

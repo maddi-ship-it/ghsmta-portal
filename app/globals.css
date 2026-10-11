@@ -14732,9 +14732,128 @@ html[data-theme="dark"] .public-home-role-marker {
 
 .report-center-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: 22px;
   align-items: start;
+}
+
+.report-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.report-overview-card {
+  min-height: 132px;
+}
+
+.report-overview-card small {
+  color: var(--portal-muted, var(--muted));
+  line-height: 1.4;
+}
+
+.report-category-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: thin;
+}
+
+.report-category-pill {
+  align-items: center;
+  border: 1px solid var(--portal-line, var(--border));
+  border-radius: 999px;
+  color: var(--portal-text, var(--text));
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.73rem;
+  font-weight: 850;
+  gap: 8px;
+  letter-spacing: 0.035em;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.report-category-pill span {
+  align-items: center;
+  background: var(--portal-surface-3, var(--soft-gray));
+  border-radius: 999px;
+  color: var(--portal-muted, var(--muted));
+  display: inline-flex;
+  font-size: 0.68rem;
+  height: 22px;
+  justify-content: center;
+  min-width: 22px;
+  padding-inline: 6px;
+}
+
+.report-category-pill:hover,
+.report-category-pill.is-active {
+  background: color-mix(in srgb, var(--portal-gold, #d6b24c) 12%, transparent);
+  border-color: color-mix(in srgb, var(--portal-gold, #d6b24c) 72%, transparent);
+}
+
+.report-category-pill.is-active span {
+  background: var(--portal-gold-bright, #f2d889);
+  color: #111827;
+}
+
+.report-digest-panel > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  padding: 17px 20px;
+}
+
+.report-digest-panel > summary::-webkit-details-marker,
+.report-advanced-filters > summary::-webkit-details-marker,
+.report-setup-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.report-digest-panel > summary > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.report-digest-panel > summary strong {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.2rem;
+}
+
+.report-digest-panel > summary small {
+  color: var(--portal-muted, var(--muted));
+}
+
+.report-summary-toggle,
+.report-advanced-filters > summary > b,
+.report-setup-details > summary > b {
+  color: var(--portal-gold-bright, #f2d889);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.report-digest-expanded {
+  align-items: end;
+  border-top: 1px solid var(--portal-line, var(--border));
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 18px 20px 20px;
+}
+
+.report-digest-expanded form,
+.report-digest-expanded form .button {
+  width: 100%;
 }
 
 .report-catalog-panel {
@@ -14752,7 +14871,7 @@ html[data-theme="dark"] .public-home-role-marker {
   display: grid;
   gap: 10px;
   margin-top: 16px;
-  max-height: 720px;
+  max-height: calc(100vh - 315px);
   overflow: auto;
   padding-right: 4px;
 }
@@ -14773,9 +14892,40 @@ html[data-theme="dark"] .public-home-role-marker {
   box-shadow: 0 14px 34px rgba(5, 12, 30, 0.14);
 }
 
-.report-catalog-card span,
+.report-catalog-card.is-active {
+  background: color-mix(in srgb, var(--portal-gold, #d6b24c) 9%, var(--portal-surface-2, transparent));
+}
+
+.report-catalog-card .report-card-kicker,
 .report-catalog-card small {
   color: var(--muted);
+}
+
+.report-card-kicker {
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.report-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.report-card-meta b,
+.report-builder-meta span {
+  background: var(--portal-surface-3, var(--soft-gray));
+  border: 1px solid var(--portal-line, var(--border));
+  border-radius: 999px;
+  color: var(--portal-muted, var(--muted));
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  padding: 4px 7px;
+  text-transform: uppercase;
 }
 
 .report-preview-stack {
@@ -14791,15 +14941,75 @@ html[data-theme="dark"] .public-home-role-marker {
   justify-content: flex-end;
 }
 
+.report-builder-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
 .report-filter-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  grid-template-columns: repeat(5, minmax(135px, 1fr));
   gap: 14px;
   align-items: end;
 }
 
-.report-filter-grid .check-card {
+.report-advanced-filters,
+.report-filter-actions {
+  grid-column: 1 / -1;
+}
+
+.report-advanced-filters,
+.report-setup-details {
+  border: 1px solid var(--portal-line, var(--border));
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.report-advanced-filters > summary,
+.report-setup-details > summary {
+  align-items: center;
+  background: var(--portal-surface-2, var(--surface-muted));
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 64px;
+  padding: 12px 15px;
+}
+
+.report-advanced-filters > summary > span,
+.report-setup-details > summary > span {
+  display: grid;
+  gap: 3px;
+}
+
+.report-advanced-filters > summary small,
+.report-setup-details > summary small {
+  color: var(--portal-muted, var(--muted));
+  font-size: 0.76rem;
+}
+
+.report-advanced-filter-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  padding: 14px;
+}
+
+.report-advanced-filter-grid .check-card {
   min-height: 86px;
+}
+
+.report-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-filter-actions .button {
+  min-width: 170px;
 }
 
 .report-warning-panel ul {
@@ -14809,6 +15019,43 @@ html[data-theme="dark"] .public-home-role-marker {
 
 .report-save-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.report-setup-details > form {
+  border-top: 1px solid var(--portal-line, var(--border));
+  padding: 16px;
+}
+
+.report-preview-table-wrap {
+  max-height: min(58vh, 700px);
+}
+
+.report-preview-table-wrap .data-table {
+  min-width: max(100%, 1080px);
+}
+
+.report-preview-table-wrap th,
+.report-preview-table-wrap td {
+  max-width: 340px;
+  min-width: 145px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.report-preview-table-wrap th:first-child,
+.report-preview-table-wrap td:first-child {
+  left: 0;
+  position: sticky;
+}
+
+.report-preview-table-wrap th:first-child {
+  z-index: 5;
+}
+
+.report-preview-table-wrap td:first-child {
+  background: var(--portal-surface, var(--surface));
+  box-shadow: 1px 0 0 var(--portal-line, var(--border));
+  z-index: 2;
 }
 
 .report-saved-lists {
@@ -14836,11 +15083,28 @@ html[data-theme="dark"] .public-home-role-marker {
   margin-top: 4px;
 }
 
+.report-saved-actions,
+.report-run-footer {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-run-footer {
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
 .user-bulk-message {
   min-width: min(420px, 100%);
 }
 
 @media (max-width: 1120px) {
+  .report-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .report-center-layout,
   .report-save-grid,
   .report-saved-lists {
@@ -14854,11 +15118,33 @@ html[data-theme="dark"] .public-home-role-marker {
   .report-filter-grid {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
+
+  .report-advanced-filter-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+
+  .report-catalog-list {
+    max-height: 520px;
+  }
 }
 
 @media (max-width: 720px) {
-  .report-filter-grid {
+  .report-overview-grid,
+  .report-filter-grid,
+  .report-advanced-filter-grid,
+  .report-digest-expanded {
     grid-template-columns: 1fr;
+  }
+
+  .report-overview-card {
+    min-height: 112px;
+  }
+
+  .report-digest-panel > summary,
+  .report-advanced-filters > summary,
+  .report-setup-details > summary {
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .report-download-actions {
@@ -14866,6 +15152,16 @@ html[data-theme="dark"] .public-home-role-marker {
   }
 
   .report-download-actions .button {
+    width: 100%;
+  }
+
+  .report-filter-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .report-filter-actions .button {
+    min-width: 0;
     width: 100%;
   }
 }
