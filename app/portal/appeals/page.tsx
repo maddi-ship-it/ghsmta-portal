@@ -1,5 +1,6 @@
 import { AppealWorkspace } from "@/components/appeal-workspace";
 import { requireProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppealsPage() {
@@ -11,7 +12,6 @@ export default async function AppealsPage() {
     formVersionsResult,
     appealsResult,
     scholarshipRequestsResult,
-    categoriesResult,
     filesResult,
     scholarshipFilesResult,
     cyclesResult,
@@ -39,11 +39,6 @@ export default async function AppealsPage() {
         .select("*")
         .order("submitted_at", { ascending: false }),
       supabase
-        .from("scoring_categories")
-        .select("id,title,rubric_id")
-        .eq("active", true)
-        .order("sort_order"),
-      supabase
         .from("portal_files")
         .select("id,context_id,original_name,generated_name,storage_path,mime_type,file_size,created_at")
         .eq("context_type", "appeal")
@@ -66,7 +61,6 @@ export default async function AppealsPage() {
     formVersionsResult,
     appealsResult,
     scholarshipRequestsResult,
-    categoriesResult,
     filesResult,
     scholarshipFilesResult,
     cyclesResult,
@@ -91,6 +85,32 @@ export default async function AppealsPage() {
         ? formRubricMap.get(application.form_version_id) ?? null
         : null,
     }));
+
+  // Applicants cannot read staff rubric tables directly. Resolve only the
+  // category options attached to applications they can already access.
+  const applicationRubricIds = Array.from(
+    new Set(
+      applications
+        .map((application) => application.scoring_rubric_id)
+        .filter((rubricId): rubricId is string => Boolean(rubricId)),
+    ),
+  );
+  let categories: { id: string; title: string; rubric_id: string }[] = [];
+  if (applicationRubricIds.length > 0) {
+    const admin = createAdminClient();
+    const categoriesResult = await admin
+      .from("scoring_categories")
+      .select("id,title,rubric_id")
+      .in("rubric_id", applicationRubricIds)
+      .eq("active", true)
+      .order("sort_order");
+
+    if (categoriesResult.error) {
+      throw new Error(categoriesResult.error.message);
+    }
+    categories = categoriesResult.data ?? [];
+  }
+
   const activeApplicationIds = new Set(
     applications.map((application) => application.id),
   );
@@ -126,7 +146,7 @@ export default async function AppealsPage() {
       <AppealWorkspace
         appeals={appeals}
         applications={applications}
-        categories={categoriesResult.data ?? []}
+        categories={categories}
         cycles={cyclesResult.data ?? []}
         files={files}
         profile={profile}
