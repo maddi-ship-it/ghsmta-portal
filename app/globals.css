@@ -9214,6 +9214,37 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   margin-bottom: 24px;
 }
 
+.specialty-awards-modal {
+  width: min(1320px, 100%);
+  height: min(92vh, 980px);
+  height: min(92dvh, 980px);
+  max-height: min(92vh, 980px);
+  max-height: min(92dvh, 980px);
+}
+
+.specialty-awards-modal-body {
+  padding: 18px;
+}
+
+.specialty-awards-modal-body > .specialty-awards-panel {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.specialty-awards-modal-body > .specialty-awards-panel > .panel-header {
+  display: none;
+}
+
+.specialty-awards-modal-body > .specialty-awards-panel > .panel-body {
+  padding: 0;
+}
+
+.specialty-awards-modal-body .specialty-action-bar {
+  top: 0;
+}
+
 .specialty-panel-header {
   align-items: center;
 }
@@ -15234,6 +15265,64 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   border: 1px solid var(--portal-line);
   border-radius: 0.95rem;
   background: var(--portal-surface-2);
+}
+
+.panel-category-final-comment {
+  border-top: 1px solid var(--portal-line);
+}
+
+.panel-narrative-card-inline {
+  margin: 0;
+}
+
+.panel-review-criterion-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--portal-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.panel-review-criterion-guide {
+  margin-top: 0.7rem;
+}
+
+.panel-review-criterion-guide .criterion-guide-button {
+  width: auto;
+  max-width: 100%;
+  border-radius: 0.65rem;
+}
+
+.criterion-score-table .data-table :where(th, td).panel-review-own-score {
+  min-width: 260px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.panel-review-score-entry {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.panel-review-score-entry > label {
+  color: var(--portal-muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.panel-review-score-entry .rich-text-field {
+  margin: 0;
+}
+
+.panel-review-score-entry .rich-text-editor {
+  min-height: 88px;
 }
 
 .panel-narrative-card-heading {

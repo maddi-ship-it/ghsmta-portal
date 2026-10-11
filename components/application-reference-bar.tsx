@@ -32,12 +32,14 @@ const REFERENCE_DOCUMENT_BUTTON_LABELS = {
 } as const;
 
 export function ApplicationReferenceBar({
+  categoryWorkflowControl,
   categoryNavigation,
   links = [],
   panels,
   reviewActions,
   scorecardSubmitControl,
 }: {
+  categoryWorkflowControl?: ReactNode;
   categoryNavigation?: {
     categories: CategoryJumpOption[];
     initialCompletedCategoryIds?: string[];
@@ -130,7 +132,9 @@ export function ApplicationReferenceBar({
             <div className="application-category-navigation-row">
               <AdjudicationCategoryNavigator {...categoryNavigation} />
 
-              {scorecardSubmitControl || reviewActions?.showCategoryReview ? (
+              {scorecardSubmitControl ||
+              categoryWorkflowControl ||
+              reviewActions?.showCategoryReview ? (
                 <div className="application-reference-action-group application-reference-workflow-actions application-category-workflow-actions">
                   {reviewActions?.showCategoryReview ? (
                     <button
@@ -145,6 +149,7 @@ export function ApplicationReferenceBar({
                       Review all categories
                     </button>
                   ) : null}
+                  {categoryWorkflowControl}
                   {scorecardSubmitControl}
                 </div>
               ) : null}
@@ -189,7 +194,9 @@ export function ApplicationReferenceBar({
 
             {reviewActions?.showPanelReview ||
             (!categoryNavigation &&
-              (scorecardSubmitControl || reviewActions?.showCategoryReview)) ? (
+              (scorecardSubmitControl ||
+                categoryWorkflowControl ||
+                reviewActions?.showCategoryReview)) ? (
               <div className="application-reference-action-group application-reference-workflow-actions">
                 {reviewActions?.showPanelReview ? (
                   <button
@@ -213,6 +220,7 @@ export function ApplicationReferenceBar({
                     Review all categories
                   </button>
                 ) : null}
+                {!categoryNavigation ? categoryWorkflowControl : null}
                 {!categoryNavigation ? scorecardSubmitControl : null}
               </div>
             ) : null}

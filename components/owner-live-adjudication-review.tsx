@@ -8,11 +8,19 @@ import {
   reopenAdjudicatorScorecard,
   savePanelFeedback,
 } from "@/app/portal/adjudication/[id]/actions";
+import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
+import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
+import { RichTextField } from "@/components/rich-text-field";
 import {
   formatScore,
   formatScoreAverage,
   roundScoreAverage,
 } from "@/lib/adjudication";
+import {
+  ADJUDICATION_CATEGORY_COMPLETION_EVENT,
+  isAdjudicationCategoryComplete,
+} from "@/lib/adjudication-category-completion";
+import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { createClient } from "@/lib/supabase/client";
 import { richTextHasContent, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/rich-text";
 import type {
@@ -26,6 +34,30 @@ import type {
   ScoringCategory,
   ScoringCriterion,
 } from "@/lib/types";
+
+export type PanelNarrativeReviewer = {
+  id: string;
+  name: string;
+  role: "adjudicator" | "advisory_member";
+};
+
+type AdvisoryNarrativeReview = {
+  canComment: boolean;
+  currentUserId: string;
+  panelReviewers: PanelNarrativeReviewer[];
+  panelApprovedCategoryIds: string[];
+  reviewStatus: string;
+};
+
+type AdvisoryScoreEntry = {
+  canComment: boolean;
+  currentUserId: string;
+  readOnly: boolean;
+  scoreOptions: Array<{
+    value: number;
+    label: string | null;
+  }>;
+};
 
 function scorecardStatusLabel(status: string) {
   return status.replaceAll("_", " ");
@@ -51,6 +83,118 @@ function RichTextPreview({ value }: { value: string | null | undefined }) {
         __html: sanitizeRichTextHtml(value),
       }}
     />
+  );
+}
+
+function CriterionDescription({ description }: { description: string | null }) {
+  if (!description) return null;
+
+  const bulletItems = description
+    .split(/\s*•\s*/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (bulletItems.length <= 1) {
+    return <small>{description}</small>;
+  }
+
+  return (
+    <ul className="panel-review-criterion-list">
+      {bulletItems.map((item, index) => (
+        <li key={`${index}-${item}`}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+function AdvisoryCategoryNarrative({
+  applicationId,
+  category,
+  categoryFeedback,
+  narrativeReview,
+  panelApproved,
+  reviewerMap,
+}: {
+  applicationId: string;
+  category: ScoringCategory;
+  categoryFeedback: AdjudicationPanelFeedback | undefined;
+  narrativeReview: AdvisoryNarrativeReview;
+  panelApproved: boolean;
+  reviewerMap: Map<string, PanelNarrativeReviewer>;
+}) {
+  const finalComment = categoryFeedback?.final_comment?.trim() ?? "";
+  const assignedReviewer = categoryFeedback?.assigned_to
+    ? reviewerMap.get(categoryFeedback.assigned_to)
+    : undefined;
+  const sentToOwners = ["ready_for_owner", "owner_review", "released"].includes(
+    narrativeReview.reviewStatus,
+  );
+  const canEdit = Boolean(
+    narrativeReview.canComment &&
+      finalComment &&
+      !panelApproved &&
+      !sentToOwners &&
+      categoryFeedback?.assigned_to === narrativeReview.currentUserId,
+  );
+
+  return (
+    <div className="panel-body panel-category-final-comment">
+      <article className="panel-narrative-card panel-narrative-card-inline">
+        <div className="panel-narrative-card-heading">
+          <div>
+            <span className="eyebrow">School-facing narrative</span>
+            <h3>Final comment</h3>
+          </div>
+          <span
+            className={`badge ${panelApproved ? "badge-complete" : "badge-warning"}`}
+          >
+            {panelApproved
+              ? "Panel approved"
+              : assignedReviewer
+                ? `Assigned to ${assignedReviewer.name}`
+                : finalComment
+                  ? "Needs assignment"
+                  : "With Owner"}
+          </span>
+        </div>
+
+        {assignedReviewer ? (
+          <div className="final-comment-assignee">
+            <span>Assigned final comment writer</span>
+            <strong>{assignedReviewer.name}</strong>
+          </div>
+        ) : null}
+
+        {finalComment ? (
+          canEdit ? (
+            <PanelNarrativeReviewEditor
+              applicationId={applicationId}
+              categoryId={category.id}
+              currentUserId={narrativeReview.currentUserId}
+              generatedAt={categoryFeedback?.generated_at ?? ""}
+              initialValue={finalComment}
+            />
+          ) : (
+            <>
+              <div className="comment-readonly-surface panel-narrative-preview">
+                {finalComment}
+              </div>
+              {!panelApproved && !assignedReviewer ? (
+                <p className="field-help">
+                  An Advisory Committee member must assign this comment before
+                  it can be edited and approved.
+                </p>
+              ) : null}
+            </>
+          )
+        ) : (
+          <div className="comment-readonly-surface">
+            The live draft is with the Owners. It will appear here after an
+            Owner sends it to the panel.
+          </div>
+        )}
+      </article>
+    </div>
   );
 }
 
@@ -460,6 +604,8 @@ function LivePanelFeedbackEditor({
 export function OwnerLiveAdjudicationReview({
   applicationId,
   isOwner,
+  advisoryNarrativeReview,
+  advisoryScoreEntry,
   categories,
   criteria,
   assignments,
@@ -468,10 +614,13 @@ export function OwnerLiveAdjudicationReview({
   initialScores,
   initialComments,
   initialFeedback,
+  productionTitle,
   release,
 }: {
   applicationId: string;
   isOwner: boolean;
+  advisoryNarrativeReview?: AdvisoryNarrativeReview;
+  advisoryScoreEntry?: AdvisoryScoreEntry;
   categories: ScoringCategory[];
   criteria: ScoringCriterion[];
   assignments: AdjudicatorAssignment[];
@@ -480,6 +629,7 @@ export function OwnerLiveAdjudicationReview({
   initialScores: AdjudicationScore[];
   initialComments: AdjudicationCategoryComment[];
   initialFeedback: AdjudicationPanelFeedback[];
+  productionTitle: string;
   release: AdjudicationRelease | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -491,6 +641,7 @@ export function OwnerLiveAdjudicationReview({
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "error">(
     "connecting",
   );
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const profileMap = useMemo(
@@ -532,6 +683,21 @@ export function OwnerLiveAdjudicationReview({
         ]),
       ),
     [scores],
+  );
+  const narrativeReviewerMap = useMemo(
+    () =>
+      new Map(
+        (advisoryNarrativeReview?.panelReviewers ?? []).map((reviewer) => [
+          reviewer.id,
+          reviewer,
+        ]),
+      ),
+    [advisoryNarrativeReview?.panelReviewers],
+  );
+  const panelApprovedCategories = useMemo(
+    () =>
+      new Set(advisoryNarrativeReview?.panelApprovedCategoryIds ?? []),
+    [advisoryNarrativeReview?.panelApprovedCategoryIds],
   );
   const refreshData = useCallback(async () => {
     const { data: scorecardData, error: scorecardError } = await supabase
@@ -588,6 +754,56 @@ export function OwnerLiveAdjudicationReview({
   }, [refreshData]);
 
   const scorecardKey = scorecards.map((scorecard) => scorecard.id).sort().join(",");
+
+  useEffect(() => {
+    if (!advisoryScoreEntry) return;
+
+    const form = workspaceRef.current?.closest("form");
+    if (!form) return;
+
+    let updateFrame = 0;
+    const updateCategoryCompletion = () => {
+      updateFrame = 0;
+      const formData = new FormData(form);
+
+      for (const category of categories) {
+        if (category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY) continue;
+
+        const categoryCriteria = criteria.filter(
+          (criterion) => criterion.category_id === category.id,
+        );
+        const complete = isAdjudicationCategoryComplete({
+          comments: categoryCriteria.map((criterion) =>
+            String(formData.get(`observation_${criterion.id}`) ?? ""),
+          ),
+          requireComments: advisoryScoreEntry.canComment,
+          scores: categoryCriteria.map((criterion) =>
+            String(formData.get(`score_${criterion.id}`) ?? ""),
+          ),
+        });
+
+        window.dispatchEvent(
+          new CustomEvent(ADJUDICATION_CATEGORY_COMPLETION_EVENT, {
+            detail: { categoryId: category.id, complete },
+          }),
+        );
+      }
+    };
+    const scheduleCompletionUpdate = () => {
+      if (updateFrame) window.cancelAnimationFrame(updateFrame);
+      updateFrame = window.requestAnimationFrame(updateCategoryCompletion);
+    };
+
+    scheduleCompletionUpdate();
+    form.addEventListener("input", scheduleCompletionUpdate);
+    form.addEventListener("change", scheduleCompletionUpdate);
+
+    return () => {
+      if (updateFrame) window.cancelAnimationFrame(updateFrame);
+      form.removeEventListener("input", scheduleCompletionUpdate);
+      form.removeEventListener("change", scheduleCompletionUpdate);
+    };
+  }, [advisoryScoreEntry, categories, criteria]);
 
   useEffect(() => {
     const channels = [
@@ -665,7 +881,10 @@ export function OwnerLiveAdjudicationReview({
 
   return (
     <>
-      <div className={`live-review-status live-review-status-${connectionState}`}>
+      <div
+        className={`live-review-status live-review-status-${connectionState}`}
+        ref={workspaceRef}
+      >
         <span aria-hidden="true" />
         <div>
           <strong>
@@ -777,6 +996,8 @@ export function OwnerLiveAdjudicationReview({
           visibleScorecards,
           scores,
         );
+        const isOverallProductionCategory =
+          category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
         const categoryComments = comments.filter(
           (comment) =>
             comment.category_id === category.id &&
@@ -814,9 +1035,21 @@ export function OwnerLiveAdjudicationReview({
                   <tr>
                     <th>Criterion</th>
                     {panelRoster.map(({ assignment, scorecard }) => (
-                      <th key={assignment.id}>
+                      <th
+                        className={
+                          advisoryScoreEntry?.currentUserId ===
+                          assignment.adjudicator_user_id
+                            ? "panel-review-own-score"
+                            : undefined
+                        }
+                        key={assignment.id}
+                      >
                         {profileMap.get(assignment.adjudicator_user_id)?.full_name?.split(" ")[0] ??
                           "Panelist"}
+                        {advisoryScoreEntry?.currentUserId ===
+                        assignment.adjudicator_user_id
+                          ? " · You"
+                          : ""}
                         <small>
                           {scorecard
                             ? scorecardStatusLabel(scorecard.status)
@@ -829,15 +1062,18 @@ export function OwnerLiveAdjudicationReview({
                 </thead>
                 <tbody>
                   {categoryCriteria.map((criterion) => {
-                    const criterionRows = panelRoster.map(({ scorecard }) =>
-                      scorecard
-                        ? scoreByCardAndCriterion.get(
-                            `${scorecard.id}:${criterion.id}`,
-                          )
-                        : undefined,
+                    const criterionRows = panelRoster.map(
+                      ({ assignment, scorecard }) => ({
+                        assignment,
+                        row: scorecard
+                          ? scoreByCardAndCriterion.get(
+                              `${scorecard.id}:${criterion.id}`,
+                            )
+                          : undefined,
+                      }),
                     );
                     const numeric = criterionRows
-                      .map((row) => row?.score)
+                      .map(({ row }) => row?.score)
                       .filter((value): value is number => typeof value === "number")
                       .map(Number);
                     const criterionAverage = numeric.length
@@ -851,18 +1087,100 @@ export function OwnerLiveAdjudicationReview({
                       <tr key={criterion.id}>
                         <td>
                           <strong>{criterion.title}</strong>
-                          <small>{criterion.description}</small>
+                          <CriterionDescription
+                            description={criterion.description}
+                          />
+                          {!isOverallProductionCategory ? (
+                            <div className="panel-review-criterion-guide">
+                              <CriterionScoringGuideButton
+                                categoryTitle={category.title}
+                                criterionId={criterion.id}
+                                criterionTitle={criterion.title}
+                                productionTitle={productionTitle}
+                              />
+                            </div>
+                          ) : null}
                         </td>
-                        {criterionRows.map((row, index) => (
-                          <td key={`${criterion.id}-${index}`}>
-                            <strong>{formatScore(row?.score)}</strong>
-                            {row?.observation && (
-                              <div className="live-score-observation">
-                                <RichTextPreview value={row.observation} />
-                              </div>
-                            )}
-                          </td>
-                        ))}
+                        {criterionRows.map(({ assignment, row }) => {
+                          const isEditableOwnColumn = Boolean(
+                            advisoryScoreEntry &&
+                              assignment.adjudicator_user_id ===
+                                advisoryScoreEntry.currentUserId,
+                          );
+                          return (
+                            <td
+                              className={
+                                isEditableOwnColumn
+                                  ? "panel-review-own-score"
+                                  : undefined
+                              }
+                              key={`${criterion.id}-${assignment.id}`}
+                            >
+                              {isEditableOwnColumn && advisoryScoreEntry ? (
+                                <div className="panel-review-score-entry">
+                                  <label htmlFor={`score_${criterion.id}`}>
+                                    Your score
+                                  </label>
+                                  {isOverallProductionCategory ? (
+                                    <output
+                                      aria-label="Automatically calculated overall production score"
+                                      className="derived-score-output"
+                                    >
+                                      {formatScore(row?.score)}
+                                    </output>
+                                  ) : (
+                                    <select
+                                      className="select score-select"
+                                      defaultValue={row?.score ?? ""}
+                                      disabled={advisoryScoreEntry.readOnly}
+                                      id={`score_${criterion.id}`}
+                                      name={`score_${criterion.id}`}
+                                    >
+                                      <option value="">—</option>
+                                      {advisoryScoreEntry.scoreOptions.map(
+                                        (option) => (
+                                          <option
+                                            key={option.value}
+                                            value={option.value}
+                                          >
+                                            {option.value.toFixed(2)}
+                                            {option.label
+                                              ? ` — ${option.label}`
+                                              : ""}
+                                          </option>
+                                        ),
+                                      )}
+                                    </select>
+                                  )}
+
+                                  {advisoryScoreEntry.canComment ? (
+                                    <RichTextField
+                                      defaultValue={row?.observation}
+                                      disabled={advisoryScoreEntry.readOnly}
+                                      id={`observation_${criterion.id}`}
+                                      label="Your criterion comment"
+                                      name={`observation_${criterion.id}`}
+                                      placeholder="Enter observable notes for this criterion"
+                                    />
+                                  ) : row?.observation ? (
+                                    <div className="live-score-observation">
+                                      <RichTextPreview value={row.observation} />
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <>
+                                  <strong>{formatScore(row?.score)}</strong>
+                                  {row?.observation ? (
+                                    <div className="live-score-observation">
+                                      <RichTextPreview value={row.observation} />
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
+                            </td>
+                          );
+                        })}
                         <td>
                           <strong>{formatScoreAverage(criterionAverage)}</strong>
                         </td>
@@ -890,6 +1208,15 @@ export function OwnerLiveAdjudicationReview({
                   )}
                 />
               </div>
+            ) : advisoryNarrativeReview ? (
+              <AdvisoryCategoryNarrative
+                applicationId={applicationId}
+                category={category}
+                categoryFeedback={categoryFeedback}
+                narrativeReview={advisoryNarrativeReview}
+                panelApproved={panelApprovedCategories.has(category.id)}
+                reviewerMap={narrativeReviewerMap}
+              />
             ) : null}
           </section>
         );

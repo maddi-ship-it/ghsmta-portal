@@ -21,6 +21,7 @@ describe("ApplicationReferenceBar", () => {
   it("renders category navigation and adjudicator actions in the requested order", () => {
     const html = renderToStaticMarkup(
       <ApplicationReferenceBar
+        categoryWorkflowControl={<span>SPECIALTY AWARDS</span>}
         categoryNavigation={{
           categories: [{ id: "direction", title: "Direction" }],
           initialCompletedCategoryIds: ["direction"],
@@ -52,6 +53,7 @@ describe("ApplicationReferenceBar", () => {
     const controlLabels = [
       "CURRENT CATEGORY",
       "Review all categories",
+      "SPECIALTY AWARDS",
       "SUBMIT SCORECARD",
       "ADJUDICATOR VIEWS",
       "ELIGIBILITY",

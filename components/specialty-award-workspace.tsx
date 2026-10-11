@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { saveSpecialtyAwardRecommendations } from "@/app/portal/adjudication/[id]/workflow-actions";
 
-type Recommendation = {
+export type SpecialtyAwardRecommendation = {
   id: string;
   application_id: string;
   advisory_user_id: string;
@@ -78,7 +78,7 @@ export function SpecialtyAwardWorkspace({
   applicationId: string;
   currentUserId: string;
   role: "adjudicator" | "advisory_member" | "owner";
-  recommendations: Recommendation[];
+  recommendations: SpecialtyAwardRecommendation[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -96,7 +96,7 @@ export function SpecialtyAwardWorkspace({
   );
 
   const ownerGroups = useMemo(() => {
-    const groups = new Map<string, Recommendation[]>();
+    const groups = new Map<string, SpecialtyAwardRecommendation[]>();
     for (const recommendation of recommendations) {
       const name =
         recommendation.advisory_member_name ??

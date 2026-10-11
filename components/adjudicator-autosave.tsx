@@ -116,7 +116,7 @@ export function AdjudicatorAutosave({
   const [message, setMessage] = useState(
     disabled
       ? "Submitted scorecards are read-only."
-      : "Brain-dump comments and scores autosave as you work.",
+      : "Scores and comments autosave as you work.",
   );
 
   useEffect(() => {
@@ -138,13 +138,13 @@ export function AdjudicatorAutosave({
       inFlightRef.current = true;
       queuedRef.current = false;
       setState("saving");
-      setMessage("Autosaving brain-dump comments and scores…");
+      setMessage("Autosaving scores and comments…");
 
       if (!navigator.onLine) {
         writeOfflineDraft(applicationId, form);
         inFlightRef.current = false;
         setState("offline");
-        setMessage("Offline — brain-dump comments and scores saved on this device.");
+        setMessage("Offline — scores and comments saved on this device.");
         return;
       }
 
@@ -163,7 +163,7 @@ export function AdjudicatorAutosave({
             ? error instanceof Error
               ? `Server sync failed — scorecard changes are saved on this device. ${error.message}`
               : "Server sync failed — scorecard changes are saved on this device."
-            : "Offline — brain-dump comments and scores saved on this device.",
+            : "Offline — scores and comments saved on this device.",
         );
         return;
       }
@@ -199,7 +199,7 @@ export function AdjudicatorAutosave({
       setMessage(
         navigator.onLine
           ? "Changes captured — autosave pending."
-          : "Offline — brain-dump comments and scores saved on this device.",
+          : "Offline — scores and comments saved on this device.",
       );
       timerRef.current = setTimeout(() => void runSave(), 900);
     };
@@ -212,7 +212,7 @@ export function AdjudicatorAutosave({
       setMessage(
         navigator.onLine
           ? "Back online — syncing saved scorecard…"
-          : "Offline — brain-dump comments and scores saved on this device.",
+          : "Offline — scores and comments saved on this device.",
       );
       if (navigator.onLine) {
         timerRef.current = setTimeout(() => void runSave(), 250);
@@ -222,7 +222,7 @@ export function AdjudicatorAutosave({
     const markOffline = () => {
       writeOfflineDraft(applicationId, form);
       setState("offline");
-      setMessage("Offline — brain-dump comments and scores saved on this device.");
+      setMessage("Offline — scores and comments saved on this device.");
     };
 
     const saveNow = (event: Event) => {
@@ -246,7 +246,7 @@ export function AdjudicatorAutosave({
           setMessage(
             navigator.onLine
               ? "Restored unsynced scorecard — syncing now…"
-              : "Restored offline brain-dump comments and scores.",
+              : "Restored offline scores and comments.",
           );
         }, 0);
         timerRef.current = setTimeout(() => void runSave(), navigator.onLine ? 350 : 900);

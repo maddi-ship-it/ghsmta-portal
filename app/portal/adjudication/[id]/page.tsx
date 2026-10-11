@@ -20,9 +20,12 @@ import {
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
-import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
-import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
+import {
+  OwnerLiveAdjudicationReview,
+  type PanelNarrativeReviewer,
+} from "@/components/owner-live-adjudication-review";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
+import { SpecialtyAwardModal } from "@/components/specialty-award-modal";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
@@ -89,12 +92,6 @@ type ScheduleSchoolDetailReference = {
   day_of_contact_phone: string | null;
 };
 
-type PanelNarrativeReviewer = {
-  id: string;
-  name: string;
-  role: "adjudicator" | "advisory_member";
-};
-
 const EASTERN_TIME_ZONE = "America/New_York";
 
 function formatReferenceDate(value: string) {
@@ -119,141 +116,6 @@ function formatReferenceTime(start: string, end: string) {
 
 function scorecardStatusLabel(status: string) {
   return status.replaceAll("_", " ");
-}
-
-function PanelNarrativeWorkflow({
-  applicationId,
-  canComment,
-  categories,
-  currentUserId,
-  feedback,
-  panelReviewers,
-  panelApprovedCategoryIds,
-  reviewStatus,
-}: {
-  applicationId: string;
-  canComment: boolean;
-  categories: ScoringCategory[];
-  currentUserId: string;
-  feedback: AdjudicationPanelFeedback[];
-  panelReviewers: PanelNarrativeReviewer[];
-  panelApprovedCategoryIds: string[];
-  reviewStatus: string;
-}) {
-  const feedbackByCategory = new Map(
-    feedback.map((item) => [item.category_id, item]),
-  );
-  const sentToOwners = ["ready_for_owner", "owner_review", "released"].includes(
-    reviewStatus,
-  );
-  const panelApprovedCategories = new Set(panelApprovedCategoryIds);
-  const panelReviewerById = new Map(
-    panelReviewers.map((reviewer) => [reviewer.id, reviewer]),
-  );
-  const availableCount = feedback.filter((item) =>
-    Boolean(item.final_comment?.trim()),
-  ).length;
-
-  return (
-    <section className="panel panel-narrative-workflow">
-      <div className="panel-header">
-        <div>
-          <span className="eyebrow">Panel narrative</span>
-          <h2>Review the school-facing final comments</h2>
-          <p>
-            Drafts are generated automatically from the live comments and go
-            to the Owners first. The panel can see a final comment only after
-            an Owner sends it for panel review.
-          </p>
-        </div>
-        <span className={`badge ${sentToOwners ? "badge-complete" : "badge-warning"}`}>
-          {sentToOwners
-            ? "Returned to Owners"
-            : availableCount > 0
-              ? "Panel review in progress"
-              : "Waiting for Owner"}
-        </span>
-      </div>
-      <div className="panel-body panel-narrative-list">
-        {categories.map((category) => {
-          const categoryFeedback = feedbackByCategory.get(category.id);
-          const finalComment = categoryFeedback?.final_comment?.trim() ?? "";
-          const panelApproved = panelApprovedCategories.has(category.id);
-          const assignedReviewer = categoryFeedback?.assigned_to
-            ? panelReviewerById.get(categoryFeedback.assigned_to)
-            : undefined;
-          const canEdit =
-            canComment &&
-            finalComment &&
-            !panelApproved &&
-            !sentToOwners &&
-            categoryFeedback?.assigned_to === currentUserId;
-
-          return (
-            <article className="panel-narrative-card" key={category.id}>
-              <div className="panel-narrative-card-heading">
-                <div>
-                  <span className="section-order">Final comment</span>
-                  <h3>{category.title}</h3>
-                </div>
-                <span className={`badge ${panelApproved ? "badge-complete" : "badge-warning"}`}>
-                  {panelApproved
-                    ? "Panel approved"
-                    : assignedReviewer
-                      ? `Assigned to ${assignedReviewer.name}`
-                    : finalComment
-                      ? "Needs assignment"
-                      : "With Owner"}
-                </span>
-              </div>
-
-              {finalComment ? (
-                <>
-                  {assignedReviewer && (
-                    <div className="final-comment-assignee">
-                      <span>Assigned final comment writer</span>
-                      <strong>{assignedReviewer.name}</strong>
-                    </div>
-                  )}
-                  {canEdit ? (
-                    <PanelNarrativeReviewEditor
-                      applicationId={applicationId}
-                      categoryId={category.id}
-                      currentUserId={currentUserId}
-                      generatedAt={categoryFeedback?.generated_at ?? ""}
-                      initialValue={finalComment}
-                    />
-                  ) : (
-                    <>
-                      <div className="comment-readonly-surface panel-narrative-preview">
-                        {finalComment}
-                      </div>
-                      {!panelApproved && !assignedReviewer && (
-                        <p className="field-help">An Advisory Committee member must assign this comment before it can be edited and approved.</p>
-                      )}
-                    </>
-                  )}
-                </>
-              ) : (
-                <>
-                  {assignedReviewer && (
-                    <div className="final-comment-assignee">
-                      <span>Assigned final comment writer</span>
-                      <strong>{assignedReviewer.name}</strong>
-                    </div>
-                  )}
-                  <div className="comment-readonly-surface">
-                    The live draft is with the Owners. It will appear here after
-                    an Owner sends it to the panel.
-                  </div>
-                </>
-              )}
-            </article>
-          );
-        })}
-      </div>
-    </section>
-  );
 }
 
 export default async function AdjudicationApplicationPage({
@@ -389,6 +251,12 @@ export default async function AdjudicationApplicationPage({
     canPanelReview,
   });
   const showPersonalScorecard = workspaceMode === "personal_scorecard";
+  const canEditAdvisoryScorecard =
+    profile.role === "advisory_member" &&
+    canPanelReview &&
+    Boolean(ownParticipantResult.data?.can_score);
+  const showEditableScorecard =
+    showPersonalScorecard || canEditAdvisoryScorecard;
 
   if (!rubric) {
     return (
@@ -770,7 +638,7 @@ export default async function AdjudicationApplicationPage({
       role: reviewer.role as PanelNarrativeReviewer["role"],
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
-  const ownScorecard = showPersonalScorecard
+  const ownScorecard = showEditableScorecard
     ? scorecards.find((scorecard) => scorecard.adjudicator_user_id === profile.id) ?? null
     : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
@@ -819,7 +687,7 @@ export default async function AdjudicationApplicationPage({
       category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
   );
   const initiallyCompletedCategoryIds =
-    showPersonalScorecard
+    showEditableScorecard
       ? narrativeCategories
           .filter((category) => {
             const categoryCriteria = criteria.filter(
@@ -840,11 +708,56 @@ export default async function AdjudicationApplicationPage({
           .map((category) => category.id)
       : [];
   const referenceLinks = await referenceLinksPromise;
-  const showConsensusControls = showPersonalScorecard || canPanelReview;
+  const showConsensusControls = showEditableScorecard || canPanelReview;
   const compactConsensusControls =
     showConsensusControls &&
     (profile.role === "adjudicator" || profile.role === "advisory_member");
   const scorecardFormId = `adjudication-scorecard-${id}`;
+  const proposalByCategoryId = new Map(
+    (proposalResult.data ?? []).map((proposal) => [
+      proposal.category_id,
+      proposal,
+    ]),
+  );
+  const panelReviewWorkspace = (
+    <OwnerLiveAdjudicationReview
+      applicationId={id}
+      isOwner={profile.role === "owner"}
+      advisoryNarrativeReview={
+        profile.role === "advisory_member"
+          ? {
+              canComment,
+              currentUserId: profile.id,
+              panelReviewers: panelNarrativeReviewers,
+              panelApprovedCategoryIds,
+              reviewStatus: reviewResult.data?.status ?? "draft",
+            }
+          : undefined
+      }
+      advisoryScoreEntry={
+        canEditAdvisoryScorecard
+          ? {
+              canComment,
+              currentUserId: profile.id,
+              readOnly,
+              scoreOptions: scoreChoices,
+            }
+          : undefined
+      }
+      categories={scoreableCategories}
+      criteria={scoreableCriteria}
+      assignments={assignments}
+      profiles={adjudicatorProfiles}
+      initialScorecards={scorecards}
+      initialScores={scores}
+      initialComments={comments}
+      initialFeedback={
+        profile.role === "owner" ? feedback : panelVisibleFeedback
+      }
+      productionTitle={application.production_title ?? "Untitled production"}
+      release={release}
+    />
+  );
 
   return (
     <>
@@ -855,7 +768,7 @@ export default async function AdjudicationApplicationPage({
           <p>{application.production_title ?? "Untitled production"}</p>
         </div>
         <div className="heading-actions">
-          {showPersonalScorecard && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
+          {showEditableScorecard && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
           <Link className="button button-secondary" href="/portal/adjudication">Back to adjudication</Link>
         </div>
       </div>
@@ -867,7 +780,7 @@ export default async function AdjudicationApplicationPage({
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field and score{canComment ? ", including criterion comments," : ""} before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
       {query.error === "assignment" && <div className="form-error page-message">The final comment assignment could not be saved. Refresh the page and try again.</div>}
 
-      {showPersonalScorecard && !canComment && (
+      {showEditableScorecard && !canComment && (
         <div className="comment-permission-banner" role="status">
           <span aria-hidden="true">◇</span>
           <div>
@@ -878,10 +791,19 @@ export default async function AdjudicationApplicationPage({
       )}
 
       <ApplicationReferenceBar
+        categoryWorkflowControl={
+          profile.role === "advisory_member" && canPanelReview ? (
+            <SpecialtyAwardModal
+              applicationId={id}
+              currentUserId={profile.id}
+              recommendations={specialtyRows}
+            />
+          ) : undefined
+        }
         categoryNavigation={{
           categories: narrativeCategories,
           initialCompletedCategoryIds: initiallyCompletedCategoryIds,
-          showCompletion: showPersonalScorecard,
+          showCompletion: showEditableScorecard,
         }}
         links={referenceLinks}
         panels={referencePanels}
@@ -893,7 +815,7 @@ export default async function AdjudicationApplicationPage({
             }
           : undefined}
         scorecardSubmitControl={
-          showPersonalScorecard && !readOnly ? (
+          showEditableScorecard && !readOnly ? (
             <ScorecardSubmitControls
               applicationId={id}
               categories={scoreableCategories}
@@ -1060,45 +982,64 @@ export default async function AdjudicationApplicationPage({
         </section>
       ) : (
         <>
-          <OwnerLiveAdjudicationReview
-            applicationId={id}
-            isOwner={profile.role === "owner"}
-            categories={scoreableCategories}
-            criteria={scoreableCriteria}
-            assignments={assignments}
-            profiles={adjudicatorProfiles}
-            initialScorecards={scorecards}
-            initialScores={scores}
-            initialComments={comments}
-            initialFeedback={
-              profile.role === "owner" ? feedback : panelVisibleFeedback
-            }
-            release={release}
-          />
+          {canEditAdvisoryScorecard ? (
+            <form className="scorecard-form" id={scorecardFormId}>
+              <AdjudicatorAutosave
+                applicationId={id}
+                disabled={readOnly}
+              />
+              {narrativeCategories.map((category) => {
+                const proposal = proposalByCategoryId.get(category.id);
 
-          {profile.role === "advisory_member" && (
-            <PanelNarrativeWorkflow
-              applicationId={id}
-              canComment={canComment}
-              categories={narrativeCategories}
-              currentUserId={profile.id}
-              feedback={panelVisibleFeedback}
-              panelReviewers={panelNarrativeReviewers}
-              panelApprovedCategoryIds={panelApprovedCategoryIds}
-              reviewStatus={reviewResult.data?.status ?? "draft"}
-            />
+                return (
+                  <span hidden key={category.id}>
+                    <input
+                      name={`category_decision_finalized_${category.id}`}
+                      type="hidden"
+                      value={
+                        proposal &&
+                        ["approved", "overridden"].includes(proposal.status)
+                          ? "1"
+                          : "0"
+                      }
+                    />
+                    <input
+                      name={`score_range_start_${category.id}`}
+                      type="hidden"
+                      value={proposal?.range_min ?? ""}
+                    />
+                    {category.subject_label ? (
+                      <input
+                        name={`subject_name_${category.id}`}
+                        type="hidden"
+                        value={
+                          comments.find(
+                            (comment) =>
+                              comment.scorecard_id === ownScorecard?.id &&
+                              comment.category_id === category.id,
+                          )?.subject_name ??
+                          categorySubjectDefaults[category.category_key] ??
+                          ""
+                        }
+                      />
+                    ) : null}
+                  </span>
+                );
+              })}
+              {panelReviewWorkspace}
+            </form>
+          ) : (
+            panelReviewWorkspace
           )}
 
-          <SpecialtyAwardWorkspace
-            applicationId={id}
-            currentUserId={profile.id}
-            recommendations={specialtyRows}
-            role={
-              profile.role === "owner"
-                ? "owner"
-                : "advisory_member"
-            }
-          />
+          {profile.role === "owner" ? (
+            <SpecialtyAwardWorkspace
+              applicationId={id}
+              currentUserId={profile.id}
+              recommendations={specialtyRows}
+              role="owner"
+            />
+          ) : null}
 
           {profile.role === "owner" && (
             <section className="panel release-panel">
