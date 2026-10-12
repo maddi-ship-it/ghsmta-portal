@@ -979,11 +979,39 @@ function ChannelNavigation({
   groups,
   selectedChannelId,
   defaultOpenSchoolGroups = false,
+  expandSchoolList = false,
+  schoolSectionLabel = "Schools",
 }: {
   groups: ChannelGroup[];
   selectedChannelId: string | null;
   defaultOpenSchoolGroups?: boolean;
+  expandSchoolList?: boolean;
+  schoolSectionLabel?: string;
 }) {
+  const [showAllSchools, setShowAllSchools] = useState(false);
+  const { standardGroups, schoolGroups } = splitChannelGroups(groups);
+  const activeSchoolGroup = schoolGroups.find((group) =>
+    group.channels.some((channel) => channel.channel_id === selectedChannelId),
+  );
+  const prioritizedSchoolKeys = new Set<string>();
+
+  if (activeSchoolGroup) prioritizedSchoolKeys.add(activeSchoolGroup.key);
+
+  schoolGroups
+    .filter((group) => group.unreadCount > 0)
+    .forEach((group) => prioritizedSchoolKeys.add(group.key));
+
+  [...schoolGroups]
+    .sort((left, right) => schoolGroupActivity(right) - schoolGroupActivity(left))
+    .forEach((group) => {
+      if (prioritizedSchoolKeys.size < 10) prioritizedSchoolKeys.add(group.key);
+    });
+
+  const schoolListExpanded = expandSchoolList || showAllSchools;
+  const visibleSchoolGroups = schoolListExpanded
+    ? schoolGroups
+    : schoolGroups.filter((group) => prioritizedSchoolKeys.has(group.key));
+
   if (groups.length === 0) {
     return (
       <div className={styles.noChannelResults}>
@@ -991,8 +1019,6 @@ function ChannelNavigation({
       </div>
     );
   }
-
-  const { standardGroups, schoolGroups } = splitChannelGroups(groups);
 
   return (
     <nav className={styles.channelList} aria-label="Chat channels">
@@ -1020,7 +1046,7 @@ function ChannelNavigation({
       {schoolGroups.length > 0 && (
         <section className={styles.channelGroup}>
           <div className={styles.channelGroupHeading}>
-            <h3>Schools</h3>
+            <h3>{schoolSectionLabel}</h3>
             {schoolGroups.some((group) => group.unreadCount > 0) && (
               <span>
                 {formatUnreadCount(
@@ -1034,7 +1060,7 @@ function ChannelNavigation({
           </div>
 
           <div className={styles.schoolGroupList}>
-            {schoolGroups.map((group) => (
+            {visibleSchoolGroups.map((group) => (
               <SchoolConversationNavigation
                 defaultOpen={defaultOpenSchoolGroups}
                 group={group}
@@ -1043,9 +1069,30 @@ function ChannelNavigation({
               />
             ))}
           </div>
+
+          {!expandSchoolList && schoolGroups.length > 10 && (
+            <button
+              aria-expanded={showAllSchools}
+              className={styles.schoolListToggle}
+              onClick={() => setShowAllSchools((current) => !current)}
+              type="button"
+            >
+              {showAllSchools
+                ? "Show active, unread & recent schools"
+                : `Show all ${schoolGroups.length} schools`}
+            </button>
+          )}
         </section>
       )}
     </nav>
+  );
+}
+
+function schoolGroupActivity(group: SchoolConversationGroup) {
+  return Math.max(
+    ...group.channels.map((channel) =>
+      new Date(channel.last_activity_at).getTime(),
+    ),
   );
 }
 
@@ -2051,7 +2098,7 @@ export function TeamsChat({
         <div className={styles.railHeader}>
           <div>
             <span className="eyebrow">Messages</span>
-            <h2>Chat workspace</h2>
+            <h2>Messaging</h2>
           </div>
           {totalUnread > 0 && (
             <span className={styles.totalUnread}>
@@ -2068,7 +2115,11 @@ export function TeamsChat({
             className={`input ${styles.searchInput}`}
             id="channel-search"
             onChange={(event) => setChannelSearch(event.target.value)}
-            placeholder="Search schools or messages"
+            placeholder={
+              profile.role === "applicant"
+                ? "Search messages"
+                : "Search schools or messages"
+            }
             type="search"
             value={channelSearch}
           />
@@ -2100,40 +2151,44 @@ export function TeamsChat({
               </button>
             )}
           </div>
-          {allowDirectMessages && (
-            <button
-              className={styles.newMessageButton}
-              disabled={isPending}
-              onClick={() => void openDirectMessagePicker()}
-              type="button"
-            >
-              <span aria-hidden="true">＋</span>
-              New direct message
-            </button>
-          )}
-          <button
-            className={styles.broadcastButton}
-            disabled={isPending}
-            onClick={markActiveChannelUnread}
-            type="button"
-          >
-            Mark current chat unread
-          </button>
-          {profile.role === "owner" && (
+          <div className={styles.railActions}>
+            {allowDirectMessages && (
+              <button
+                className={styles.newMessageButton}
+                disabled={isPending}
+                onClick={() => void openDirectMessagePicker()}
+                type="button"
+              >
+                <span aria-hidden="true">＋</span>
+                New message
+              </button>
+            )}
             <button
               className={styles.broadcastButton}
-              disabled={activeSchoolDmCount === 0}
-              onClick={() => setShowBroadcastComposer(true)}
+              disabled={isPending}
+              onClick={markActiveChannelUnread}
               type="button"
             >
-              Message all active School Messaging
+              Mark unread
             </button>
-          )}
+            {profile.role === "owner" && (
+              <button
+                className={`${styles.broadcastButton} ${styles.broadcastAllButton}`}
+                disabled={activeSchoolDmCount === 0}
+                onClick={() => setShowBroadcastComposer(true)}
+                type="button"
+              >
+                Message all active schools
+              </button>
+            )}
+          </div>
         </div>
 
         <ChannelNavigation
           defaultOpenSchoolGroups={profile.role === "applicant"}
+          expandSchoolList={channelSearch.trim().length > 0 || showUnreadOnly}
           groups={groups}
+          schoolSectionLabel={profile.role === "applicant" ? "Messaging" : "Schools"}
           selectedChannelId={selectedChannelId}
         />
       </aside>

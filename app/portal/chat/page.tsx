@@ -157,7 +157,15 @@ export default async function ChatPage({
     throw new Error(`Chat channels could not be loaded: ${channelError.message}`);
   }
 
-  const normalizedChannels = normalizeChannels(channelRows ?? []);
+  const normalizedChannels = normalizeChannels(channelRows ?? []).filter(
+    (channel) =>
+      profile.role !== "applicant" ||
+      ![
+        "applicant_community",
+        "direct_message",
+        "group_direct_message",
+      ].includes(channel.channel_type),
+  );
   const requestedChannel = normalizedChannels.find(
     (channel) => channel.channel_id === params.channel,
   );
@@ -216,10 +224,10 @@ export default async function ChatPage({
       <div className="page-heading chat-page-heading">
         <div>
           <span className="eyebrow">Communication</span>
-          <h1>GHSMTA Chat</h1>
+          <h1>Messaging</h1>
           <p>
-            General Announcements and the private conversations available to
-            your portal role in one workspace.
+            Updates and conversations available to your portal role in one
+            place.
           </p>
         </div>
       </div>

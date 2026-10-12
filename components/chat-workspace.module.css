@@ -2686,6 +2686,8 @@
 }
 
 .schoolGroup {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
   overflow: hidden;
   border: 1px solid var(--portal-line);
   border-radius: 0.85rem;
@@ -2791,11 +2793,73 @@
   font-size: 0.59rem;
 }
 
+.schoolListToggle {
+  width: 100%;
+  margin-top: 0.55rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px dashed var(--portal-line-strong);
+  border-radius: 0.75rem;
+  color: var(--portal-gold-bright);
+  background: color-mix(in srgb, var(--portal-gold) 7%, transparent);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.schoolListToggle:hover,
+.schoolListToggle:focus-visible {
+  border-style: solid;
+  background: color-mix(in srgb, var(--portal-gold) 12%, transparent);
+}
+
 /* Facebook-inspired social workspace: conversations, feed, and people. */
 .shell {
   grid-template-columns: minmax(270px, 310px) minmax(0, 1fr) minmax(230px, 270px);
-  min-height: min(820px, calc(100vh - 190px));
+  height: clamp(600px, calc(100dvh - 190px), 820px);
+  min-height: 0;
   border-radius: 18px;
+}
+
+.rail,
+.conversation,
+.messageWorkspace {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.railHeader,
+.filters {
+  flex: 0 0 auto;
+}
+
+.channelList {
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+}
+
+.messageFeed {
+  max-height: none;
+  overscroll-behavior: contain;
+}
+
+.railActions {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.railActions .newMessageButton,
+.railActions .broadcastButton {
+  grid-column: auto;
+  min-height: 40px;
+  padding: 9px 10px;
+}
+
+.railActions > :only-child,
+.railActions .broadcastAllButton {
+  grid-column: 1 / -1;
 }
 
 .threadWorkspace {
@@ -2849,7 +2913,8 @@
 .peopleRail {
   display: flex;
   min-width: 0;
-  max-height: min(820px, calc(100vh - 190px));
+  height: 100%;
+  max-height: none;
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
@@ -3024,6 +3089,17 @@
 }
 
 @media (max-width: 860px) {
+  .shell {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .conversation,
+  .messageWorkspace {
+    overflow: visible;
+  }
+
   .threadWorkspace {
     padding: 14px;
   }
