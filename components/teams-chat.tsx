@@ -73,6 +73,22 @@ export type ChatMember = {
   user_role: AppRole;
 };
 
+export type AdjudicationVisitDetails = {
+  scheduleTitle: string;
+  dateLabel: string;
+  timeLabel: string;
+  venueName: string | null;
+  venueAddress: string | null;
+  arrivalEntrance: string | null;
+  parkingInstructions: string | null;
+  accessibilityNotes: string | null;
+  wifiNetwork: string | null;
+  wifiPassword: string | null;
+  dayOfContactName: string | null;
+  dayOfContactPhone: string | null;
+  schoolInstructions: string | null;
+};
+
 type MentionSuggestion =
   | {
       kind: "channel";
@@ -573,6 +589,105 @@ function DirectMessageDialog({
   );
 }
 
+function AdjudicationVisitDetailsDialog({
+  channel,
+  details,
+  onClose,
+}: {
+  channel: ChatChannel;
+  details: AdjudicationVisitDetails | null;
+  onClose: () => void;
+}) {
+  const detailGroups = details
+    ? [
+        {
+          title: "Schedule",
+          items: [
+            ["Visit", details.scheduleTitle],
+            ["Date", details.dateLabel],
+            ["Time", details.timeLabel],
+          ],
+        },
+        {
+          title: "Venue & arrival",
+          items: [
+            ["Venue", details.venueName],
+            ["Address", details.venueAddress],
+            ["Entrance", details.arrivalEntrance],
+            ["Parking", details.parkingInstructions],
+          ],
+        },
+        {
+          title: "Access & connectivity",
+          items: [
+            ["Accessibility", details.accessibilityNotes],
+            ["Wi-Fi network", details.wifiNetwork],
+            ["Wi-Fi password", details.wifiPassword],
+          ],
+        },
+        {
+          title: "Day-of contact",
+          items: [
+            ["Name", details.dayOfContactName],
+            ["Phone", details.dayOfContactPhone],
+            ["Instructions", details.schoolInstructions],
+          ],
+        },
+      ]
+    : [];
+
+  return (
+    <div
+      aria-labelledby="adjudication-visit-details-title"
+      aria-modal="true"
+      className={styles.modalBackdrop}
+      role="dialog"
+    >
+      <section className={`${styles.broadcastModal} ${styles.visitDetailsModal}`}>
+        <div className={styles.broadcastModalHeader}>
+          <div>
+            <span className="eyebrow">Adjudication visit details</span>
+            <h2 id="adjudication-visit-details-title">
+              {channel.school_name ?? channel.channel_name}
+            </h2>
+            <p>{channel.production_title ?? "Production title not entered"}</p>
+          </div>
+          <button
+            aria-label="Close adjudication visit details"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        {details ? (
+          <div className={styles.visitDetailsGrid}>
+            {detailGroups.map((group) => (
+              <section className={styles.visitDetailsCard} key={group.title}>
+                <h3>{group.title}</h3>
+                <dl>
+                  {group.items.map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value || "Not provided"}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.visitDetailsEmpty}>
+            No adjudication visit has been confirmed for this school yet.
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function escapeRegularExpression(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -980,12 +1095,14 @@ function ChannelNavigation({
   selectedChannelId,
   defaultOpenSchoolGroups = false,
   expandSchoolList = false,
+  flattenSchoolGroups = false,
   schoolSectionLabel = "Schools",
 }: {
   groups: ChannelGroup[];
   selectedChannelId: string | null;
   defaultOpenSchoolGroups?: boolean;
   expandSchoolList?: boolean;
+  flattenSchoolGroups?: boolean;
   schoolSectionLabel?: string;
 }) {
   const [showAllSchools, setShowAllSchools] = useState(false);
@@ -1023,24 +1140,13 @@ function ChannelNavigation({
   return (
     <nav className={styles.channelList} aria-label="Chat channels">
       {standardGroups.map((group) => (
-        <section className={styles.channelGroup} key={group.key}>
-          <div className={styles.channelGroupHeading}>
-            <h3>{group.label}</h3>
-            {group.unreadCount > 0 && (
-              <span>{group.unreadCount > 99 ? "99+" : group.unreadCount}</span>
-            )}
-          </div>
-
-          <div className={styles.channelGroupItems}>
-            {group.channels.map((channel) => (
-              <ChannelNavigationLink
-                channel={channel}
-                key={channel.channel_id}
-                selectedChannelId={selectedChannelId}
-              />
-            ))}
-          </div>
-        </section>
+        <StandardChannelGroupNavigation
+          collapsible={group.key === "direct_messages"}
+          forceOpen={expandSchoolList}
+          group={group}
+          key={group.key}
+          selectedChannelId={selectedChannelId}
+        />
       ))}
 
       {schoolGroups.length > 0 && (
@@ -1059,16 +1165,36 @@ function ChannelNavigation({
             )}
           </div>
 
-          <div className={styles.schoolGroupList}>
-            {visibleSchoolGroups.map((group) => (
-              <SchoolConversationNavigation
-                defaultOpen={defaultOpenSchoolGroups}
-                group={group}
-                key={group.key}
-                selectedChannelId={selectedChannelId}
-              />
-            ))}
-          </div>
+          {flattenSchoolGroups ? (
+            <div className={styles.channelGroupItems}>
+              {visibleSchoolGroups.flatMap((group) =>
+                group.channels.map((channel) => (
+                  <ChannelNavigationLink
+                    channel={channel}
+                    groupedBySchool
+                    key={channel.channel_id}
+                    navigationLabel={
+                      channel.channel_type === "school_dm"
+                        ? "Messaging"
+                        : schoolChannelLabel(channel)
+                    }
+                    selectedChannelId={selectedChannelId}
+                  />
+                )),
+              )}
+            </div>
+          ) : (
+            <div className={styles.schoolGroupList}>
+              {visibleSchoolGroups.map((group) => (
+                <SchoolConversationNavigation
+                  defaultOpen={defaultOpenSchoolGroups}
+                  group={group}
+                  key={group.key}
+                  selectedChannelId={selectedChannelId}
+                />
+              ))}
+            </div>
+          )}
 
           {!expandSchoolList && schoolGroups.length > 10 && (
             <button
@@ -1085,6 +1211,69 @@ function ChannelNavigation({
         </section>
       )}
     </nav>
+  );
+}
+
+function StandardChannelGroupNavigation({
+  collapsible,
+  forceOpen,
+  group,
+  selectedChannelId,
+}: {
+  collapsible: boolean;
+  forceOpen: boolean;
+  group: ChannelGroup;
+  selectedChannelId: string | null;
+}) {
+  const containsActiveChannel = group.channels.some(
+    (channel) => channel.channel_id === selectedChannelId,
+  );
+  const [isOpen, setIsOpen] = useState(
+    !collapsible || containsActiveChannel || group.unreadCount > 0,
+  );
+
+  const expanded = !collapsible || forceOpen || isOpen;
+
+  return (
+    <section className={styles.channelGroup}>
+      {collapsible ? (
+        <button
+          aria-expanded={expanded}
+          className={styles.channelGroupDisclosure}
+          onClick={() => setIsOpen((current) => !current)}
+          type="button"
+        >
+          <span className={styles.channelGroupDisclosureIcon} aria-hidden="true">
+            {expanded ? "−" : "+"}
+          </span>
+          <h3>{group.label}</h3>
+          {group.unreadCount > 0 && (
+            <span className={styles.channelGroupDisclosureUnread}>
+              {formatUnreadCount(group.unreadCount)}
+            </span>
+          )}
+        </button>
+      ) : (
+        <div className={styles.channelGroupHeading}>
+          <h3>{group.label}</h3>
+          {group.unreadCount > 0 && (
+            <span>{formatUnreadCount(group.unreadCount)}</span>
+          )}
+        </div>
+      )}
+
+      {expanded && (
+        <div className={styles.channelGroupItems}>
+          {group.channels.map((channel) => (
+            <ChannelNavigationLink
+              channel={channel}
+              key={channel.channel_id}
+              selectedChannelId={selectedChannelId}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1173,10 +1362,12 @@ function ChannelNavigationLink({
   channel,
   selectedChannelId,
   groupedBySchool = false,
+  navigationLabel,
 }: {
   channel: ChatChannel;
   selectedChannelId: string | null;
   groupedBySchool?: boolean;
+  navigationLabel?: string;
 }) {
   const active = channel.channel_id === selectedChannelId;
   const context = groupedBySchool
@@ -1206,7 +1397,10 @@ function ChannelNavigationLink({
       <span className={styles.channelCopy}>
         <span className={styles.channelTitleRow}>
           <strong>
-            {groupedBySchool ? schoolChannelLabel(channel) : channel.channel_name}
+            {navigationLabel ??
+              (groupedBySchool
+                ? schoolChannelLabel(channel)
+                : channel.channel_name)}
           </strong>
           <time dateTime={channel.last_activity_at}>
             {formatChannelActivity(channel.last_activity_at)}
@@ -1300,12 +1494,14 @@ export function TeamsChat({
   selectedChannelId,
   initialThreads,
   initialMembers,
+  adjudicationVisitDetails,
 }: {
   profile: Profile;
   initialChannels: ChatChannel[];
   selectedChannelId: string | null;
   initialThreads: ChatThread[];
   initialMembers: ChatMember[];
+  adjudicationVisitDetails: AdjudicationVisitDetails | null;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -1329,6 +1525,7 @@ export function TeamsChat({
   const [showBroadcastComposer, setShowBroadcastComposer] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showDirectMessagePicker, setShowDirectMessagePicker] = useState(false);
+  const [showVisitDetails, setShowVisitDetails] = useState(false);
   const [directMessageContacts, setDirectMessageContacts] = useState<ChatMember[]>([]);
   const [directMessageContactsLoaded, setDirectMessageContactsLoaded] = useState(false);
   const [directMessageSearch, setDirectMessageSearch] = useState("");
@@ -2187,8 +2384,8 @@ export function TeamsChat({
         <ChannelNavigation
           defaultOpenSchoolGroups={profile.role === "applicant"}
           expandSchoolList={channelSearch.trim().length > 0 || showUnreadOnly}
+          flattenSchoolGroups={profile.role === "applicant"}
           groups={groups}
-          schoolSectionLabel={profile.role === "applicant" ? "Messaging" : "Schools"}
           selectedChannelId={selectedChannelId}
         />
       </aside>
@@ -2209,6 +2406,15 @@ export function TeamsChat({
                 </span>
                 {activeChannel.application_archived && (
                   <span className={styles.archivedBadge}>Archived</span>
+                )}
+                {activeChannel.channel_type === "school" && (
+                  <button
+                    className={styles.visitDetailsButton}
+                    onClick={() => setShowVisitDetails(true)}
+                    type="button"
+                  >
+                    Adjudication visit details
+                  </button>
                 )}
               </div>
               <h1>{activeChannel.channel_name}</h1>
@@ -3064,6 +3270,14 @@ export function TeamsChat({
           onSearchChange={setDirectMessageSearch}
           pending={isPending}
           search={directMessageSearch}
+        />
+      )}
+
+      {showVisitDetails && activeChannel.channel_type === "school" && (
+        <AdjudicationVisitDetailsDialog
+          channel={activeChannel}
+          details={adjudicationVisitDetails}
+          onClose={() => setShowVisitDetails(false)}
         />
       )}
 

@@ -1,4 +1,5 @@
 import type {
+  AdjudicationVisitDetails,
   ChatChannel,
   ChatMember,
   ChatThread,
@@ -17,6 +18,53 @@ type RawChannel = Partial<ChatChannel> & {
   channel_type: ChatChannel["channel_type"];
   channel_name: string;
 };
+
+type ScheduleBookingReference = {
+  slot_id: string;
+  application_id: string;
+};
+
+type ScheduleSlotReference = {
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  location: string | null;
+  school_instructions: string | null;
+};
+
+type ScheduleSchoolDetailsReference = {
+  venue_name: string | null;
+  venue_address: string | null;
+  arrival_entrance: string | null;
+  parking_instructions: string | null;
+  accessibility_notes: string | null;
+  wifi_network: string | null;
+  wifi_password: string | null;
+  day_of_contact_name: string | null;
+  day_of_contact_phone: string | null;
+};
+
+const EASTERN_TIME_ZONE = "America/New_York";
+
+function formatVisitDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatVisitTime(start: string, end: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return `${formatter.format(new Date(start))}–${formatter.format(new Date(end))}`;
+}
 
 function fallbackChannelGroup(
   channelType: ChatChannel["channel_type"],
@@ -161,7 +209,6 @@ export default async function ChatPage({
     (channel) =>
       profile.role !== "applicant" ||
       ![
-        "applicant_community",
         "direct_message",
         "group_direct_message",
       ].includes(channel.channel_type),
@@ -184,15 +231,22 @@ export default async function ChatPage({
 
   let threads: ChatThread[] = [];
   let members: ChatMember[] = [];
+  let adjudicationVisitDetails: AdjudicationVisitDetails | null = null;
 
   if (selectedChannel) {
-    const [threadResult, memberResult] = await Promise.all([
+    const shouldLoadVisitDetails =
+      selectedChannel.channel_type === "school" &&
+      Boolean(selectedChannel.application_id);
+    const [threadResult, memberResult, scheduleBookingsResult] = await Promise.all([
       supabase.rpc("get_chat_channel_threads", {
         p_channel_id: selectedChannel.channel_id,
       }),
       supabase.rpc("get_chat_channel_members", {
         p_channel_id: selectedChannel.channel_id,
       }),
+      shouldLoadVisitDetails
+        ? supabase.rpc("get_schedule_bookings_for_staff")
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (threadResult.error) {
@@ -203,8 +257,70 @@ export default async function ChatPage({
       throw new Error(`Chat members could not be loaded: ${memberResult.error.message}`);
     }
 
+    if (scheduleBookingsResult.error) {
+      throw new Error(
+        `Adjudication visit details could not be loaded: ${scheduleBookingsResult.error.message}`,
+      );
+    }
+
     threads = (threadResult.data ?? []) as ChatThread[];
     members = (memberResult.data ?? []) as ChatMember[];
+
+    const scheduleBooking = (
+      (scheduleBookingsResult.data ?? []) as ScheduleBookingReference[]
+    ).find(
+      (booking) => booking.application_id === selectedChannel.application_id,
+    );
+
+    if (scheduleBooking) {
+      const [slotResult, detailsResult] = await Promise.all([
+        supabase
+          .from("schedule_slots")
+          .select("title,starts_at,ends_at,location,school_instructions")
+          .eq("id", scheduleBooking.slot_id)
+          .maybeSingle(),
+        supabase
+          .from("schedule_slot_school_details")
+          .select(
+            "venue_name,venue_address,arrival_entrance,parking_instructions,accessibility_notes,wifi_network,wifi_password,day_of_contact_name,day_of_contact_phone",
+          )
+          .eq("slot_id", scheduleBooking.slot_id)
+          .maybeSingle(),
+      ]);
+
+      if (slotResult.error) {
+        throw new Error(
+          `Adjudication schedule could not be loaded: ${slotResult.error.message}`,
+        );
+      }
+
+      if (detailsResult.error) {
+        throw new Error(
+          `School visit details could not be loaded: ${detailsResult.error.message}`,
+        );
+      }
+
+      const slot = slotResult.data as ScheduleSlotReference | null;
+      const details = detailsResult.data as ScheduleSchoolDetailsReference | null;
+
+      if (slot) {
+        adjudicationVisitDetails = {
+          scheduleTitle: slot.title,
+          dateLabel: formatVisitDate(slot.starts_at),
+          timeLabel: formatVisitTime(slot.starts_at, slot.ends_at),
+          venueName: details?.venue_name ?? slot.location,
+          venueAddress: details?.venue_address ?? null,
+          arrivalEntrance: details?.arrival_entrance ?? null,
+          parkingInstructions: details?.parking_instructions ?? null,
+          accessibilityNotes: details?.accessibility_notes ?? null,
+          wifiNetwork: details?.wifi_network ?? null,
+          wifiPassword: details?.wifi_password ?? null,
+          dayOfContactName: details?.day_of_contact_name ?? null,
+          dayOfContactPhone: details?.day_of_contact_phone ?? null,
+          schoolInstructions: slot.school_instructions,
+        };
+      }
+    }
 
     const readResult = await supabase.rpc("mark_chat_channel_read", {
       p_channel_id: selectedChannel.channel_id,
@@ -233,6 +349,7 @@ export default async function ChatPage({
       </div>
 
       <TeamsChat
+        adjudicationVisitDetails={adjudicationVisitDetails}
         key={selectedChannel?.channel_id ?? "no-channel"}
         initialChannels={channels}
         initialMembers={members}

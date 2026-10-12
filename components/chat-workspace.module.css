@@ -115,6 +115,59 @@
   text-align: center;
 }
 
+.channelGroupDisclosure {
+  display: grid;
+  width: calc(100% - 20px);
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 6px;
+  padding: 4px 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.channelGroupDisclosure h3 {
+  margin: 0;
+  color: var(--portal-muted, var(--muted));
+  font-size: .69rem;
+  font-weight: 900;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.channelGroupDisclosureIcon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 50%;
+  color: var(--portal-gold-bright, #001699);
+  background: var(--portal-surface-3, #fff);
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.channelGroupDisclosureUnread {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #071328;
+  background: var(--portal-gold, #d5b14f);
+  font-size: .64rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.channelGroupDisclosure:hover h3,
+.channelGroupDisclosure:focus-visible h3 {
+  color: var(--portal-gold-bright, #001699);
+}
+
 .channelGroupItems {
   display: grid;
   gap: 4px;
@@ -1232,6 +1285,88 @@
   width: min(620px, 100%);
 }
 
+.visitDetailsModal {
+  width: min(820px, 100%);
+}
+
+.visitDetailsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.visitDetailsCard {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 14px;
+  background: var(--portal-surface-3, #f6f7fb);
+}
+
+.visitDetailsCard h3 {
+  margin: 0 0 12px;
+  color: var(--portal-gold-bright, #765b06);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.visitDetailsCard dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.visitDetailsCard dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.visitDetailsCard dt {
+  color: var(--portal-muted, var(--muted));
+  font-size: .66rem;
+  font-weight: 850;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.visitDetailsCard dd {
+  margin: 0;
+  color: var(--portal-text, var(--navy-900));
+  font-size: .84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.visitDetailsEmpty {
+  padding: 28px;
+  border: 1px dashed var(--portal-line, var(--line));
+  border-radius: 14px;
+  color: var(--portal-muted, var(--muted));
+  background: var(--portal-surface-3, #f6f7fb);
+  text-align: center;
+}
+
+.visitDetailsButton {
+  padding: 5px 9px;
+  border: 1px solid var(--portal-line-strong, rgba(213, 177, 79, .38));
+  border-radius: 999px;
+  color: var(--portal-gold-bright, #765b06);
+  background: color-mix(in srgb, var(--portal-gold, #d5b14f) 10%, transparent);
+  font: inherit;
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.visitDetailsButton:hover,
+.visitDetailsButton:focus-visible {
+  background: color-mix(in srgb, var(--portal-gold, #d5b14f) 18%, transparent);
+}
+
 .memberSearch {
   margin-bottom: 14px;
 }
@@ -1349,6 +1484,10 @@
     max-height: 90vh;
     border-radius: 20px 20px 0 0;
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .visitDetailsGrid {
+    grid-template-columns: 1fr;
   }
 
   .broadcastActions {
