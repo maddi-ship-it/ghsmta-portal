@@ -34,7 +34,16 @@ describe("72-hour adjudication visit reminder copy", () => {
     expect(copy.text).toContain("MSCD_Guest");
     expect(copy.text).toContain("Courtney McClendon");
     expect(copy.text).toContain("Arrive 30 minutes before curtain.");
-    expect(copy.text).toContain("Eligibility, Acting Candidates, Budget, Program Maturity/Vision/Support, and Full Application");
+    expect(copy.text).toContain(
+      "The GHSMTA Portal is the official source of truth",
+    );
+    expect(copy.text).toContain("Please check the portal before your visit");
+    expect(copy.text).toContain(
+      "For convenience, the five attached PDFs are a snapshot",
+    );
+    expect(copy.text).toContain(
+      "Eligibility, Acting Candidates, Budget, Program Maturity/Vision/Support, and Full Application",
+    );
     expect(copy.text).toContain("Christy Baggett, Julie Ann Rice");
   });
 });
