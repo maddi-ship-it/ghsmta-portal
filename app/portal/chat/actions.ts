@@ -33,6 +33,12 @@ function formText(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 function profileDisplayName(profile: { full_name?: string | null; email?: string | null }) {
   return profile.full_name?.trim() || profile.email || "Someone";
 }
@@ -40,10 +46,17 @@ function profileDisplayName(profile: { full_name?: string | null; email?: string
 export async function startChatDirectMessage(
   formData: FormData,
 ): Promise<ChatActionResult> {
-  await requireProfile();
+  const profile = await requireProfile();
   const otherUserId = formText(formData, "user_id");
 
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(otherUserId)) {
+  if (profile.role === "applicant") {
+    return {
+      ok: false,
+      error: "Applicant conversations must use School Messaging.",
+    };
+  }
+
+  if (!isUuid(otherUserId)) {
     return { ok: false, error: "Choose a portal user to message." };
   }
 
@@ -165,6 +178,8 @@ export async function createChatReply(
   const channelId = formText(formData, "channel_id");
   const postId = formText(formData, "post_id");
   const body = formText(formData, "body");
+  const replyToMessageId = formText(formData, "reply_to_message_id");
+  const replyToMessageKind = formText(formData, "reply_to_message_kind");
 
   if (!channelId || !postId || !body) {
     return {
@@ -178,6 +193,14 @@ export async function createChatReply(
       ok: false,
       error: "The reply is longer than the allowed limit.",
     };
+  }
+
+  if (
+    (replyToMessageId && !isUuid(replyToMessageId)) ||
+    (replyToMessageId && !["post", "reply"].includes(replyToMessageKind)) ||
+    (!replyToMessageId && replyToMessageKind)
+  ) {
+    return { ok: false, error: "The message being replied to could not be found." };
   }
 
   const { supabase, channel, error: channelError } =
@@ -197,6 +220,43 @@ export async function createChatReply(
     };
   }
 
+  let replyReference: {
+    reply_to_post_id?: string;
+    reply_to_reply_id?: string;
+  } = {};
+
+  if (replyToMessageId && replyToMessageKind === "post") {
+    const { data: referencedPost, error: referenceError } = await supabase
+      .from("chat_posts")
+      .select("id")
+      .eq("id", replyToMessageId)
+      .eq("channel_id", channelId)
+      .eq("id", postId)
+      .maybeSingle();
+
+    if (referenceError || !referencedPost) {
+      return { ok: false, error: "The message being replied to could not be found." };
+    }
+
+    replyReference = { reply_to_post_id: replyToMessageId };
+  }
+
+  if (replyToMessageId && replyToMessageKind === "reply") {
+    const { data: referencedReply, error: referenceError } = await supabase
+      .from("chat_replies")
+      .select("id")
+      .eq("id", replyToMessageId)
+      .eq("channel_id", channelId)
+      .eq("post_id", postId)
+      .maybeSingle();
+
+    if (referenceError || !referencedReply) {
+      return { ok: false, error: "The message being replied to could not be found." };
+    }
+
+    replyReference = { reply_to_reply_id: replyToMessageId };
+  }
+
   const [{ data: parentPost }, { data: reply, error }] = await Promise.all([
     supabase
       .from("chat_posts")
@@ -211,6 +271,7 @@ export async function createChatReply(
         post_id: postId,
         author_id: profile.id,
         body,
+        ...replyReference,
       })
       .select("id")
       .single(),

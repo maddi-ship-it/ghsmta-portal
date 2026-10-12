@@ -103,6 +103,10 @@ export type ChatReply = {
   deleted_at: string | null;
   deleted_by: string | null;
   deletion_reason: string | null;
+  reply_to_message_id: string | null;
+  reply_to_message_kind: "post" | "reply" | null;
+  reply_to_author_name: string | null;
+  reply_to_body: string | null;
 };
 
 export type ChatThread = {
@@ -136,6 +140,10 @@ type FlatMessage = {
   message_kind: "post" | "reply";
   deleted_at: string | null;
   deletion_reason: string | null;
+  reply_to_message_id: string | null;
+  reply_to_message_kind: "post" | "reply" | null;
+  reply_to_author_name: string | null;
+  reply_to_body: string | null;
 };
 
 type ChannelGroup = {
@@ -398,6 +406,7 @@ function initials(name: string) {
 }
 
 function MemberDirectoryDialog({
+  allowDirectMessages,
   channel,
   currentUserId,
   error,
@@ -406,6 +415,7 @@ function MemberDirectoryDialog({
   onClose,
   onMessage,
 }: {
+  allowDirectMessages: boolean;
   channel: ChatChannel;
   currentUserId: string;
   error: string | null;
@@ -453,7 +463,7 @@ function MemberDirectoryDialog({
               </span>
               {member.user_id === currentUserId ? (
                 <span className={styles.memberSelfLabel}>You</span>
-              ) : (
+              ) : allowDirectMessages && member.user_role !== "applicant" ? (
                 <button
                   className="button button-secondary button-compact"
                   disabled={pending}
@@ -462,6 +472,8 @@ function MemberDirectoryDialog({
                 >
                   Message
                 </button>
+              ) : (
+                <span className={styles.memberSelfLabel}>Channel only</span>
               )}
             </div>
           ))}
@@ -615,6 +627,30 @@ function formatDay(value: string) {
     month: "long",
     day: "numeric",
   }).format(date);
+}
+
+function messageExcerpt(value: string, limit = 120) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > limit
+    ? `${normalized.slice(0, limit - 1).trimEnd()}…`
+    : normalized;
+}
+
+function messagesBelongTogether(
+  previous: FlatMessage | undefined,
+  current: FlatMessage | undefined,
+) {
+  if (!previous || !current || previous.author_id !== current.author_id) {
+    return false;
+  }
+
+  const previousTime = new Date(previous.created_at);
+  const currentTime = new Date(current.created_at);
+
+  return (
+    previousTime.toDateString() === currentTime.toDateString() &&
+    currentTime.getTime() - previousTime.getTime() <= 5 * 60 * 1000
+  );
 }
 
 function normalizeChannel(row: Partial<ChatChannel> & Pick<ChatChannel, "channel_id" | "channel_type" | "channel_name">): ChatChannel {
@@ -1260,9 +1296,12 @@ export function TeamsChat({
   const [attachmentPickerVersion, setAttachmentPickerVersion] = useState(0);
   const [replyingTo, setReplyingTo] = useState<{
     messageId: string;
+    messageKind: "post" | "reply";
     postId: string;
     authorName: string;
+    body: string;
   } | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<{
     id: string;
     kind: "post" | "reply";
@@ -1278,6 +1317,7 @@ export function TeamsChat({
   const isPortalUpdates = activeChannel?.channel_type === "portal_updates";
   const canPostToActiveChannel = !isPortalUpdates || profile.role === "owner";
   const canSeeActiveChannelMembers = !isPortalUpdates || profile.role === "owner";
+  const allowDirectMessages = profile.role !== "applicant";
   const openThreadIds =
     openThreadState.channelId === selectedChannelId
       ? openThreadState.ids
@@ -1442,6 +1482,10 @@ export function TeamsChat({
           message_kind: "post" as const,
           deleted_at: thread.post_deleted_at,
           deletion_reason: thread.post_deletion_reason,
+          reply_to_message_id: null,
+          reply_to_message_kind: null,
+          reply_to_author_name: null,
+          reply_to_body: null,
         },
         ...thread.replies.map((reply) => ({
           id: reply.id,
@@ -1455,6 +1499,10 @@ export function TeamsChat({
           message_kind: "reply" as const,
           deleted_at: reply.deleted_at,
           deletion_reason: reply.deletion_reason,
+          reply_to_message_id: reply.reply_to_message_id ?? null,
+          reply_to_message_kind: reply.reply_to_message_kind ?? null,
+          reply_to_author_name: reply.reply_to_author_name ?? null,
+          reply_to_body: reply.reply_to_body ?? null,
         })),
       ])
       .sort(
@@ -1463,6 +1511,25 @@ export function TeamsChat({
           new Date(right.created_at).getTime(),
       );
   }, [threads]);
+
+  const messageById = useMemo(
+    () => new Map(messages.map((message) => [message.id, message])),
+    [messages],
+  );
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    const target = document.getElementById(`chat-message-${messageId}`);
+
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedMessageId(messageId);
+    window.setTimeout(() => {
+      setHighlightedMessageId((current) =>
+        current === messageId ? null : current,
+      );
+    }, 1800);
+  }, []);
 
   const reloadChannels = useCallback(async () => {
     const personalizedResult = await supabase.rpc("get_my_chat_channels_v4");
@@ -1790,16 +1857,11 @@ export function TeamsChat({
 
   const submitMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    runFormAction(event.currentTarget, createChatMessage, "Message sent.");
-  };
-
-  const submitInlineReply = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
     runFormAction(
       event.currentTarget,
-      createChatReply,
-      "Reply sent.",
-      () => setReplyingTo(null),
+      replyingTo ? createChatReply : createChatMessage,
+      replyingTo ? "Reply sent." : "Message sent.",
+      replyingTo ? () => setReplyingTo(null) : undefined,
     );
   };
 
@@ -1907,6 +1969,11 @@ export function TeamsChat({
   };
 
   const openDirectMessagePicker = async () => {
+    if (!allowDirectMessages) {
+      setStatus("Applicant conversations must use School Messaging.");
+      return;
+    }
+
     setShowMembers(false);
     setShowDirectMessagePicker(true);
     setDirectMessageError(null);
@@ -1935,6 +2002,13 @@ export function TeamsChat({
   };
 
   const beginDirectMessage = (member: ChatMember) => {
+    if (!allowDirectMessages || member.user_role === "applicant") {
+      setDirectMessageError(
+        "Applicant conversations must use School Messaging.",
+      );
+      return;
+    }
+
     const formData = new FormData();
     formData.set("user_id", member.user_id);
     setDirectMessageError(null);
@@ -2026,15 +2100,17 @@ export function TeamsChat({
               </button>
             )}
           </div>
-          <button
-            className={styles.newMessageButton}
-            disabled={isPending}
-            onClick={() => void openDirectMessagePicker()}
-            type="button"
-          >
-            <span aria-hidden="true">＋</span>
-            New direct message
-          </button>
+          {allowDirectMessages && (
+            <button
+              className={styles.newMessageButton}
+              disabled={isPending}
+              onClick={() => void openDirectMessagePicker()}
+              type="button"
+            >
+              <span aria-hidden="true">＋</span>
+              New direct message
+            </button>
+          )}
           <button
             className={styles.broadcastButton}
             disabled={isPending}
@@ -2603,10 +2679,29 @@ export function TeamsChat({
                 messages.map((message, index) => {
                   const ownMessage = message.author_id === profile.id;
                   const previous = messages[index - 1];
+                  const next = messages[index + 1];
+                  const startsGroup = !messagesBelongTogether(previous, message);
+                  const endsGroup = !messagesBelongTogether(message, next);
                   const showDay =
                     !previous ||
                     new Date(previous.created_at).toDateString() !==
                       new Date(message.created_at).toDateString();
+                  const quotedMessage = message.reply_to_message_id
+                    ? messageById.get(message.reply_to_message_id)
+                    : undefined;
+                  const quotedAuthor =
+                    quotedMessage?.author_name ?? message.reply_to_author_name;
+                  const quotedBody = quotedMessage?.body ?? message.reply_to_body;
+                  const messageAttachments = attachments.filter(
+                    (attachment) =>
+                      attachment.message_kind === message.message_kind &&
+                      attachment.message_id === message.id,
+                  );
+                  const messageReactions = reactions.filter(
+                    (reaction) =>
+                      reaction.message_kind === message.message_kind &&
+                      reaction.message_id === message.id,
+                  );
 
                   return (
                     <Fragment key={message.id}>
@@ -2616,21 +2711,29 @@ export function TeamsChat({
                         </div>
                       )}
                       <article
+                        id={`chat-message-${message.id}`}
                         className={[
                           styles.chatMessage,
                           ownMessage ? styles.chatMessageOwn : "",
+                          startsGroup ? styles.chatMessageGroupStart : "",
+                          endsGroup ? styles.chatMessageGroupEnd : "",
+                          highlightedMessageId === message.id
+                            ? styles.chatMessageHighlighted
+                            : "",
                           message.deleted_at ? styles.deletedMessage : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
                       >
-                        {!ownMessage && (
+                        {!ownMessage && endsGroup ? (
                           <span className={styles.avatar}>
                             {initials(message.author_name)}
                           </span>
-                        )}
+                        ) : !ownMessage ? (
+                          <span className={styles.avatarSpacer} aria-hidden="true" />
+                        ) : null}
                         <div className={styles.chatMessageColumn}>
-                          {!ownMessage && (
+                          {!ownMessage && startsGroup && (
                             <div className={styles.messageMeta}>
                               <strong>{message.author_name}</strong>
                               <span>{roleName(message.author_role)}</span>
@@ -2648,58 +2751,95 @@ export function TeamsChat({
                             </form>
                           ) : (
                             <div className={styles.chatBubble}>
-                              <MentionedMessage body={message.body} currentUserId={profile.id} members={members} />
+                              {quotedAuthor && quotedBody && (
+                                <button
+                                  className={styles.quotedMessage}
+                                  disabled={!quotedMessage}
+                                  onClick={() =>
+                                    quotedMessage && scrollToMessage(quotedMessage.id)
+                                  }
+                                  type="button"
+                                >
+                                  <strong>{quotedAuthor}</strong>
+                                  <span>{messageExcerpt(quotedBody)}</span>
+                                </button>
+                              )}
+                              <div className={styles.messageBody}>
+                                <MentionedMessage
+                                  body={message.body}
+                                  currentUserId={profile.id}
+                                  members={members}
+                                />
+                              </div>
+                              <AttachmentList attachments={messageAttachments} />
                             </div>
                           )}
-                          <AttachmentList
-                            attachments={attachments.filter(
-                              (attachment) => attachment.message_kind === message.message_kind && attachment.message_id === message.id,
-                            )}
-                          />
                           {!message.deleted_at && (
                             <ReactionBar
                               currentUserId={profile.id}
                               onToggle={(emoji) => void toggleReaction(message.id, message.message_kind, emoji)}
-                              reactions={reactions.filter(
-                                (reaction) => reaction.message_kind === message.message_kind && reaction.message_id === message.id,
-                              )}
+                              reactions={messageReactions}
                             />
                           )}
                           <div className={styles.messageFooter}>
-                            <time dateTime={message.created_at}>
-                              {formatTime(message.created_at)}
-                            </time>
-                            {ownMessage && !message.deleted_at && (
-                              <button
-                                className={styles.messageActionButton}
-                                disabled={isPending}
-                                onClick={() => setEditingMessage({ id: message.id, kind: message.message_kind, body: message.body })}
-                                type="button"
-                              >
-                                Edit
-                              </button>
+                            {endsGroup && (
+                              <time dateTime={message.created_at}>
+                                {formatTime(message.created_at)}
+                              </time>
                             )}
-                            {canPostToActiveChannel && !message.deleted_at && (
-                              <button
-                                className={styles.messageActionButton}
-                                disabled={isPending}
-                                onClick={() => setReplyingTo({ messageId: message.id, postId: message.post_id, authorName: message.author_name })}
-                                type="button"
-                              >
-                                Reply
-                              </button>
-                            )}
-                            {profile.role === "owner" && !message.deleted_at && (
-                              <button
-                                className={`${styles.messageDeleteButton} danger-text`}
-                                disabled={isPending}
-                                onClick={() =>
-                                  deleteMessage(message.id, message.message_kind)
-                                }
-                                type="button"
-                              >
-                                Delete
-                              </button>
+                            {!message.deleted_at && (
+                              <details className={styles.messageMenu}>
+                                <summary aria-label="Message actions">•••</summary>
+                                <div>
+                                  {canPostToActiveChannel && (
+                                    <button
+                                      disabled={isPending}
+                                      onClick={() =>
+                                        setReplyingTo({
+                                          messageId: message.id,
+                                          messageKind: message.message_kind,
+                                          postId: message.post_id,
+                                          authorName: message.author_name,
+                                          body: message.body,
+                                        })
+                                      }
+                                      type="button"
+                                    >
+                                      Reply
+                                    </button>
+                                  )}
+                                  {ownMessage && (
+                                    <button
+                                      disabled={isPending}
+                                      onClick={() =>
+                                        setEditingMessage({
+                                          id: message.id,
+                                          kind: message.message_kind,
+                                          body: message.body,
+                                        })
+                                      }
+                                      type="button"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                  {profile.role === "owner" && (
+                                    <button
+                                      className="danger-text"
+                                      disabled={isPending}
+                                      onClick={() =>
+                                        deleteMessage(
+                                          message.id,
+                                          message.message_kind,
+                                        )
+                                      }
+                                      type="button"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              </details>
                             )}
                             {profile.role === "owner" &&
                               message.deletion_reason && (
@@ -2710,21 +2850,6 @@ export function TeamsChat({
                           </div>
                         </div>
                       </article>
-                      {replyingTo?.messageId === message.id && (
-                        <form className={styles.inlineReplyForm} onSubmit={submitInlineReply}>
-                          <input name="channel_id" type="hidden" value={activeChannel.channel_id} />
-                          <input name="post_id" type="hidden" value={message.post_id} />
-                          <div>
-                            <strong>Reply to {replyingTo.authorName}</strong>
-                            <button aria-label="Cancel reply" onClick={() => setReplyingTo(null)} type="button">×</button>
-                          </div>
-                          <MentionTextarea id={`inline-reply-${message.id}`} members={members} name="body" placeholder="Write a reply" rows={2} submitOnEnter />
-                          <div className={styles.inlineReplyActions}>
-                            <ChatFilePicker key={`inline-reply-files-${message.id}-${attachmentPickerVersion}`} />
-                            <button className="button button-dark button-compact" disabled={isPending} type="submit">Reply</button>
-                          </div>
-                        </form>
-                      )}
                     </Fragment>
                   );
                 })
@@ -2739,11 +2864,43 @@ export function TeamsChat({
                 type="hidden"
                 value={activeChannel.channel_id}
               />
+              {replyingTo && (
+                <>
+                  <input name="post_id" type="hidden" value={replyingTo.postId} />
+                  <input
+                    name="reply_to_message_id"
+                    type="hidden"
+                    value={replyingTo.messageId}
+                  />
+                  <input
+                    name="reply_to_message_kind"
+                    type="hidden"
+                    value={replyingTo.messageKind}
+                  />
+                  <div className={styles.composerReplyPreview}>
+                    <div>
+                      <strong>Replying to {replyingTo.authorName}</strong>
+                      <span>{messageExcerpt(replyingTo.body)}</span>
+                    </div>
+                    <button
+                      aria-label="Cancel reply"
+                      onClick={() => setReplyingTo(null)}
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </>
+              )}
               <MentionTextarea
                 id="channel-message"
                 members={members}
                 name="body"
-                placeholder={`Message ${activeChannel.channel_name}`}
+                placeholder={
+                  replyingTo
+                    ? `Reply to ${replyingTo.authorName}`
+                    : `Message ${activeChannel.channel_name}`
+                }
                 rows={2}
                 submitOnEnter
               />
@@ -2754,7 +2911,7 @@ export function TeamsChat({
                   disabled={isPending}
                   type="submit"
                 >
-                  {isPending ? "Sending…" : "Send"}
+                  {isPending ? "Sending…" : replyingTo ? "Reply" : "Send"}
                 </button>
               </div>
             </form>
@@ -2803,7 +2960,7 @@ export function TeamsChat({
                 </span>
                 {member.user_id === profile.id ? (
                   <span className={styles.peopleYou}>You</span>
-                ) : (
+                ) : allowDirectMessages && member.user_role !== "applicant" ? (
                   <button
                     aria-label={`Message ${member.display_name}`}
                     disabled={isPending}
@@ -2812,6 +2969,8 @@ export function TeamsChat({
                   >
                     ✉
                   </button>
+                ) : (
+                  <span className={styles.peopleYou}>Channel only</span>
                 )}
               </div>
             ))}
@@ -2825,6 +2984,7 @@ export function TeamsChat({
 
       {showMembers && canSeeActiveChannelMembers && (
         <MemberDirectoryDialog
+          allowDirectMessages={allowDirectMessages}
           channel={activeChannel}
           currentUserId={profile.id}
           error={directMessageError}
@@ -2835,7 +2995,7 @@ export function TeamsChat({
         />
       )}
 
-      {showDirectMessagePicker && (
+      {showDirectMessagePicker && allowDirectMessages && (
         <DirectMessageDialog
           contacts={filteredDirectMessageContacts}
           error={directMessageError}
