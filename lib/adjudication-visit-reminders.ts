@@ -157,7 +157,7 @@ export function buildVisitReminderCopy(input: VisitReminderCopyInput) {
     ...textRows,
     `Assigned panel: ${panel}`,
     "",
-    "The GHSMTA Portal is the official source of truth for adjudication information. Please check the portal before your visit for the latest updates.",
+    "Please visit the GHSMTA Portal before your scheduled visit to review the most current adjudication information and any updates.",
     "Because there is not currently a dedicated GHSMTA mobile app, the five attached PDFs are provided for convenient mobile viewing. They are a snapshot of the Eligibility, Acting Candidates, Budget, Program Maturity/Vision/Support, and Full Application views as of when this reminder was generated.",
     `Open the adjudication workspace: ${portalUrl}`,
   ].join("\n");
@@ -174,7 +174,7 @@ export function buildVisitReminderCopy(input: VisitReminderCopyInput) {
       <p style="font-size:16px;color:#4c566a;margin:0 0 22px">Your adjudication visit is 72 hours away.</p>
       <table style="border-collapse:collapse;width:100%;border-top:1px solid #d7dce5;border-bottom:1px solid #d7dce5">${htmlRows}</table>
       <p><strong>Assigned panel:</strong> ${escapeHtml(panel)}</p>
-      <p><strong>The GHSMTA Portal is the official source of truth for adjudication information.</strong> Please check the portal before your visit for the latest updates.</p>
+      <p><strong>Please visit the GHSMTA Portal before your scheduled visit</strong> to review the most current adjudication information and any updates.</p>
       <p>Because there is not currently a dedicated GHSMTA mobile app, the five attached PDFs are provided for convenient mobile viewing. They are a snapshot of the Eligibility, Acting Candidates, Budget, Program Maturity/Vision/Support, and Full Application views as of when this reminder was generated.</p>
       <p><a href="${escapeHtml(portalUrl)}" style="display:inline-block;padding:12px 18px;background:#153f8f;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Open adjudication workspace</a></p>
     </div>`;
@@ -184,7 +184,7 @@ export function buildVisitReminderCopy(input: VisitReminderCopyInput) {
     ...textRows.map((row) => `**${row.split(":")[0]}:**${row.slice(row.indexOf(":") + 1)}`),
     `**Assigned panel:** ${panel}`,
     "",
-    "**The GHSMTA Portal is the official source of truth for adjudication information.** Please check the portal before your visit for the latest updates.",
+    "**Please visit the GHSMTA Portal before your scheduled visit** to review the most current adjudication information and any updates.",
     "Because there is not currently a dedicated GHSMTA mobile app, five PDFs are attached for convenient mobile viewing. They are a snapshot of the Eligibility, Acting Candidates, Budget, Program Maturity/Vision/Support, and Full Application views as of when this reminder was generated.",
     `Open adjudication workspace: ${portalUrl}`,
   ].join("\n");

@@ -35,9 +35,11 @@ describe("72-hour adjudication visit reminder copy", () => {
     expect(copy.text).toContain("Courtney McClendon");
     expect(copy.text).toContain("Arrive 30 minutes before curtain.");
     expect(copy.text).toContain(
-      "The GHSMTA Portal is the official source of truth",
+      "Please visit the GHSMTA Portal before your scheduled visit",
     );
-    expect(copy.text).toContain("Please check the portal before your visit");
+    expect(copy.text).toContain(
+      "the most current adjudication information and any updates",
+    );
     expect(copy.text).toContain(
       "there is not currently a dedicated GHSMTA mobile app",
     );
