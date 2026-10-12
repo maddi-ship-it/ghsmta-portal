@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { processAdjudicationVisitReminders } from "@/lib/adjudication-visit-reminders";
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { deliverSchoolInvoice } from "@/lib/billing/delivery";
 import { sendOwnerDigestEmail } from "@/lib/email/owner-digest";
@@ -8,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 800;
 
 function escapeHtml(value: string) {
   return value
@@ -315,16 +317,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [notifications, digests, invoiceReminders] = await Promise.all([
+    const [notifications, digests, invoiceReminders, adjudicationVisitReminders] = await Promise.all([
       processScheduleNotifications(),
       processOwnerDigests(),
       processInvoiceReminders(),
+      processAdjudicationVisitReminders(),
     ]);
     const result = {
       ok: true,
       notifications,
       digests,
       invoiceReminders,
+      adjudicationVisitReminders,
     };
     logEvent("info", "cron.notifications.completed", result);
     return Response.json(result);
