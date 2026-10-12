@@ -39,8 +39,9 @@ describe("72-hour adjudication visit reminder copy", () => {
     );
     expect(copy.text).toContain("Please check the portal before your visit");
     expect(copy.text).toContain(
-      "For convenience, the five attached PDFs are a snapshot",
+      "there is not currently a dedicated GHSMTA mobile app",
     );
+    expect(copy.text).toContain("provided for convenient mobile viewing");
     expect(copy.text).toContain(
       "Eligibility, Acting Candidates, Budget, Program Maturity/Vision/Support, and Full Application",
     );
