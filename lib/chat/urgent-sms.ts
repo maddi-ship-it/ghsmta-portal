@@ -5,7 +5,11 @@ import {
   loadChatChannelRecipientIds,
   type ChatNotificationChannel,
 } from "@/lib/chat/email-notifications";
-import { buildUrgentChatSms, containsUrgentMention } from "@/lib/chat/urgent";
+import {
+  buildUrgentChatSms,
+  canUseUrgentTag,
+  containsUrgentMention,
+} from "@/lib/chat/urgent";
 import { portalSiteUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -14,6 +18,7 @@ type UrgentSmsStatus =
   | "queued"
   | "no_recipients"
   | "not_configured"
+  | "not_authorized"
   | "partial_failure"
   | "failed";
 
@@ -107,6 +112,7 @@ export async function sendUrgentChatSmsNotifications({
   messageId,
   messageKind,
   authorId,
+  authorRole,
   authorName,
   subject,
   body,
@@ -115,15 +121,31 @@ export async function sendUrgentChatSmsNotifications({
   messageId: string;
   messageKind: "post" | "reply";
   authorId: string;
+  authorRole: string;
   authorName: string;
   subject: string;
   body: string;
 }): Promise<UrgentSmsResult> {
   const messageText = subject === "Message" ? body : `${subject}\n${body}`;
-  if (!containsUrgentMention(body)) {
+  if (!containsUrgentMention(messageText)) {
     return {
       triggered: false,
       status: "not_urgent",
+      recipientCount: 0,
+      queuedCount: 0,
+    };
+  }
+
+  if (!canUseUrgentTag(authorRole)) {
+    console.warn("Blocked unauthorized @URGENT chat alert", {
+      authorId,
+      channelId,
+      messageId,
+      messageKind,
+    });
+    return {
+      triggered: true,
+      status: "not_authorized",
       recipientCount: 0,
       queuedCount: 0,
     };

@@ -4,6 +4,10 @@ export function containsUrgentMention(value: string) {
   return URGENT_MENTION_PATTERN.test(value);
 }
 
+export function canUseUrgentTag(role: string) {
+  return role === "owner" || role === "advisory_member";
+}
+
 function normalizeForSms(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }

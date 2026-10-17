@@ -8,6 +8,7 @@ import {
   sendUrgentChatSmsNotifications,
   type UrgentSmsResult,
 } from "@/lib/chat/urgent-sms";
+import { canUseUrgentTag, containsUrgentMention } from "@/lib/chat/urgent";
 import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
 import { isOwnerChatSection } from "@/lib/chat-owner-sections";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -57,6 +58,7 @@ async function sendChatNotifications(input: {
   messageId: string;
   messageKind: "post" | "reply";
   authorId: string;
+  authorRole: string;
   authorName: string;
   subject: string;
   body: string;
@@ -83,6 +85,13 @@ async function sendChatNotifications(input: {
     urgentSmsRecipientCount: urgentSmsResult.value.recipientCount,
     urgentSmsQueuedCount: urgentSmsResult.value.queuedCount,
   };
+}
+
+function urgentTagPermissionError(message: string, role: string) {
+  if (containsUrgentMention(message) && !canUseUrgentTag(role)) {
+    return "Only Owners and Advisory Members can use @URGENT.";
+  }
+  return null;
 }
 
 export async function startChatDirectMessage(
@@ -255,6 +264,14 @@ export async function createChatPost(
     };
   }
 
+  const urgentPermissionError = urgentTagPermissionError(
+    `${subject}\n${body}`,
+    profile.role,
+  );
+  if (urgentPermissionError) {
+    return { ok: false, error: urgentPermissionError };
+  }
+
   const { supabase, channel, error: channelError } =
     await readChannelMode(channelId);
 
@@ -289,6 +306,7 @@ export async function createChatPost(
     messageId: post.id,
     messageKind: "post",
     authorId: profile.id,
+    authorRole: profile.role,
     authorName: profileDisplayName(profile),
     subject,
     body,
@@ -325,6 +343,12 @@ export async function createChatReply(
       ok: false,
       error: "The reply is longer than the allowed limit.",
     };
+  }
+
+
+  const urgentPermissionError = urgentTagPermissionError(body, profile.role);
+  if (urgentPermissionError) {
+    return { ok: false, error: urgentPermissionError };
   }
 
   if (
@@ -418,6 +442,7 @@ export async function createChatReply(
     messageId: reply.id,
     messageKind: "reply",
     authorId: profile.id,
+    authorRole: profile.role,
     authorName: profileDisplayName(profile),
     subject: parentPost?.subject ? `Reply: ${parentPost.subject}` : "New reply",
     body,
@@ -451,6 +476,12 @@ export async function createChatMessage(
       ok: false,
       error: "The message is longer than the allowed limit.",
     };
+  }
+
+
+  const urgentPermissionError = urgentTagPermissionError(body, profile.role);
+  if (urgentPermissionError) {
+    return { ok: false, error: urgentPermissionError };
   }
 
   const { supabase, channel, error: channelError } =
@@ -497,6 +528,7 @@ export async function createChatMessage(
     messageId: post.id,
     messageKind: "post",
     authorId: profile.id,
+    authorRole: profile.role,
     authorName: profileDisplayName(profile),
     subject: "Message",
     body,
@@ -525,6 +557,11 @@ export async function editChatMessage(
   if (!body) return { ok: false, error: "A message cannot be empty." };
   if (body.length > 5000) {
     return { ok: false, error: "The message is longer than the allowed limit." };
+  }
+
+  const urgentPermissionError = urgentTagPermissionError(body, profile.role);
+  if (urgentPermissionError) {
+    return { ok: false, error: urgentPermissionError };
   }
 
   const table = messageKind === "post" ? "chat_posts" : "chat_replies";

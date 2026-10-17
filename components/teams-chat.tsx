@@ -206,6 +206,7 @@ type ChatAction = (
     | "queued"
     | "no_recipients"
     | "not_configured"
+    | "not_authorized"
     | "partial_failure"
     | "failed";
   urgentSmsRecipientCount?: number;
@@ -2457,6 +2458,9 @@ export function TeamsChat({
         }
         if (result.urgentSmsStatus === "not_configured") {
           return " The urgent tag was added, but Twilio text delivery is not configured yet.";
+        }
+        if (result.urgentSmsStatus === "not_authorized") {
+          return " Only Owners and Advisory Members can use @URGENT.";
         }
         return " The urgent text alert could not be queued.";
       })();

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildUrgentChatSms, containsUrgentMention } from "@/lib/chat/urgent";
+import {
+  buildUrgentChatSms,
+  canUseUrgentTag,
+  containsUrgentMention,
+} from "@/lib/chat/urgent";
 
 describe("urgent chat messages", () => {
   it("recognizes a standalone urgent mention without case sensitivity", () => {
@@ -11,6 +15,14 @@ describe("urgent chat messages", () => {
   it("does not match email-like or longer tokens", () => {
     expect(containsUrgentMention("person@urgent.example")).toBe(false);
     expect(containsUrgentMention("@urgently please")).toBe(false);
+  });
+
+  it("allows only owners and advisory members to use the urgent tag", () => {
+    expect(canUseUrgentTag("owner")).toBe(true);
+    expect(canUseUrgentTag("advisory_member")).toBe(true);
+    expect(canUseUrgentTag("adjudicator")).toBe(false);
+    expect(canUseUrgentTag("applicant")).toBe(false);
+    expect(canUseUrgentTag("program_manager")).toBe(false);
   });
 
   it("builds a compact text with context and a chat link", () => {
