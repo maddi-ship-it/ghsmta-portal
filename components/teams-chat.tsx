@@ -1385,7 +1385,7 @@ function ChannelNavigation({
     <nav className={styles.channelList} aria-label="Chat channels">
       {standardGroups.map((group) => (
         <StandardChannelGroupNavigation
-          collapsible={group.key === "direct_messages"}
+          collapsible={group.channels.some(isDirectMessageConversation)}
           forceOpen={expandSchoolList}
           group={group}
           key={group.key}
@@ -1469,12 +1469,7 @@ function StandardChannelGroupNavigation({
   group: ChannelGroup;
   selectedChannelId: string | null;
 }) {
-  const containsActiveChannel = group.channels.some(
-    (channel) => channel.channel_id === selectedChannelId,
-  );
-  const [isOpen, setIsOpen] = useState(
-    !collapsible || containsActiveChannel || group.unreadCount > 0,
-  );
+  const [isOpen, setIsOpen] = useState(!collapsible);
 
   const expanded = !collapsible || forceOpen || isOpen;
 
@@ -1531,6 +1526,13 @@ function schoolGroupActivity(group: SchoolConversationGroup) {
 
 function isSchoolConversation(channel: ChatChannel) {
   return channel.channel_type === "school" || channel.channel_type === "school_dm";
+}
+
+function isDirectMessageConversation(channel: ChatChannel) {
+  return (
+    channel.channel_type === "direct_message" ||
+    channel.channel_type === "group_direct_message"
+  );
 }
 
 function formatUnreadCount(count: number) {
