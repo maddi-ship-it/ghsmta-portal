@@ -147,6 +147,11 @@ export default async function StaffSignupPage({
           <p className="auth-links">
             Registering a school? <Link href="/signup">Applicant signup</Link>
           </p>
+          <p className="auth-links auth-privacy-link">
+            By creating an account, you agree to the{" "}
+            <Link href="/terms">Terms &amp; Conditions</Link> and acknowledge the{" "}
+            <Link href="/privacy">Privacy Policy</Link>.
+          </p>
         </div>
       </section>
     </main>

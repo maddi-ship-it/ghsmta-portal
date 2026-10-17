@@ -13750,9 +13750,55 @@ html[data-theme="light"] .auth-card :where(.text-button, .auth-forgot-link) {
 }
 
 .public-policy-card p,
+.public-policy-card li,
 .system-state-card p {
   color: var(--app-muted, #59667b);
   line-height: 1.7;
+}
+
+.public-policy-card ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.75rem 0 0;
+  padding-left: 1.35rem;
+}
+
+.public-policy-card a {
+  color: var(--portal-blue, #2857bd);
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.public-policy-card .policy-brand {
+  text-decoration: none;
+}
+
+.policy-effective-date {
+  margin-bottom: 2rem;
+  font-weight: 750;
+}
+
+.policy-emphasis {
+  padding: 1rem 1.1rem;
+  border-left: 4px solid var(--portal-gold, #d5b14f);
+  border-radius: 0 0.75rem 0.75rem 0;
+  background: color-mix(in srgb, var(--portal-gold, #d5b14f) 12%, transparent);
+}
+
+.policy-address {
+  color: var(--app-muted, #59667b);
+  font-style: normal;
+  line-height: 1.7;
+}
+
+.policy-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--app-line, rgba(35, 50, 75, 0.17));
 }
 
 .policy-brand {

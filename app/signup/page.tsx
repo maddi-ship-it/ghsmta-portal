@@ -112,6 +112,11 @@ export default async function SignupPage({
           <p className="auth-links">
             GHSMTA staff or adjudicator? <Link href="/staff-signup">Staff signup</Link>
           </p>
+          <p className="auth-links auth-privacy-link">
+            By creating an account, you agree to the{" "}
+            <Link href="/terms">Terms &amp; Conditions</Link> and acknowledge the{" "}
+            <Link href="/privacy">Privacy Policy</Link>.
+          </p>
         </div>
       </section>
     </main>

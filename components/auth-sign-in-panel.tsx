@@ -308,7 +308,11 @@ export function AuthSignInPanel({
       <p className="auth-links">
         Applying for the first time? <Link href="/signup">Create an applicant account</Link>
       </p>
-      <p className="auth-links auth-privacy-link"><Link href="/privacy">Privacy &amp; data use</Link></p>
+      <p className="auth-links auth-privacy-link">
+        <Link href="/privacy">Privacy Policy</Link>
+        {" · "}
+        <Link href="/terms">Terms &amp; Conditions</Link>
+      </p>
     </div>
   );
 }

@@ -77,9 +77,12 @@ export default function LandingPage() {
               </span>
             </Link>
             <p>
-              Celebrating excellence in Georgia high school musical theatre. ·{" "}
-              <Link href="/privacy">Privacy &amp; data use</Link>
+              Celebrating excellence in Georgia high school musical theatre.
             </p>
+            <nav className="public-home-footer-links" aria-label="Legal">
+              <Link href="/privacy">Privacy Policy</Link>
+              <Link href="/terms">Terms &amp; Conditions</Link>
+            </nav>
           </div>
 
           <div className="public-home-presented-by">
