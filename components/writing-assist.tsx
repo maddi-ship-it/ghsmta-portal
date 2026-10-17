@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import styles from "./writing-assist.module.css";
 
@@ -8,6 +9,7 @@ type WritableTarget = HTMLTextAreaElement | HTMLDivElement;
 type AssistMode = "idle" | "recording" | "processing";
 
 function isWritableTarget(element: Element | null): element is WritableTarget {
+  if (element?.closest('[data-writing-assist="off"]')) return false;
   if (element instanceof HTMLTextAreaElement) {
     return !element.disabled && !element.readOnly;
   }
@@ -28,6 +30,14 @@ function setTextareaValue(target: HTMLTextAreaElement, value: string) {
 }
 
 export function WritingAssist() {
+  const pathname = usePathname();
+
+  if (pathname.startsWith("/portal/chat")) return null;
+
+  return <WritingAssistControls />;
+}
+
+function WritingAssistControls() {
   const rootRef = useRef<HTMLDivElement>(null);
   const targetRef = useRef<WritableTarget | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);

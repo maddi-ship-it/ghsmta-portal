@@ -1138,20 +1138,6 @@ export function OwnerLiveAdjudicationReview({
                 ) : null}
                 {category.guidance && <p>{category.guidance}</p>}
               </div>
-              <div className="category-average-group" aria-label={`${category.title} averages`}>
-                <div className="category-person-averages">
-                  {panelistAverages.map((panelist) => (
-                    <span className="category-person-average" key={panelist.id}>
-                      <small>{panelist.name}</small>
-                      <strong>{formatScoreAverage(panelist.average)}</strong>
-                    </span>
-                  ))}
-                </div>
-                <div className="category-average">
-                  <span>Full panel average</span>
-                  <strong>{formatScoreAverage(average)}</strong>
-                </div>
-              </div>
             </div>
 
             <div className="table-wrap criterion-score-table">
@@ -1159,7 +1145,7 @@ export function OwnerLiveAdjudicationReview({
                 <thead>
                   <tr>
                     <th>Criterion</th>
-                    {panelRoster.map(({ assignment, scorecard }) => (
+                    {panelRoster.map(({ assignment, scorecard }, panelistIndex) => (
                       <th
                         className={
                           advisoryScoreEntry?.currentUserId ===
@@ -1169,20 +1155,37 @@ export function OwnerLiveAdjudicationReview({
                         }
                         key={assignment.id}
                       >
-                        {profileMap.get(assignment.adjudicator_user_id)?.full_name?.split(" ")[0] ??
-                          "Panelist"}
-                        {advisoryScoreEntry?.currentUserId ===
-                        assignment.adjudicator_user_id
-                          ? " · You"
-                          : ""}
-                        <small>
-                          {scorecard
-                            ? scorecardStatusLabel(scorecard.status)
-                            : "Not started"}
-                        </small>
+                        <span className="criterion-header-name">
+                          {profileMap.get(assignment.adjudicator_user_id)?.full_name?.split(" ")[0] ??
+                            "Panelist"}
+                          {advisoryScoreEntry?.currentUserId ===
+                          assignment.adjudicator_user_id
+                            ? " · You"
+                            : ""}
+                        </span>
+                        <span className="criterion-header-summary">
+                          <small>
+                            {scorecard
+                              ? scorecardStatusLabel(scorecard.status)
+                              : "Not started"}
+                          </small>
+                          <strong aria-label={`${panelistAverages[panelistIndex]?.name ?? "Panelist"} category average`}>
+                            {formatScoreAverage(
+                              panelistAverages[panelistIndex]?.average ?? null,
+                            )}
+                          </strong>
+                        </span>
                       </th>
                     ))}
-                    <th>Average</th>
+                    <th>
+                      <span className="criterion-header-name">Average</span>
+                      <span className="criterion-header-summary">
+                        <small>Full panel</small>
+                        <strong aria-label={`${category.title} full panel average`}>
+                          {formatScoreAverage(average)}
+                        </strong>
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

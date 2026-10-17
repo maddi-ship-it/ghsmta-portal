@@ -3238,6 +3238,543 @@
   }
 }
 
+/* Clean two-pane messaging workspace. The member directory remains available
+   from the header without permanently taking space away from the conversation. */
+.shell {
+  grid-template-columns: minmax(292px, 330px) minmax(0, 1fr);
+  height: clamp(640px, calc(100dvh - 176px), 860px);
+  border-radius: 20px;
+  background: var(--portal-bg-deep);
+}
+
+.peopleRail {
+  display: none;
+}
+
+.rail {
+  background: var(--portal-surface);
+}
+
+.railHeader {
+  padding: 18px 18px 12px;
+}
+
+.railHeader h2 {
+  margin-top: 2px;
+  font-family: inherit;
+  font-size: 1.28rem;
+  letter-spacing: -0.02em;
+}
+
+.filters {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 12px 12px;
+}
+
+.filterButtons {
+  grid-column: auto;
+  gap: 6px;
+}
+
+.unreadFilter {
+  min-height: 34px;
+  padding-inline: 10px;
+  border-radius: 999px;
+}
+
+.railActions {
+  grid-column: auto;
+  gap: 6px;
+}
+
+.railActions .newMessageButton,
+.railActions .broadcastButton {
+  min-height: 38px;
+  border-radius: 10px;
+}
+
+.channelList {
+  padding-inline: 6px;
+}
+
+.channelGroup {
+  margin-top: 10px;
+}
+
+.channelLink {
+  min-height: 60px;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 12px;
+}
+
+.channelLinkActive {
+  border-color: color-mix(in srgb, var(--portal-gold) 34%, transparent);
+  background: color-mix(in srgb, var(--portal-gold) 8%, var(--portal-surface-2));
+  box-shadow: none;
+}
+
+.conversation {
+  min-height: 0;
+  border-radius: 0 20px 20px 0;
+}
+
+.channelHeader {
+  min-height: 78px;
+  padding: 12px 18px;
+}
+
+.headerIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+}
+
+.channelEyebrowRow > .eyebrow {
+  font-size: 0.61rem;
+}
+
+.channelHeadingLine {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.channelHeader .channelHeadingLine h1 {
+  min-width: 0;
+  margin: 2px 0;
+  font-family: inherit;
+  font-size: clamp(1.02rem, 2vw, 1.24rem);
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.realtimeIndicator {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  color: var(--portal-muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.realtimeIndicator > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.realtimeIndicator_connected {
+  color: #50c878;
+}
+
+.realtimeIndicator_connecting {
+  color: var(--portal-gold-bright);
+}
+
+.realtimeIndicator_reconnecting {
+  color: var(--portal-danger, #ff9c9c);
+}
+
+.headerMeta {
+  display: flex;
+  max-width: 340px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.headerMeta .visibilityPill {
+  width: auto;
+  text-align: center;
+}
+
+.memberSummary {
+  min-height: 34px;
+}
+
+.messageWorkspace {
+  position: relative;
+  min-height: 0;
+}
+
+.messageFeed {
+  padding: 22px clamp(14px, 4vw, 44px) 18px;
+  scrollbar-gutter: stable;
+}
+
+.chatMessage {
+  max-width: min(680px, 74%);
+}
+
+.chatMessageOwn .messageBody {
+  color: #fff;
+}
+
+.jumpToLatest {
+  position: absolute;
+  z-index: 18;
+  bottom: 132px;
+  left: 50%;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 999px;
+  color: var(--portal-text);
+  background: color-mix(in srgb, var(--portal-surface-2) 94%, transparent);
+  box-shadow: var(--portal-shadow);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  transform: translateX(-50%);
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.jumpToLatest:hover,
+.jumpToLatest:focus-visible {
+  color: var(--portal-gold-bright);
+  background: var(--portal-surface-hover);
+}
+
+.messageComposer {
+  position: sticky;
+  bottom: 0;
+  padding: 10px clamp(12px, 3vw, 28px) calc(12px + env(safe-area-inset-bottom));
+  border: 0;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--portal-bg-deep) 94%, transparent) 22%,
+    var(--portal-bg-deep) 62%
+  );
+  backdrop-filter: none;
+}
+
+.composerReplyPreview,
+.composerSurface {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+
+.composerReplyPreview {
+  margin-bottom: 6px;
+}
+
+.composerSurface {
+  overflow: visible;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 18px;
+  background: var(--portal-surface-2);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.2);
+}
+
+.composerSurface .mentionComposer {
+  display: block;
+  width: 100%;
+  background: transparent;
+}
+
+.composerSurface .composerTextarea {
+  display: block;
+  width: 100% !important;
+  min-height: 58px;
+  max-height: 180px;
+  box-sizing: border-box;
+  padding: 12px 14px 3px;
+  border: 0;
+  border-radius: 18px 18px 0 0;
+  outline: 0;
+  color: var(--portal-text);
+  background: transparent;
+  box-shadow: none;
+  overflow-y: hidden;
+  resize: none;
+}
+
+.composerSurface .composerTextarea:focus {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.composerSurface .mentionHelp {
+  margin: 0;
+  padding: 2px 14px 0;
+}
+
+.composerSurface .mentionSuggestions {
+  right: 8px;
+  left: 8px;
+}
+
+.composerSurface .composerFooter {
+  min-height: 48px;
+  margin: 0;
+  padding: 6px 8px 8px 10px;
+  border: 0;
+  background: transparent;
+}
+
+.composerFooter > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.composerFooter > div > span {
+  overflow: hidden;
+  color: var(--portal-muted);
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sendButton {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #071328;
+  background: var(--portal-gold);
+  box-shadow: 0 7px 16px color-mix(in srgb, var(--portal-gold) 25%, transparent);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.sendButton:hover,
+.sendButton:focus-visible {
+  background: var(--portal-gold-bright);
+  transform: translateY(-1px);
+}
+
+.sendButton:disabled {
+  opacity: 0.54;
+  transform: none;
+  cursor: wait;
+}
+
+.selectedFiles > span {
+  display: flex;
+  min-width: 170px;
+  grid-template-columns: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.selectedFiles > span > span {
+  display: grid;
+  min-width: 0;
+}
+
+.selectedFiles button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--portal-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.selectedFiles button:hover,
+.selectedFiles button:focus-visible {
+  color: var(--portal-danger, #ff9c9c);
+  background: var(--portal-surface-hover);
+}
+
+@media (hover: hover) {
+  .chatMessage .reactionPicker {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease;
+  }
+
+  .chatMessage:hover .reactionPicker,
+  .chatMessage:focus-within .reactionPicker {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+:global(html[data-theme="light"]) .rail {
+  background: #f4f6fa;
+}
+
+:global(html[data-theme="light"]) .conversation,
+:global(html[data-theme="light"]) .messageWorkspace {
+  background: #fff;
+}
+
+:global(html[data-theme="light"]) .composerSurface {
+  border-color: #cfd7e4;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(28, 43, 68, 0.12);
+}
+
+:global(html[data-theme="light"]) .composerSurface .composerTextarea {
+  color: #172033 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:global(html[data-theme="light"]) .chatMessageOwn .messageBody {
+  color: #fff;
+}
+
+:global(html[data-theme="light"]) .messageComposer {
+  background: linear-gradient(180deg, transparent, rgba(246, 248, 252, 0.96) 24%, #f6f8fc 62%);
+}
+
+:global(html[data-theme="light"]) .jumpToLatest {
+  color: #172033;
+  border-color: #d2dae6;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+@media (max-width: 1080px) {
+  .headerMeta {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .shell {
+    display: block;
+    height: min(760px, calc(100dvh - 150px));
+    min-height: 540px;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+
+  .conversation {
+    height: 100%;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+
+  .messageWorkspace {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .channelHeader {
+    padding: 11px 12px;
+  }
+
+  .channelIdentity {
+    gap: 10px;
+  }
+
+  .headerIcon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .channelHeader p {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.72rem;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .mobilePicker {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
+    margin-top: 9px;
+  }
+
+  .mobilePicker label,
+  .mobilePicker select {
+    grid-column: 1 / -1;
+  }
+
+  .mobilePicker label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .mobilePicker button {
+    min-height: 38px;
+    padding-inline: 8px;
+    font-size: 0.67rem;
+  }
+
+  .messageFeed {
+    min-height: 0;
+    padding: 14px 10px 10px;
+  }
+
+  .chatMessage {
+    max-width: 88%;
+  }
+
+  .messageComposer {
+    padding-inline: 8px;
+  }
+
+  .jumpToLatest {
+    bottom: 126px;
+  }
+}
+
+@media (max-width: 520px) {
+  .shell {
+    height: calc(100dvh - 132px);
+    min-height: 520px;
+  }
+
+  .channelEyebrowRow {
+    display: none;
+  }
+
+  .channelHeader .channelHeadingLine h1 {
+    font-size: 0.98rem;
+  }
+
+  .realtimeIndicator {
+    font-size: 0.6rem;
+  }
+
+  .composerFooter > div > span,
+  .composerSurface .mentionHelp {
+    display: none;
+  }
+
+  .composerSurface .composerTextarea {
+    padding-bottom: 8px;
+  }
+}
+
 @media (max-width: 860px) {
   .shell {
     height: auto;

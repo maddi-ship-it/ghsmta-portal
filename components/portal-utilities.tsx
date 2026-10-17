@@ -531,6 +531,7 @@ export function PortalUtilities({
           <section
             aria-label="Chat messages"
             className={`header-chat-popover${selectedChatChannel ? " is-conversation" : ""}`}
+            data-writing-assist="off"
             role="dialog"
           >
             <header className="header-chat-popover-header">

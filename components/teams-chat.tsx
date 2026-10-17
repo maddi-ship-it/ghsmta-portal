@@ -32,6 +32,12 @@ import {
   ADJUDICATOR_CHANNELS_LABEL,
   SCHOOL_COMMUNITY_CHAT_LABEL,
 } from "@/lib/chat-terminology";
+import {
+  isFeedNearBottom,
+  messagesBelongTogether,
+  realtimeConnectionLabel,
+  type RealtimeConnectionState,
+} from "@/lib/chat-presentation";
 import { createClient } from "@/lib/supabase/client";
 import { isAllowedPortalFile, PORTAL_FILE_ACCEPT } from "@/lib/file-upload-policy";
 import type { AppRole, Profile } from "@/lib/types";
@@ -229,7 +235,19 @@ function formatFileSize(value: number) {
 }
 
 function ChatFilePicker() {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  const removeFile = (fileIndex: number) => {
+    const nextFiles = selectedFiles.filter((_, index) => index !== fileIndex);
+    setSelectedFiles(nextFiles);
+
+    if (!inputRef.current || typeof DataTransfer === "undefined") return;
+
+    const transfer = new DataTransfer();
+    nextFiles.forEach((file) => transfer.items.add(file));
+    inputRef.current.files = transfer.files;
+  };
 
   return (
     <div className={styles.filePickerGroup}>
@@ -241,16 +259,26 @@ function ChatFilePicker() {
           multiple
           name="attachments"
           onChange={(event) => setSelectedFiles(Array.from(event.target.files ?? []))}
+          ref={inputRef}
           type="file"
         />
         <small>Up to 25 MB each</small>
       </label>
       {selectedFiles.length > 0 && (
         <div className={styles.selectedFiles} aria-live="polite">
-          {selectedFiles.map((file) => (
+          {selectedFiles.map((file, index) => (
             <span key={`${file.name}-${file.size}-${file.lastModified}`}>
-              <strong>{file.name}</strong>
-              <small>{formatFileSize(file.size)}</small>
+              <span>
+                <strong>{file.name}</strong>
+                <small>{formatFileSize(file.size)}</small>
+              </span>
+              <button
+                aria-label={`Remove ${file.name}`}
+                onClick={() => removeFile(index)}
+                type="button"
+              >
+                ×
+              </button>
             </span>
           ))}
         </div>
@@ -299,6 +327,7 @@ function ReactionBar({
   currentUserId: string;
   onToggle: (emoji: string) => void;
 }) {
+  const pickerRef = useRef<HTMLDetailsElement>(null);
   const grouped = new Map<string, ChatReaction[]>();
   for (const reaction of reactions) {
     const existing = grouped.get(reaction.emoji) ?? [];
@@ -318,11 +347,21 @@ function ReactionBar({
           {emoji} <span>{entries.length}</span>
         </button>
       ))}
-      <details className={styles.reactionPicker}>
+      <details className={styles.reactionPicker} ref={pickerRef}>
         <summary aria-label="Add a reaction">☺</summary>
         <div>
           {[...QUICK_REACTIONS, ...MORE_REACTIONS].map((emoji) => (
-            <button key={emoji} onClick={() => onToggle(emoji)} type="button">{emoji}</button>
+            <button
+              aria-label={`React with ${emoji}`}
+              key={emoji}
+              onClick={() => {
+                onToggle(emoji);
+                pickerRef.current?.removeAttribute("open");
+              }}
+              type="button"
+            >
+              {emoji}
+            </button>
           ))}
         </div>
       </details>
@@ -422,6 +461,78 @@ function initials(name: string) {
     .join("");
 }
 
+function useDialogFocus<T extends HTMLElement>(
+  onClose: () => void,
+  active = true,
+) {
+  const dialogRef = useRef<T>(null);
+  const closeRef = useRef(onClose);
+
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const dialog = dialogRef.current;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+
+    if (!dialog) return;
+
+    const focusableSelector =
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])';
+    const focusFirstControl = window.requestAnimationFrame(() => {
+      (
+        dialog.querySelector<HTMLElement>("[autofocus]") ??
+        dialog.querySelector<HTMLElement>(focusableSelector)
+      )?.focus();
+    });
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(focusableSelector),
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (!first || !last) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFirstControl);
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [active]);
+
+  return dialogRef;
+}
+
 function MemberDirectoryDialog({
   allowDirectMessages,
   channel,
@@ -441,12 +552,16 @@ function MemberDirectoryDialog({
   onClose: () => void;
   onMessage: (member: ChatMember) => void;
 }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
+
   return (
     <div
       aria-labelledby="chat-members-title"
       aria-modal="true"
       className={styles.modalBackdrop}
+      ref={dialogRef}
       role="dialog"
+      tabIndex={-1}
     >
       <section className={`${styles.broadcastModal} ${styles.memberModal}`}>
         <div className={styles.broadcastModalHeader}>
@@ -519,12 +634,16 @@ function DirectMessageDialog({
   onMessage: (member: ChatMember) => void;
   onSearchChange: (value: string) => void;
 }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
+
   return (
     <div
       aria-labelledby="direct-message-title"
       aria-modal="true"
       className={styles.modalBackdrop}
+      ref={dialogRef}
       role="dialog"
+      tabIndex={-1}
     >
       <section className={`${styles.broadcastModal} ${styles.memberModal}`}>
         <div className={styles.broadcastModalHeader}>
@@ -720,6 +839,7 @@ function AdjudicationVisitDetailsDialog({
   details: AdjudicationVisitDetails | null;
   onClose: () => void;
 }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
   const detailGroups = details
     ? [
         {
@@ -763,7 +883,9 @@ function AdjudicationVisitDetailsDialog({
       aria-labelledby="adjudication-visit-details-title"
       aria-modal="true"
       className={styles.modalBackdrop}
+      ref={dialogRef}
       role="dialog"
+      tabIndex={-1}
     >
       <section className={`${styles.broadcastModal} ${styles.visitDetailsModal}`}>
         <div className={styles.broadcastModalHeader}>
@@ -873,23 +995,6 @@ function messageExcerpt(value: string, limit = 120) {
     : normalized;
 }
 
-function messagesBelongTogether(
-  previous: FlatMessage | undefined,
-  current: FlatMessage | undefined,
-) {
-  if (!previous || !current || previous.author_id !== current.author_id) {
-    return false;
-  }
-
-  const previousTime = new Date(previous.created_at);
-  const currentTime = new Date(current.created_at);
-
-  return (
-    previousTime.toDateString() === currentTime.toDateString() &&
-    currentTime.getTime() - previousTime.getTime() <= 5 * 60 * 1000
-  );
-}
-
 function normalizeChannel(row: Partial<ChatChannel> & Pick<ChatChannel, "channel_id" | "channel_type" | "channel_name">): ChatChannel {
   const fallback = GROUP_FALLBACKS[row.channel_type];
   const archived = Boolean(row.application_archived);
@@ -995,6 +1100,7 @@ function MentionTextarea({
   rows,
   className,
   submitOnEnter = false,
+  autoResize = false,
 }: {
   id: string;
   name: string;
@@ -1003,6 +1109,7 @@ function MentionTextarea({
   rows: number;
   className?: string;
   submitOnEnter?: boolean;
+  autoResize?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState("");
@@ -1058,11 +1165,24 @@ function MentionTextarea({
       setQuery(null);
       setMentionStart(null);
       setActiveIndex(0);
+      const textarea = textareaRef.current;
+      if (autoResize && textarea) {
+        textarea.style.height = "";
+        textarea.style.overflowY = "hidden";
+      }
     };
 
     form.addEventListener("reset", reset);
     return () => form.removeEventListener("reset", reset);
-  }, []);
+  }, [autoResize]);
+
+  const resizeTextarea = (textarea: HTMLTextAreaElement) => {
+    if (!autoResize) return;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, 180);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 180 ? "auto" : "hidden";
+  };
 
   const detectMention = (nextValue: string, cursor: number) => {
     const beforeCursor = nextValue.slice(0, cursor);
@@ -1099,6 +1219,7 @@ function MentionTextarea({
     requestAnimationFrame(() => {
       textarea.focus();
       textarea.setSelectionRange(nextCursor, nextCursor);
+      resizeTextarea(textarea);
     });
   };
 
@@ -1157,6 +1278,7 @@ function MentionTextarea({
           const nextValue = event.target.value;
           setValue(nextValue);
           detectMention(nextValue, event.target.selectionStart);
+          resizeTextarea(event.target);
         }}
         onClick={(event) =>
           detectMention(value, event.currentTarget.selectionStart)
@@ -1618,6 +1740,7 @@ export function TeamsChat({
   initialMembers,
   ownerChannelCandidates,
   adjudicationVisitDetails,
+  previewMode = false,
 }: {
   profile: Profile;
   initialChannels: ChatChannel[];
@@ -1626,6 +1749,7 @@ export function TeamsChat({
   initialMembers: ChatMember[];
   ownerChannelCandidates: ChatMember[];
   adjudicationVisitDetails: AdjudicationVisitDetails | null;
+  previewMode?: boolean;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -1658,6 +1782,9 @@ export function TeamsChat({
   const [ownerChannelError, setOwnerChannelError] = useState<string | null>(null);
   const [loadingDirectMessageContacts, setLoadingDirectMessageContacts] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [realtimeState, setRealtimeState] =
+    useState<RealtimeConnectionState>(previewMode ? "connected" : "connecting");
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [pendingDeletion, setPendingDeletion] = useState<{
     messageId: string;
     messageKind: "post" | "reply";
@@ -1678,7 +1805,12 @@ export function TeamsChat({
     body: string;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
-  const feedEndRef = useRef<HTMLDivElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
+  const hasInitialScrollRef = useRef(false);
+  const broadcastDialogRef = useDialogFocus<HTMLDivElement>(
+    () => setShowBroadcastComposer(false),
+    showBroadcastComposer,
+  );
 
   const activeChannel = channels.find(
     (channel) => channel.channel_id === selectedChannelId,
@@ -1688,6 +1820,10 @@ export function TeamsChat({
   const canPostToActiveChannel = !isPortalUpdates || profile.role === "owner";
   const canSeeActiveChannelMembers = !isPortalUpdates || profile.role === "owner";
   const allowDirectMessages = profile.role !== "applicant";
+  const activeChannelTitle =
+    activeChannel && isSchoolConversation(activeChannel)
+      ? (activeChannel.school_name ?? activeChannel.channel_name)
+      : (activeChannel?.channel_name ?? "Conversation");
   const openThreadIds =
     openThreadState.channelId === selectedChannelId
       ? openThreadState.ids
@@ -2011,11 +2147,13 @@ export function TeamsChat({
   }, [loadEnhancements, reloadChannels, selectedChannelId, supabase]);
 
   useEffect(() => {
+    if (previewMode) return;
     const timeout = window.setTimeout(() => void loadEnhancements(), 0);
     return () => window.clearTimeout(timeout);
-  }, [loadEnhancements]);
+  }, [loadEnhancements, previewMode]);
 
   useEffect(() => {
+    if (previewMode) return;
     const subscription = supabase
       .channel(`chat-workspace:${profile.id}`)
       .on(
@@ -2064,18 +2202,65 @@ export function TeamsChat({
           if (row?.channel_id === selectedChannelId) void loadEnhancements();
         },
       )
-      .subscribe();
+      .subscribe((subscriptionStatus) => {
+        if (subscriptionStatus === "SUBSCRIBED") {
+          setRealtimeState("connected");
+          return;
+        }
+
+        if (
+          subscriptionStatus === "CHANNEL_ERROR" ||
+          subscriptionStatus === "TIMED_OUT" ||
+          subscriptionStatus === "CLOSED"
+        ) {
+          setRealtimeState("reconnecting");
+        }
+      });
 
     return () => {
       void supabase.removeChannel(subscription);
     };
-  }, [loadChannel, loadEnhancements, profile.id, reloadChannels, selectedChannelId, supabase]);
+  }, [
+    loadChannel,
+    loadEnhancements,
+    previewMode,
+    profile.id,
+    reloadChannels,
+    selectedChannelId,
+    supabase,
+  ]);
+
+  const scrollToLatest = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const feed = feedRef.current;
+    if (!feed) return;
+    feed.scrollTo({ top: feed.scrollHeight, behavior });
+    setShowJumpToLatest(false);
+  }, []);
 
   useEffect(() => {
-    if (!isThreaded) {
-      feedEndRef.current?.scrollIntoView({ block: "end" });
+    if (isThreaded) return;
+
+    hasInitialScrollRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      scrollToLatest("auto");
+      hasInitialScrollRef.current = true;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isThreaded, scrollToLatest, selectedChannelId]);
+
+  useEffect(() => {
+    if (isThreaded || !hasInitialScrollRef.current) return;
+
+    const feed = feedRef.current;
+    if (!feed) return;
+
+    if (isFeedNearBottom(feed, 220)) {
+      scrollToLatest("smooth");
+    } else {
+      setShowJumpToLatest(true);
     }
-  }, [isThreaded, messages.length]);
+  }, [isThreaded, messages.length, scrollToLatest]);
 
   const uploadAttachments = async (
     files: File[],
@@ -2111,11 +2296,18 @@ export function TeamsChat({
     }
   };
 
+  const blockPreviewMutation = () => {
+    if (!previewMode) return false;
+    setStatus("Sample-data preview only — changes are disabled.");
+    return true;
+  };
+
   const toggleReaction = async (
     messageId: string,
     messageKind: "post" | "reply",
     emoji: string,
   ) => {
+    if (blockPreviewMutation()) return;
     if (!selectedChannelId) return;
     const existing = reactions.find(
       (reaction) =>
@@ -2143,6 +2335,7 @@ export function TeamsChat({
     successMessage: string,
     onSuccess?: () => void,
   ) => {
+    if (blockPreviewMutation()) return;
     const formData = new FormData(form);
     const files = formData
       .getAll("attachments")
@@ -2247,6 +2440,7 @@ export function TeamsChat({
 
   const submitBroadcast = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (blockPreviewMutation()) return;
     const form = event.currentTarget;
     const formData = new FormData(form);
     setStatus(null);
@@ -2271,6 +2465,7 @@ export function TeamsChat({
   };
 
   const moderate = (postId: string, operation: "pin" | "lock") => {
+    if (blockPreviewMutation()) return;
     const formData = new FormData();
     formData.set("post_id", postId);
     formData.set("operation", operation);
@@ -2292,11 +2487,13 @@ export function TeamsChat({
     messageId: string,
     messageKind: "post" | "reply",
   ) => {
+    if (blockPreviewMutation()) return;
     setDeletionReason("");
     setPendingDeletion({ messageId, messageKind });
   };
 
   const confirmMessageDeletion = () => {
+    if (blockPreviewMutation()) return;
     if (!pendingDeletion) return;
     const formData = new FormData();
     formData.set("message_id", pendingDeletion.messageId);
@@ -2320,6 +2517,7 @@ export function TeamsChat({
   };
 
   const markActiveChannelUnread = () => {
+    if (blockPreviewMutation()) return;
     if (!activeChannel) return;
     const formData = new FormData();
     formData.set("channel_id", activeChannel.channel_id);
@@ -2339,6 +2537,7 @@ export function TeamsChat({
   };
 
   const openDirectMessagePicker = async () => {
+    if (blockPreviewMutation()) return;
     if (!allowDirectMessages) {
       setStatus("Applicant conversations must use School Messaging.");
       return;
@@ -2372,6 +2571,7 @@ export function TeamsChat({
   };
 
   const beginDirectMessage = (member: ChatMember) => {
+    if (blockPreviewMutation()) return;
     if (!allowDirectMessages || member.user_role === "applicant") {
       setDirectMessageError(
         "Applicant conversations must use School Messaging.",
@@ -2422,7 +2622,7 @@ export function TeamsChat({
 
   if (!activeChannel) {
     return (
-      <section className={`panel ${styles.emptyPanel}`}>
+      <section className={`panel ${styles.emptyPanel}`} data-writing-assist="off">
         <div className="empty-state">
           <h2>No chat channels are available.</h2>
           <p>
@@ -2435,7 +2635,7 @@ export function TeamsChat({
   }
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-writing-assist="off">
       <aside className={styles.rail}>
         <div className={styles.railHeader}>
           <div>
@@ -2576,7 +2776,17 @@ export function TeamsChat({
                   </button>
                 )}
               </div>
-              <h1>{activeChannel.channel_name}</h1>
+              <div className={styles.channelHeadingLine}>
+                <h1>{activeChannelTitle}</h1>
+                <span
+                  aria-live="polite"
+                  className={`${styles.realtimeIndicator} ${styles[`realtimeIndicator_${realtimeState}`]}`}
+                  role="status"
+                >
+                  <span aria-hidden="true" />
+                  {realtimeConnectionLabel(realtimeState)}
+                </span>
+              </div>
               <p>
                 {activeChannel.production_title && (
                   <strong>{activeChannel.production_title} · </strong>
@@ -3089,7 +3299,16 @@ export function TeamsChat({
           </div>
         ) : (
           <div className={styles.messageWorkspace}>
-            <div className={styles.messageFeed} aria-live="polite">
+            <div
+              aria-label={`Messages in ${activeChannelTitle}`}
+              className={styles.messageFeed}
+              onScroll={(event) => {
+                const nearBottom = isFeedNearBottom(event.currentTarget);
+                setShowJumpToLatest(!nearBottom);
+              }}
+              ref={feedRef}
+              role="log"
+            >
               {messages.length === 0 ? (
                 <div className={`empty-state ${styles.messageEmpty}`}>
                   <h2>No messages yet.</h2>
@@ -3274,8 +3493,18 @@ export function TeamsChat({
                   );
                 })
               )}
-              <div ref={feedEndRef} />
             </div>
+
+            {showJumpToLatest && (
+              <button
+                className={styles.jumpToLatest}
+                onClick={() => scrollToLatest()}
+                type="button"
+              >
+                <span aria-hidden="true">↓</span>
+                Jump to latest
+              </button>
+            )}
 
             {canPostToActiveChannel ? (
             <form className={styles.messageComposer} onSubmit={submitMessage}>
@@ -3312,27 +3541,35 @@ export function TeamsChat({
                   </div>
                 </>
               )}
-              <MentionTextarea
-                id="channel-message"
-                members={members}
-                name="body"
-                placeholder={
-                  replyingTo
-                    ? `Reply to ${replyingTo.authorName}`
-                    : `Message ${activeChannel.channel_name}`
-                }
-                rows={2}
-                submitOnEnter
-              />
-              <div className={styles.composerFooter}>
-                <div><ChatFilePicker key={`message-files-${attachmentPickerVersion}`} /><span>{activeChannel.visibility_label}</span></div>
-                <button
-                  className="button button-dark"
-                  disabled={isPending}
-                  type="submit"
-                >
-                  {isPending ? "Sending…" : replyingTo ? "Reply" : "Send"}
-                </button>
+              <div className={styles.composerSurface}>
+                <MentionTextarea
+                  autoResize
+                  className={styles.composerTextarea}
+                  id="channel-message"
+                  members={members}
+                  name="body"
+                  placeholder={
+                    replyingTo
+                      ? `Reply to ${replyingTo.authorName}`
+                      : `Message ${activeChannelTitle}`
+                  }
+                  rows={2}
+                  submitOnEnter
+                />
+                <div className={styles.composerFooter}>
+                  <div>
+                    <ChatFilePicker key={`message-files-${attachmentPickerVersion}`} />
+                    <span>{activeChannel.visibility_label}</span>
+                  </div>
+                  <button
+                    aria-label={replyingTo ? "Send reply" : "Send message"}
+                    className={styles.sendButton}
+                    disabled={isPending}
+                    type="submit"
+                  >
+                    {isPending ? "…" : <span aria-hidden="true">↑</span>}
+                  </button>
+                </div>
               </div>
             </form>
             ) : (
@@ -3344,63 +3581,6 @@ export function TeamsChat({
           </div>
         )}
       </section>
-
-      <aside className={styles.peopleRail} aria-label="Conversation details">
-        <section className={styles.aboutChannel}>
-          <span className={styles.aboutChannelIcon} aria-hidden="true">
-            {channelIcon(activeChannel.channel_type)}
-          </span>
-          <div>
-            <span className="eyebrow">About this group</span>
-            <h2>{activeChannel.channel_name}</h2>
-            <p>{activeChannel.channel_description ?? activeChannel.visibility_label}</p>
-          </div>
-          <span className={styles.peopleVisibility}>{activeChannel.visibility_label}</span>
-        </section>
-
-        {canSeeActiveChannelMembers && (
-        <section className={styles.peopleSection}>
-          <div className={styles.peopleHeading}>
-            <div>
-              <span className="eyebrow">People</span>
-              <h2>{members.length} in this chat</h2>
-            </div>
-            <button onClick={openMemberDirectory} type="button">See all</button>
-          </div>
-
-          <div className={styles.peopleList}>
-            {members.slice(0, 12).map((member) => (
-              <div className={styles.peopleRow} key={member.user_id}>
-                <span className={styles.peopleAvatar} aria-hidden="true">
-                  {initials(member.display_name)}
-                </span>
-                <span className={styles.peopleIdentity}>
-                  <strong>{member.display_name}</strong>
-                  <small>{roleName(member.user_role)}</small>
-                </span>
-                {member.user_id === profile.id ? (
-                  <span className={styles.peopleYou}>You</span>
-                ) : allowDirectMessages && member.user_role !== "applicant" ? (
-                  <button
-                    aria-label={`Message ${member.display_name}`}
-                    disabled={isPending}
-                    onClick={() => beginDirectMessage(member)}
-                    type="button"
-                  >
-                    ✉
-                  </button>
-                ) : (
-                  <span className={styles.peopleYou}>Channel only</span>
-                )}
-              </div>
-            ))}
-            {members.length === 0 && (
-              <p className={styles.peopleEmpty}>No member list is available.</p>
-            )}
-          </div>
-        </section>
-        )}
-      </aside>
 
       {showMembers && canSeeActiveChannelMembers && (
         <MemberDirectoryDialog
@@ -3458,7 +3638,9 @@ export function TeamsChat({
           aria-labelledby="broadcast-title"
           aria-modal="true"
           className={styles.modalBackdrop}
+          ref={broadcastDialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <form className={styles.broadcastModal} onSubmit={submitBroadcast}>
             <div className={styles.broadcastModalHeader}>

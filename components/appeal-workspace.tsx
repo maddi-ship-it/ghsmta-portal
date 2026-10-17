@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -212,7 +212,7 @@ export function AppealWorkspace({
       {(message || error) && <div className={error ? "form-error page-message" : "notice-banner success-banner page-message"}>{error ?? message}</div>}
 
       <section className="panel"><div className="panel-header"><div><h2>{profile.role === "applicant" ? "My eligibility appeals" : "Eligibility appeal review queue"}</h2><p>{appeals.length} appeal{appeals.length === 1 ? "" : "s"}</p></div></div><div className="appeal-list">
-        {appeals.length === 0 ? <div className="empty-state"><h3>No category eligibility appeals</h3><p>Submitted appeals will appear here.</p></div> : appeals.map((appeal) => { const application = applicationMap.get(appeal.application_id); const appealFiles = files.filter((file) => file.context_id === appeal.id); const expanded = openAppeal === appeal.id; return <article className="appeal-card" key={appeal.id}><button className="appeal-card-summary" onClick={() => setOpenAppeal(expanded ? null : appeal.id)} type="button"><span><strong>{application?.school_name ?? "School"}</strong><small>{categoryMap.get(appeal.category_id ?? "") ?? "Category"} · {formatDate(appeal.submitted_at)}</small></span><span className={`badge badge-${appeal.status}`}>{statusLabel(appeal.status)}</span></button>{expanded && <div className="appeal-card-body"><div className="eligibility-appeal-summary"><span><small>Current determination</small><strong>{appeal.current_eligibility ? "Eligible" : "Not eligible"}</strong></span><span><small>Requested determination</small><strong>Eligible</strong></span></div><div className="appeal-explanation"><strong>School explanation</strong><p>{appeal.explanation}</p></div>{appealFiles.length > 0 && <div className="appeal-file-list"><strong>Supporting files</strong>{appealFiles.map((file) => <button className="button button-secondary button-compact" key={file.id} onClick={() => void openFile(file)} type="button">{file.generated_name}</button>)}</div>}{profile.role === "applicant" ? <div className="appeal-resolution-view">{appeal.resolution ? <><strong>Final eligibility decision</strong><p>{appeal.resolution}</p></> : <p>GHSMTA is reviewing this category eligibility appeal.</p>}</div> : <EligibilityReviewForm appeal={appeal} isOwner={profile.role === "owner"} />}</div>}</article>; })}
+        {appeals.length === 0 ? <div className="empty-state"><h3>No category eligibility appeals</h3><p>Submitted appeals will appear here.</p></div> : appeals.map((appeal) => { const application = applicationMap.get(appeal.application_id); const appealFiles = files.filter((file) => file.context_id === appeal.id); const expanded = openAppeal === appeal.id; return <article className="appeal-card" key={appeal.id}><button className="appeal-card-summary" onClick={() => setOpenAppeal(expanded ? null : appeal.id)} type="button"><span><strong>{application?.school_name ?? "School"}</strong><small>{categoryMap.get(appeal.category_id ?? "") ?? "Category"} · {formatDate(appeal.submitted_at)}</small></span><span className={`badge badge-${appeal.status}`}>{appeal.status === "resolved" ? "Approved" : statusLabel(appeal.status)}</span></button>{expanded && <div className="appeal-card-body"><div className="eligibility-appeal-summary"><span><small>Current determination</small><strong>{appeal.current_eligibility ? "Eligible" : "Not eligible"}</strong></span><span><small>Requested determination</small><strong>Eligible</strong></span></div><div className="appeal-explanation"><strong>School explanation</strong><p>{appeal.explanation}</p></div>{appealFiles.length > 0 && <div className="appeal-file-list"><strong>Supporting files</strong>{appealFiles.map((file) => <button className="button button-secondary button-compact" key={file.id} onClick={() => void openFile(file)} type="button">{file.generated_name}</button>)}</div>}{profile.role === "applicant" ? <div className="appeal-resolution-view">{appeal.resolution ? <><strong>Final eligibility decision</strong><p>{appeal.resolution}</p></> : <p>GHSMTA is reviewing this category eligibility appeal.</p>}</div> : <EligibilityReviewForm appeal={appeal} isOwner={profile.role === "owner"} onError={(errorMessage) => { setMessage(null); setError(errorMessage); }} onSaved={(successMessage) => { setOpenAppeal(null); setError(null); setMessage(successMessage); router.refresh(); }} />}</div>}</article>; })}
       </div></section>
 
       {(profile.role === "applicant" || profile.role === "owner") && (
@@ -224,8 +224,128 @@ export function AppealWorkspace({
   );
 }
 
-function EligibilityReviewForm({ appeal, isOwner }: { appeal: Appeal; isOwner: boolean }) {
-  return <form action={reviewEligibilityAppeal.bind(null, appeal.id)} className="form-stack appeal-review-form"><div className="field"><label>Status</label><select className="select" name="status" defaultValue={appeal.status}><option value="submitted">Submitted</option><option value="advisory_review">Advisory review</option><option value="owner_review">Owner review</option>{isOwner && <><option value="resolved">Approved — mark eligible</option><option value="denied">Denied</option></>}</select></div><div className="field"><label>Advisory Committee notes</label><textarea className="textarea" name="advisory_notes" defaultValue={appeal.advisory_notes ?? ""} rows={4} /></div>{isOwner && <><div className="field"><label>Owner notes</label><textarea className="textarea" name="owner_notes" defaultValue={appeal.owner_notes ?? ""} rows={4} /></div><div className="field"><label>School-facing final decision</label><textarea className="textarea" name="resolution" defaultValue={appeal.resolution ?? ""} rows={5} required /></div></>}<button className="button button-gold" type="submit">Save eligibility review</button></form>;
+function EligibilityReviewForm({
+  appeal,
+  isOwner,
+  onError,
+  onSaved,
+}: {
+  appeal: Appeal;
+  isOwner: boolean;
+  onError: (message: string) => void;
+  onSaved: (message: string) => void;
+}) {
+  const [saving, startTransition] = useTransition();
+  const closed = appeal.status === "resolved" || appeal.status === "denied";
+
+  if (closed) {
+    return (
+      <div className="appeal-resolution-view">
+        <strong>
+          Final decision: {appeal.status === "resolved" ? "Approved" : "Denied"}
+        </strong>
+        {appeal.resolution ? <p>{appeal.resolution}</p> : null}
+        <small>
+          Closed {appeal.resolved_at ? formatDate(appeal.resolved_at) : "after Owner review"}
+        </small>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="form-stack appeal-review-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        startTransition(async () => {
+          try {
+            const result = await reviewEligibilityAppeal(appeal.id, formData);
+            if (!result.ok) {
+              onError(result.error ?? "The appeal review could not be saved.");
+              return;
+            }
+            onSaved(result.message ?? "Eligibility appeal review saved.");
+          } catch (error) {
+            onError(
+              error instanceof Error
+                ? error.message
+                : "The appeal review could not be saved.",
+            );
+          }
+        });
+      }}
+    >
+      {isOwner ? (
+        <div className="field">
+          <label htmlFor={`appeal-decision-${appeal.id}`}>Final decision</label>
+          <select
+            className="select"
+            defaultValue=""
+            id={`appeal-decision-${appeal.id}`}
+            name="decision"
+            required
+          >
+            <option disabled value="">Choose Approved or Denied</option>
+            <option value="approved">Approved</option>
+            <option value="denied">Denied</option>
+          </select>
+          <small>
+            Saving closes the appeal and sends the decision to the school,
+            Advisory Committee, and assigned panel.
+          </small>
+        </div>
+      ) : (
+        <div className="field">
+          <label htmlFor={`appeal-status-${appeal.id}`}>Review status</label>
+          <select
+            className="select"
+            defaultValue={appeal.status}
+            id={`appeal-status-${appeal.id}`}
+            name="status"
+          >
+            <option value="submitted">Submitted</option>
+            <option value="advisory_review">Advisory review</option>
+            <option value="owner_review">Ready for Owner decision</option>
+          </select>
+        </div>
+      )}
+
+      <div className="field">
+        <label htmlFor={`appeal-advisory-notes-${appeal.id}`}>
+          Advisory Committee notes
+        </label>
+        <textarea
+          className="textarea"
+          defaultValue={appeal.advisory_notes ?? ""}
+          id={`appeal-advisory-notes-${appeal.id}`}
+          name="advisory_notes"
+          rows={4}
+        />
+      </div>
+
+      {isOwner ? (
+        <div className="field">
+          <label htmlFor={`appeal-owner-notes-${appeal.id}`}>Owner notes</label>
+          <textarea
+            className="textarea"
+            defaultValue={appeal.owner_notes ?? ""}
+            id={`appeal-owner-notes-${appeal.id}`}
+            name="owner_notes"
+            rows={4}
+          />
+        </div>
+      ) : null}
+
+      <button className="button button-gold" disabled={saving} type="submit">
+        {saving
+          ? "Saving…"
+          : isOwner
+            ? "Save decision & notify channels"
+            : "Save eligibility review"}
+      </button>
+    </form>
+  );
 }
 
 function ScholarshipReviewForm({ request }: { request: ScholarshipRequest }) {

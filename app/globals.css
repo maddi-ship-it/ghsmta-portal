@@ -795,14 +795,6 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 .panelist-card { display: grid; gap: 12px; align-content: start; padding: 16px; border: 1px solid var(--line); border-radius: 14px; }
 .panelist-card strong, .panelist-card small { display: block; }
 .panelist-card small { margin-top: 5px; color: var(--muted); }
-.category-average { flex: 0 0 auto; display: grid; min-width: 120px; justify-items: end; }
-.category-average span { color: var(--muted); font-size: .76rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
-.category-average strong { color: var(--navy-800); font-family: Georgia, serif; font-size: 2.5rem; }
-.category-average-group { display: flex; align-items: stretch; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
-.category-person-averages { display: flex; align-items: stretch; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-.category-person-average { display: grid; min-width: 92px; align-content: center; gap: 3px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--paper) 86%, transparent); }
-.category-person-average small { overflow: hidden; max-width: 145px; color: var(--muted); font-size: .72rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.category-person-average strong { color: var(--navy-800); font-family: Georgia, serif; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
 .panel-review-category-subject { margin: 6px 0 0; color: var(--navy-800); font-size: .93rem; }
 .panel-review-category-subject strong { color: inherit; }
 .criterion-score-table .data-table th:not(:first-child),
@@ -930,7 +922,6 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
   .criterion-list { margin-inline: -22px; }
   .panel-feedback-heading { flex-direction: column; }
   .panel-feedback-heading .button { width: 100%; }
-  .category-average { justify-items: start; }
   .scoring-category-header { flex-direction: column; }
   .criterion-score-table .data-table td:first-child { min-width: 280px; }
 }
@@ -1960,6 +1951,21 @@ html[data-theme="light"] .notification-popover-row.is-unread {
   font-size: .65rem;
   font-weight: 700;
   text-transform: capitalize;
+}
+.criterion-header-name { display: block; }
+.criterion-header-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 4px;
+}
+.criterion-score-table th .criterion-header-summary small { margin-top: 0; }
+.criterion-header-summary strong {
+  color: var(--navy-800);
+  font-family: Georgia, serif;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
 }
 .text-button {
   padding: 0;
@@ -5473,6 +5479,7 @@ body.modal-open {
 .appeal-file-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
 .appeal-file-list > strong { width: 100%; }
 .appeal-review-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.appeal-resolution-view p { white-space: pre-line; }
 
 .notification-row {
   display: grid;
@@ -15328,10 +15335,6 @@ html[data-theme="dark"] .public-home-role-marker {
 }
 
 @media (max-width: 720px) {
-  .category-average-group,
-  .category-person-averages { width: 100%; justify-content: flex-start; }
-  .category-person-average { min-width: min(132px, 100%); flex: 1 1 120px; }
-  .category-average { justify-items: start; }
   .report-overview-grid,
   .report-filter-grid,
   .report-advanced-filter-grid,

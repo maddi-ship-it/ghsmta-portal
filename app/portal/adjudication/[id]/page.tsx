@@ -1126,6 +1126,26 @@ export default async function AdjudicationApplicationPage({
                 applicationId={id}
                 disabled={readOnly}
               />
+              {canComment ? (
+                <>
+                  <AdjudicationBrainDump
+                    applicationId={id}
+                    canComment
+                    defaultValue={ownScorecard?.internal_notes}
+                    fieldName="scorecard_internal_notes"
+                    readOnly={readOnly}
+                    title="INITIAL BRAIN DUMP (INTERMISSION)"
+                  />
+                  <AdjudicationBrainDump
+                    applicationId={id}
+                    canComment
+                    defaultValue={ownScorecard?.post_show_notes}
+                    fieldName="scorecard_post_show_notes"
+                    readOnly={readOnly}
+                    title="INITIAL BRAIN DUMP (POST SHOW)"
+                  />
+                </>
+              ) : null}
               {narrativeCategories.map((category) => {
                 const proposal = proposalByCategoryId.get(category.id);
 
