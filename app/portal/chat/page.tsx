@@ -360,17 +360,7 @@ export default async function ChatPage({
   }
 
   return (
-    <>
-      <div className="page-heading chat-page-heading chat-page-heading-compact">
-        <div>
-          <span className="eyebrow">Communication center</span>
-          <h1>Messages</h1>
-          <p>
-            Channels, direct messages, and school conversations in one place.
-          </p>
-        </div>
-      </div>
-
+    <div className="chat-fullscreen-page">
       <TeamsChat
         adjudicationVisitDetails={adjudicationVisitDetails}
         key={selectedChannel?.channel_id ?? "no-channel"}
@@ -381,6 +371,6 @@ export default async function ChatPage({
         profile={profile}
         selectedChannelId={selectedChannel?.channel_id ?? null}
       />
-    </>
+    </div>
   );
 }

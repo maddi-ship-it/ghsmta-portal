@@ -4200,8 +4200,10 @@
 
 /* Refined messaging workspace: compact chrome and a focused reading column. */
 .shell {
+  width: 100%;
   grid-template-columns: minmax(278px, 316px) minmax(0, 1fr);
-  height: clamp(620px, calc(100dvh - 205px), 860px);
+  height: 100%;
+  min-height: 0;
   border-color: var(--portal-line-strong);
   border-radius: 18px;
   box-shadow: 0 22px 64px rgba(0, 0, 0, 0.24);
@@ -4405,7 +4407,7 @@
 
 @media (max-width: 860px) {
   .shell {
-    height: min(760px, calc(100dvh - 160px));
+    height: 100%;
   }
 
   .messageFeedInner {
