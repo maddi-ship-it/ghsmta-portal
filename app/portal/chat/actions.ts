@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
 import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
+import { isOwnerChatSection } from "@/lib/chat-owner-sections";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -85,6 +86,7 @@ export async function createOwnerChatChannel(
   const owner = await requireProfile(["owner"]);
   const name = formText(formData, "channel_name");
   const description = formText(formData, "channel_description");
+  const sidebarSection = formText(formData, "sidebar_section");
   const selectedUserIds = [
     ...new Set(
       formData
@@ -105,6 +107,9 @@ export async function createOwnerChatChannel(
   }
   if (selectedUserIds.length === 0) {
     return { ok: false, error: "Choose at least one channel member." };
+  }
+  if (!isOwnerChatSection(sidebarSection)) {
+    return { ok: false, error: "Choose where this channel should appear." };
   }
 
   const admin = createAdminClient();
@@ -130,6 +135,7 @@ export async function createOwnerChatChannel(
       name,
       description:
         description || "Private Owner-created portal conversation.",
+      sidebar_section: sidebarSection,
       active: true,
       created_by: owner.id,
     })

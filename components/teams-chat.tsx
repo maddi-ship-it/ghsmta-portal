@@ -32,6 +32,7 @@ import {
   ADJUDICATOR_CHANNELS_LABEL,
   SCHOOL_COMMUNITY_CHAT_LABEL,
 } from "@/lib/chat-terminology";
+import { OWNER_CHAT_SECTIONS } from "@/lib/chat-owner-sections";
 import {
   isFeedNearBottom,
   messagesBelongTogether,
@@ -784,6 +785,26 @@ function OwnerChannelDialog({
           />
         </div>
         <div className="field">
+          <label htmlFor="owner-channel-section">Sidebar header</label>
+          <select
+            className="select"
+            defaultValue="direct_messages"
+            id="owner-channel-section"
+            name="sidebar_section"
+            required
+          >
+            {OWNER_CHAT_SECTIONS.map((section) => (
+              <option key={section.value} value={section.value}>
+                {section.label} — {section.description}
+              </option>
+            ))}
+          </select>
+          <small>
+            This controls where the channel appears. Only the members you choose
+            below can open it.
+          </small>
+        </div>
+        <div className="field">
           <label htmlFor="owner-channel-member-search">Members</label>
           <input
             className={`input ${styles.memberSearch}`}
@@ -1354,6 +1375,7 @@ function ChannelNavigation({
   const activeSchoolGroup = schoolGroups.find((group) =>
     group.channels.some((channel) => channel.channel_id === selectedChannelId),
   );
+  const [schoolsOpen, setSchoolsOpen] = useState(Boolean(activeSchoolGroup));
   const prioritizedSchoolKeys = new Set<string>();
 
   if (activeSchoolGroup) prioritizedSchoolKeys.add(activeSchoolGroup.key);
@@ -1372,6 +1394,11 @@ function ChannelNavigation({
   const visibleSchoolGroups = schoolListExpanded
     ? schoolGroups
     : schoolGroups.filter((group) => prioritizedSchoolKeys.has(group.key));
+  const schoolUnreadCount = schoolGroups.reduce(
+    (sum, group) => sum + group.unreadCount,
+    0,
+  );
+  const schoolSectionExpanded = expandSchoolList || schoolsOpen;
 
   if (groups.length === 0) {
     return (
@@ -1385,7 +1412,10 @@ function ChannelNavigation({
     <nav className={styles.channelList} aria-label="Chat channels">
       {standardGroups.map((group) => (
         <StandardChannelGroupNavigation
-          collapsible={group.channels.some(isDirectMessageConversation)}
+          collapsible={
+            group.key === "owner_direct_messages" ||
+            group.key === "direct_messages"
+          }
           forceOpen={expandSchoolList}
           group={group}
           key={group.key}
@@ -1395,62 +1425,69 @@ function ChannelNavigation({
 
       {schoolGroups.length > 0 && (
         <section className={styles.channelGroup}>
-          <div className={styles.channelGroupHeading}>
+          <button
+            aria-expanded={schoolSectionExpanded}
+            className={styles.channelGroupDisclosure}
+            onClick={() => setSchoolsOpen((current) => !current)}
+            type="button"
+          >
+            <span className={styles.channelGroupDisclosureIcon} aria-hidden="true">
+              {schoolSectionExpanded ? "−" : "+"}
+            </span>
             <h3>{schoolSectionLabel}</h3>
-            {schoolGroups.some((group) => group.unreadCount > 0) && (
-              <span>
-                {formatUnreadCount(
-                  schoolGroups.reduce(
-                    (sum, group) => sum + group.unreadCount,
-                    0,
-                  ),
-                )}
+            {schoolUnreadCount > 0 && (
+              <span className={styles.channelGroupDisclosureUnread}>
+                {formatUnreadCount(schoolUnreadCount)}
               </span>
             )}
-          </div>
+          </button>
 
-          {flattenSchoolGroups ? (
-            <div className={styles.channelGroupItems}>
-              {visibleSchoolGroups.flatMap((group) =>
-                group.channels.map((channel) => (
-                  <ChannelNavigationLink
-                    channel={channel}
-                    groupedBySchool
-                    key={channel.channel_id}
-                    navigationLabel={
-                      channel.channel_type === "school_dm"
-                        ? "Messaging"
-                        : schoolChannelLabel(channel)
-                    }
-                    selectedChannelId={selectedChannelId}
-                  />
-                )),
+          {schoolSectionExpanded && (
+            <>
+              {flattenSchoolGroups ? (
+                <div className={styles.channelGroupItems}>
+                  {visibleSchoolGroups.flatMap((group) =>
+                    group.channels.map((channel) => (
+                      <ChannelNavigationLink
+                        channel={channel}
+                        groupedBySchool
+                        key={channel.channel_id}
+                        navigationLabel={
+                          channel.channel_type === "school_dm"
+                            ? "Messaging"
+                            : schoolChannelLabel(channel)
+                        }
+                        selectedChannelId={selectedChannelId}
+                      />
+                    )),
+                  )}
+                </div>
+              ) : (
+                <div className={styles.schoolGroupList}>
+                  {visibleSchoolGroups.map((group) => (
+                    <SchoolConversationNavigation
+                      defaultOpen={defaultOpenSchoolGroups}
+                      group={group}
+                      key={group.key}
+                      selectedChannelId={selectedChannelId}
+                    />
+                  ))}
+                </div>
               )}
-            </div>
-          ) : (
-            <div className={styles.schoolGroupList}>
-              {visibleSchoolGroups.map((group) => (
-                <SchoolConversationNavigation
-                  defaultOpen={defaultOpenSchoolGroups}
-                  group={group}
-                  key={group.key}
-                  selectedChannelId={selectedChannelId}
-                />
-              ))}
-            </div>
-          )}
 
-          {!expandSchoolList && schoolGroups.length > 10 && (
-            <button
-              aria-expanded={showAllSchools}
-              className={styles.schoolListToggle}
-              onClick={() => setShowAllSchools((current) => !current)}
-              type="button"
-            >
-              {showAllSchools
-                ? "Show active, unread & recent schools"
-                : `Show all ${schoolGroups.length} schools`}
-            </button>
+              {!expandSchoolList && schoolGroups.length > 10 && (
+                <button
+                  aria-expanded={showAllSchools}
+                  className={styles.schoolListToggle}
+                  onClick={() => setShowAllSchools((current) => !current)}
+                  type="button"
+                >
+                  {showAllSchools
+                    ? "Show active, unread & recent schools"
+                    : `Show all ${schoolGroups.length} schools`}
+                </button>
+              )}
+            </>
           )}
         </section>
       )}
@@ -1526,13 +1563,6 @@ function schoolGroupActivity(group: SchoolConversationGroup) {
 
 function isSchoolConversation(channel: ChatChannel) {
   return channel.channel_type === "school" || channel.channel_type === "school_dm";
-}
-
-function isDirectMessageConversation(channel: ChatChannel) {
-  return (
-    channel.channel_type === "direct_message" ||
-    channel.channel_type === "group_direct_message"
-  );
 }
 
 function formatUnreadCount(count: number) {
