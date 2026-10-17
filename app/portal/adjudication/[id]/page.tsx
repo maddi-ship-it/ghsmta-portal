@@ -845,6 +845,7 @@ export default async function AdjudicationApplicationPage({
           : undefined
       }
       categories={scoreableCategories}
+      categorySubjectDefaults={categorySubjectDefaults}
       criteria={scoreableCriteria}
       assignments={assignments}
       profiles={adjudicatorProfiles}
@@ -1009,7 +1010,17 @@ export default async function AdjudicationApplicationPage({
             applicationId={id}
             canComment={canComment}
             defaultValue={ownScorecard?.internal_notes}
+            fieldName="scorecard_internal_notes"
             readOnly={readOnly}
+            title="INITIAL BRAIN DUMP (INTERMISSION)"
+          />
+          <AdjudicationBrainDump
+            applicationId={id}
+            canComment={canComment}
+            defaultValue={ownScorecard?.post_show_notes}
+            fieldName="scorecard_post_show_notes"
+            readOnly={readOnly}
+            title="INITIAL BRAIN DUMP (POST SHOW)"
           />
           <section className="panel score-guide-panel">
             <div className="panel-header"><div><h2>Scoring guide</h2><p>Use the 1–10 scale in 0.25-point increments. Scores remain private to you, advisory members, and owners.</p></div></div>

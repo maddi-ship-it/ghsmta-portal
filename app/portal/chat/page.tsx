@@ -12,6 +12,7 @@ import {
   chatChannelGroupLabel,
 } from "@/lib/chat-terminology";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type RawChannel = Partial<ChatChannel> & {
   channel_id: string;
@@ -182,6 +183,29 @@ export default async function ChatPage({
   const profile = await requireProfile();
   const supabase = await createClient();
   const params = await searchParams;
+  let ownerChannelCandidates: ChatMember[] = [];
+
+  if (profile.role === "owner") {
+    const admin = createAdminClient();
+    const { data: candidateProfiles, error: candidateError } = await admin
+      .from("profiles")
+      .select("id,email,full_name,role")
+      .eq("active", true)
+      .neq("id", profile.id)
+      .neq("role", "applicant")
+      .order("full_name");
+
+    if (candidateError) {
+      throw new Error(`Channel members could not be loaded: ${candidateError.message}`);
+    }
+
+    ownerChannelCandidates = (candidateProfiles ?? []).map((candidate) => ({
+      user_id: candidate.id,
+      display_name:
+        candidate.full_name?.trim() || candidate.email || "Portal user",
+      user_role: candidate.role,
+    }));
+  }
 
   const personalizedChannelResult = await supabase.rpc("get_my_chat_channels_v4");
   let channelRows = personalizedChannelResult.data as RawChannel[] | null;
@@ -354,6 +378,7 @@ export default async function ChatPage({
         initialChannels={channels}
         initialMembers={members}
         initialThreads={threads}
+        ownerChannelCandidates={ownerChannelCandidates}
         profile={profile}
         selectedChannelId={selectedChannel?.channel_id ?? null}
       />

@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-review";
 import {
+  completedNarrativeAssignmentsNow,
+  narrativeAssignmentAnnouncement,
+} from "@/lib/adjudication-narrative-assignments";
+import {
   isValidTwoPointRange,
   twoPointRangeFromStart,
 } from "@/lib/adjudication-ranges";
@@ -234,11 +238,13 @@ async function savePanelNarrativeAssignments({
   applicationId,
   actorId,
   categoryIds,
+  announcementCategoryIds,
   formData,
 }: {
   applicationId: string;
   actorId: string;
   categoryIds: string[];
+  announcementCategoryIds: string[];
   formData: FormData;
 }) {
   const assignments = categoryIds.map((categoryId) => ({
@@ -248,7 +254,7 @@ async function savePanelNarrativeAssignments({
   const admin = createAdminClient();
   const { data: application, error: applicationError } = await admin
     .from("applications")
-    .select("form_version_id")
+    .select("form_version_id,school_name,production_title")
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -321,7 +327,7 @@ async function savePanelNarrativeAssignments({
     selectedReviewerIds.length > 0
       ? await admin
           .from("profiles")
-          .select("id,active,role")
+          .select("id,email,full_name,active,role")
           .in("id", selectedReviewerIds)
       : { data: [], error: null };
 
@@ -401,6 +407,73 @@ async function savePanelNarrativeAssignments({
         actorId,
         message: notificationError.message,
       });
+    }
+  }
+
+  if (
+    changedAssignments.length > 0 &&
+    completedNarrativeAssignmentsNow({
+      categoryIds: announcementCategoryIds,
+      previousAssignments: categoryIds.map((categoryId) => ({
+        categoryId,
+        assignedTo:
+          feedbackByCategory.get(categoryId)?.assigned_to ?? null,
+      })),
+      nextAssignments: assignments,
+    })
+  ) {
+    const reviewerById = new Map(
+      (reviewerProfiles ?? []).map((reviewer) => [reviewer.id, reviewer]),
+    );
+    const announcementCategoryIdSet = new Set(announcementCategoryIds);
+    const announcementAssignments = assignments
+      .filter((assignment) =>
+        announcementCategoryIdSet.has(assignment.categoryId),
+      )
+      .map((assignment) => {
+        const reviewer = assignment.assignedTo
+          ? reviewerById.get(assignment.assignedTo)
+          : null;
+        const reviewerName =
+          reviewer?.full_name?.trim() || reviewer?.email || "Panel member";
+        const categoryTitle =
+          categoryById.get(assignment.categoryId)?.title ?? "Category";
+        return { categoryTitle, reviewerName };
+      });
+    const { data: panelChannel, error: panelChannelError } = await admin
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", applicationId)
+      .eq("channel_type", "school")
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (panelChannelError) {
+      logEvent("warn", "adjudication.assignment_chat_channel_lookup_failed", {
+        applicationId,
+        actorId,
+        message: panelChannelError.message,
+      });
+    } else if (panelChannel) {
+      const { error: announcementError } = await admin.from("chat_posts").insert({
+        channel_id: panelChannel.id,
+        author_id: actorId,
+        subject: "Final comment assignments",
+        body: narrativeAssignmentAnnouncement({
+          schoolName: application.school_name,
+          productionTitle: application.production_title,
+          assignments: announcementAssignments,
+        }),
+      });
+
+      if (announcementError) {
+        logEvent("warn", "adjudication.assignment_chat_announcement_failed", {
+          applicationId,
+          actorId,
+          message: announcementError.message,
+        });
+      }
     }
   }
 
@@ -656,6 +729,9 @@ export async function saveAllCategoryProposals(
         applicationId,
         actorId: profile.id,
         categoryIds,
+        announcementCategoryIds: scoreabilityDecisions
+          .filter((decision) => decision.is_scoreable)
+          .map((decision) => decision.category_id),
         formData,
       });
     } catch (assignmentError) {

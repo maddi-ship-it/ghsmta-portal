@@ -286,6 +286,7 @@ export type AdjudicationScorecard = {
   submitted_at: string | null;
   reopened_at: string | null;
   internal_notes: string | null;
+  post_show_notes: string | null;
   created_at: string;
   updated_at: string;
 };

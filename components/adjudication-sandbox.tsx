@@ -251,6 +251,7 @@ function createPanelSampleData(
       submitted_at: index < 3 ? SAMPLE_TIMESTAMP : null,
       reopened_at: null,
       internal_notes: null,
+      post_show_notes: null,
       created_at: SAMPLE_TIMESTAMP,
       updated_at: SAMPLE_TIMESTAMP,
     }),
@@ -763,8 +764,19 @@ export function AdjudicationSandbox({
                 applicationId={SANDBOX_APPLICATION_ID}
                 canComment
                 defaultValue=""
+                fieldName="scorecard_internal_notes"
                 practiceMode
                 readOnly={practiceSubmitted}
+                title="INITIAL BRAIN DUMP (INTERMISSION)"
+              />
+              <AdjudicationBrainDump
+                applicationId={SANDBOX_APPLICATION_ID}
+                canComment
+                defaultValue=""
+                fieldName="scorecard_post_show_notes"
+                practiceMode
+                readOnly={practiceSubmitted}
+                title="INITIAL BRAIN DUMP (POST SHOW)"
               />
               <SandboxScoringGuide scale={scale} />
               <CollaborativeAdjudicatorScorecard
@@ -835,6 +847,7 @@ export function AdjudicationSandbox({
               applicationId={SANDBOX_APPLICATION_ID}
               assignments={panelData.assignments}
               categories={scoreableCategories}
+              categorySubjectDefaults={categorySubjectDefaults}
               criteria={scoreableCriteria}
               initialComments={panelData.comments}
               initialFeedback={[]}

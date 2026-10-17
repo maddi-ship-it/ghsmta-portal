@@ -9,6 +9,7 @@ import {
   savePanelFeedback,
 } from "@/app/portal/adjudication/[id]/actions";
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
+import { AdjudicationBigPictureComment } from "@/components/adjudication-overall-production";
 import { OwnerCommentReviewModal } from "@/components/owner-comment-review-modal";
 import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
@@ -284,6 +285,21 @@ function categoryAverage(
   if (values.length === 0) return null;
   return roundScoreAverage(
     values.reduce((sum, value) => sum + value, 0) / values.length,
+  );
+}
+
+function scorecardCategoryAverage(
+  categoryId: string,
+  scorecardId: string | null,
+  criteria: ScoringCriterion[],
+  scores: AdjudicationScore[],
+) {
+  if (!scorecardId) return null;
+  return categoryAverage(
+    categoryId,
+    criteria,
+    [{ id: scorecardId } as AdjudicationScorecard],
+    scores,
   );
 }
 
@@ -620,6 +636,7 @@ export function OwnerLiveAdjudicationReview({
   initialComments,
   initialFeedback,
   productionTitle,
+  categorySubjectDefaults,
   practiceMode = false,
   release,
 }: {
@@ -636,6 +653,7 @@ export function OwnerLiveAdjudicationReview({
   initialComments: AdjudicationCategoryComment[];
   initialFeedback: AdjudicationPanelFeedback[];
   productionTitle: string;
+  categorySubjectDefaults: Record<string, string>;
   practiceMode?: boolean;
   release: AdjudicationRelease | null;
 }) {
@@ -669,6 +687,24 @@ export function OwnerLiveAdjudicationReview({
         scorecard: scorecardByAssignmentId.get(assignment.id) ?? null,
       })),
     [assignments, scorecardByAssignmentId],
+  );
+  const ownAdvisoryScorecard = useMemo(
+    () =>
+      panelRoster.find(
+        ({ assignment }) =>
+          assignment.adjudicator_user_id ===
+          advisoryScoreEntry?.currentUserId,
+      )?.scorecard ?? null,
+    [advisoryScoreEntry?.currentUserId, panelRoster],
+  );
+  const ownAdvisoryScores = useMemo(
+    () =>
+      ownAdvisoryScorecard
+        ? scores.filter(
+            (score) => score.scorecard_id === ownAdvisoryScorecard.id,
+          )
+        : [],
+    [ownAdvisoryScorecard, scores],
   );
   const visibleScorecards = useMemo(
     () =>
@@ -1050,6 +1086,28 @@ export function OwnerLiveAdjudicationReview({
         );
         const isOverallProductionCategory =
           category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
+        const subjectName = category.subject_label
+          ? categorySubjectDefaults[category.category_key] ||
+            comments.find(
+              (comment) =>
+                comment.category_id === category.id &&
+                richTextToPlainText(comment.subject_name),
+            )?.subject_name ||
+            "Not provided"
+          : null;
+        const panelistAverages = panelRoster.map(({ assignment, scorecard }) => ({
+          id: assignment.id,
+          name:
+            profileMap.get(assignment.adjudicator_user_id)?.full_name ??
+            profileMap.get(assignment.adjudicator_user_id)?.email ??
+            "Panelist",
+          average: scorecardCategoryAverage(
+            category.id,
+            scorecard?.id ?? null,
+            criteria,
+            scores,
+          ),
+        }));
         const categoryComments = comments.filter(
           (comment) =>
             comment.category_id === category.id &&
@@ -1073,11 +1131,26 @@ export function OwnerLiveAdjudicationReview({
               <div>
                 <span className="section-order">Category {categoryIndex + 1}</span>
                 <h2>{category.title}</h2>
+                {category.subject_label ? (
+                  <p className="panel-review-category-subject">
+                    <strong>{category.subject_label}:</strong> {subjectName}
+                  </p>
+                ) : null}
                 {category.guidance && <p>{category.guidance}</p>}
               </div>
-              <div className="category-average">
-                <span>Live panel average</span>
-                <strong>{formatScoreAverage(average)}</strong>
+              <div className="category-average-group" aria-label={`${category.title} averages`}>
+                <div className="category-person-averages">
+                  {panelistAverages.map((panelist) => (
+                    <span className="category-person-average" key={panelist.id}>
+                      <small>{panelist.name}</small>
+                      <strong>{formatScoreAverage(panelist.average)}</strong>
+                    </span>
+                  ))}
+                </div>
+                <div className="category-average">
+                  <span>Full panel average</span>
+                  <strong>{formatScoreAverage(average)}</strong>
+                </div>
               </div>
             </div>
 
@@ -1205,7 +1278,8 @@ export function OwnerLiveAdjudicationReview({
                                     </select>
                                   )}
 
-                                  {advisoryScoreEntry.canComment ? (
+                                  {advisoryScoreEntry.canComment &&
+                                  !isOverallProductionCategory ? (
                                     <RichTextField
                                       defaultValue={row?.observation}
                                       disabled={advisoryScoreEntry.readOnly}
@@ -1214,7 +1288,7 @@ export function OwnerLiveAdjudicationReview({
                                       name={`observation_${criterion.id}`}
                                       placeholder="Enter observable notes for this criterion"
                                     />
-                                  ) : row?.observation ? (
+                                  ) : !isOverallProductionCategory && row?.observation ? (
                                     <div className="live-score-observation">
                                       <RichTextPreview value={row.observation} />
                                     </div>
@@ -1273,6 +1347,26 @@ export function OwnerLiveAdjudicationReview({
           </section>
         );
       })}
+
+      {advisoryScoreEntry ? (
+        <AdjudicationBigPictureComment
+          canComment={advisoryScoreEntry.canComment}
+          categories={categories}
+          criteria={criteria}
+          ownScores={ownAdvisoryScores}
+          privateNotes={comments.find((comment) => {
+            const overallCategory = categories.find(
+              (category) =>
+                category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY,
+            );
+            return (
+              comment.scorecard_id === ownAdvisoryScorecard?.id &&
+              comment.category_id === overallCategory?.id
+            );
+          })?.private_notes}
+          readOnly={advisoryScoreEntry.readOnly}
+        />
+      ) : null}
     </>
   );
 }

@@ -1393,6 +1393,17 @@
   background: var(--portal-surface-3, #192743);
 }
 
+.ownerChannelMemberRow {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  cursor: pointer;
+}
+
+.ownerChannelMemberRow > input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--portal-gold, #d5b14f);
+}
+
 .contactListRow {
   width: 100%;
   font: inherit;

@@ -16,6 +16,7 @@ import {
 
 import {
   broadcastToActiveSchoolDms,
+  createOwnerChatChannel,
   createChatMessage,
   createChatPost,
   createChatReply,
@@ -585,6 +586,127 @@ function DirectMessageDialog({
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function OwnerChannelDialog({
+  candidates,
+  error,
+  pending,
+  onClose,
+  onCreate,
+}: {
+  candidates: ChatMember[];
+  error: string | null;
+  pending: boolean;
+  onClose: () => void;
+  onCreate: (formData: FormData) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredCandidates = candidates.filter((candidate) =>
+    `${candidate.display_name} ${roleName(candidate.user_role)}`
+      .toLowerCase()
+      .includes(normalizedSearch),
+  );
+
+  return (
+    <div
+      aria-labelledby="owner-channel-title"
+      aria-modal="true"
+      className={styles.modalBackdrop}
+      role="dialog"
+    >
+      <form
+        className={`${styles.broadcastModal} ${styles.memberModal}`}
+        onSubmit={(event) => {
+          event.preventDefault();
+          onCreate(new FormData(event.currentTarget));
+        }}
+      >
+        <div className={styles.broadcastModalHeader}>
+          <div>
+            <span className="eyebrow">Private channel</span>
+            <h2 id="owner-channel-title">Create a new chat channel</h2>
+            <p>Name the channel and choose the portal staff who can access it.</p>
+          </div>
+          <button
+            aria-label="Close channel creator"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="field">
+          <label htmlFor="owner-channel-name">Channel name</label>
+          <input
+            autoFocus
+            className="input"
+            id="owner-channel-name"
+            maxLength={120}
+            name="channel_name"
+            placeholder="Example: Awards planning"
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="owner-channel-description">Description (optional)</label>
+          <textarea
+            className="textarea"
+            id="owner-channel-description"
+            maxLength={500}
+            name="channel_description"
+            placeholder="What this channel is for"
+            rows={2}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="owner-channel-member-search">Members</label>
+          <input
+            className={`input ${styles.memberSearch}`}
+            id="owner-channel-member-search"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search people by name or role"
+            type="search"
+            value={search}
+          />
+        </div>
+
+        {error && <div className={styles.directoryError} role="alert">{error}</div>}
+        <div className={styles.memberList}>
+          {filteredCandidates.map((candidate) => (
+            <label
+              className={`${styles.memberListRow} ${styles.ownerChannelMemberRow}`}
+              key={candidate.user_id}
+            >
+              <input name="user_ids" type="checkbox" value={candidate.user_id} />
+              <span className={styles.memberListAvatar} aria-hidden="true">
+                {initials(candidate.display_name)}
+              </span>
+              <span className={styles.memberListIdentity}>
+                <strong>{candidate.display_name}</strong>
+                <small>{roleName(candidate.user_role)}</small>
+              </span>
+            </label>
+          ))}
+          {filteredCandidates.length === 0 ? (
+            <div className={styles.memberListEmpty}>No matching staff members.</div>
+          ) : null}
+        </div>
+
+        <div className={styles.broadcastActions}>
+          <button className="button button-secondary" onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button className="button button-dark" disabled={pending} type="submit">
+            {pending ? "Creating…" : "Create channel"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -1494,6 +1616,7 @@ export function TeamsChat({
   selectedChannelId,
   initialThreads,
   initialMembers,
+  ownerChannelCandidates,
   adjudicationVisitDetails,
 }: {
   profile: Profile;
@@ -1501,6 +1624,7 @@ export function TeamsChat({
   selectedChannelId: string | null;
   initialThreads: ChatThread[];
   initialMembers: ChatMember[];
+  ownerChannelCandidates: ChatMember[];
   adjudicationVisitDetails: AdjudicationVisitDetails | null;
 }) {
   const router = useRouter();
@@ -1525,11 +1649,13 @@ export function TeamsChat({
   const [showBroadcastComposer, setShowBroadcastComposer] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showDirectMessagePicker, setShowDirectMessagePicker] = useState(false);
+  const [showOwnerChannelCreator, setShowOwnerChannelCreator] = useState(false);
   const [showVisitDetails, setShowVisitDetails] = useState(false);
   const [directMessageContacts, setDirectMessageContacts] = useState<ChatMember[]>([]);
   const [directMessageContactsLoaded, setDirectMessageContactsLoaded] = useState(false);
   const [directMessageSearch, setDirectMessageSearch] = useState("");
   const [directMessageError, setDirectMessageError] = useState<string | null>(null);
+  const [ownerChannelError, setOwnerChannelError] = useState<string | null>(null);
   const [loadingDirectMessageContacts, setLoadingDirectMessageContacts] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<{
@@ -2275,6 +2401,25 @@ export function TeamsChat({
     });
   };
 
+  const createOwnerChannel = (formData: FormData) => {
+    setOwnerChannelError(null);
+    startTransition(async () => {
+      const result = await createOwnerChatChannel(formData);
+
+      if (!result.ok || !result.channelId) {
+        setOwnerChannelError(
+          result.error ?? "The channel could not be created.",
+        );
+        return;
+      }
+
+      setShowOwnerChannelCreator(false);
+      setStatus("Channel created.");
+      router.push(`/portal/chat?channel=${result.channelId}`);
+      router.refresh();
+    });
+  };
+
   if (!activeChannel) {
     return (
       <section className={`panel ${styles.emptyPanel}`}>
@@ -2349,6 +2494,20 @@ export function TeamsChat({
             )}
           </div>
           <div className={styles.railActions}>
+            {profile.role === "owner" && (
+              <button
+                className={styles.newMessageButton}
+                disabled={isPending}
+                onClick={() => {
+                  setOwnerChannelError(null);
+                  setShowOwnerChannelCreator(true);
+                }}
+                type="button"
+              >
+                <span aria-hidden="true">＋</span>
+                New channel
+              </button>
+            )}
             {allowDirectMessages && (
               <button
                 className={styles.newMessageButton}
@@ -3270,6 +3429,19 @@ export function TeamsChat({
           onSearchChange={setDirectMessageSearch}
           pending={isPending}
           search={directMessageSearch}
+        />
+      )}
+
+      {showOwnerChannelCreator && profile.role === "owner" && (
+        <OwnerChannelDialog
+          candidates={ownerChannelCandidates}
+          error={ownerChannelError}
+          onClose={() => {
+            setShowOwnerChannelCreator(false);
+            setOwnerChannelError(null);
+          }}
+          onCreate={createOwnerChannel}
+          pending={isPending}
         />
       )}
 

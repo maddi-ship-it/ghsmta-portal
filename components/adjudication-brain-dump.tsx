@@ -392,16 +392,20 @@ export function AdjudicationBrainDump({
   applicationId,
   defaultValue,
   canComment,
+  fieldName = "scorecard_internal_notes",
   practiceMode = false,
   readOnly,
+  title = "Initial brain dump",
 }: {
   applicationId: string;
   defaultValue: string | null | undefined;
   canComment: boolean;
+  fieldName?: "scorecard_internal_notes" | "scorecard_post_show_notes";
   practiceMode?: boolean;
   readOnly: boolean;
+  title?: string;
 }) {
-  const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}`;
+  const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}:${fieldName}`;
   const [value, setValue] = useState(defaultValue ?? "");
   const [expanded, setExpanded] = useState(!(defaultValue ?? "").trim());
   const [sorting, setSorting] = useState(false);
@@ -621,7 +625,7 @@ export function AdjudicationBrainDump({
         <summary className="adjudication-brain-dump-summary">
           <span>
             <span className="eyebrow">Private working notes</span>
-            <strong>Initial brain dump</strong>
+            <strong>{title}</strong>
           </span>
           <span className="adjudication-brain-dump-summary-hint">
             Expand / collapse
@@ -630,16 +634,16 @@ export function AdjudicationBrainDump({
 
         <div className="panel-body adjudication-brain-dump-body">
           <div className="field">
-            <label htmlFor={canComment ? "scorecard_internal_notes" : undefined}>
+            <label htmlFor={canComment ? fieldName : undefined}>
               Dictate, scan, paste, or type everything you noticed
             </label>
             {canComment ? (
               <textarea
                 className="textarea adjudication-brain-dump-input"
                 disabled={readOnly}
-                id="scorecard_internal_notes"
+                id={fieldName}
                 maxLength={30000}
-                name="scorecard_internal_notes"
+                name={fieldName}
                 onChange={(event) => {
                   setValue(event.target.value);
                   setMessage(null);

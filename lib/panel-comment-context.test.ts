@@ -50,6 +50,7 @@ const scorecards = [
     submitted_at: null,
     reopened_at: null,
     internal_notes: null,
+    post_show_notes: null,
     created_at: "",
     updated_at: "",
   },

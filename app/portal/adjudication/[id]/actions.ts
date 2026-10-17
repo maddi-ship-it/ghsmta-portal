@@ -471,6 +471,8 @@ async function persistAdjudicatorScorecard(
   if (canComment) {
     scorecardUpdate.internal_notes =
       formText(formData, "scorecard_internal_notes") || null;
+    scorecardUpdate.post_show_notes =
+      formText(formData, "scorecard_post_show_notes") || null;
   }
 
   const { error: cardUpdateError } = await supabase

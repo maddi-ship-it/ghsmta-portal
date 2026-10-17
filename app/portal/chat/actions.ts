@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
 import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type ChatActionResult = {
@@ -76,6 +77,91 @@ export async function startChatDirectMessage(
   revalidatePath("/portal/chat");
   revalidatePath("/portal/notifications");
   return { ok: true, channelId: String(data) };
+}
+
+export async function createOwnerChatChannel(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  const owner = await requireProfile(["owner"]);
+  const name = formText(formData, "channel_name");
+  const description = formText(formData, "channel_description");
+  const selectedUserIds = [
+    ...new Set(
+      formData
+        .getAll("user_ids")
+        .map(String)
+        .filter((value) => isUuid(value) && value !== owner.id),
+    ),
+  ];
+
+  if (!name) {
+    return { ok: false, error: "Add a channel name." };
+  }
+  if (name.length > 120 || description.length > 500) {
+    return {
+      ok: false,
+      error: "The channel name or description is longer than the allowed limit.",
+    };
+  }
+  if (selectedUserIds.length === 0) {
+    return { ok: false, error: "Choose at least one channel member." };
+  }
+
+  const admin = createAdminClient();
+  const { data: selectedProfiles, error: profileError } = await admin
+    .from("profiles")
+    .select("id,role")
+    .in("id", selectedUserIds)
+    .eq("active", true)
+    .neq("role", "applicant");
+
+  if (profileError) return { ok: false, error: profileError.message };
+  if ((selectedProfiles ?? []).length !== selectedUserIds.length) {
+    return {
+      ok: false,
+      error: "One or more selected members are no longer available.",
+    };
+  }
+
+  const { data: channel, error: channelError } = await admin
+    .from("chat_channels")
+    .insert({
+      channel_type: "group_direct_message",
+      name,
+      description:
+        description || "Private Owner-created portal conversation.",
+      active: true,
+      created_by: owner.id,
+    })
+    .select("id")
+    .single();
+
+  if (channelError || !channel) {
+    return {
+      ok: false,
+      error: channelError?.message ?? "The channel could not be created.",
+    };
+  }
+
+  const participantIds = [owner.id, ...selectedUserIds];
+  const { error: participantError } = await admin
+    .from("chat_direct_participants")
+    .insert(
+      participantIds.map((userId) => ({
+        channel_id: channel.id,
+        user_id: userId,
+        added_by: owner.id,
+      })),
+    );
+
+  if (participantError) {
+    await admin.from("chat_channels").delete().eq("id", channel.id);
+    return { ok: false, error: participantError.message };
+  }
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+  return { ok: true, channelId: channel.id };
 }
 
 async function readChannelMode(channelId: string) {
