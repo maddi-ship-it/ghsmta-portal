@@ -4309,28 +4309,30 @@
 }
 
 .channelHeader {
-  min-height: 76px;
-  gap: 14px;
-  padding: 11px 16px;
+  min-height: 66px;
+  gap: 12px;
+  padding: 8px 14px;
   border-bottom-color: var(--portal-line-strong);
   background: color-mix(in srgb, var(--portal-surface) 97%, transparent);
 }
 
 .headerIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
 }
 
 .channelHeader p {
   max-width: 760px;
+  font-size: 0.72rem;
 }
 
 .headerMeta {
-  display: grid;
-  max-width: min(36vw, 430px);
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
+  max-width: none;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 7px;
 }
 
@@ -4338,14 +4340,32 @@
   display: block;
   min-width: 0;
   overflow: hidden;
+  padding: 4px 8px;
+  font-size: 0.62rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .memberSummary {
+  min-height: 32px;
   padding: 3px 7px;
   border: 1px solid var(--portal-line);
   background: var(--portal-surface-2);
+  white-space: nowrap;
+}
+
+.visitDetailsButton,
+.headerActionButton {
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.visitDetailsButton {
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .messageFeed {
@@ -4386,12 +4406,12 @@
 
 @media (max-width: 1180px) {
   .headerMeta {
-    max-width: 270px;
-    grid-template-columns: auto auto;
+    max-width: 430px;
+    flex-wrap: wrap;
   }
 
   .visibilityPill {
-    grid-column: 1 / -1;
+    max-width: 190px;
   }
 }
 

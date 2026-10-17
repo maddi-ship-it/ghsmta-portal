@@ -2751,25 +2751,11 @@ export function TeamsChat({
               {channelIcon(activeChannel.channel_type)}
             </span>
             <div>
-              <div className={styles.channelEyebrowRow}>
-                <span className="eyebrow">
-                  {isThreaded ? "Threaded discussion" : "Live channel"}
-                </span>
+              <div className={styles.channelHeadingLine}>
+                <h1>{activeChannelTitle}</h1>
                 {activeChannel.application_archived && (
                   <span className={styles.archivedBadge}>Archived</span>
                 )}
-                {activeChannel.channel_type === "school" && (
-                  <button
-                    className={styles.visitDetailsButton}
-                    onClick={() => setShowVisitDetails(true)}
-                    type="button"
-                  >
-                    Adjudication visit details
-                  </button>
-                )}
-              </div>
-              <div className={styles.channelHeadingLine}>
-                <h1>{activeChannelTitle}</h1>
                 <span
                   aria-live="polite"
                   className={`${styles.realtimeIndicator} ${styles[`realtimeIndicator_${realtimeState}`]}`}
@@ -2795,8 +2781,18 @@ export function TeamsChat({
             >
               {activeChannel.visibility_label}
             </span>
+            {activeChannel.channel_type === "school" && (
+              <button
+                className={styles.visitDetailsButton}
+                onClick={() => setShowVisitDetails(true)}
+                type="button"
+              >
+                Visit details
+              </button>
+            )}
             <button
-              className="button button-secondary button-compact"
+              aria-label="Mark this conversation unread"
+              className={`button button-secondary button-compact ${styles.headerActionButton}`}
               disabled={isPending}
               onClick={markActiveChannelUnread}
               type="button"
@@ -2847,6 +2843,15 @@ export function TeamsChat({
                 </optgroup>
               ))}
             </select>
+            {activeChannel.channel_type === "school" && (
+              <button
+                className="button button-secondary button-compact"
+                onClick={() => setShowVisitDetails(true)}
+                type="button"
+              >
+                Visit details
+              </button>
+            )}
             <button
               className="button button-secondary button-compact"
               disabled={isPending}
