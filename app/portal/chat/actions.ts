@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { requireProfile } from "@/lib/auth";
 import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
+import {
+  sendUrgentChatSmsNotifications,
+  type UrgentSmsResult,
+} from "@/lib/chat/urgent-sms";
 import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
 import { isOwnerChatSection } from "@/lib/chat-owner-sections";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,6 +20,9 @@ type ChatActionResult = {
   channelId?: string;
   messageId?: string;
   messageKind?: "post" | "reply";
+  urgentSmsStatus?: UrgentSmsResult["status"];
+  urgentSmsRecipientCount?: number;
+  urgentSmsQueuedCount?: number;
 };
 
 type ChannelMode = {
@@ -43,6 +50,39 @@ function isUuid(value: string) {
 
 function profileDisplayName(profile: { full_name?: string | null; email?: string | null }) {
   return profile.full_name?.trim() || profile.email || "Someone";
+}
+
+async function sendChatNotifications(input: {
+  channelId: string;
+  messageId: string;
+  messageKind: "post" | "reply";
+  authorId: string;
+  authorName: string;
+  subject: string;
+  body: string;
+}) {
+  const [emailResult, urgentSmsResult] = await Promise.allSettled([
+    sendChatEmailNotifications(input),
+    sendUrgentChatSmsNotifications(input),
+  ]);
+
+  if (emailResult.status === "rejected") {
+    console.warn("Chat email notification failed", emailResult.reason);
+  }
+  if (urgentSmsResult.status === "rejected") {
+    console.warn("Urgent chat text notification failed", urgentSmsResult.reason);
+    return {
+      urgentSmsStatus: "failed" as const,
+      urgentSmsRecipientCount: 0,
+      urgentSmsQueuedCount: 0,
+    };
+  }
+
+  return {
+    urgentSmsStatus: urgentSmsResult.value.status,
+    urgentSmsRecipientCount: urgentSmsResult.value.recipientCount,
+    urgentSmsQueuedCount: urgentSmsResult.value.queuedCount,
+  };
 }
 
 export async function startChatDirectMessage(
@@ -244,23 +284,23 @@ export async function createChatPost(
     return { ok: false, error: error.message };
   }
 
-  try {
-    await sendChatEmailNotifications({
-      channelId,
-      messageId: post.id,
-      messageKind: "post",
-      authorId: profile.id,
-      authorName: profileDisplayName(profile),
-      subject,
-      body,
-    });
-  } catch (error) {
-    console.warn("Chat email notification failed", error);
-    // Chat should remain sent even if email notification delivery is unavailable.
-  }
+  const notificationResult = await sendChatNotifications({
+    channelId,
+    messageId: post.id,
+    messageKind: "post",
+    authorId: profile.id,
+    authorName: profileDisplayName(profile),
+    subject,
+    body,
+  });
 
   revalidatePath("/portal/chat");
-  return { ok: true, messageId: post.id, messageKind: "post" };
+  return {
+    ok: true,
+    messageId: post.id,
+    messageKind: "post",
+    ...notificationResult,
+  };
 }
 
 export async function createChatReply(
@@ -373,23 +413,23 @@ export async function createChatReply(
     return { ok: false, error: error.message };
   }
 
-  try {
-    await sendChatEmailNotifications({
-      channelId,
-      messageId: reply.id,
-      messageKind: "reply",
-      authorId: profile.id,
-      authorName: profileDisplayName(profile),
-      subject: parentPost?.subject ? `Reply: ${parentPost.subject}` : "New reply",
-      body,
-    });
-  } catch (error) {
-    console.warn("Chat email notification failed", error);
-    // Chat should remain sent even if email notification delivery is unavailable.
-  }
+  const notificationResult = await sendChatNotifications({
+    channelId,
+    messageId: reply.id,
+    messageKind: "reply",
+    authorId: profile.id,
+    authorName: profileDisplayName(profile),
+    subject: parentPost?.subject ? `Reply: ${parentPost.subject}` : "New reply",
+    body,
+  });
 
   revalidatePath("/portal/chat");
-  return { ok: true, messageId: reply.id, messageKind: "reply" };
+  return {
+    ok: true,
+    messageId: reply.id,
+    messageKind: "reply",
+    ...notificationResult,
+  };
 }
 
 export async function createChatMessage(
@@ -452,23 +492,23 @@ export async function createChatMessage(
     return { ok: false, error: error.message };
   }
 
-  try {
-    await sendChatEmailNotifications({
-      channelId,
-      messageId: post.id,
-      messageKind: "post",
-      authorId: profile.id,
-      authorName: profileDisplayName(profile),
-      subject: "Message",
-      body,
-    });
-  } catch (error) {
-    console.warn("Chat email notification failed", error);
-    // Chat should remain sent even if email notification delivery is unavailable.
-  }
+  const notificationResult = await sendChatNotifications({
+    channelId,
+    messageId: post.id,
+    messageKind: "post",
+    authorId: profile.id,
+    authorName: profileDisplayName(profile),
+    subject: "Message",
+    body,
+  });
 
   revalidatePath("/portal/chat");
-  return { ok: true, messageId: post.id, messageKind: "post" };
+  return {
+    ok: true,
+    messageId: post.id,
+    messageKind: "post",
+    ...notificationResult,
+  };
 }
 
 export async function editChatMessage(

@@ -10,9 +10,9 @@ type RecipientProfile = {
   } | null;
 };
 
-type AdminClient = ReturnType<typeof createAdminClient>;
+export type ChatNotificationAdminClient = ReturnType<typeof createAdminClient>;
 
-type ChatChannel = {
+export type ChatNotificationChannel = {
   id: string;
   channel_type: string;
   name: string;
@@ -45,7 +45,7 @@ function truncate(value: string, maxLength: number) {
     : value;
 }
 
-function channelLabel(channel: ChatChannel) {
+export function chatChannelLabel(channel: ChatNotificationChannel) {
   const application = channelApplication(channel);
 
   if (channel.channel_type === "school_dm") {
@@ -77,7 +77,7 @@ function channelLabel(channel: ChatChannel) {
   return channel.name || "Chat";
 }
 
-function channelApplication(channel: ChatChannel) {
+function channelApplication(channel: ChatNotificationChannel) {
   return Array.isArray(channel.applications)
     ? channel.applications[0]
     : channel.applications;
@@ -93,7 +93,7 @@ function addIds(
 }
 
 async function addActiveRoleRecipients(
-  admin: AdminClient,
+  admin: ChatNotificationAdminClient,
   recipientIds: Set<string>,
   roles: string[],
 ) {
@@ -105,7 +105,7 @@ async function addActiveRoleRecipients(
 
   if (error) {
     throw new Error(
-      `Chat email role recipients could not be loaded: ${error.message}`,
+      `Chat role recipients could not be loaded: ${error.message}`,
     );
   }
 
@@ -113,7 +113,7 @@ async function addActiveRoleRecipients(
 }
 
 async function addApplicationApplicantRecipients(
-  admin: AdminClient,
+  admin: ChatNotificationAdminClient,
   recipientIds: Set<string>,
   applicationId: string | null,
 ) {
@@ -127,7 +127,7 @@ async function addApplicationApplicantRecipients(
 
   if (memberError) {
     throw new Error(
-      `Chat email school members could not be loaded: ${memberError.message}`,
+      `Chat school members could not be loaded: ${memberError.message}`,
     );
   }
 
@@ -150,7 +150,7 @@ async function addApplicationApplicantRecipients(
 
   if (profileError) {
     throw new Error(
-      `Chat email school profiles could not be loaded: ${profileError.message}`,
+      `Chat school profiles could not be loaded: ${profileError.message}`,
     );
   }
 
@@ -158,7 +158,7 @@ async function addApplicationApplicantRecipients(
 }
 
 async function addPanelRecipients(
-  admin: AdminClient,
+  admin: ChatNotificationAdminClient,
   recipientIds: Set<string>,
   applicationId: string | null,
 ) {
@@ -172,7 +172,7 @@ async function addPanelRecipients(
 
   if (assignmentError) {
     throw new Error(
-      `Chat email assignments could not be loaded: ${assignmentError.message}`,
+      `Chat assignments could not be loaded: ${assignmentError.message}`,
     );
   }
 
@@ -188,7 +188,7 @@ async function addPanelRecipients(
 
   if (bookingError) {
     throw new Error(
-      `Chat email schedule bookings could not be loaded: ${bookingError.message}`,
+      `Chat schedule bookings could not be loaded: ${bookingError.message}`,
     );
   }
 
@@ -210,7 +210,7 @@ async function addPanelRecipients(
 
   if (staffError) {
     throw new Error(
-      `Chat email schedule staff could not be loaded: ${staffError.message}`,
+      `Chat schedule staff could not be loaded: ${staffError.message}`,
     );
   }
 
@@ -218,7 +218,7 @@ async function addPanelRecipients(
 }
 
 async function addDirectRecipients(
-  admin: AdminClient,
+  admin: ChatNotificationAdminClient,
   recipientIds: Set<string>,
   channelId: string,
 ) {
@@ -229,16 +229,17 @@ async function addDirectRecipients(
 
   if (error) {
     throw new Error(
-      `Chat email direct-message participants could not be loaded: ${error.message}`,
+      `Chat direct-message participants could not be loaded: ${error.message}`,
     );
   }
 
   addIds(recipientIds, (data ?? []).map((participant) => participant.user_id));
 }
 
-async function loadChannelRecipientIds(
-  admin: AdminClient,
-  channel: ChatChannel,
+export async function loadChatChannelRecipientIds(
+  admin: ChatNotificationAdminClient,
+  channel: ChatNotificationChannel,
+  options: { includePortalUpdatesAudience?: boolean } = {},
 ) {
   const recipientIds = new Set<string>();
 
@@ -248,6 +249,18 @@ async function loadChannelRecipientIds(
   }
 
   await addActiveRoleRecipients(admin, recipientIds, ["owner"]);
+
+  if (
+    channel.channel_type === "portal_updates" &&
+    options.includePortalUpdatesAudience
+  ) {
+    await addActiveRoleRecipients(admin, recipientIds, [
+      "applicant",
+      "adjudicator",
+      "advisory_member",
+      "program_manager",
+    ]);
+  }
 
   if (channel.channel_type === "applicant_community") {
     await addActiveRoleRecipients(admin, recipientIds, ["applicant"]);
@@ -359,10 +372,10 @@ export async function sendChatEmailNotifications({
     throw new Error(`Chat email author could not be loaded: ${authorError.message}`);
   }
 
-  const safeChannel = channel as ChatChannel;
+  const safeChannel = channel as ChatNotificationChannel;
   let recipientIds: string[];
   try {
-    recipientIds = (await loadChannelRecipientIds(admin, safeChannel)).filter(
+    recipientIds = (await loadChatChannelRecipientIds(admin, safeChannel)).filter(
       (id) => id !== authorId,
     );
   } catch (error) {
@@ -389,7 +402,7 @@ export async function sendChatEmailNotifications({
     .filter((profile) => profile.notification_preferences?.email !== false)
     .map((profile) => profile.email as string);
 
-  const label = channelLabel(safeChannel);
+  const label = chatChannelLabel(safeChannel);
   const application = channelApplication(safeChannel);
   const externalApplicantEmail =
     safeChannel?.channel_type &&

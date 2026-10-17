@@ -106,6 +106,13 @@ type MentionSuggestion =
       insertion: "@channel";
     }
   | {
+      kind: "urgent";
+      id: "urgent";
+      label: "@URGENT";
+      description: string;
+      insertion: "@URGENT";
+    }
+  | {
       kind: "member";
       id: string;
       label: string;
@@ -194,6 +201,15 @@ type ChatAction = (
   error?: string;
   messageId?: string;
   messageKind?: "post" | "reply";
+  urgentSmsStatus?:
+    | "not_urgent"
+    | "queued"
+    | "no_recipients"
+    | "not_configured"
+    | "partial_failure"
+    | "failed";
+  urgentSmsRecipientCount?: number;
+  urgentSmsQueuedCount?: number;
 }>;
 
 type ChatReaction = {
@@ -1060,8 +1076,11 @@ function MentionedMessage({
     .filter(Boolean)
     .sort((left, right) => right.length - left.length);
   const mentionTokens = [
+    "URGENT",
     "channel",
-    ...mentionNames.filter((name) => name.toLowerCase() !== "channel"),
+    ...mentionNames.filter(
+      (name) => !["channel", "urgent"].includes(name.toLowerCase()),
+    ),
   ];
 
   const pattern = new RegExp(
@@ -1079,6 +1098,17 @@ function MentionedMessage({
   return (
     <>
       {body.split(pattern).map((part, index) => {
+        if (part.toLowerCase() === "@urgent") {
+          return (
+            <span
+              className={`${styles.mention} ${styles.urgentMention}`}
+              key={`urgent-${index}`}
+            >
+              {part}
+            </span>
+          );
+        }
+
         if (part.toLowerCase() === "@channel") {
           return (
             <span
@@ -1153,6 +1183,16 @@ function MentionTextarea({
         label: "@channel",
         description: "Tag everyone in this chat",
         insertion: "@channel",
+      });
+    }
+
+    if ("urgent".includes(normalized)) {
+      nextSuggestions.push({
+        kind: "urgent",
+        id: "urgent",
+        label: "@URGENT",
+        description: "Text all verified members in this chat",
+        insertion: "@URGENT",
       });
     }
 
@@ -1332,12 +1372,16 @@ function MentionTextarea({
                 className={
                   suggestion.kind === "channel"
                     ? `${styles.avatar} ${styles.avatarSmall} ${styles.channelMentionAvatar}`
+                    : suggestion.kind === "urgent"
+                      ? `${styles.avatar} ${styles.avatarSmall} ${styles.urgentMentionAvatar}`
                     : `${styles.avatar} ${styles.avatarSmall}`
                 }
               >
-                {suggestion.kind === "channel"
-                  ? "@"
-                  : initials(suggestion.member.display_name)}
+                {suggestion.kind === "member"
+                  ? initials(suggestion.member.display_name)
+                  : suggestion.kind === "urgent"
+                    ? "!"
+                    : "@"}
               </span>
               <span>
                 <strong>{suggestion.label}</strong>
@@ -1349,7 +1393,7 @@ function MentionTextarea({
       )}
 
       <small className={styles.mentionHelp}>
-        Type @ to tag someone or @channel. Press Enter to send; Shift+Enter adds a line.
+        Type @ to tag someone, @channel, or @URGENT for a text alert. Press Enter to send; Shift+Enter adds a line.
       </small>
     </div>
   );
@@ -2397,6 +2441,26 @@ export function TeamsChat({
         return;
       }
 
+      const urgentStatus = (() => {
+        if (!result.urgentSmsStatus || result.urgentSmsStatus === "not_urgent") {
+          return "";
+        }
+        if (result.urgentSmsStatus === "queued") {
+          const count = result.urgentSmsQueuedCount ?? 0;
+          return ` Urgent text alert queued for ${count} verified ${count === 1 ? "member" : "members"}.`;
+        }
+        if (result.urgentSmsStatus === "partial_failure") {
+          return ` Urgent text alert queued for ${result.urgentSmsQueuedCount ?? 0} of ${result.urgentSmsRecipientCount ?? 0} verified members; some texts could not be queued.`;
+        }
+        if (result.urgentSmsStatus === "no_recipients") {
+          return " No other members of this chat have a verified phone number for the urgent text alert.";
+        }
+        if (result.urgentSmsStatus === "not_configured") {
+          return " The urgent tag was added, but Twilio text delivery is not configured yet.";
+        }
+        return " The urgent text alert could not be queued.";
+      })();
+
       if (files.length > 0 && result.messageId && result.messageKind) {
         try {
           await uploadAttachments(
@@ -2407,7 +2471,7 @@ export function TeamsChat({
           );
         } catch (uploadError) {
           setStatus(
-            `Message sent, but a file could not be attached: ${uploadError instanceof Error ? uploadError.message : "upload failed"}`,
+            `Message sent.${urgentStatus} A file could not be attached: ${uploadError instanceof Error ? uploadError.message : "upload failed"}`,
           );
           await loadChannel();
           return;
@@ -2434,7 +2498,9 @@ export function TeamsChat({
       }
       form.reset();
       setAttachmentPickerVersion((version) => version + 1);
-      setStatus(files.length > 0 ? `${successMessage} Files attached.` : successMessage);
+      setStatus(
+        `${files.length > 0 ? `${successMessage} Files attached.` : successMessage}${urgentStatus}`,
+      );
       await loadChannel();
       onSuccess?.();
     });
