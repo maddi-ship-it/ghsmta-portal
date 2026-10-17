@@ -37,6 +37,6 @@ export async function updateAccountDetails(
   revalidatePath("/portal", "layout");
   return {
     ok: true,
-    message: "Account details saved. Verify the mobile number again if it changed.",
+    message: "Account details saved. Your mobile number is ready for text alerts.",
   };
 }

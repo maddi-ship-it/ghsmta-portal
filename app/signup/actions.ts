@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { normalizePhoneE164 } from "@/lib/phone";
-import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
 import { portalAuthCallbackUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,7 +19,7 @@ export async function signup(formData: FormData) {
 
   const headerStore = await headers();
   const emailRedirectTo = portalAuthCallbackUrl(
-    PHONE_VERIFICATION_ENABLED ? "/verify-phone" : "/portal",
+    "/portal",
     headerStore.get("origin"),
   );
 
@@ -32,7 +31,7 @@ export async function signup(formData: FormData) {
       data: {
         full_name: fullName,
         phone_e164: phone,
-        require_phone_verification: PHONE_VERIFICATION_ENABLED,
+        require_phone_verification: false,
       },
       emailRedirectTo,
     },
@@ -40,14 +39,8 @@ export async function signup(formData: FormData) {
 
   if (error) redirect("/signup?error=exists");
   if (data.session) {
-    redirect(
-      PHONE_VERIFICATION_ENABLED ? "/verify-phone" : "/portal",
-    );
+    redirect("/portal");
   }
 
-  redirect(
-    PHONE_VERIFICATION_ENABLED
-      ? "/login?message=Check your email to confirm your account, then sign in and verify your mobile number."
-      : "/login?message=Check your email to confirm your account, then sign in.",
-  );
+  redirect("/login?message=Check your email to confirm your account, then sign in.");
 }

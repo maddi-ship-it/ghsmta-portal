@@ -283,8 +283,9 @@ export async function updateUserAccess(userId: string, formData: FormData) {
     role,
     active,
     phone_e164: phone,
-    phone_verified_at: phoneChanged ? null : undefined,
-    phone_required_at: phoneChanged && phone ? new Date().toISOString() : undefined,
+    phone_verified_at:
+      phoneChanged && phone ? new Date().toISOString() : phone ? undefined : null,
+    phone_required_at: phoneChanged ? null : undefined,
     mfa_required: nextMfaRequired,
     mfa_grace_until:
       nextMfaRequired && !mfaWasEnabled

@@ -55,10 +55,8 @@ export async function staffSignup(formData: FormData) {
   }
 
   const headerStore = await headers();
-  const phoneVerificationEnabled =
-    process.env.PHONE_VERIFICATION_ENABLED === "true";
   const emailRedirectTo = portalAuthCallbackUrl(
-    phoneVerificationEnabled ? "/verify-phone" : "/portal",
+    "/portal",
     headerStore.get("origin"),
   );
 
@@ -70,7 +68,7 @@ export async function staffSignup(formData: FormData) {
       data: {
         full_name: fullName,
         phone_e164: phone,
-        require_phone_verification: phoneVerificationEnabled,
+        require_phone_verification: false,
         staff_signup: true,
         requested_role: "adjudicator",
       },
@@ -101,9 +99,7 @@ export async function staffSignup(formData: FormData) {
   }
 
   if (data.session) {
-    redirect(
-      phoneVerificationEnabled ? "/verify-phone" : "/portal",
-    );
+    redirect("/portal");
   }
 
   redirect(
