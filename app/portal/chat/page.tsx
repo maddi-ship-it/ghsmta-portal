@@ -361,13 +361,12 @@ export default async function ChatPage({
 
   return (
     <>
-      <div className="page-heading chat-page-heading">
+      <div className="page-heading chat-page-heading chat-page-heading-compact">
         <div>
-          <span className="eyebrow">Communication</span>
-          <h1>Messaging</h1>
+          <span className="eyebrow">Communication center</span>
+          <h1>Messages</h1>
           <p>
-            Updates and conversations available to your portal role in one
-            place.
+            Channels, direct messages, and school conversations in one place.
           </p>
         </div>
       </div>

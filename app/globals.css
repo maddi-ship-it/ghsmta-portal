@@ -7739,6 +7739,48 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   background: linear-gradient(90deg, var(--portal-gold), transparent);
 }
 
+.chat-page-heading-compact {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
+
+.chat-page-heading-compact > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 2px 24px;
+}
+
+.chat-page-heading-compact .eyebrow {
+  grid-column: 1 / -1;
+}
+
+.chat-page-heading-compact h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 0.98;
+}
+
+.chat-page-heading-compact p {
+  max-width: none;
+  margin: 0 0 3px;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 700px) {
+  .chat-page-heading-compact > div {
+    display: block;
+  }
+
+  .chat-page-heading-compact h1 {
+    margin-top: 4px;
+  }
+
+  .chat-page-heading-compact p {
+    margin-top: 6px;
+  }
+}
+
 .eyebrow,
 .metric-label,
 .reference-folder-tabs button,

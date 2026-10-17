@@ -723,7 +723,10 @@ export async function saveAllCategoryProposals(
     changedCount += changedScoreability.length;
   }
 
-  if (profile.role === "advisory_member") {
+  if (
+    profile.role === "advisory_member" ||
+    profile.role === "owner"
+  ) {
     try {
       changedCount += await savePanelNarrativeAssignments({
         applicationId,

@@ -2639,8 +2639,8 @@ export function TeamsChat({
       <aside className={styles.rail}>
         <div className={styles.railHeader}>
           <div>
-            <span className="eyebrow">Messages</span>
-            <h2>Messaging</h2>
+            <span className="eyebrow">Inbox</span>
+            <h2>Conversations</h2>
           </div>
           {totalUnread > 0 && (
             <span className={styles.totalUnread}>
@@ -2659,8 +2659,8 @@ export function TeamsChat({
             onChange={(event) => setChannelSearch(event.target.value)}
             placeholder={
               profile.role === "applicant"
-                ? "Search messages"
-                : "Search schools or messages"
+                ? "Search conversations"
+                : "Search schools or conversations"
             }
             type="search"
             value={channelSearch}
@@ -2719,14 +2719,6 @@ export function TeamsChat({
                 New message
               </button>
             )}
-            <button
-              className={styles.broadcastButton}
-              disabled={isPending}
-              onClick={markActiveChannelUnread}
-              type="button"
-            >
-              Mark unread
-            </button>
             {profile.role === "owner" && (
               <button
                 className={`${styles.broadcastButton} ${styles.broadcastAllButton}`}
@@ -2797,7 +2789,10 @@ export function TeamsChat({
           </div>
 
           <div className={styles.headerMeta}>
-            <span className={styles.visibilityPill}>
+            <span
+              className={styles.visibilityPill}
+              title={activeChannel.visibility_label}
+            >
               {activeChannel.visibility_label}
             </span>
             <button
@@ -3309,6 +3304,7 @@ export function TeamsChat({
               ref={feedRef}
               role="log"
             >
+              <div className={styles.messageFeedInner}>
               {messages.length === 0 ? (
                 <div className={`empty-state ${styles.messageEmpty}`}>
                   <h2>No messages yet.</h2>
@@ -3493,6 +3489,7 @@ export function TeamsChat({
                   );
                 })
               )}
+              </div>
             </div>
 
             {showJumpToLatest && (

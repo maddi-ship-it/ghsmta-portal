@@ -4197,3 +4197,218 @@
     display: none;
   }
 }
+
+/* Refined messaging workspace: compact chrome and a focused reading column. */
+.shell {
+  grid-template-columns: minmax(278px, 316px) minmax(0, 1fr);
+  height: clamp(620px, calc(100dvh - 205px), 860px);
+  border-color: var(--portal-line-strong);
+  border-radius: 18px;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.24);
+}
+
+.rail {
+  border-right-color: var(--portal-line-strong);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--portal-blue-deep) 7%, var(--portal-surface)) 0%,
+    var(--portal-surface) 24%
+  );
+}
+
+.railHeader {
+  padding: 18px 16px 11px;
+}
+
+.railHeader h2 {
+  color: var(--portal-ivory);
+  font-size: 1.16rem;
+}
+
+.totalUnread {
+  min-width: 31px;
+  height: 31px;
+  color: #071328;
+  background: var(--portal-gold);
+  box-shadow: none;
+}
+
+.filters {
+  gap: 7px;
+  padding: 0 10px 11px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.searchInput {
+  min-height: 42px;
+  padding-inline: 13px;
+  border-radius: 12px;
+}
+
+.filterButtons {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filterButtons::-webkit-scrollbar {
+  display: none;
+}
+
+.unreadFilter {
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding-inline: 10px;
+  font-size: 0.67rem;
+}
+
+.railActions {
+  order: -1;
+  gap: 6px;
+}
+
+.railActions .newMessageButton {
+  min-height: 36px;
+  border-radius: 9px;
+  font-size: 0.7rem;
+}
+
+.railActions .broadcastAllButton {
+  min-height: 32px;
+  padding-block: 7px;
+  font-size: 0.67rem;
+}
+
+.channelList {
+  padding: 5px 6px 18px;
+}
+
+.channelGroupHeading {
+  margin-top: 2px;
+}
+
+.channelLink {
+  min-height: 56px;
+  border-radius: 10px;
+}
+
+.channelLinkActive {
+  border-color: color-mix(in srgb, var(--portal-gold) 45%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--portal-gold) 12%, var(--portal-surface-2)),
+    var(--portal-surface-2)
+  );
+  box-shadow: inset 3px 0 0 var(--portal-gold);
+}
+
+.conversation {
+  border-radius: 0 18px 18px 0;
+}
+
+.channelHeader {
+  min-height: 76px;
+  gap: 14px;
+  padding: 11px 16px;
+  border-bottom-color: var(--portal-line-strong);
+  background: color-mix(in srgb, var(--portal-surface) 97%, transparent);
+}
+
+.headerIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.channelHeader p {
+  max-width: 760px;
+}
+
+.headerMeta {
+  display: grid;
+  max-width: min(36vw, 430px);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.visibilityPill {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberSummary {
+  padding: 3px 7px;
+  border: 1px solid var(--portal-line);
+  background: var(--portal-surface-2);
+}
+
+.messageFeed {
+  padding: 0;
+  scrollbar-gutter: stable;
+}
+
+.messageFeedInner {
+  width: min(100%, 960px);
+  min-height: 100%;
+  margin-inline: auto;
+  padding: 22px clamp(14px, 3vw, 34px) 18px;
+}
+
+.messageEmpty {
+  padding-top: 15vh;
+}
+
+.chatMessage {
+  max-width: min(680px, 82%);
+}
+
+.messageComposer {
+  border-top: 1px solid var(--portal-line);
+  background: color-mix(in srgb, var(--portal-bg-deep) 96%, transparent);
+}
+
+.composerSurface {
+  width: min(100%, 820px);
+  border-radius: 14px;
+  box-shadow: 0 9px 28px rgba(0, 0, 0, 0.2);
+}
+
+.composerSurface .composerTextarea {
+  min-height: 52px;
+  border-radius: 14px 14px 0 0;
+}
+
+@media (max-width: 1180px) {
+  .headerMeta {
+    max-width: 270px;
+    grid-template-columns: auto auto;
+  }
+
+  .visibilityPill {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1080px) {
+  .shell {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .headerMeta {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .shell {
+    height: min(760px, calc(100dvh - 160px));
+  }
+
+  .messageFeedInner {
+    padding: 14px 10px 12px;
+  }
+}

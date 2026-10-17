@@ -907,7 +907,7 @@ export function AdjudicationConsensusBar({
                               <label htmlFor={assigneeFieldName}>
                                 Final comment writer
                               </label>
-                            {role === "advisory_member" ? (
+                            {canSetDecisions ? (
                               <select
                                 className="select"
                                 defaultValue={assigneeId ?? ""}
