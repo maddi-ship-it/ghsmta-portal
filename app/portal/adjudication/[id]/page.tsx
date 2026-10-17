@@ -267,7 +267,10 @@ export default async function AdjudicationApplicationPage({
   const canEditAdvisoryScorecard =
     profile.role === "advisory_member" &&
     canPanelReview &&
-    Boolean(ownParticipantResult.data?.can_score);
+    Boolean(
+      ownParticipantResult.data?.can_score ||
+        ownParticipantResult.data?.can_comment,
+    );
   const showEditableScorecard =
     showPersonalScorecard || canEditAdvisoryScorecard;
 
@@ -838,6 +841,7 @@ export default async function AdjudicationApplicationPage({
         canEditAdvisoryScorecard
           ? {
               canComment,
+              canScore: Boolean(ownParticipantResult.data?.can_score),
               currentUserId: profile.id,
               readOnly,
               scoreOptions: scoreChoices,

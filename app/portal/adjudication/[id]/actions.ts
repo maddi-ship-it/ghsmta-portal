@@ -88,10 +88,11 @@ async function persistAdjudicatorScorecard(
   if (assignmentReadError) {
     throw new Error(assignmentReadError.message);
   }
-  if (!assignment?.can_score) {
-    throw new Error("You are not assigned as a scoring participant for this application.");
+  if (!assignment || (!assignment.can_score && !assignment.can_comment)) {
+    throw new Error("You are not assigned to score or comment on this application.");
   }
 
+  const canScore = Boolean(assignment.can_score);
   const canComment = Boolean(assignment.can_comment);
 
   const { data: scorecardId, error: scorecardError } = await supabase.rpc(
@@ -260,6 +261,7 @@ async function persistAdjudicatorScorecard(
       );
 
     if (
+      canScore &&
       (officialProposal?.range_min != null ||
         officialProposal?.range_max != null) &&
       !validRange
@@ -321,17 +323,17 @@ async function persistAdjudicatorScorecard(
         numericScore != null &&
         isQuarterPointScore(numericScore, scoreMinimum, scoreMaximum);
 
-      if (rawScore && !validScore) {
+      if (canScore && rawScore && !validScore) {
         throw new Error(
           `Scores must be entered between ${scoreMinimum} and ${scoreMaximum} in 0.25-point increments.`,
         );
       }
 
-      if (validScore && numericScore != null) {
+      if (canScore && validScore && numericScore != null) {
         categoryNumericScores.push(numericScore);
       }
 
-      if (submit && !validScore) {
+      if (submit && canScore && !validScore) {
         missing.push(`${category.title}: ${criterion.title} score`);
       }
 
@@ -346,20 +348,23 @@ async function persistAdjudicatorScorecard(
       const scoreRow: Record<string, unknown> = {
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
-        score: validScore ? numericScore : null,
+        ...(canScore ? { score: validScore ? numericScore : null } : {}),
       };
       if (canComment) {
         scoreRow.observation = observation || null;
       }
       scoreRows.push(scoreRow);
-      sourceScores.set(
-        criterion.id,
-        validScore && numericScore != null ? numericScore : null,
-      );
+      if (canScore) {
+        sourceScores.set(
+          criterion.id,
+          validScore && numericScore != null ? numericScore : null,
+        );
+      }
     }
 
     if (
       submit &&
+      canScore &&
       validRange &&
       rangeMinimum != null &&
       rangeMaximum != null &&
@@ -385,7 +390,11 @@ async function persistAdjudicatorScorecard(
     (category) =>
       category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY,
   );
-  if (overallCategory && !unscoreableCategoryIds.has(overallCategory.id)) {
+  if (
+    canScore &&
+    overallCategory &&
+    !unscoreableCategoryIds.has(overallCategory.id)
+  ) {
     const overallCriteria = criteria.filter(
       (criterion) => criterion.category_id === overallCategory.id,
     );

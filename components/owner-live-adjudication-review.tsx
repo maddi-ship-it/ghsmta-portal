@@ -53,6 +53,7 @@ type AdvisoryNarrativeReview = {
 
 type AdvisoryScoreEntry = {
   canComment: boolean;
+  canScore: boolean;
   currentUserId: string;
   readOnly: boolean;
   scoreOptions: Array<{
@@ -1246,40 +1247,44 @@ export function OwnerLiveAdjudicationReview({
                             >
                               {isEditableOwnColumn && advisoryScoreEntry ? (
                                 <div className="panel-review-score-entry">
-                                  <label htmlFor={`score_${criterion.id}`}>
-                                    Your score
-                                  </label>
-                                  {isOverallProductionCategory ? (
-                                    <output
-                                      aria-label="Automatically calculated overall production score"
-                                      className="derived-score-output"
-                                    >
-                                      {formatScore(row?.score)}
-                                    </output>
-                                  ) : (
-                                    <select
-                                      className="select score-select"
-                                      defaultValue={row?.score ?? ""}
-                                      disabled={advisoryScoreEntry.readOnly}
-                                      id={`score_${criterion.id}`}
-                                      name={`score_${criterion.id}`}
-                                    >
-                                      <option value="">—</option>
-                                      {advisoryScoreEntry.scoreOptions.map(
-                                        (option) => (
-                                          <option
-                                            key={option.value}
-                                            value={option.value}
-                                          >
-                                            {option.value.toFixed(2)}
-                                            {option.label
-                                              ? ` — ${option.label}`
-                                              : ""}
-                                          </option>
-                                        ),
+                                  {advisoryScoreEntry.canScore ? (
+                                    <>
+                                      <label htmlFor={`score_${criterion.id}`}>
+                                        Your score
+                                      </label>
+                                      {isOverallProductionCategory ? (
+                                        <output
+                                          aria-label="Automatically calculated overall production score"
+                                          className="derived-score-output"
+                                        >
+                                          {formatScore(row?.score)}
+                                        </output>
+                                      ) : (
+                                        <select
+                                          className="select score-select"
+                                          defaultValue={row?.score ?? ""}
+                                          disabled={advisoryScoreEntry.readOnly}
+                                          id={`score_${criterion.id}`}
+                                          name={`score_${criterion.id}`}
+                                        >
+                                          <option value="">—</option>
+                                          {advisoryScoreEntry.scoreOptions.map(
+                                            (option) => (
+                                              <option
+                                                key={option.value}
+                                                value={option.value}
+                                              >
+                                                {option.value.toFixed(2)}
+                                                {option.label
+                                                  ? ` — ${option.label}`
+                                                  : ""}
+                                              </option>
+                                            ),
+                                          )}
+                                        </select>
                                       )}
-                                    </select>
-                                  )}
+                                    </>
+                                  ) : null}
 
                                   {advisoryScoreEntry.canComment &&
                                   !isOverallProductionCategory ? (
