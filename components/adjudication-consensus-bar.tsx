@@ -219,8 +219,21 @@ export function AdjudicationConsensusBar({
       ),
     );
   const supabase = useMemo(() => createClient(), []);
-  const saveCategoryAction = useMemo(
-    () => saveAllCategoryProposals.bind(null, applicationId),
+  const saveCategoryAction = useCallback(
+    async (
+      previous: CategoryProposalSaveResult,
+      formData: FormData,
+    ) => {
+      const result = await saveAllCategoryProposals(
+        applicationId,
+        previous,
+        formData,
+      );
+      if (result.ok && result.intent === "draft") {
+        setMatrixOpen(false);
+      }
+      return result;
+    },
     [applicationId],
   );
   const [categorySaveResult, categorySaveAction] = useActionState(
@@ -810,10 +823,13 @@ export function AdjudicationConsensusBar({
                 </div>
                 <div className="modal-header-actions">
                   <button
-                    aria-label="Close category decisions"
+                    aria-label="Save and close category decisions"
                     className="modal-close"
-                    onClick={() => setMatrixOpen(false)}
-                    type="button"
+                    formNoValidate
+                    name="save_intent"
+                    title="Save and close"
+                    type="submit"
+                    value="draft"
                   >
                     ×
                   </button>
@@ -1175,15 +1191,26 @@ export function AdjudicationConsensusBar({
                   onClick={() => setMatrixOpen(false)}
                   type="button"
                 >
-                  Cancel
+                  Discard changes
                 </button>
                 <ScheduleSubmitButton
+                  className="button button-secondary"
+                  formNoValidate
+                  name="save_intent"
+                  pendingLabel="Saving draft…"
+                  value="draft"
+                >
+                  Save and close
+                </ScheduleSubmitButton>
+                <ScheduleSubmitButton
                   className="button button-gold"
+                  name="save_intent"
                   pendingLabel={
                     role === "advisory_member"
                       ? "Sending for approval…"
                       : "Saving decisions…"
                   }
+                  value="approval"
                 >
                   {role === "advisory_member"
                     ? "Send for approval"

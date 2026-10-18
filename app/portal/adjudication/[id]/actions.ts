@@ -142,7 +142,8 @@ async function persistAdjudicatorScorecard(
   const { data: proposalData, error: proposalError } = await supabase
     .from("adjudication_category_proposals")
     .select("category_id,is_eligible,range_min,range_max,status")
-    .eq("application_id", applicationId);
+    .eq("application_id", applicationId)
+    .neq("status", "draft");
 
   if (proposalError) throw new Error(proposalError.message);
 

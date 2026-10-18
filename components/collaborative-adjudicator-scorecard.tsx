@@ -1168,7 +1168,8 @@ export function CollaborativeAdjudicatorScorecard({
         .select(
           "id,category_id,is_eligible,range_min,range_max,status,advisory_note",
         )
-        .eq("application_id", applicationId),
+        .eq("application_id", applicationId)
+        .neq("status", "draft"),
       canComment
         ? supabase
             .from("adjudication_panel_feedback")

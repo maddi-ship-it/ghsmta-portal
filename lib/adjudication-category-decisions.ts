@@ -23,6 +23,8 @@ export type ExistingCategoryProposal = {
   approved_at: string | null;
 };
 
+export type CategorySaveIntent = "draft" | "approval";
+
 function numbersMatch(
   left: number | string | null,
   right: number | null,
@@ -73,5 +75,17 @@ export function categoryDecisionHasChanges(
     (actorRole === "owner" &&
       (existing.owner_override_note !== decision.owner_override_note ||
         (existing.status === "overridden") !== decision.owner_override))
+  );
+}
+
+export function categoryDecisionNeedsSave(
+  decision: CategoryDecision,
+  existing: ExistingCategoryProposal | undefined,
+  actorRole: AppRole,
+  intent: CategorySaveIntent,
+) {
+  return (
+    categoryDecisionHasChanges(decision, existing, actorRole) ||
+    (intent === "approval" && existing?.status === "draft")
   );
 }

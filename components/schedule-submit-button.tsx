@@ -8,6 +8,9 @@ type ScheduleSubmitButtonProps = {
   className?: string;
   disabled?: boolean;
   formAction?: React.ComponentProps<"button">["formAction"];
+  formNoValidate?: boolean;
+  name?: string;
+  value?: string;
 };
 
 export function ScheduleSubmitButton({
@@ -16,6 +19,9 @@ export function ScheduleSubmitButton({
   className = "button button-dark",
   disabled = false,
   formAction,
+  formNoValidate = false,
+  name,
+  value,
 }: ScheduleSubmitButtonProps) {
   const { pending } = useFormStatus();
 
@@ -24,7 +30,10 @@ export function ScheduleSubmitButton({
       className={className}
       disabled={disabled || pending}
       formAction={formAction}
+      formNoValidate={formNoValidate}
+      name={name}
       type="submit"
+      value={value}
     >
       {pending ? pendingLabel : children}
     </button>

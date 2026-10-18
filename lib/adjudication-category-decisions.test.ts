@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   categoryDecisionHasChanges,
+  categoryDecisionNeedsSave,
   type CategoryDecision,
   type ExistingCategoryProposal,
 } from "./adjudication-category-decisions";
@@ -120,6 +121,32 @@ describe("categoryDecisionHasChanges", () => {
           owner_override_note: "Owner decision",
         },
         "owner",
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("categoryDecisionNeedsSave", () => {
+  const draftProposal = { ...baseProposal, status: "draft" };
+
+  it("does not rewrite an unchanged draft while saving and closing", () => {
+    expect(
+      categoryDecisionNeedsSave(
+        baseDecision,
+        draftProposal,
+        "advisory_member",
+        "draft",
+      ),
+    ).toBe(false);
+  });
+
+  it("submits an unchanged draft when it is sent for approval", () => {
+    expect(
+      categoryDecisionNeedsSave(
+        baseDecision,
+        draftProposal,
+        "advisory_member",
+        "approval",
       ),
     ).toBe(true);
   });

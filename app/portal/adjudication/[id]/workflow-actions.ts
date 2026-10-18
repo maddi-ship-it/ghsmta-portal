@@ -12,7 +12,8 @@ import {
   twoPointRangeFromStart,
 } from "@/lib/adjudication-ranges";
 import {
-  categoryDecisionHasChanges,
+  categoryDecisionNeedsSave,
+  type CategorySaveIntent,
   type CategoryDecision,
   type ExistingCategoryProposal,
 } from "@/lib/adjudication-category-decisions";
@@ -32,6 +33,7 @@ export type CategoryProposalSaveResult = {
   message?: string;
   changedCount?: number;
   attemptId?: string;
+  intent?: CategorySaveIntent;
 };
 
 export type PanelAssignmentAnnouncementResult = {
@@ -57,11 +59,13 @@ async function saveAssignedWorkspaceCategoryProposals({
   actorId,
   actorRole,
   decisions,
+  sendForApproval,
 }: {
   applicationId: string;
   actorId: string;
   actorRole: AppRole;
   decisions: CategoryDecision[];
+  sendForApproval: boolean;
 }) {
   const admin = createAdminClient();
   const { data: application, error: applicationError } = await admin
@@ -142,7 +146,7 @@ async function saveAssignedWorkspaceCategoryProposals({
       actorRole === "owner" && decision.owner_override;
     const ownerOverrideNote =
       actorRole === "owner" ? decision.owner_override_note : null;
-    const decisionChanged =
+    const contentChanged =
       !existing ||
       existing.is_eligible !== decision.is_eligible ||
       !numbersMatch(existing.range_min, decision.range_min) ||
@@ -152,11 +156,15 @@ async function saveAssignedWorkspaceCategoryProposals({
         existing.owner_override_note !== ownerOverrideNote) ||
       (ownerOverride && existing.status !== "overridden") ||
       (!ownerOverride && existing.status === "overridden");
-    const nextStatus = ownerOverride
+    const nextStatus = !sendForApproval
+      ? "draft"
+      : ownerOverride
       ? "overridden"
-      : existing && !decisionChanged
+      : existing && !contentChanged && existing.status !== "draft"
         ? existing.status
         : "proposed";
+    const decisionChanged =
+      contentChanged || existing?.status !== nextStatus;
 
     if (decisionChanged) changedCategoryIds.add(decision.category_id);
 
@@ -214,7 +222,7 @@ async function saveAssignedWorkspaceCategoryProposals({
       ),
     ];
 
-    if (recipientIds.length > 0) {
+    if (sendForApproval && recipientIds.length > 0) {
       const changedCount = changedCategoryIds.size;
       const { error: notificationError } = await admin
         .from("user_notifications")
@@ -247,12 +255,14 @@ async function savePanelNarrativeAssignments({
   actorId,
   categoryIds,
   announcementCategoryIds,
+  announceChanges,
   formData,
 }: {
   applicationId: string;
   actorId: string;
   categoryIds: string[];
   announcementCategoryIds: string[];
+  announceChanges: boolean;
   formData: FormData;
 }) {
   const assignments = categoryIds.map((categoryId) => ({
@@ -405,7 +415,7 @@ async function savePanelNarrativeAssignments({
     ];
   });
 
-  if (notifications.length > 0) {
+  if (announceChanges && notifications.length > 0) {
     const { error: notificationError } = await admin
       .from("user_notifications")
       .insert(notifications);
@@ -419,6 +429,7 @@ async function savePanelNarrativeAssignments({
   }
 
   if (
+    announceChanges &&
     changedAssignments.length > 0 &&
     completedNarrativeAssignmentsNow({
       categoryIds: announcementCategoryIds,
@@ -495,6 +506,8 @@ export async function saveAllCategoryProposals(
 ): Promise<CategoryProposalSaveResult> {
   const profile = await requireProfile(["advisory_member", "owner"]);
   const attemptId = new Date().toISOString();
+  const intent: CategorySaveIntent =
+    text(formData, "save_intent") === "approval" ? "approval" : "draft";
   const categoryIds = [
     ...new Set(
       formData
@@ -604,11 +617,19 @@ export async function saveAllCategoryProposals(
       row,
     ]),
   );
-  const changedDecisions = decisions.filter((decision) =>
-    categoryDecisionHasChanges(
+  const savableDecisions = decisions.map((decision) =>
+    intent === "draft" &&
+    (!Number.isFinite(decision.range_min) ||
+      !Number.isFinite(decision.range_max))
+      ? { ...decision, range_min: null, range_max: null }
+      : decision,
+  );
+  const changedDecisions = savableDecisions.filter((decision) =>
+    categoryDecisionNeedsSave(
       decision,
       existingByCategory.get(decision.category_id),
       profile.role,
+      intent,
     ),
   );
   const changedScoreability = scoreabilityDecisions.filter((decision) => {
@@ -620,6 +641,7 @@ export async function saveAllCategoryProposals(
   });
 
   if (
+    intent === "approval" &&
     decisions.some(
       (decision) =>
         !Number.isFinite(decision.range_min) ||
@@ -631,10 +653,12 @@ export async function saveAllCategoryProposals(
       error:
         "Every category needs a valid two-point range, even when it is not award eligible.",
       attemptId,
+      intent,
     };
   }
 
   if (
+    intent === "approval" &&
     profile.role === "owner" &&
     changedDecisions.some(
       (decision) =>
@@ -645,13 +669,16 @@ export async function saveAllCategoryProposals(
       ok: false,
       error: "Every Owner override needs an override note.",
       attemptId,
+      intent,
     };
   }
 
   let changedCount = 0;
   if (changedDecisions.length > 0) {
     const { data, error } = await supabase.rpc(
-      "save_all_adjudication_category_proposals",
+      intent === "draft"
+        ? "save_adjudication_category_proposal_drafts"
+        : "save_all_adjudication_category_proposals",
       {
         p_application_id: applicationId,
         p_decisions: changedDecisions,
@@ -667,6 +694,7 @@ export async function saveAllCategoryProposals(
             actorId: profile.id,
             actorRole: profile.role,
             decisions: changedDecisions,
+            sendForApproval: intent === "approval",
           });
         } catch (fallbackError) {
           const message =
@@ -743,6 +771,7 @@ export async function saveAllCategoryProposals(
         announcementCategoryIds: scoreabilityDecisions
           .filter((decision) => decision.is_scoreable)
           .map((decision) => decision.category_id),
+        announceChanges: intent === "approval",
         formData,
       });
     } catch (assignmentError) {
@@ -759,25 +788,32 @@ export async function saveAllCategoryProposals(
     }
   }
 
-  try {
-    await queuePanelReviewForOwnersIfReady(applicationId, profile.id);
-  } catch (queueError) {
-    logEvent("warn", "adjudication.owner_review_queue_check_failed", {
-      applicationId,
-      actorId: profile.id,
-      message:
-        queueError instanceof Error
-          ? queueError.message
-          : "Owner review queue check failed.",
-    });
+  if (intent === "approval") {
+    try {
+      await queuePanelReviewForOwnersIfReady(applicationId, profile.id);
+    } catch (queueError) {
+      logEvent("warn", "adjudication.owner_review_queue_check_failed", {
+        applicationId,
+        actorId: profile.id,
+        message:
+          queueError instanceof Error
+            ? queueError.message
+            : "Owner review queue check failed.",
+      });
+    }
   }
 
   revalidatePath(`/portal/adjudication/${applicationId}`);
   return {
     ok: true,
     changedCount,
+    intent,
     message:
-      changedCount === 0
+      intent === "draft"
+        ? changedCount === 0
+          ? "Your draft is already up to date."
+          : `${changedCount} draft change${changedCount === 1 ? "" : "s"} saved.`
+        : changedCount === 0
         ? "All category decisions and assignments are already up to date."
         : `${changedCount} category decision or assignment change${changedCount === 1 ? "" : "s"} saved.`,
     attemptId,
@@ -804,12 +840,18 @@ export async function respondCategoryProposal(
   const supabase = await createClient();
   const { data: proposal, error: proposalError } = await supabase
     .from("adjudication_category_proposals")
-    .select("application_id,range_min,range_max")
+    .select("application_id,range_min,range_max,status")
     .eq("id", proposalId)
     .eq("application_id", applicationId)
     .maybeSingle();
 
   if (proposalError) throw new Error(proposalError.message);
+
+  if (proposal?.status === "draft") {
+    throw new Error(
+      "This category decision has not been sent for approval yet.",
+    );
+  }
 
   if (
     !proposal ||

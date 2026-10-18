@@ -582,11 +582,16 @@ export default async function AdjudicationApplicationPage({
   const scores = (scoresResult.data ?? []) as AdjudicationScore[];
   const comments = (commentsResult.data ?? []) as AdjudicationCategoryComment[];
 
+  let proposalQuery = supabase
+    .from("adjudication_category_proposals")
+    .select("*")
+    .eq("application_id", id);
+  if (profile.role === "adjudicator") {
+    proposalQuery = proposalQuery.neq("status", "draft");
+  }
+
   const [proposalResult, scoreabilityResult, reviewResult] = await Promise.all([
-    supabase
-      .from("adjudication_category_proposals")
-      .select("*")
-      .eq("application_id", id),
+    proposalQuery,
     supabase
       .from("adjudication_category_scoreability")
       .select("category_id,is_scoreable,reason")
