@@ -17078,23 +17078,6 @@ html[data-theme="light"] .portal-shell .portal-main .application-reference-actio
   background: rgba(231, 220, 195, 0.35);
 }
 
-@media (min-width: 1501px) {
-  .portal-shell .portal-main .application-reference-bar {
-    padding-top: 6px;
-    padding-bottom: 6px;
-  }
-
-  .portal-shell .portal-main .application-reference-buttons {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-  }
-
-  .portal-shell .portal-main .application-reference-action-groups {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-  }
-}
-
 @media (max-width: 1700px) {
   .portal-shell .portal-main .application-reference-bar {
     position: sticky;
