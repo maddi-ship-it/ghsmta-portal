@@ -987,6 +987,39 @@ export function AdjudicationConsensusBar({
                     })}
               </div>
 
+              {canSetDecisions && (
+                <div className="panel-assignment-announcement">
+                  <div>
+                    <strong>Panel comment assignments</strong>
+                    <p>
+                      Post the currently saved final-comment writers in this
+                      school&apos;s panel channel.
+                    </p>
+                  </div>
+                  <ScheduleSubmitButton
+                    className="button button-secondary"
+                    formAction={sendAssignments}
+                    pendingLabel="Sending assignments…"
+                  >
+                    Send assignments to panel
+                  </ScheduleSubmitButton>
+                </div>
+              )}
+              {assignmentAnnouncementResult.message && (
+                <div
+                  aria-live="polite"
+                  className="notice-banner success-banner page-message"
+                  role="status"
+                >
+                  {assignmentAnnouncementResult.message}
+                </div>
+              )}
+              {assignmentAnnouncementResult.error && (
+                <div className="form-error page-message" role="alert">
+                  {assignmentAnnouncementResult.error}
+                </div>
+              )}
+
               <div className="sticky-modal-footer advisory-decision-footer">
                 <span aria-live="polite" className="range-review-live-status">
                   <span
@@ -1066,39 +1099,6 @@ export function AdjudicationConsensusBar({
                 {statusLabel(review?.status ?? "draft")}
               </p>
             </div>
-            {canSetDecisions && (
-              <div className="panel-assignment-announcement">
-                <div>
-                  <strong>Panel comment assignments</strong>
-                  <p>
-                    Post the currently saved final-comment writers in this
-                    school&apos;s panel channel.
-                  </p>
-                </div>
-                <form action={sendAssignments}>
-                  <ScheduleSubmitButton
-                    className="button button-gold"
-                    pendingLabel="Sending assignments…"
-                  >
-                    Send assignments to panel
-                  </ScheduleSubmitButton>
-                </form>
-              </div>
-            )}
-            {assignmentAnnouncementResult.message && (
-              <div
-                aria-live="polite"
-                className="notice-banner success-banner page-message"
-                role="status"
-              >
-                {assignmentAnnouncementResult.message}
-              </div>
-            )}
-            {assignmentAnnouncementResult.error && (
-              <div className="form-error page-message" role="alert">
-                {assignmentAnnouncementResult.error}
-              </div>
-            )}
             {role === "advisory_member" && (
               <form action={submitPanelForOwnerReview.bind(null, applicationId)}>
                 <button
