@@ -231,6 +231,58 @@ export function actingCandidateReviewIsComplete(
   );
 }
 
+function candidateSubject(candidate: ActingCandidate) {
+  if (!candidate.name && !candidate.pronouns && !candidate.role) return "";
+
+  return [candidate.name, candidate.pronouns, candidate.role]
+    .map((value) => value || "Not provided")
+    .join(" | ");
+}
+
+export function actingCandidateSubjectDefaults(
+  candidates: ActingCandidate[],
+): Record<ActingCandidateSlot, string> {
+  return Object.fromEntries(
+    candidates.map((candidate) => [
+      candidate.slot,
+      candidateSubject(candidate),
+    ]),
+  ) as Record<ActingCandidateSlot, string>;
+}
+
+export function applyActingCandidatesToReferencePanels(
+  panels: ApplicationReferencePanel[],
+  candidates: ActingCandidate[],
+): ApplicationReferencePanel[] {
+  return panels.map((panel) => {
+    if (panel.key !== "acting-candidates") return panel;
+
+    return {
+      ...panel,
+      description:
+        "Current acting candidates, roles, pronouns, and grade levels from the adjudication review.",
+      groups: candidates
+        .filter((candidate) =>
+          [
+            candidate.name,
+            candidate.pronouns,
+            candidate.role,
+            candidate.gradeLevel,
+          ].some(Boolean),
+        )
+        .map((candidate) => ({
+          title: candidate.label,
+          items: [
+            { label: "Name", value: candidate.name },
+            { label: "Pronouns", value: candidate.pronouns },
+            { label: "Role", value: candidate.role },
+            { label: "Grade level", value: candidate.gradeLevel },
+          ],
+        })),
+    };
+  });
+}
+
 function candidateLine(candidate: ActingCandidate) {
   const name = candidate.name || "Not provided";
   return `${candidate.label}: ${name}${candidate.role ? ` (${candidate.role})` : ""}`;

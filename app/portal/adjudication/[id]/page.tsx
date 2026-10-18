@@ -13,7 +13,9 @@ import {
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
 import {
+  actingCandidateSubjectDefaults,
   actingCandidateReviewIsComplete,
+  applyActingCandidatesToReferencePanels,
   createInitialActingCandidateReviewState,
   extractActingCandidates,
   extractDirectorName,
@@ -193,7 +195,7 @@ export default async function AdjudicationApplicationPage({
   const applicationAnswers =
     (applicationAnswersResult.data ?? []) as ApplicationAnswer[];
 
-  const categorySubjectDefaults = resolveScoringCategorySubjects({
+  const submittedCategorySubjectDefaults = resolveScoringCategorySubjects({
     application,
     questions: applicationQuestions,
     answers: applicationAnswers,
@@ -560,11 +562,6 @@ export default async function AdjudicationApplicationPage({
     ],
   };
 
-  const referencePanels = [
-    ...applicationReferencePanels,
-    adjudicationReferencePanel,
-  ];
-
   if (isScoringParticipant && !ownParticipantResult.data) notFound();
 
   const categoryIds = categories.map((category) => category.id);
@@ -705,6 +702,17 @@ export default async function AdjudicationApplicationPage({
       ),
       directorName: applicationDirectorName,
     });
+  const categorySubjectDefaults: Record<string, string> = {
+    ...submittedCategorySubjectDefaults,
+    ...actingCandidateSubjectDefaults(actingCandidateReview.candidates),
+  };
+  const referencePanels = [
+    ...applyActingCandidatesToReferencePanels(
+      applicationReferencePanels,
+      actingCandidateReview.candidates,
+    ),
+    adjudicationReferencePanel,
+  ];
   const ownScorecard = showEditableScorecard
     ? scorecards.find((scorecard) => scorecard.adjudicator_user_id === profile.id) ?? null
     : null;

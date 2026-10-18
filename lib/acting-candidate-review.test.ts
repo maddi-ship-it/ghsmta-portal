@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  actingCandidateSubjectDefaults,
+  applyActingCandidatesToReferencePanels,
   buildActingCandidateSchoolMessage,
   changedActingCandidateSlots,
   extractActingCandidates,
@@ -84,6 +86,52 @@ describe("acting candidate review", () => {
 
     expect(changedActingCandidateSlots(original, updated)).toEqual([
       "featured_performer",
+    ]);
+  });
+
+  it("uses the reviewed roster in acting category subjects", () => {
+    const candidates = extractActingCandidates([actingPanel]).map(
+      (candidate) =>
+        candidate.slot === "leading_actress"
+          ? {
+              ...candidate,
+              name: "Updated Student",
+              pronouns: "They/Them",
+              role: "Updated Role",
+            }
+          : candidate,
+    );
+
+    expect(actingCandidateSubjectDefaults(candidates).leading_actress).toBe(
+      "Updated Student | They/Them | Updated Role",
+    );
+  });
+
+  it("uses the reviewed roster in the Acting Candidates reference panel", () => {
+    const candidates = extractActingCandidates([actingPanel]).map(
+      (candidate) =>
+        candidate.slot === "featured_performer"
+          ? {
+              ...candidate,
+              name: "Updated Student",
+              role: "Updated Role",
+              gradeLevel: "12",
+            }
+          : candidate,
+    );
+    const [panel] = applyActingCandidatesToReferencePanels(
+      [actingPanel],
+      candidates,
+    );
+    const featured = panel.groups.find(
+      (group) => group.title === "Featured Performer",
+    );
+
+    expect(featured?.items).toEqual([
+      { label: "Name", value: "Updated Student" },
+      { label: "Pronouns", value: "they/them" },
+      { label: "Role", value: "Updated Role" },
+      { label: "Grade level", value: "12" },
     ]);
   });
 
