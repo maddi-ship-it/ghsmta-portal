@@ -12,8 +12,10 @@ import {
   ownerUpdateAdjudicationReview,
   respondCategoryProposal,
   saveAllCategoryProposals,
+  sendPanelNarrativeAssignmentsToChannel,
   submitPanelForOwnerReview,
   type CategoryProposalSaveResult,
+  type PanelAssignmentAnnouncementResult,
 } from "@/app/portal/adjudication/[id]/workflow-actions";
 import { ActingCandidateReviewPanel } from "@/components/acting-candidate-review-panel";
 import { ScheduleSubmitButton } from "@/components/schedule-submit-button";
@@ -138,6 +140,9 @@ const rangeOptions = Array.from(
 ).filter((value) => value <= 8);
 
 const initialCategorySaveResult: CategoryProposalSaveResult = { ok: false };
+const initialAssignmentAnnouncementResult: PanelAssignmentAnnouncementResult = {
+  ok: false,
+};
 
 export function AdjudicationConsensusBar({
   actingCandidateReview,
@@ -197,6 +202,14 @@ export function AdjudicationConsensusBar({
   const [categorySaveResult, categorySaveAction] = useActionState(
     saveCategoryAction,
     initialCategorySaveResult,
+  );
+  const sendAssignmentsAction = useMemo(
+    () => sendPanelNarrativeAssignmentsToChannel.bind(null, applicationId),
+    [applicationId],
+  );
+  const [assignmentAnnouncementResult, sendAssignments] = useActionState(
+    sendAssignmentsAction,
+    initialAssignmentAnnouncementResult,
   );
   const proposalByCategory = useMemo(
     () => new Map(proposals.map((proposal) => [proposal.category_id, proposal])),
@@ -1053,6 +1066,39 @@ export function AdjudicationConsensusBar({
                 {statusLabel(review?.status ?? "draft")}
               </p>
             </div>
+            {canSetDecisions && (
+              <div className="panel-assignment-announcement">
+                <div>
+                  <strong>Panel comment assignments</strong>
+                  <p>
+                    Post the currently saved final-comment writers in this
+                    school&apos;s panel channel.
+                  </p>
+                </div>
+                <form action={sendAssignments}>
+                  <ScheduleSubmitButton
+                    className="button button-gold"
+                    pendingLabel="Sending assignments…"
+                  >
+                    Send assignments to panel
+                  </ScheduleSubmitButton>
+                </form>
+              </div>
+            )}
+            {assignmentAnnouncementResult.message && (
+              <div
+                aria-live="polite"
+                className="notice-banner success-banner page-message"
+                role="status"
+              >
+                {assignmentAnnouncementResult.message}
+              </div>
+            )}
+            {assignmentAnnouncementResult.error && (
+              <div className="form-error page-message" role="alert">
+                {assignmentAnnouncementResult.error}
+              </div>
+            )}
             {role === "advisory_member" && (
               <form action={submitPanelForOwnerReview.bind(null, applicationId)}>
                 <button

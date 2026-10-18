@@ -34,6 +34,14 @@ export type CategoryProposalSaveResult = {
   attemptId?: string;
 };
 
+export type PanelAssignmentAnnouncementResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  sentCount?: number;
+  attemptId?: string;
+};
+
 const ACTIVE_APPLICATION_ERROR = "The active application was not found.";
 
 function numbersMatch(
@@ -882,6 +890,247 @@ export async function submitPanelForOwnerReview(applicationId: string) {
     );
   }
   revalidatePath(`/portal/adjudication/${applicationId}`);
+}
+
+export async function sendPanelNarrativeAssignmentsToChannel(
+  applicationId: string,
+  _previous: PanelAssignmentAnnouncementResult,
+): Promise<PanelAssignmentAnnouncementResult> {
+  void _previous;
+  const profile = await requireProfile(["advisory_member", "owner"]);
+  const attemptId = new Date().toISOString();
+  const supabase = await createClient();
+  const { data: canReview, error: accessError } = await supabase.rpc(
+    "can_advisory_review_application",
+    {
+      p_application_id: applicationId,
+      p_user_id: profile.id,
+    },
+  );
+
+  if (accessError || !canReview) {
+    logEvent("warn", "adjudication.assignment_chat_access_denied", {
+      applicationId,
+      actorId: profile.id,
+      message: accessError?.message ?? "Review access is no longer active.",
+    });
+    return {
+      ok: false,
+      error: "You are no longer assigned to review this application.",
+      attemptId,
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: application, error: applicationError } = await admin
+    .from("applications")
+    .select("form_version_id,school_name,production_title")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (applicationError || !application?.form_version_id) {
+    return {
+      ok: false,
+      error: "The application and its scoring rubric could not be loaded.",
+      attemptId,
+    };
+  }
+
+  const { data: formVersion, error: formVersionError } = await admin
+    .from("application_form_versions")
+    .select("scoring_rubric_id")
+    .eq("id", application.form_version_id)
+    .maybeSingle();
+
+  if (formVersionError || !formVersion?.scoring_rubric_id) {
+    return {
+      ok: false,
+      error: "The scoring rubric could not be loaded.",
+      attemptId,
+    };
+  }
+
+  const [categoryResult, feedbackResult, scoreabilityResult, channelResult] =
+    await Promise.all([
+      admin
+        .from("scoring_categories")
+        .select("id,title,sort_order")
+        .eq("rubric_id", formVersion.scoring_rubric_id)
+        .eq("active", true)
+        .order("sort_order"),
+      admin
+        .from("adjudication_panel_feedback")
+        .select("category_id,assigned_to")
+        .eq("application_id", applicationId)
+        .not("assigned_to", "is", null),
+      admin
+        .from("adjudication_category_scoreability")
+        .select("category_id,is_scoreable")
+        .eq("application_id", applicationId),
+      admin
+        .from("chat_channels")
+        .select("id")
+        .eq("application_id", applicationId)
+        .eq("channel_type", "school")
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+  const firstError = [
+    categoryResult.error,
+    feedbackResult.error,
+    scoreabilityResult.error,
+    channelResult.error,
+  ].find(Boolean);
+  if (firstError) {
+    logEvent("error", "adjudication.assignment_chat_load_failed", {
+      applicationId,
+      actorId: profile.id,
+      message: firstError.message,
+    });
+    return {
+      ok: false,
+      error: "The comment assignments could not be loaded.",
+      attemptId,
+    };
+  }
+  if (!channelResult.data) {
+    return {
+      ok: false,
+      error: "This school does not have an active panel channel.",
+      attemptId,
+    };
+  }
+
+  const assignmentByCategory = new Map(
+    (feedbackResult.data ?? []).map((assignment) => [
+      assignment.category_id,
+      assignment.assigned_to,
+    ]),
+  );
+  const scoreabilityByCategory = new Map(
+    (scoreabilityResult.data ?? []).map((decision) => [
+      decision.category_id,
+      decision.is_scoreable,
+    ]),
+  );
+  const reviewerIds = [
+    ...new Set(
+      (feedbackResult.data ?? []).flatMap((assignment) =>
+        assignment.assigned_to ? [assignment.assigned_to] : [],
+      ),
+    ),
+  ];
+  const { data: reviewerProfiles, error: reviewerError } =
+    reviewerIds.length > 0
+      ? await admin
+          .from("profiles")
+          .select("id,email,full_name")
+          .in("id", reviewerIds)
+      : { data: [], error: null };
+
+  if (reviewerError) {
+    return {
+      ok: false,
+      error: "The assigned panel members could not be loaded.",
+      attemptId,
+    };
+  }
+
+  const reviewerById = new Map(
+    (reviewerProfiles ?? []).map((reviewer) => [reviewer.id, reviewer]),
+  );
+  const announcementAssignments = (categoryResult.data ?? []).flatMap(
+    (category) => {
+      if (scoreabilityByCategory.get(category.id) === false) return [];
+      const reviewerId = assignmentByCategory.get(category.id);
+      if (!reviewerId) return [];
+      const reviewer = reviewerById.get(reviewerId);
+      return [
+        {
+          categoryTitle: category.title,
+          reviewerName:
+            reviewer?.full_name?.trim() || reviewer?.email || "Panel member",
+        },
+      ];
+    },
+  );
+
+  if (announcementAssignments.length === 0) {
+    return {
+      ok: false,
+      error: "Assign at least one final-comment writer before sending the list.",
+      attemptId,
+    };
+  }
+
+  const subject = "Final comment assignments";
+  const body = narrativeAssignmentAnnouncement({
+    schoolName: application.school_name,
+    productionTitle: application.production_title,
+    assignments: announcementAssignments,
+  });
+  const duplicateWindowStart = new Date(Date.now() - 5 * 60 * 1_000).toISOString();
+  const { data: recentDuplicate, error: duplicateError } = await admin
+    .from("chat_posts")
+    .select("id")
+    .eq("channel_id", channelResult.data.id)
+    .eq("subject", subject)
+    .eq("body", body)
+    .is("deleted_at", null)
+    .gte("created_at", duplicateWindowStart)
+    .limit(1)
+    .maybeSingle();
+
+  if (duplicateError) {
+    return {
+      ok: false,
+      error: "The panel channel could not be checked for a recent post.",
+      attemptId,
+    };
+  }
+  if (recentDuplicate) {
+    return {
+      ok: true,
+      message: "These comment assignments were already sent to the panel recently.",
+      sentCount: announcementAssignments.length,
+      attemptId,
+    };
+  }
+
+  const { data: sentPost, error: sendError } = await admin
+    .from("chat_posts")
+    .insert({
+      channel_id: channelResult.data.id,
+      author_id: profile.id,
+      subject,
+      body,
+    })
+    .select("id")
+    .single();
+
+  if (sendError || !sentPost) {
+    logEvent("error", "adjudication.assignment_chat_send_failed", {
+      applicationId,
+      actorId: profile.id,
+      message: sendError?.message ?? "The created post could not be verified.",
+    });
+    return {
+      ok: false,
+      error: "The assignments could not be sent to the panel channel.",
+      attemptId,
+    };
+  }
+
+  revalidatePath(`/portal/adjudication/${applicationId}`);
+  revalidatePath("/portal/chat");
+  return {
+    ok: true,
+    message: `${announcementAssignments.length} comment assignment${announcementAssignments.length === 1 ? "" : "s"} sent to the panel channel.`,
+    sentCount: announcementAssignments.length,
+    attemptId,
+  };
 }
 
 export async function ownerUpdateAdjudicationReview(

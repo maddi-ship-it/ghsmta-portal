@@ -5597,6 +5597,34 @@ body.modal-open {
 .consensus-response-form { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
 .consensus-response-status { display: flex; justify-content: space-between; gap: 12px; }
 .consensus-review-checklist { margin-bottom: 20px; padding: 16px; border-radius: 14px; background: var(--surface-soft); }
+.panel-assignment-announcement {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.panel-assignment-announcement p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.panel-assignment-announcement form,
+.panel-assignment-announcement .button {
+  flex: 0 0 auto;
+}
+@media (max-width: 700px) {
+  .panel-assignment-announcement {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .panel-assignment-announcement .button {
+    width: 100%;
+  }
+}
 .badge-warning { color: #8b4d00; background: #fff3d8; }
 .badge-complete { color: #145d32; background: #e7f8ed; }
 
