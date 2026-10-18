@@ -21,6 +21,7 @@ export function AuthSignInPanel({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [method, setMethod] = useState<LoginMethod>("password");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneCodeSent, setPhoneCodeSent] = useState(false);
   const [message, setMessage] = useState<string | null>(
@@ -200,14 +201,25 @@ export function AuthSignInPanel({
           </div>
           <div className="field">
             <label htmlFor="password">Password</label>
-            <input
-              autoComplete="current-password"
-              className="input"
-              id="password"
-              name="password"
-              required
-              type="password"
-            />
+            <div className="auth-password-input">
+              <input
+                autoComplete="current-password"
+                className="input"
+                id="password"
+                name="password"
+                required
+                type={passwordVisible ? "text" : "password"}
+              />
+              <button
+                aria-controls="password"
+                aria-label={`${passwordVisible ? "Hide" : "Show"} password`}
+                aria-pressed={passwordVisible}
+                onClick={() => setPasswordVisible((visible) => !visible)}
+                type="button"
+              >
+                {passwordVisible ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
           <button className="button button-primary" disabled={pending} type="submit">
             {pending ? "Signing in…" : "Sign in"}

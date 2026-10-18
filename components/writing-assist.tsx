@@ -49,6 +49,7 @@ function WritingAssistControls() {
   const [draft, setDraft] = useState("");
   const [source, setSource] = useState<"Voice dictation" | "Handwritten notes">("Voice dictation");
   const [error, setError] = useState("");
+  const [isBrainDumpTarget, setIsBrainDumpTarget] = useState(false);
 
   useEffect(() => {
     const handleFocus = (event: FocusEvent) => {
@@ -56,9 +57,11 @@ function WritingAssistControls() {
       if (rootRef.current?.contains(element)) return;
       if (isWritableTarget(element)) {
         targetRef.current = element;
+        setIsBrainDumpTarget(Boolean(element.closest(".adjudication-brain-dump")));
         setVisible(true);
         setError("");
       } else {
+        setIsBrainDumpTarget(false);
         setVisible(false);
       }
     };
@@ -182,7 +185,14 @@ function WritingAssistControls() {
           </button>
           {mode === "processing" && <span className={styles.progress}>Processing…</span>}
           <span className={styles.disclosure}>AI transcription · review before inserting</span>
-          <input accept="image/*" capture="environment" hidden onChange={scanImage} ref={imageInputRef} type="file" />
+          <input
+            accept="image/*,.heic,.heif,image/heic,image/heif"
+            capture="environment"
+            hidden
+            onChange={scanImage}
+            ref={imageInputRef}
+            type="file"
+          />
         </div>
       )}
 
@@ -198,7 +208,9 @@ function WritingAssistControls() {
             <div className={styles.actions}>
               <button className="button button-secondary" onClick={() => setDraft("")} type="button">Cancel</button>
               <button className="button button-secondary" onClick={() => applyDraft(true)} type="button">Replace field</button>
-              <button className="button button-primary" onClick={() => applyDraft(false)} type="button">Append to field</button>
+              <button className="button button-primary" onClick={() => applyDraft(false)} type="button">
+                {isBrainDumpTarget ? "Add to brain dump" : "Add to field"}
+              </button>
             </div>
           </div>
         </div>

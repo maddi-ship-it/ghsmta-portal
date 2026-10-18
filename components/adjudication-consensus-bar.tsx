@@ -1046,9 +1046,15 @@ export function AdjudicationConsensusBar({
                 </button>
                 <ScheduleSubmitButton
                   className="button button-gold"
-                  pendingLabel="Saving and sending decisions…"
+                  pendingLabel={
+                    role === "advisory_member"
+                      ? "Sending for approval…"
+                      : "Saving decisions…"
+                  }
                 >
-                  Save &amp; send decisions for approval
+                  {role === "advisory_member"
+                    ? "Send for approval"
+                    : "Save category decisions"}
                 </ScheduleSubmitButton>
                 </div>
               </div>

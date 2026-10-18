@@ -1967,6 +1967,14 @@ html[data-theme="light"] .notification-popover-row.is-unread {
   font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
 }
+
+.portal-shell .criterion-header-summary strong {
+  color: var(--portal-gold-bright);
+}
+
+html[data-theme="light"] .portal-shell .criterion-header-summary strong {
+  color: #72510a;
+}
 .text-button {
   padding: 0;
   border: 0;
@@ -16482,6 +16490,40 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   color: var(--app-text);
   border-color: var(--app-line);
   background: var(--app-surface-2);
+}
+
+.auth-password-input {
+  position: relative;
+}
+
+.auth-password-input .input {
+  width: 100%;
+  padding-right: 4.5rem;
+}
+
+.auth-password-input button {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  min-width: 3.2rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+  transform: translateY(-50%);
+  border: 1px solid var(--app-line);
+  border-radius: 0.55rem;
+  color: var(--app-text);
+  background: var(--app-surface);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.auth-password-input button:hover,
+.auth-password-input button:focus-visible {
+  border-color: var(--regal-gold);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--regal-gold) 20%, transparent);
 }
 
 .auth-method-tabs {
