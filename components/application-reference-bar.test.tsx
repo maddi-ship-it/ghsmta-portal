@@ -48,6 +48,7 @@ describe("ApplicationReferenceBar", () => {
           showPanelReview: false,
         }}
         scorecardSubmitControl={<span>SUBMIT SCORECARD</span>}
+        showFullScoreView
       />,
     );
 
@@ -55,6 +56,7 @@ describe("ApplicationReferenceBar", () => {
       "CURRENT CATEGORY",
       "Review all categories",
       "SPECIALTY AWARDS",
+      "Full score view",
       "SUBMIT SCORECARD",
       "ADJUDICATOR VIEWS",
       "ELIGIBILITY",

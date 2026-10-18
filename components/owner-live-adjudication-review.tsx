@@ -10,6 +10,8 @@ import {
 } from "@/app/portal/adjudication/[id]/actions";
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
 import { AdjudicationBigPictureComment } from "@/components/adjudication-overall-production";
+import { OPEN_FULL_SCORE_VIEW_EVENT } from "@/components/application-reference-bar";
+import { FullScoreOverviewModal } from "@/components/full-score-overview-modal";
 import { OwnerCommentReviewModal } from "@/components/owner-comment-review-modal";
 import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
@@ -663,6 +665,7 @@ export function OwnerLiveAdjudicationReview({
   const [scores, setScores] = useState(initialScores);
   const [comments, setComments] = useState(initialComments);
   const [feedback, setFeedback] = useState(initialFeedback);
+  const [fullScoreOverviewOpen, setFullScoreOverviewOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "error">(
     "connecting",
@@ -812,6 +815,25 @@ export function OwnerLiveAdjudicationReview({
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     refreshTimer.current = setTimeout(() => void refreshData(), 150);
   }, [refreshData]);
+  const closeFullScoreOverview = useCallback(
+    () => setFullScoreOverviewOpen(false),
+    [],
+  );
+
+  useEffect(() => {
+    const openFullScoreOverview = () => setFullScoreOverviewOpen(true);
+    window.addEventListener(
+      OPEN_FULL_SCORE_VIEW_EVENT,
+      openFullScoreOverview,
+    );
+
+    return () => {
+      window.removeEventListener(
+        OPEN_FULL_SCORE_VIEW_EVENT,
+        openFullScoreOverview,
+      );
+    };
+  }, []);
 
   const scorecardKey = scorecards.map((scorecard) => scorecard.id).sort().join(",");
 
@@ -943,6 +965,16 @@ export function OwnerLiveAdjudicationReview({
 
   return (
     <>
+      <FullScoreOverviewModal
+        assignments={assignments}
+        categories={categories}
+        criteria={criteria}
+        onClose={closeFullScoreOverview}
+        open={fullScoreOverviewOpen}
+        profiles={profiles}
+        scorecards={scorecards}
+        scores={scores}
+      />
       <div
         className={`live-review-status live-review-status-${
           practiceMode ? "live" : connectionState

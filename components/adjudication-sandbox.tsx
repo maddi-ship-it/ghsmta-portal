@@ -723,6 +723,7 @@ export function AdjudicationSandbox({
             : undefined
         }
         panels={panels}
+        showFullScoreView={mode === "committee"}
         reviewActions={{
           categoryReviewStatus: categoryReviewComplete
             ? "complete"

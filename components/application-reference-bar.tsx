@@ -18,6 +18,8 @@ export const OPEN_CATEGORY_REVIEW_EVENT =
   "ghsmta:open-adjudication-category-review";
 export const OPEN_PANEL_REVIEW_EVENT =
   "ghsmta:open-adjudication-panel-review";
+export const OPEN_FULL_SCORE_VIEW_EVENT =
+  "ghsmta:open-adjudication-full-score-view";
 export const PANEL_COMMENT_VISIBILITY_EVENT =
   "ghsmta:panel-comment-visibility";
 
@@ -50,6 +52,7 @@ export function ApplicationReferenceBar({
   panels,
   reviewActions,
   scorecardSubmitControl,
+  showFullScoreView = false,
 }: {
   categoryWorkflowControl?: ReactNode;
   categoryNavigation?: {
@@ -69,6 +72,7 @@ export function ApplicationReferenceBar({
     showPanelReview: boolean;
   };
   scorecardSubmitControl?: ReactNode;
+  showFullScoreView?: boolean;
 }) {
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
@@ -218,7 +222,8 @@ export function ApplicationReferenceBar({
               {scorecardSubmitControl ||
               categoryWorkflowControl ||
               reviewActions?.showCategoryReview ||
-              panelCommentControl ? (
+              panelCommentControl ||
+              showFullScoreView ? (
                 <div className="application-reference-action-group application-reference-workflow-actions application-category-workflow-actions">
                   {reviewActions?.showCategoryReview ? (
                     <button
@@ -238,6 +243,19 @@ export function ApplicationReferenceBar({
                     </button>
                   ) : null}
                   {categoryWorkflowControl}
+                  {showFullScoreView ? (
+                    <button
+                      className="application-reference-button application-reference-score-overview-button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new Event(OPEN_FULL_SCORE_VIEW_EVENT),
+                        )
+                      }
+                      type="button"
+                    >
+                      Full score view
+                    </button>
+                  ) : null}
                   {scorecardSubmitControl}
                   {panelCommentControl}
                 </div>
@@ -286,7 +304,8 @@ export function ApplicationReferenceBar({
               (scorecardSubmitControl ||
                 categoryWorkflowControl ||
                 reviewActions?.showCategoryReview ||
-                panelCommentControl)) ? (
+                panelCommentControl ||
+                showFullScoreView)) ? (
               <div className="application-reference-action-group application-reference-workflow-actions">
                 {reviewActions?.showPanelReview ? (
                   <button
@@ -315,6 +334,19 @@ export function ApplicationReferenceBar({
                   </button>
                 ) : null}
                 {!categoryNavigation ? categoryWorkflowControl : null}
+                {!categoryNavigation && showFullScoreView ? (
+                  <button
+                    className="application-reference-button application-reference-score-overview-button"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new Event(OPEN_FULL_SCORE_VIEW_EVENT),
+                      )
+                    }
+                    type="button"
+                  >
+                    Full score view
+                  </button>
+                ) : null}
                 {!categoryNavigation ? scorecardSubmitControl : null}
                 {!categoryNavigation ? panelCommentControl : null}
               </div>

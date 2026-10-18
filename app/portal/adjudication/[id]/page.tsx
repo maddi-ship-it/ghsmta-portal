@@ -923,6 +923,10 @@ export default async function AdjudicationApplicationPage({
             : undefined
         }
         panels={referencePanels}
+        showFullScoreView={
+          canPanelReview &&
+          (profile.role === "owner" || profile.role === "advisory_member")
+        }
         reviewActions={compactConsensusControls
           ? {
               categoryReviewStatus: categoryReviewComplete

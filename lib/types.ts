@@ -274,6 +274,9 @@ export type AdjudicatorAssignment = {
   status: "assigned" | "in_progress" | "submitted" | "reopened" | "complete";
   due_at: string | null;
   internal_notes: string | null;
+  can_score?: boolean;
+  can_comment?: boolean;
+  removed_at?: string | null;
 };
 
 export type AdjudicationScorecard = {
