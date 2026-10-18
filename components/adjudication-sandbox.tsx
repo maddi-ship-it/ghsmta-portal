@@ -12,6 +12,7 @@ import {
   OPEN_CATEGORY_REVIEW_EVENT,
 } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
+import { AdjudicationScoringGuideHeading } from "@/components/adjudication-scoring-guide-heading";
 import { OwnerLiveAdjudicationReview } from "@/components/owner-live-adjudication-review";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { quarterScoreOptions } from "@/lib/adjudication";
@@ -482,17 +483,19 @@ function SandboxCategoryReview({
   );
 }
 
-function SandboxScoringGuide({ scale }: { scale: ScoringScaleLevel[] }) {
+function SandboxScoringGuide({
+  activeCategoryTitle,
+  scale,
+}: {
+  activeCategoryTitle: string;
+  scale: ScoringScaleLevel[];
+}) {
   return (
     <section className="panel score-guide-panel">
       <div className="panel-header">
-        <div>
-          <h2>Scoring guide</h2>
-          <p>
-            Use the 1–10 scale in 0.25-point increments. Practice scores are
-            visible only on this page.
-          </p>
-        </div>
+        <AdjudicationScoringGuideHeading
+          initialCategoryTitle={activeCategoryTitle}
+        />
       </div>
       <div className="score-scale-grid">
         {scale.map((level) => (
@@ -778,7 +781,10 @@ export function AdjudicationSandbox({
                 readOnly={practiceSubmitted}
                 title="INITIAL BRAIN DUMP (POST SHOW)"
               />
-              <SandboxScoringGuide scale={scale} />
+              <SandboxScoringGuide
+                activeCategoryTitle={narrativeCategories[0]?.title ?? ""}
+                scale={scale}
+              />
               <CollaborativeAdjudicatorScorecard
                 afterCategory={
                   <>

@@ -312,7 +312,6 @@ function InlinePanelNarrativeReview({
 
 function CategoryScoreSection({
   category,
-  categoryIndex,
   categoryCriteria,
   categoryComment,
   categorySubjectName,
@@ -338,7 +337,6 @@ function CategoryScoreSection({
   practiceMode,
 }: {
   category: ScoringCategory;
-  categoryIndex: number;
   categoryCriteria: ScoringCriterion[];
   categoryComment: AdjudicationCategoryComment | undefined;
   categorySubjectName: string;
@@ -370,6 +368,7 @@ function CategoryScoreSection({
   const isOverallProduction =
     category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
 
+  const [collapsed, setCollapsed] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(
     ownApproval?.response === "disputed",
@@ -537,7 +536,9 @@ function CategoryScoreSection({
     <section
       className={[
         "panel score-category-panel",
-        "score-category-panel-expanded",
+        collapsed
+          ? "score-category-panel-collapsed"
+          : "score-category-panel-expanded",
         rangeMismatch ? "score-category-panel-range-error" : "",
         `score-category-panel-decision-${decisionResponseState}`,
       ]
@@ -566,12 +567,21 @@ function CategoryScoreSection({
         )}
 
       <div className="panel-header scoring-category-header">
-        <div className="scoring-category-heading-copy scoring-category-context">
-          <span className="section-order">
-            Category {categoryIndex + 1}
+        <button
+          aria-controls={`category-body-${category.id}`}
+          aria-expanded={!collapsed}
+          className="category-collapse-toggle"
+          onClick={() => setCollapsed((current) => !current)}
+          type="button"
+        >
+          <span aria-hidden="true" className="category-collapse-icon">
+            {collapsed ? "+" : "−"}
           </span>
-          {category.guidance && <small>{category.guidance}</small>}
-        </div>
+          <span className="scoring-category-heading-copy scoring-category-context">
+            <span className="category-collapse-title">{category.title}</span>
+            {category.guidance && <small>{category.guidance}</small>}
+          </span>
+        </button>
 
         <div className="scoring-category-header-actions">
           {isOverallProduction ? (
@@ -595,10 +605,120 @@ function CategoryScoreSection({
               rangeMismatch={rangeMismatch}
             />
           )}
+
+          {!isOverallProduction && (
+            <section
+              aria-labelledby={`category-decision-${category.id}`}
+              className={[
+                "category-decision-response-card",
+                "category-decision-response-header",
+                `category-decision-response-${decisionResponseState}`,
+              ].join(" ")}
+            >
+              <span
+                aria-hidden="true"
+                className="category-decision-state-dot"
+              />
+
+              <div className="category-decision-response-copy">
+                <span>Committee decision for your approval</span>
+                <strong id={`category-decision-${category.id}`}>
+                  {officialProposal
+                    ? officialProposal.is_eligible
+                      ? "Eligible"
+                      : "Not eligible"
+                    : decisionResponseLabel}
+                </strong>
+                <small>
+                  {proposalRangeIsValid && officialProposal
+                    ? `${Number(officialProposal.range_min).toFixed(2)}–${Number(
+                        officialProposal.range_max,
+                      ).toFixed(2)} required range · ${decisionResponseDetail}`
+                    : decisionResponseDetail}
+                </small>
+              </div>
+
+              <div className="category-decision-response-status">
+                <span
+                  className={`badge badge-decision-${decisionResponseState}`}
+                >
+                  {decisionResponseLabel}
+                </span>
+              </div>
+
+              {officialProposal &&
+                proposalRangeIsValid &&
+                officialProposal.status !== "overridden" && (
+                  <div className="category-decision-response-actions">
+                    {decisionResponseState === "approved" ? (
+                      <button
+                        className="button button-gold button-compact"
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new Event(OPEN_CATEGORY_REVIEW_EVENT),
+                          )
+                        }
+                        type="button"
+                      >
+                        Review all categories
+                      </button>
+                    ) : practiceMode ? (
+                      <button
+                        className="button button-gold button-compact"
+                        disabled={readOnly}
+                        onClick={() =>
+                          onPracticeProposalResponse?.(
+                            officialProposal.id,
+                            "approved",
+                            null,
+                          )
+                        }
+                        type="button"
+                      >
+                        Approve range
+                      </button>
+                    ) : (
+                      <button
+                        className="button button-gold button-compact"
+                        disabled={readOnly}
+                        formAction={respondCategoryProposal.bind(
+                          null,
+                          applicationId,
+                          officialProposal.id,
+                          "approved",
+                          `proposal_comment_${category.id}`,
+                        )}
+                        formNoValidate
+                        type="submit"
+                      >
+                        Approve range
+                      </button>
+                    )}
+                    {canComment && (
+                      <button
+                        aria-expanded={disputeOpen}
+                        className="button button-danger button-compact"
+                        disabled={readOnly}
+                        onClick={() =>
+                          setDisputeOpen((current) => !current)
+                        }
+                        type="button"
+                      >
+                        Dispute
+                      </button>
+                    )}
+                  </div>
+                )}
+            </section>
+          )}
         </div>
       </div>
 
-      <div className="panel-body">
+      <div
+        className="panel-body"
+        hidden={collapsed}
+        id={`category-body-${category.id}`}
+      >
         {category.subject_label && (
           <div className="field category-subject-field">
             <label htmlFor={`subject_name_display_${category.id}`}>
@@ -759,116 +879,6 @@ function CategoryScoreSection({
           })}
         </div>
 
-        {!isOverallProduction && (
-          <section
-            aria-labelledby={`category-decision-${category.id}`}
-            className={[
-              "category-decision-response-card",
-              "category-decision-response-after-comments",
-              `category-decision-response-${decisionResponseState}`,
-            ].join(" ")}
-          >
-            <span
-              aria-hidden="true"
-              className="category-decision-state-dot"
-            />
-
-            <div className="category-decision-response-copy">
-              <span>
-                {category.title} · Committee decision for your approval
-              </span>
-              <strong id={`category-decision-${category.id}`}>
-                {officialProposal
-                  ? officialProposal.is_eligible
-                    ? "Eligible"
-                    : "Not eligible"
-                  : decisionResponseLabel}
-              </strong>
-              <small>
-                {proposalRangeIsValid && officialProposal
-                  ? `${Number(officialProposal.range_min).toFixed(2)}–${Number(
-                      officialProposal.range_max,
-                    ).toFixed(2)} required scoring range · ${decisionResponseDetail}`
-                  : decisionResponseDetail}
-              </small>
-            </div>
-
-            <div className="category-decision-response-status">
-              <span
-                className={`badge badge-decision-${decisionResponseState}`}
-              >
-                {decisionResponseLabel}
-              </span>
-            </div>
-
-            {officialProposal &&
-              proposalRangeIsValid &&
-              officialProposal.status !== "overridden" && (
-                <div className="category-decision-response-actions">
-                  {decisionResponseState === "approved" ? (
-                    <button
-                      className="button button-gold button-compact"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new Event(OPEN_CATEGORY_REVIEW_EVENT),
-                        )
-                      }
-                      type="button"
-                    >
-                      Review all categories
-                    </button>
-                  ) : (
-                    practiceMode ? (
-                      <button
-                        className="button button-gold button-compact"
-                        disabled={readOnly}
-                        onClick={() =>
-                          onPracticeProposalResponse?.(
-                            officialProposal.id,
-                            "approved",
-                            null,
-                          )
-                        }
-                        type="button"
-                      >
-                        Approve {category.title} eligibility &amp; range
-                      </button>
-                    ) : (
-                      <button
-                        className="button button-gold button-compact"
-                        disabled={readOnly}
-                        formAction={respondCategoryProposal.bind(
-                          null,
-                          applicationId,
-                          officialProposal.id,
-                          "approved",
-                          `proposal_comment_${category.id}`,
-                        )}
-                        formNoValidate
-                        type="submit"
-                      >
-                        Approve {category.title} eligibility &amp; range
-                      </button>
-                    )
-                  )}
-                  {canComment && (
-                    <button
-                      aria-expanded={disputeOpen}
-                      className="button button-danger button-compact"
-                      disabled={readOnly}
-                      onClick={() =>
-                        setDisputeOpen((current) => !current)
-                      }
-                      type="button"
-                    >
-                      Dispute
-                    </button>
-                  )}
-                </div>
-              )}
-          </section>
-        )}
-
         {canComment &&
           officialProposal &&
           proposalRangeIsValid &&
@@ -959,32 +969,6 @@ function CategoryScoreSection({
           panelApproved={panelApproved}
           reviewStatus={reviewStatus}
         />}
-
-        <details className="private-category-notes">
-          <summary>Optional private category notes</summary>
-          <div className="field">
-            <label htmlFor={`private_notes_${category.id}`}>
-              Private adjudicator notes
-            </label>
-            {canComment ? (
-              <textarea
-                className="textarea compact-textarea"
-                defaultValue={categoryComment?.private_notes ?? ""}
-                disabled={readOnly}
-                id={`private_notes_${category.id}`}
-                name={`private_notes_${category.id}`}
-              />
-            ) : (
-              <div className="comment-readonly-surface">
-                {categoryComment?.private_notes || "No private notes were entered before commenting was disabled."}
-              </div>
-            )}
-            <small className="field-help">
-              Private notes are never included in the school release or sent to
-              OpenAI.
-            </small>
-          </div>
-        </details>
 
       </div>
 
@@ -1108,6 +1092,7 @@ export function CollaborativeAdjudicatorScorecard({
   panelApprovedCategoryIds,
   reviewStatus,
   initialPanelRows,
+  activePanelUserIds,
   scoreOptions,
   canComment,
   readOnly,
@@ -1132,6 +1117,7 @@ export function CollaborativeAdjudicatorScorecard({
   panelApprovedCategoryIds: string[];
   reviewStatus: string;
   initialPanelRows: PanelObservationRow[];
+  activePanelUserIds?: string[];
   scoreOptions: ScoreOption[];
   canComment: boolean;
   readOnly: boolean;
@@ -1282,23 +1268,45 @@ export function CollaborativeAdjudicatorScorecard({
     ? panelFeedback
     : livePanelFeedback;
 
+  const activePanelUserIdSet = useMemo(
+    () =>
+      activePanelUserIds
+        ? new Set([...activePanelUserIds, currentUserId])
+        : null,
+    [activePanelUserIds, currentUserId],
+  );
+
+  const activePanelRows = useMemo(
+    () =>
+      activePanelUserIdSet
+        ? panelRows.filter((row) =>
+            activePanelUserIdSet.has(row.adjudicator_user_id),
+          )
+        : panelRows,
+    [activePanelUserIdSet, panelRows],
+  );
+
   const panelMembers = useMemo(
     () =>
-      panelMembersFromRows(panelRows, currentUserId, currentUserName),
-    [currentUserId, currentUserName, panelRows],
+      panelMembersFromRows(
+        activePanelRows,
+        currentUserId,
+        currentUserName,
+      ),
+    [activePanelRows, currentUserId, currentUserName],
   );
 
   const observationMap = useMemo(
     () =>
       new Map(
-        panelRows
+        activePanelRows
           .filter((row) => row.criterion_id)
           .map((row) => [
             `${row.adjudicator_user_id}:${row.criterion_id}`,
             row.observation,
           ]),
       ),
-    [panelRows],
+    [activePanelRows],
   );
 
   const ownScoreMap = useMemo(
@@ -1404,7 +1412,7 @@ export function CollaborativeAdjudicatorScorecard({
         </div>
       </div>
 
-      {categories.map((category, categoryIndex) => (
+      {categories.map((category) => (
         <Fragment key={category.id}>
           <CategoryScoreSection
             category={category}
@@ -1412,7 +1420,6 @@ export function CollaborativeAdjudicatorScorecard({
             categoryCriteria={criteria.filter(
               (criterion) => criterion.category_id === category.id,
             )}
-            categoryIndex={categoryIndex}
             categorySubjectName={
               categorySubjectDefaults[category.category_key] ?? ""
             }

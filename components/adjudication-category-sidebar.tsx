@@ -12,6 +12,11 @@ export type CategoryJumpOption = {
   title: string;
 };
 
+export const ADJUDICATION_ACTIVE_CATEGORY_EVENT =
+  "ghsmta:adjudication-active-category";
+
+export type AdjudicationActiveCategoryDetail = CategoryJumpOption;
+
 export function AdjudicationCategoryNavigator({
   categories,
   initialCompletedCategoryIds = [],
@@ -132,6 +137,17 @@ export function AdjudicationCategoryNavigator({
       showCompletion &&
       completedCategoryIds.has(activeCategory.id),
   );
+
+  useEffect(() => {
+    if (!activeCategory) return;
+
+    window.dispatchEvent(
+      new CustomEvent<AdjudicationActiveCategoryDetail>(
+        ADJUDICATION_ACTIVE_CATEGORY_EVENT,
+        { detail: activeCategory },
+      ),
+    );
+  }, [activeCategory]);
 
   return (
     <div

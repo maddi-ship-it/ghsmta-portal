@@ -28,6 +28,7 @@ import {
 import { ApplicationReferenceBar } from "@/components/application-reference-bar";
 import { CollaborativeAdjudicatorScorecard } from "@/components/collaborative-adjudicator-scorecard";
 import { AdjudicationConsensusBar } from "@/components/adjudication-consensus-bar";
+import { AdjudicationScoringGuideHeading } from "@/components/adjudication-scoring-guide-heading";
 import { CompleteAdjudicationControl } from "@/components/complete-adjudication-control";
 import {
   OwnerLiveAdjudicationReview,
@@ -1027,13 +1028,18 @@ export default async function AdjudicationApplicationPage({
             title="INITIAL BRAIN DUMP (POST SHOW)"
           />
           <section className="panel score-guide-panel">
-            <div className="panel-header"><div><h2>Scoring guide</h2><p>Use the 1–10 scale in 0.25-point increments. Scores remain private to you, advisory members, and owners.</p></div></div>
+            <div className="panel-header">
+              <AdjudicationScoringGuideHeading
+                initialCategoryTitle={narrativeCategories[0]?.title ?? ""}
+              />
+            </div>
             <div className="score-scale-grid">
               {scale.map((level) => <div key={level.id}><strong>{formatScore(level.score)}</strong><span>{level.label}</span><small>{level.description}</small></div>)}
             </div>
           </section>
 
           <CollaborativeAdjudicatorScorecard
+            activePanelUserIds={panelReviewerIds}
             afterCategory={
               <>
                 <AdjudicationBigPictureComment
