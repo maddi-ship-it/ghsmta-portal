@@ -2589,45 +2589,6 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
 .panel-comment-sync-status small { color: var(--muted); }
 .panel-comment-sync-status-error { border-color: #fecdca; background: #fff6f5; }
 .panel-comment-sync-status-error .status-dot { background: #d92d20; box-shadow: 0 0 0 7px rgba(217,45,32,.1); }
-.panel-comment-workspace-toolbar {
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-}
-.panel-comment-workspace-toolbar .panel-comment-sync-status {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.panel-comment-visibility-toggle {
-  display: grid;
-  flex: 0 0 auto;
-  min-width: 210px;
-  place-content: center;
-  gap: 2px;
-  padding: 10px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  color: var(--text);
-  background: var(--surface);
-  cursor: pointer;
-  text-align: left;
-}
-.panel-comment-visibility-toggle span {
-  color: var(--muted);
-  font-size: .7rem;
-  font-weight: 800;
-  letter-spacing: .055em;
-  text-transform: uppercase;
-}
-.panel-comment-visibility-toggle strong {
-  font-size: .9rem;
-}
-.panel-comment-visibility-toggle:hover,
-.panel-comment-visibility-toggle:focus-visible {
-  border-color: var(--gold);
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 20%, transparent);
-}
 
 .collaborative-criterion-table {
   overflow-x: auto;
@@ -2738,14 +2699,6 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
 .private-category-notes .field { padding: 0 15px 15px; }
 
 @media (max-width: 900px) {
-  .panel-comment-workspace-toolbar {
-    flex-direction: column;
-  }
-  .panel-comment-visibility-toggle {
-    width: 100%;
-    min-width: 0;
-    place-content: initial;
-  }
   .collaborative-criterion-table {
     overflow: visible;
     margin-inline: -22px;
@@ -4249,6 +4202,30 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
   white-space: nowrap;
   cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.application-reference-panel-comments-button {
+  flex-direction: column;
+  gap: 1px;
+  min-width: 118px;
+  line-height: 1.05;
+}
+
+.application-reference-panel-comments-button span {
+  color: var(--muted);
+  font-size: .56rem;
+  font-weight: 900;
+  letter-spacing: .055em;
+}
+
+.application-reference-panel-comments-button strong {
+  color: inherit;
+  font-size: .72rem;
+}
+
+.application-reference-panel-comments-button[aria-pressed="false"] {
+  border-color: color-mix(in srgb, var(--gold) 72%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 15%, transparent);
 }
 
 .application-reference-divider {
@@ -9333,32 +9310,6 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 
 .portal-shell .portal-main .panel-comment-sync-status small {
   color: var(--portal-muted);
-}
-
-.portal-shell .portal-main .panel-comment-visibility-toggle {
-  color: var(--portal-text);
-  border-color: var(--portal-line);
-  background: linear-gradient(135deg, rgba(16, 35, 45, 0.94), rgba(9, 19, 34, 0.97));
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
-}
-
-.portal-shell .portal-main .panel-comment-visibility-toggle span {
-  color: var(--portal-muted);
-}
-
-.portal-shell .portal-main .panel-comment-visibility-toggle strong {
-  color: var(--portal-ivory);
-}
-
-html[data-theme="light"] .portal-shell .portal-main .panel-comment-visibility-toggle {
-  color: var(--portal-text);
-  border-color: var(--portal-line);
-  background: #ffffff;
-  box-shadow: var(--portal-shadow);
-}
-
-html[data-theme="light"] .portal-shell .portal-main .panel-comment-visibility-toggle strong {
-  color: var(--portal-navy);
 }
 
 @media (max-width: 1420px) {

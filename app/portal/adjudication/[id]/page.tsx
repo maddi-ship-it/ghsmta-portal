@@ -912,6 +912,16 @@ export default async function AdjudicationApplicationPage({
           showCompletion: showEditableScorecard,
         }}
         links={referenceLinks}
+        panelCommentControls={
+          profile.role === "adjudicator" && showEditableScorecard
+            ? {
+                currentUserId: profile.id,
+                peerCount: panelReviewerIds.filter(
+                  (reviewerId) => reviewerId !== profile.id,
+                ).length,
+              }
+            : undefined
+        }
         panels={referencePanels}
         reviewActions={compactConsensusControls
           ? {

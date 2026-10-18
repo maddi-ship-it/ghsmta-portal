@@ -18,6 +18,17 @@ export const OPEN_CATEGORY_REVIEW_EVENT =
   "ghsmta:open-adjudication-category-review";
 export const OPEN_PANEL_REVIEW_EVENT =
   "ghsmta:open-adjudication-panel-review";
+export const PANEL_COMMENT_VISIBILITY_EVENT =
+  "ghsmta:panel-comment-visibility";
+
+export type PanelCommentVisibilityDetail = {
+  currentUserId: string;
+  showPeerComments: boolean;
+};
+
+export function panelCommentVisibilityStorageKey(currentUserId: string) {
+  return `ghsmta:adjudication:peer-comments:v1:${currentUserId}`;
+}
 
 const PRIMARY_PANEL_ORDER = [
   "eligibility",
@@ -35,6 +46,7 @@ export function ApplicationReferenceBar({
   categoryWorkflowControl,
   categoryNavigation,
   links = [],
+  panelCommentControls,
   panels,
   reviewActions,
   scorecardSubmitControl,
@@ -46,6 +58,10 @@ export function ApplicationReferenceBar({
     showCompletion: boolean;
   };
   links?: AdjudicationReferenceLink[];
+  panelCommentControls?: {
+    currentUserId: string;
+    peerCount: number;
+  };
   panels: ApplicationReferencePanel[];
   reviewActions?: {
     categoryReviewStatus?: "needs-action" | "complete";
@@ -56,13 +72,79 @@ export function ApplicationReferenceBar({
 }) {
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
+  const [showPeerComments, setShowPeerComments] = useState(true);
   const barRef = useRef<HTMLDivElement>(null);
+  const panelCommentUserId = panelCommentControls?.currentUserId;
+  const panelCommentPeerCount = panelCommentControls?.peerCount ?? 0;
   const panelByKey = new Map(panels.map((panel) => [panel.key, panel]));
   const primaryPanels = PRIMARY_PANEL_ORDER.flatMap((key) => {
     const panel = panelByKey.get(key);
     return panel ? [panel] : [];
   });
   const fullApplicationPanel = panelByKey.get("full-application");
+
+  useEffect(() => {
+    if (!panelCommentUserId) return;
+
+    const savedPreference = window.localStorage.getItem(
+      panelCommentVisibilityStorageKey(panelCommentUserId),
+    );
+    const nextVisibility = savedPreference !== "hidden";
+    const preferenceTimer = window.setTimeout(() => {
+      setShowPeerComments(nextVisibility);
+      window.dispatchEvent(
+        new CustomEvent<PanelCommentVisibilityDetail>(
+          PANEL_COMMENT_VISIBILITY_EVENT,
+          {
+            detail: {
+              currentUserId: panelCommentUserId,
+              showPeerComments: nextVisibility,
+            },
+          },
+        ),
+      );
+    }, 0);
+
+    return () => window.clearTimeout(preferenceTimer);
+  }, [panelCommentUserId]);
+
+  const togglePanelComments = () => {
+    if (!panelCommentUserId) return;
+
+    const next = !showPeerComments;
+    setShowPeerComments(next);
+    window.localStorage.setItem(
+      panelCommentVisibilityStorageKey(panelCommentUserId),
+      next ? "visible" : "hidden",
+    );
+    window.dispatchEvent(
+      new CustomEvent<PanelCommentVisibilityDetail>(
+        PANEL_COMMENT_VISIBILITY_EVENT,
+        {
+          detail: {
+            currentUserId: panelCommentUserId,
+            showPeerComments: next,
+          },
+        },
+      ),
+    );
+  };
+
+  const panelCommentControl =
+    panelCommentUserId && panelCommentPeerCount > 0 ? (
+      <button
+        aria-label={`${showPeerComments ? "Hide" : "Show"} ${panelCommentPeerCount} other panel comments`}
+        aria-pressed={showPeerComments}
+        className="application-reference-button application-reference-panel-comments-button"
+        onClick={togglePanelComments}
+        type="button"
+      >
+        <span>Other comments</span>
+        <strong>
+          {showPeerComments ? "Hide" : "Show"} {panelCommentPeerCount}
+        </strong>
+      </button>
+    ) : null;
 
   const panelButton = (panel: ApplicationReferencePanel) => (
     <button
@@ -135,7 +217,8 @@ export function ApplicationReferenceBar({
 
               {scorecardSubmitControl ||
               categoryWorkflowControl ||
-              reviewActions?.showCategoryReview ? (
+              reviewActions?.showCategoryReview ||
+              panelCommentControl ? (
                 <div className="application-reference-action-group application-reference-workflow-actions application-category-workflow-actions">
                   {reviewActions?.showCategoryReview ? (
                     <button
@@ -156,6 +239,7 @@ export function ApplicationReferenceBar({
                   ) : null}
                   {categoryWorkflowControl}
                   {scorecardSubmitControl}
+                  {panelCommentControl}
                 </div>
               ) : null}
             </div>
@@ -201,7 +285,8 @@ export function ApplicationReferenceBar({
             (!categoryNavigation &&
               (scorecardSubmitControl ||
                 categoryWorkflowControl ||
-                reviewActions?.showCategoryReview)) ? (
+                reviewActions?.showCategoryReview ||
+                panelCommentControl)) ? (
               <div className="application-reference-action-group application-reference-workflow-actions">
                 {reviewActions?.showPanelReview ? (
                   <button
@@ -231,6 +316,7 @@ export function ApplicationReferenceBar({
                 ) : null}
                 {!categoryNavigation ? categoryWorkflowControl : null}
                 {!categoryNavigation ? scorecardSubmitControl : null}
+                {!categoryNavigation ? panelCommentControl : null}
               </div>
             ) : null}
           </div>

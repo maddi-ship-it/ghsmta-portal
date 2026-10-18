@@ -712,6 +712,16 @@ export function AdjudicationSandbox({
           showCompletion: mode === "adjudicator",
         }}
         links={links}
+        panelCommentControls={
+          mode === "adjudicator"
+            ? {
+                currentUserId: SANDBOX_USER_ID,
+                peerCount: panelData.profiles.filter(
+                  (profile) => profile.id !== SANDBOX_USER_ID,
+                ).length,
+              }
+            : undefined
+        }
         panels={panels}
         reviewActions={{
           categoryReviewStatus: categoryReviewComplete
