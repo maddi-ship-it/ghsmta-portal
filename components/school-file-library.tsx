@@ -1,6 +1,6 @@
 "use client";
 
-import { type DragEvent, useMemo, useState, useTransition } from "react";
+import { type DragEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { archiveSchoolFile } from "@/app/portal/files/actions";
@@ -35,6 +35,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
   const [reviewerVisible, setReviewerVisible] = useState(true);
   const [search, setSearch] = useState("");
   const [dropActive, setDropActive] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(
@@ -48,6 +49,23 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
   const pronunciationRequirement = pronunciationRequirements.find(
     (requirement) => requirement.applicationId === applicationId,
   );
+
+  useEffect(() => {
+    if (!uploadOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !pending) setUploadOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [pending, uploadOpen]);
 
   const visibleFiles = initialFiles.filter((file) => file.application_id === applicationId && [file.original_name, file.generated_name, file.person_name, file.award_category, file.document_category].join(" ").toLowerCase().includes(search.trim().toLowerCase()));
   const allVisibleSelected =
@@ -142,7 +160,10 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
             productionName: application.production_title,
           },
         });
-        form?.reset(); setMessage(`${files.length} file${files.length === 1 ? "" : "s"} uploaded.`); router.refresh();
+        form?.reset();
+        if (form) setUploadOpen(false);
+        setMessage(`${files.length} file${files.length === 1 ? "" : "s"} uploaded.`);
+        router.refresh();
       } catch (caught) { setError(caught instanceof Error ? caught.message : "Upload failed."); }
     });
   }
@@ -272,25 +293,17 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
               Download selected{selectedFileIds.size > 0 ? ` (${selectedFileIds.size})` : ""}
             </button>
             {application?.can_upload && (
-              <details className="reference-action-drawer school-file-upload-drawer">
-                <summary>Upload files</summary>
-                <form className="typed-file-upload school-file-upload-form" onSubmit={(event) => { event.preventDefault(); upload(event.currentTarget); }}>
-                  <div><h3>Upload school files</h3><p className="muted-copy">Files stay private to your school, GHSMTA Owners, and assigned reviewers you allow.</p></div>
-                  <PronunciationRecorder />
-                  <div className="form-grid two-column-form">
-                    <div className="field"><label htmlFor="school_file_type">File type</label><select className="select" id="school_file_type" value={fileType} onChange={(event) => setFileType(event.target.value)}>{FILE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div>
-                    <div className="field"><label htmlFor="school_file_input">Choose file</label><input className="input file-input" id="school_file_input" name="files" type="file" accept={selectedType[2]} multiple={fileType === "scenic"} required /></div>
-                  </div>
-                  {fileType === "logo" && <div className="field"><label>Display name</label><input className="input" name="display_name" placeholder="Official school or production logo" /></div>}
-                  {fileType === "scenic" && <div className="form-grid two-column-form"><div className="field"><label>Drawing / rendering title</label><input className="input" name="display_name" required /></div><div className="field"><label>Scenic designer</label><input className="input" name="designer_name" /></div></div>}
-                  {personFields && <div className="form-grid two-column-form"><div className="field"><label>Name of person</label><input className="input" name="person_name" required /></div><div className="field"><label>Award category</label><input className="input" name="award_category" required placeholder="Example: Leading Performer" /></div></div>}
-                  {["headshot", "resume"].includes(fileType) && <div className="field"><label>Role / character <span>Optional</span></label><input className="input" name="role_or_character" /></div>}
-                  {fileType === "name_pronunciation" && <div className="field"><label>Phonetic spelling <span>Optional</span></label><input className="input" name="phonetic_spelling" placeholder="Example: muh-RYE-uh" /></div>}
-                  <div className="field"><label>Notes <span>Optional</span></label><textarea className="textarea" name="file_notes" rows={3} /></div>
-                  <label className="checkbox-row"><input type="checkbox" checked={reviewerVisible} onChange={(event) => setReviewerVisible(event.target.checked)} /><span>Visible to assigned adjudicators and Advisory Committee members</span></label>
-                  <button className="button button-gold" type="submit" disabled={pending}>{pending ? "Uploading…" : `Upload ${selectedType[1]}`}</button>
-                </form>
-              </details>
+              <button
+                aria-haspopup="dialog"
+                className="button button-gold button-compact"
+                onClick={() => {
+                  setError(null);
+                  setUploadOpen(true);
+                }}
+                type="button"
+              >
+                Upload files
+              </button>
             )}
           </div>
 
@@ -358,6 +371,95 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
           </div>
         </div>
       </section>
+
+      {uploadOpen && application?.can_upload && (
+        <div
+          className="school-file-upload-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !pending) setUploadOpen(false);
+          }}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="school-file-upload-title"
+            aria-modal="true"
+            className="school-file-upload-panel"
+            role="dialog"
+          >
+            <header className="school-file-upload-header">
+              <div>
+                <p className="eyebrow">School files</p>
+                <h2 id="school-file-upload-title">Upload files</h2>
+                <p>Choose the file type and add any details needed for reviewers.</p>
+              </div>
+              <button
+                aria-label="Close upload window"
+                className="modal-close"
+                disabled={pending}
+                onClick={() => setUploadOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </header>
+
+            <form
+              className="school-file-upload-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                upload(event.currentTarget);
+              }}
+            >
+              <div className="school-file-upload-scroll">
+                <div className="school-file-upload-destination">
+                  <span>Destination</span>
+                  <strong>{application.school_name}</strong>
+                  <small>
+                    {application.production_title || application.program_name} · {selectedType[1]} folder
+                  </small>
+                </div>
+
+                <p className="muted-copy">
+                  Files stay private to your school, GHSMTA Owners, and the assigned reviewers you allow.
+                </p>
+
+                <PronunciationRecorder />
+
+                <div className="form-grid two-column-form">
+                  <div className="field">
+                    <label htmlFor="school_file_type">File type</label>
+                    <select className="select" id="school_file_type" value={fileType} onChange={(event) => setFileType(event.target.value)}>
+                      {FILE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="school_file_input">Choose file</label>
+                    <input className="input file-input" id="school_file_input" name="files" type="file" accept={selectedType[2]} multiple={fileType === "scenic"} required />
+                  </div>
+                </div>
+
+                {fileType === "logo" && <div className="field"><label>Display name</label><input className="input" name="display_name" placeholder="Official school or production logo" /></div>}
+                {fileType === "scenic" && <div className="form-grid two-column-form"><div className="field"><label>Drawing / rendering title</label><input className="input" name="display_name" required /></div><div className="field"><label>Scenic designer</label><input className="input" name="designer_name" /></div></div>}
+                {personFields && <div className="form-grid two-column-form"><div className="field"><label>Name of person</label><input className="input" name="person_name" required /></div><div className="field"><label>Award category</label><input className="input" name="award_category" required placeholder="Example: Leading Performer" /></div></div>}
+                {["headshot", "resume"].includes(fileType) && <div className="field"><label>Role / character <span>Optional</span></label><input className="input" name="role_or_character" /></div>}
+                {fileType === "name_pronunciation" && <div className="field"><label>Phonetic spelling <span>Optional</span></label><input className="input" name="phonetic_spelling" placeholder="Example: muh-RYE-uh" /></div>}
+                <div className="field"><label>Notes <span>Optional</span></label><textarea className="textarea" name="file_notes" rows={3} /></div>
+                <label className="checkbox-row"><input type="checkbox" checked={reviewerVisible} onChange={(event) => setReviewerVisible(event.target.checked)} /><span>Visible to assigned adjudicators and Advisory Committee members</span></label>
+              </div>
+
+              <footer className="school-file-upload-actions">
+                <span>
+                  Uploading to <strong>{application.school_name}</strong>
+                </span>
+                <div>
+                  <button className="button button-secondary" disabled={pending} onClick={() => setUploadOpen(false)} type="button">Cancel</button>
+                  <button className="button button-gold" type="submit" disabled={pending}>{pending ? "Uploading…" : `Upload ${selectedType[1]}`}</button>
+                </div>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
 
       <RegalConfirmDialog
         confirmLabel="Remove file"
