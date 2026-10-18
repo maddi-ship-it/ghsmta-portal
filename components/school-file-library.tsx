@@ -32,7 +32,6 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
   const supabase = useMemo(() => createClient(), []);
   const [applicationId, setApplicationId] = useState(applications[0]?.application_id ?? "");
   const [fileType, setFileType] = useState("playbill");
-  const [reviewerVisible, setReviewerVisible] = useState(true);
   const [search, setSearch] = useState("");
   const [dropActive, setDropActive] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -148,7 +147,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
           school: application.school_name,
           documentType: selectedType[1],
           documentCategory: fileType,
-          reviewerVisible,
+          reviewerVisible: true,
           metadata: {
             displayName: String(formData.get("display_name") ?? "").trim() || null,
             personName: personName || null,
@@ -444,7 +443,6 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
                 {["headshot", "resume"].includes(fileType) && <div className="field"><label>Role / character <span>Optional</span></label><input className="input" name="role_or_character" /></div>}
                 {fileType === "name_pronunciation" && <div className="field"><label>Phonetic spelling <span>Optional</span></label><input className="input" name="phonetic_spelling" placeholder="Example: muh-RYE-uh" /></div>}
                 <div className="field"><label>Notes <span>Optional</span></label><textarea className="textarea" name="file_notes" rows={3} /></div>
-                <label className="checkbox-row"><input type="checkbox" checked={reviewerVisible} onChange={(event) => setReviewerVisible(event.target.checked)} /><span>Visible to assigned adjudicators and Advisory Committee members</span></label>
               </div>
 
               <footer className="school-file-upload-actions">
