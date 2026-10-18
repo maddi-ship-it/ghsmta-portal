@@ -1017,6 +1017,7 @@ export default async function AdjudicationApplicationPage({
             defaultValue={ownScorecard?.internal_notes}
             fieldName="scorecard_internal_notes"
             readOnly={readOnly}
+            scorecardId={ownScorecard?.id}
             title="INITIAL BRAIN DUMP (INTERMISSION)"
           />
           <AdjudicationBrainDump
@@ -1025,6 +1026,7 @@ export default async function AdjudicationApplicationPage({
             defaultValue={ownScorecard?.post_show_notes}
             fieldName="scorecard_post_show_notes"
             readOnly={readOnly}
+            scorecardId={ownScorecard?.id}
             title="INITIAL BRAIN DUMP (POST SHOW)"
           />
           <section className="panel score-guide-panel">
@@ -1144,6 +1146,7 @@ export default async function AdjudicationApplicationPage({
                     defaultValue={ownScorecard?.internal_notes}
                     fieldName="scorecard_internal_notes"
                     readOnly={readOnly}
+                    scorecardId={ownScorecard?.id}
                     title="INITIAL BRAIN DUMP (INTERMISSION)"
                   />
                   <AdjudicationBrainDump
@@ -1152,6 +1155,7 @@ export default async function AdjudicationApplicationPage({
                     defaultValue={ownScorecard?.post_show_notes}
                     fieldName="scorecard_post_show_notes"
                     readOnly={readOnly}
+                    scorecardId={ownScorecard?.id}
                     title="INITIAL BRAIN DUMP (POST SHOW)"
                   />
                 </>

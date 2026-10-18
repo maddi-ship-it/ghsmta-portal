@@ -18,6 +18,7 @@ import {
   type AdjudicationBrainDumpReviewNote,
   type AdjudicationBrainDumpTarget,
 } from "@/lib/adjudication-brain-dump";
+import { createClient } from "@/lib/supabase/client";
 
 type SortResponse = {
   context?: { productionTitle?: string };
@@ -395,6 +396,7 @@ export function AdjudicationBrainDump({
   fieldName = "scorecard_internal_notes",
   practiceMode = false,
   readOnly,
+  scorecardId,
   title = "Initial brain dump",
 }: {
   applicationId: string;
@@ -403,8 +405,10 @@ export function AdjudicationBrainDump({
   fieldName?: "scorecard_internal_notes" | "scorecard_post_show_notes";
   practiceMode?: boolean;
   readOnly: boolean;
+  scorecardId?: string;
   title?: string;
 }) {
+  const supabase = useMemo(() => createClient(), []);
   const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}:${fieldName}`;
   const [value, setValue] = useState(defaultValue ?? "");
   const [expanded, setExpanded] = useState(!(defaultValue ?? "").trim());
@@ -413,6 +417,51 @@ export function AdjudicationBrainDump({
   const [review, setReview] = useState<BrainDumpReview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const sortButtonRef = useRef<HTMLButtonElement | null>(null);
+  const valueRef = useRef(defaultValue ?? "");
+  const lastLocalChangeAtRef = useRef(0);
+
+  useEffect(() => {
+    if (practiceMode || !scorecardId) return;
+
+    const databaseField =
+      fieldName === "scorecard_post_show_notes"
+        ? "post_show_notes"
+        : "internal_notes";
+    const channel = supabase
+      .channel(`brain-dump:${scorecardId}:${databaseField}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "adjudication_scorecards",
+          filter: `id=eq.${scorecardId}`,
+        },
+        (payload) => {
+          const remoteValue = payload.new[databaseField];
+          const nextValue = typeof remoteValue === "string" ? remoteValue : "";
+
+          if (nextValue === valueRef.current) return;
+
+          if (Date.now() - lastLocalChangeAtRef.current < 2_000) {
+            setMessage(
+              "New brain-dump notes were saved from another device. Finish your current edit, then refresh to reconcile both versions.",
+            );
+            return;
+          }
+
+          valueRef.current = nextValue;
+          setValue(nextValue);
+          setExpanded(true);
+          setMessage("Brain dump updated live from another signed-in device.");
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [fieldName, practiceMode, scorecardId, supabase]);
 
   useEffect(() => {
     const restoreFrame = window.requestAnimationFrame(() => {
@@ -645,6 +694,8 @@ export function AdjudicationBrainDump({
                 maxLength={30000}
                 name={fieldName}
                 onChange={(event) => {
+                  valueRef.current = event.target.value;
+                  lastLocalChangeAtRef.current = Date.now();
                   setValue(event.target.value);
                   setMessage(null);
                 }}

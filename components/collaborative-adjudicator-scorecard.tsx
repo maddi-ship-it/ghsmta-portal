@@ -1141,6 +1141,7 @@ export function CollaborativeAdjudicatorScorecard({
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [refreshError, setRefreshError] = useState(false);
   const [liveConnection, setLiveConnection] = useState(false);
+  const [showPeerComments, setShowPeerComments] = useState(true);
   const [liveOwnScoreValues, setLiveOwnScoreValues] = useState<
     Record<string, number | null>
   >(() =>
@@ -1296,6 +1297,39 @@ export function CollaborativeAdjudicatorScorecard({
     [activePanelRows, currentUserId, currentUserName],
   );
 
+  const peerCommentCount = panelMembers.filter(
+    (member) => member.userId !== currentUserId,
+  ).length;
+  const visiblePanelMembers = useMemo(
+    () =>
+      showPeerComments
+        ? panelMembers
+        : panelMembers.filter((member) => member.userId === currentUserId),
+    [currentUserId, panelMembers, showPeerComments],
+  );
+
+  useEffect(() => {
+    const savedPreference = window.localStorage.getItem(
+      `ghsmta:adjudication:peer-comments:v1:${currentUserId}`,
+    );
+    const preferenceTimer = window.setTimeout(() => {
+      if (savedPreference === "hidden") setShowPeerComments(false);
+    }, 0);
+
+    return () => window.clearTimeout(preferenceTimer);
+  }, [currentUserId]);
+
+  const togglePeerComments = () => {
+    setShowPeerComments((current) => {
+      const next = !current;
+      window.localStorage.setItem(
+        `ghsmta:adjudication:peer-comments:v1:${currentUserId}`,
+        next ? "visible" : "hidden",
+      );
+      return next;
+    });
+  };
+
   const observationMap = useMemo(
     () =>
       new Map(
@@ -1376,40 +1410,58 @@ export function CollaborativeAdjudicatorScorecard({
   );
 
   const commentColumnsStyle = {
-    "--panel-comment-count": Math.max(panelMembers.length, 1),
+    "--panel-comment-count": Math.max(visiblePanelMembers.length, 1),
   } as CSSProperties;
   const normalizedAfterCategoryTitle =
     afterCategoryTitle?.trim().toLocaleLowerCase();
 
   return (
     <>
-      <div
-        className={[
-          "panel-comment-sync-status",
-          refreshError ? "panel-comment-sync-status-error" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <span className="status-dot" />
-        <div>
-          <strong>
-            {practiceMode
-              ? "Practice workspace"
-              : refreshError
-              ? "Live refresh interrupted"
-              : liveConnection
-                ? "Two-point ranges update live"
-                : "Comments and two-point ranges refresh automatically"}
-          </strong>
-          <small>
-            {practiceMode
-              ? "Entries stay in this browser and are never saved to a school."
-              : lastRefreshed
-              ? `Last refreshed ${lastRefreshed.toLocaleTimeString()}`
-              : "Waiting for the next panel update…"}
-          </small>
+      <div className="panel-comment-workspace-toolbar">
+        <div
+          className={[
+            "panel-comment-sync-status",
+            refreshError ? "panel-comment-sync-status-error" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <span className="status-dot" />
+          <div>
+            <strong>
+              {practiceMode
+                ? "Practice workspace"
+                : refreshError
+                ? "Live refresh interrupted"
+                : liveConnection
+                  ? "Two-point ranges update live"
+                  : "Comments and two-point ranges refresh automatically"}
+            </strong>
+            <small>
+              {practiceMode
+                ? "Entries stay in this browser and are never saved to a school."
+                : lastRefreshed
+                ? `Last refreshed ${lastRefreshed.toLocaleTimeString()}`
+                : "Waiting for the next panel update…"}
+            </small>
+          </div>
         </div>
+
+        {peerCommentCount > 0 && (
+          <button
+            aria-pressed={showPeerComments}
+            className="panel-comment-visibility-toggle"
+            onClick={togglePeerComments}
+            type="button"
+          >
+            <span>Other panel comments</span>
+            <strong>
+              {showPeerComments
+                ? `Hide ${peerCommentCount}`
+                : `Show ${peerCommentCount}`}
+            </strong>
+          </button>
+        )}
       </div>
 
       {categories.map((category) => (
@@ -1438,7 +1490,7 @@ export function CollaborativeAdjudicatorScorecard({
             currentUserId={currentUserId}
             observationMap={observationMap}
             ownScoreMap={ownScoreMap}
-            panelMembers={panelMembers}
+            panelMembers={visiblePanelMembers}
             canComment={canComment}
             readOnly={readOnly}
             scoreOptions={scoreOptions}
