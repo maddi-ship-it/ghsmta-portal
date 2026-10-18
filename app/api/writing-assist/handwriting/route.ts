@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 
 import { NextResponse } from "next/server";
-import sharp from "sharp";
 
 import { extractOpenAIText } from "@/lib/adjudication";
 import {
@@ -13,13 +12,15 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+// Keep the multipart request safely below Vercel's 4.5 MB Function payload limit.
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const HEIC_MIME_TYPES = new Set([
   "image/heic",
   "image/heic-sequence",
   "image/heif",
   "image/heif-sequence",
 ]);
+const OPENAI_IMAGE_MIME_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
 
 function isHeicImage(image: File) {
   const mimeType = image.type.toLowerCase();
@@ -49,32 +50,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Take or choose a photo of the notes." }, { status: 400 });
   }
   if (image.size > MAX_IMAGE_BYTES) {
-    return NextResponse.json({ error: "The note image must be 15 MB or smaller." }, { status: 413 });
+    return NextResponse.json(
+      { error: "The note image was too large to send. Try taking a closer photo of one page." },
+      { status: 413 },
+    );
   }
   const heicImage = isHeicImage(image);
   if (!image.type.startsWith("image/") && !heicImage) {
     return NextResponse.json({ error: "Choose an image of the handwritten notes." }, { status: 415 });
   }
-
-  let imageBytes = Buffer.from(await image.arrayBuffer());
-  let imageMimeType = image.type || "image/jpeg";
-
-  if (heicImage) {
-    try {
-      imageBytes = await sharp(imageBytes)
-        .rotate()
-        .jpeg({ quality: 92, mozjpeg: true })
-        .toBuffer();
-      imageMimeType = "image/jpeg";
-    } catch (error) {
-      console.error("HEIC handwriting conversion failed", error);
-      return NextResponse.json(
-        { error: "This HEIC image could not be prepared for scanning. Try taking a new photo or choosing a different image." },
-        { status: 422 },
-      );
-    }
+  if (heicImage || !OPENAI_IMAGE_MIME_TYPES.has(image.type.toLowerCase())) {
+    return NextResponse.json(
+      { error: "This photo format could not be prepared on your device. Refresh the portal and try the image again." },
+      { status: 415 },
+    );
   }
 
+  const imageBytes = Buffer.from(await image.arrayBuffer());
+  const imageMimeType = image.type;
   const base64 = imageBytes.toString("base64");
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -113,7 +106,20 @@ export async function POST(request: Request) {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    return NextResponse.json({ error: apiError(payload, "The handwritten notes could not be scanned.") }, { status: 502 });
+    const upstreamError = apiError(payload, "The handwritten notes could not be scanned.");
+    const errorDetails = payload && typeof payload === "object"
+      ? (payload as { error?: { code?: string; type?: string } }).error
+      : undefined;
+    console.error("Handwriting transcription request failed", {
+      code: errorDetails?.code,
+      message: upstreamError,
+      status: response.status,
+      type: errorDetails?.type,
+    });
+    return NextResponse.json(
+      { error: response.status === 429 ? "The note scanner is busy. Please try again shortly." : "The handwritten notes could not be scanned. Please try again." },
+      { status: 502 },
+    );
   }
   const transcription = extractOpenAIText(payload).trim();
   if (!transcription) return NextResponse.json({ error: "No readable handwriting was found." }, { status: 422 });

@@ -22,6 +22,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "ai": "^7.0.118",
     "fflate": "^0.8.3",
+    "heic2any": "^0.0.4",
     "next": "16.2.12",
     "nodemailer": "9.0.3",
     "pdf-lib": "^1.17.1",

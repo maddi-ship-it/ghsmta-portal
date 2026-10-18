@@ -3,6 +3,8 @@
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
+import { MAX_SCAN_SOURCE_BYTES, prepareScanImage } from "@/lib/scan-image";
+
 import styles from "./writing-assist.module.css";
 
 type WritableTarget = HTMLTextAreaElement | HTMLDivElement;
@@ -131,17 +133,23 @@ function WritingAssistControls() {
     const image = event.target.files?.[0];
     event.target.value = "";
     if (!image) return;
-    if (image.size > 15 * 1024 * 1024) {
+    if (image.size > MAX_SCAN_SOURCE_BYTES) {
       setError("The note image must be 15 MB or smaller.");
       return;
     }
     setMode("processing");
-    const body = new FormData();
-    body.set("image", image);
     try {
+      const preparedImage = await prepareScanImage(image);
+      const body = new FormData();
+      body.set("image", preparedImage);
       const response = await fetch("/api/writing-assist/handwriting", { method: "POST", body });
       const payload = (await response.json().catch(() => null)) as { text?: string; error?: string } | null;
-      if (!response.ok || !payload?.text) throw new Error(payload?.error || "The notes could not be scanned.");
+      if (!response.ok || !payload?.text) {
+        const fallback = response.status === 413
+          ? "The note image was too large to send. Try taking a closer photo of one page."
+          : "The notes could not be scanned. Please try again.";
+        throw new Error(payload?.error || fallback);
+      }
       setSource("Handwritten notes");
       setDraft(payload.text);
       setError("");
