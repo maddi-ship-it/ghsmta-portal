@@ -10,6 +10,7 @@ import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
+import { deriveNaturalTwoPointRange } from "@/lib/adjudication-ranges";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import type {
   AdjudicationScore,
@@ -230,6 +231,14 @@ export function FullScoreOverviewModal({
                         </small>
                       </span>
                     </th>
+                    <th className="full-score-range-column">
+                      <span className="full-score-member-name">
+                        Natural range
+                      </span>
+                      <span className="full-score-member-overall">
+                        <small>Automatic two-point check</small>
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -247,9 +256,43 @@ export function FullScoreOverviewModal({
                           : [],
                       ),
                     );
+                    const contributingAverages = memberAverages.flatMap(
+                      (value, index) =>
+                        panelMembers[index]?.contributesToPanelAverage &&
+                        value != null
+                          ? [value]
+                          : [],
+                    );
+                    const naturalRange =
+                      category.category_key ===
+                      OVERALL_PRODUCTION_CATEGORY_KEY
+                        ? null
+                        : deriveNaturalTwoPointRange(contributingAverages);
+                    const hasComparableScores =
+                      category.category_key !==
+                        OVERALL_PRODUCTION_CATEGORY_KEY &&
+                      contributingAverages.length >= 2;
+                    const scoreMinimum = hasComparableScores
+                      ? Math.min(...contributingAverages)
+                      : null;
+                    const scoreMaximum = hasComparableScores
+                      ? Math.max(...contributingAverages)
+                      : null;
+                    const rangeStatus =
+                      category.category_key ===
+                      OVERALL_PRODUCTION_CATEGORY_KEY
+                        ? "not-required"
+                        : !hasComparableScores
+                          ? "pending"
+                          : naturalRange
+                            ? "within"
+                            : "outside";
 
                     return (
-                      <tr key={category.id}>
+                      <tr
+                        className={`full-score-range-${rangeStatus}`}
+                        key={category.id}
+                      >
                         <th scope="row">
                           <span>Category {category.sort_order}</span>
                           <strong>{category.title}</strong>
@@ -284,6 +327,35 @@ export function FullScoreOverviewModal({
                               ? "adjudicators reporting"
                               : "members reporting"}
                           </small>
+                        </td>
+                        <td className="full-score-range-column">
+                          {rangeStatus === "not-required" ? (
+                            <>
+                              <strong>Not required</strong>
+                              <small>Overall Production</small>
+                            </>
+                          ) : naturalRange ? (
+                            <>
+                              <strong>
+                                {naturalRange.rangeMinimum.toFixed(2)}–
+                                {naturalRange.rangeMaximum.toFixed(2)}
+                              </strong>
+                              <small>Scores fit naturally</small>
+                            </>
+                          ) : hasComparableScores ? (
+                            <>
+                              <strong>Outside two points</strong>
+                              <small>
+                                {scoreMinimum?.toFixed(2)}–
+                                {scoreMaximum?.toFixed(2)} live spread
+                              </small>
+                            </>
+                          ) : (
+                            <>
+                              <strong>Waiting</strong>
+                              <small>Two scores needed</small>
+                            </>
+                          )}
                         </td>
                       </tr>
                     );

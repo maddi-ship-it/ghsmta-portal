@@ -96,6 +96,9 @@ describe("FullScoreOverviewModal", () => {
     expect(html).toContain("8.00000");
     expect(html).toContain("Music Direction");
     expect(html).toContain("Overall Production");
+    expect(html).toContain("full-score-range-within");
+    expect(html).toContain("7.00–9.00");
+    expect(html).toContain("Scores fit naturally");
   });
 
   it("shows an Advisory Committee score as reference when three adjudicators are present", () => {
@@ -159,5 +162,64 @@ describe("FullScoreOverviewModal", () => {
     expect(html).toContain("3 adjudicators; committee shown as reference");
     expect(html).toContain("8.00000");
     expect(html).not.toContain("6.50000");
+  });
+
+  it("flags a category red when panel averages cannot fit a two-point range", () => {
+    const categories = [
+      {
+        id: "music",
+        category_key: "music_direction",
+        title: "Music Direction",
+        sort_order: 1,
+      },
+    ] as ScoringCategory[];
+    const criteria = [
+      { id: "pitch", category_id: "music" },
+    ] as ScoringCriterion[];
+    const assignments = ["one", "two"].map(
+      (userId) =>
+        ({
+          id: `assignment-${userId}`,
+          adjudicator_user_id: userId,
+          can_score: true,
+        }) as AdjudicatorAssignment,
+    );
+    const scorecards = assignments.map(
+      (assignment) =>
+        ({
+          id: `scorecard-${assignment.adjudicator_user_id}`,
+          assignment_id: assignment.id,
+          adjudicator_user_id: assignment.adjudicator_user_id,
+          status: "draft",
+        }) as AdjudicationScorecard,
+    );
+    const scores = [6, 9].map(
+      (score, index) =>
+        ({
+          scorecard_id: scorecards[index].id,
+          criterion_id: "pitch",
+          score,
+        }) as AdjudicationScore,
+    );
+    const profiles = ["one", "two"].map(
+      (id) => ({ id, full_name: id }) as Profile,
+    );
+
+    const html = renderToStaticMarkup(
+      <FullScoreOverviewModal
+        assignments={assignments}
+        categories={categories}
+        criteria={criteria}
+        onClose={() => undefined}
+        open
+        profiles={profiles}
+        scorecards={scorecards}
+        scores={scores}
+      />,
+    );
+
+    expect(html).toContain("full-score-range-outside");
+    expect(html).toContain("Outside two points");
+    expect(html).toContain("6.00–9.00 live spread");
   });
 });

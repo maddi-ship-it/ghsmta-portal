@@ -1,5 +1,14 @@
 const TWO_POINT_RANGE_WIDTH = 2;
 const SCORE_INCREMENT = 0.25;
+const FLOAT_TOLERANCE = 0.0001;
+
+export type NaturalTwoPointRange = {
+  rangeMinimum: number;
+  rangeMaximum: number;
+  scoreMinimum: number;
+  scoreMaximum: number;
+  spread: number;
+};
 
 export function formatTwoPointRangeStart(
   value: number | string | null | undefined,
@@ -61,4 +70,59 @@ export function isValidTwoPointRange(
       Number.isFinite(numericMaximum) &&
       Math.abs(range.rangeMaximum - numericMaximum) < 0.0001,
   );
+}
+
+export function deriveNaturalTwoPointRange(
+  values: Array<number | null | undefined>,
+  allowedScoreMinimum = 1,
+  allowedScoreMaximum = 10,
+): NaturalTwoPointRange | null {
+  const scores = values.filter(
+    (value): value is number => value != null && Number.isFinite(value),
+  );
+
+  if (scores.length < 2) return null;
+
+  const scoreMinimum = Math.min(...scores);
+  const scoreMaximum = Math.max(...scores);
+  const minimumPossibleStart = Math.max(
+    allowedScoreMinimum,
+    scoreMaximum - TWO_POINT_RANGE_WIDTH,
+  );
+  const maximumPossibleStart = Math.min(
+    scoreMinimum,
+    allowedScoreMaximum - TWO_POINT_RANGE_WIDTH,
+  );
+  const firstValidStart =
+    Math.ceil(
+      (minimumPossibleStart - FLOAT_TOLERANCE) / SCORE_INCREMENT,
+    ) * SCORE_INCREMENT;
+  const lastValidStart =
+    Math.floor(
+      (maximumPossibleStart + FLOAT_TOLERANCE) / SCORE_INCREMENT,
+    ) * SCORE_INCREMENT;
+
+  if (firstValidStart > lastValidStart + FLOAT_TOLERANCE) return null;
+
+  const centeredStart =
+    (scoreMinimum + scoreMaximum) / 2 - TWO_POINT_RANGE_WIDTH / 2;
+  const roundedCenteredStart =
+    Math.round(centeredStart / SCORE_INCREMENT) * SCORE_INCREMENT;
+  const rangeMinimum = Number(
+    Math.min(
+      lastValidStart,
+      Math.max(firstValidStart, roundedCenteredStart),
+    ).toFixed(2),
+  );
+  const rangeMaximum = Number(
+    (rangeMinimum + TWO_POINT_RANGE_WIDTH).toFixed(2),
+  );
+
+  return {
+    rangeMinimum,
+    rangeMaximum,
+    scoreMinimum,
+    scoreMaximum,
+    spread: Number((scoreMaximum - scoreMinimum).toFixed(5)),
+  };
 }

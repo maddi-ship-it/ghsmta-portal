@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  deriveNaturalTwoPointRange,
   formatTwoPointRangeStart,
   isValidTwoPointRange,
   twoPointRangeFromStart,
@@ -32,5 +33,29 @@ describe("adjudication two-point ranges", () => {
     expect(isValidTwoPointRange(5, null)).toBe(false);
     expect(isValidTwoPointRange(5, 7.25)).toBe(false);
     expect(isValidTwoPointRange(8.25, 10.25)).toBe(false);
+  });
+
+  it("centers a valid two-point range around panel category averages", () => {
+    expect(deriveNaturalTwoPointRange([7.5, 8, 8.5])).toEqual({
+      rangeMinimum: 7,
+      rangeMaximum: 9,
+      scoreMinimum: 7.5,
+      scoreMaximum: 8.5,
+      spread: 1,
+    });
+    expect(deriveNaturalTwoPointRange([9, 9.5, 10])).toMatchObject({
+      rangeMinimum: 8,
+      rangeMaximum: 10,
+    });
+    expect(deriveNaturalTwoPointRange([7.25, 8.5, 9.25])).toMatchObject({
+      rangeMinimum: 7.25,
+      rangeMaximum: 9.25,
+    });
+  });
+
+  it("does not suggest a range when scores cannot fit a selectable interval", () => {
+    expect(deriveNaturalTwoPointRange([6.75, 9])).toBeNull();
+    expect(deriveNaturalTwoPointRange([7.9, 9.8])).toBeNull();
+    expect(deriveNaturalTwoPointRange([8])).toBeNull();
   });
 });

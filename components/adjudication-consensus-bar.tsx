@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -24,6 +25,7 @@ import {
   OPEN_PANEL_REVIEW_EVENT,
 } from "@/components/application-reference-bar";
 import {
+  deriveNaturalTwoPointRange,
   formatTwoPointRangeStart,
   isValidTwoPointRange,
 } from "@/lib/adjudication-ranges";
@@ -74,9 +76,11 @@ type CategoryApproval = {
   comment: string | null;
 };
 
-type LivePanelAverage = {
+type LivePanelScoreSpread = {
   category_id: string;
   average_score: number | string | null;
+  minimum_member_average: number | string | null;
+  maximum_member_average: number | string | null;
   score_count: number | string;
   scoring_member_count: number | string;
   assigned_scorer_count: number | string;
@@ -134,6 +138,21 @@ function proposalHasValidRange(proposal: Proposal | undefined) {
   return isValidTwoPointRange(proposal?.range_min, proposal?.range_max);
 }
 
+function initialRangeSelections(categories: ScoringCategory[], proposals: Proposal[]) {
+  const proposalByCategory = new Map(
+    proposals.map((proposal) => [proposal.category_id, proposal]),
+  );
+
+  return Object.fromEntries(
+    categories.map((category) => [
+      category.id,
+      formatTwoPointRangeStart(
+        proposalByCategory.get(category.id)?.range_min,
+      ),
+    ]),
+  );
+}
+
 const rangeOptions = Array.from(
   { length: 29 },
   (_, index) => 1 + index * 0.25,
@@ -181,8 +200,13 @@ export function AdjudicationConsensusBar({
   const [rangeReviewOpen, setRangeReviewOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [livePanelAverages, setLivePanelAverages] = useState<
-    LivePanelAverage[]
+    LivePanelScoreSpread[]
   >([]);
+  const [rangeSelections, setRangeSelections] = useState<Record<string, string>>(
+    () => initialRangeSelections(categories, proposals),
+  );
+  const touchedRangeSelections = useRef(new Set<string>());
+  const autoSuggestedRanges = useRef(new Map<string, string>());
   const [liveAverageStatus, setLiveAverageStatus] = useState<
     "loading" | "live" | "error"
   >("loading");
@@ -279,6 +303,12 @@ export function AdjudicationConsensusBar({
     actingCandidateReview.status === "approved";
   const canSetDecisions = role === "advisory_member" || role === "owner";
   const canReviewRanges = role === "adjudicator";
+  const openDecisionMatrix = useCallback(() => {
+    touchedRangeSelections.current.clear();
+    autoSuggestedRanges.current.clear();
+    setRangeSelections(initialRangeSelections(categories, proposals));
+    setMatrixOpen(true);
+  }, [categories, proposals]);
   const openRangeReview = useCallback(() => {
     setAdjudicatorCategoryAverages(
       adjudicatorCategoryScores.map((source) =>
@@ -295,7 +325,7 @@ export function AdjudicationConsensusBar({
       if (canReviewRanges) {
         openRangeReview();
       } else if (canSetDecisions) {
-        setMatrixOpen(true);
+        openDecisionMatrix();
       }
     };
     const openPanelReview = () => {
@@ -309,7 +339,13 @@ export function AdjudicationConsensusBar({
       window.removeEventListener(OPEN_CATEGORY_REVIEW_EVENT, openCategoryReview);
       window.removeEventListener(OPEN_PANEL_REVIEW_EVENT, openPanelReview);
     };
-  }, [canReviewRanges, canSetDecisions, compact, openRangeReview]);
+  }, [
+    canReviewRanges,
+    canSetDecisions,
+    compact,
+    openDecisionMatrix,
+    openRangeReview,
+  ]);
 
   useEffect(() => {
     const shouldLoadLiveAverages = matrixOpen && canSetDecisions;
@@ -324,7 +360,7 @@ export function AdjudicationConsensusBar({
       if (showLoading) setLiveAverageStatus("loading");
 
       const { data, error } = await supabase.rpc(
-        "get_live_panel_category_averages",
+        "get_live_panel_category_score_spreads",
         { p_application_id: applicationId },
       );
       requestInFlight = false;
@@ -336,7 +372,58 @@ export function AdjudicationConsensusBar({
         return;
       }
 
-      setLivePanelAverages((data ?? []) as LivePanelAverage[]);
+      const scoreSpreads = (data ?? []) as LivePanelScoreSpread[];
+      setLivePanelAverages(scoreSpreads);
+      setRangeSelections((current) => {
+        const next = { ...current };
+
+        for (const spread of scoreSpreads) {
+          const savedRangeStart = formatTwoPointRangeStart(
+            proposalByCategory.get(spread.category_id)?.range_min,
+          );
+          if (
+            touchedRangeSelections.current.has(spread.category_id) ||
+            savedRangeStart
+          ) {
+            continue;
+          }
+
+          const minimum =
+            spread.minimum_member_average == null
+              ? null
+              : Number(spread.minimum_member_average);
+          const maximum =
+            spread.maximum_member_average == null
+              ? null
+              : Number(spread.maximum_member_average);
+          const suggestedRange =
+            Number(spread.scoring_member_count) >= 2
+              ? deriveNaturalTwoPointRange([minimum, maximum])
+              : null;
+          const previousSuggestion = autoSuggestedRanges.current.get(
+            spread.category_id,
+          );
+          const currentIsAutomatic =
+            previousSuggestion != null &&
+            next[spread.category_id] === previousSuggestion;
+
+          if (suggestedRange) {
+            const suggestedStart = suggestedRange.rangeMinimum.toFixed(2);
+            if (!next[spread.category_id] || currentIsAutomatic) {
+              next[spread.category_id] = suggestedStart;
+            }
+            autoSuggestedRanges.current.set(
+              spread.category_id,
+              suggestedStart,
+            );
+          } else {
+            if (currentIsAutomatic) next[spread.category_id] = "";
+            autoSuggestedRanges.current.delete(spread.category_id);
+          }
+        }
+
+        return next;
+      });
       setLiveAverageUpdatedAt(new Date());
       setLiveAverageStatus("live");
     };
@@ -355,6 +442,7 @@ export function AdjudicationConsensusBar({
     canReviewRanges,
     canSetDecisions,
     matrixOpen,
+    proposalByCategory,
     rangeReviewOpen,
     supabase,
   ]);
@@ -393,7 +481,7 @@ export function AdjudicationConsensusBar({
           {canSetDecisions && (
             <button
               className="button button-secondary button-compact"
-              onClick={() => setMatrixOpen(true)}
+              onClick={openDecisionMatrix}
               type="button"
             >
               Review all categories
@@ -792,6 +880,27 @@ export function AdjudicationConsensusBar({
                         panelAverage?.average_score == null
                           ? null
                           : Number(panelAverage.average_score);
+                      const minimumMemberAverage =
+                        panelAverage?.minimum_member_average == null
+                          ? null
+                          : Number(panelAverage.minimum_member_average);
+                      const maximumMemberAverage =
+                        panelAverage?.maximum_member_average == null
+                          ? null
+                          : Number(panelAverage.maximum_member_average);
+                      const reportingMemberCount = panelAverage
+                        ? Number(panelAverage.scoring_member_count)
+                        : 0;
+                      const naturalRange = deriveNaturalTwoPointRange([
+                        minimumMemberAverage,
+                        maximumMemberAverage,
+                      ]);
+                      const hasComparableScores = reportingMemberCount >= 2;
+                      const naturalRangeStatus = !hasComparableScores
+                        ? "pending"
+                        : naturalRange
+                          ? "within"
+                          : "outside";
 
                       return (
                         <article
@@ -799,7 +908,7 @@ export function AdjudicationConsensusBar({
                             proposal?.status === "disputed"
                               ? "advisory-decision-card-disputed"
                               : ""
-                          }`}
+                          } advisory-decision-range-${naturalRangeStatus}`}
                           key={category.id}
                         >
                           <header className="advisory-decision-card-header">
@@ -836,6 +945,21 @@ export function AdjudicationConsensusBar({
                                       )} scoring members`
                                     : "Updates as panel scores are entered"}
                                 </small>
+                                {naturalRange ? (
+                                  <small className="advisory-live-range advisory-live-range-within">
+                                    Natural range {naturalRange.rangeMinimum.toFixed(2)}–
+                                    {naturalRange.rangeMaximum.toFixed(2)}
+                                  </small>
+                                ) : hasComparableScores ? (
+                                  <small className="advisory-live-range advisory-live-range-outside">
+                                    Outside two points: {minimumMemberAverage?.toFixed(2)}–
+                                    {maximumMemberAverage?.toFixed(2)}
+                                  </small>
+                                ) : (
+                                  <small className="advisory-live-range">
+                                    Waiting for at least two panel scores
+                                  </small>
+                                )}
                               </div>
                               <span
                                 className={`badge ${
@@ -898,12 +1022,17 @@ export function AdjudicationConsensusBar({
                               </label>
                             <select
                               className="select"
-                              defaultValue={formatTwoPointRangeStart(
-                                proposal?.range_min,
-                              )}
                               id={`range_${category.id}`}
                               name={`range_${category.id}`}
+                              onChange={(event) => {
+                                touchedRangeSelections.current.add(category.id);
+                                setRangeSelections((current) => ({
+                                  ...current,
+                                  [category.id]: event.target.value,
+                                }));
+                              }}
                               required
+                              value={rangeSelections[category.id] ?? ""}
                             >
                               <option value="">Select range</option>
                               {rangeOptions.map((value) => (
@@ -913,7 +1042,11 @@ export function AdjudicationConsensusBar({
                               ))}
                             </select>
                               <small>
-                                Choose the approved low and high range.
+                                {naturalRange &&
+                                rangeSelections[category.id] ===
+                                  naturalRange.rangeMinimum.toFixed(2)
+                                  ? "Auto-set from the live panel scores."
+                                  : "Choose the approved low and high range."}
                               </small>
                             </div>
                             <div className="advisory-decision-field advisory-decision-writer">

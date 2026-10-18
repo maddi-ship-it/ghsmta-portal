@@ -18499,6 +18499,31 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
   background: color-mix(in srgb, var(--portal-gold) 9%, var(--portal-surface-2)) !important;
 }
 
+.full-score-range-column {
+  min-width: 210px;
+  border-left: 1px solid var(--portal-line);
+}
+
+.full-score-overview-table tbody tr.full-score-range-within > :where(th, td) {
+  background: color-mix(in srgb, #2fa86f 16%, var(--portal-surface)) !important;
+  box-shadow: inset 0 1px color-mix(in srgb, #56d79a 38%, transparent),
+    inset 0 -1px color-mix(in srgb, #56d79a 38%, transparent);
+}
+
+.full-score-overview-table tbody tr.full-score-range-outside > :where(th, td) {
+  background: color-mix(in srgb, #b63a45 18%, var(--portal-surface)) !important;
+  box-shadow: inset 0 1px color-mix(in srgb, #ef6571 42%, transparent),
+    inset 0 -1px color-mix(in srgb, #ef6571 42%, transparent);
+}
+
+.full-score-range-within .full-score-range-column > strong {
+  color: #69e0a6 !important;
+}
+
+.full-score-range-outside .full-score-range-column > strong {
+  color: #ff8992 !important;
+}
+
 .full-score-overview-footer {
   flex: 0 0 auto;
   color: var(--portal-muted);
@@ -18514,6 +18539,45 @@ html[data-theme="light"] .full-score-member-overall strong,
 html[data-theme="light"] .full-score-overview-table tbody td > strong,
 html[data-theme="light"] .full-score-overview-table tbody th span {
   color: #72510a;
+}
+
+html[data-theme="light"] .full-score-range-within .full-score-range-column > strong {
+  color: #176d45 !important;
+}
+
+html[data-theme="light"] .full-score-range-outside .full-score-range-column > strong {
+  color: #9b2733 !important;
+}
+
+.advisory-decision-card.advisory-decision-range-within {
+  border-color: color-mix(in srgb, #42c784 65%, var(--portal-line));
+  background: color-mix(in srgb, #2fa86f 9%, var(--portal-surface));
+}
+
+.advisory-decision-card.advisory-decision-range-outside {
+  border-color: color-mix(in srgb, #dd5360 70%, var(--portal-line));
+  background: color-mix(in srgb, #b63a45 10%, var(--portal-surface));
+}
+
+.advisory-live-range {
+  margin-top: 4px;
+  font-weight: 850 !important;
+}
+
+.advisory-live-range-within {
+  color: #69e0a6 !important;
+}
+
+.advisory-live-range-outside {
+  color: #ff8992 !important;
+}
+
+html[data-theme="light"] .advisory-live-range-within {
+  color: #176d45 !important;
+}
+
+html[data-theme="light"] .advisory-live-range-outside {
+  color: #9b2733 !important;
 }
 
 @media (max-width: 720px) {
