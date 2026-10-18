@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth";
 import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
 import {
   sendUrgentChatSmsNotifications,
+  sendUrgentSchoolBroadcastSmsNotifications,
   type UrgentSmsResult,
 } from "@/lib/chat/urgent-sms";
 import { canUseUrgentTag, containsUrgentMention } from "@/lib/chat/urgent";
@@ -721,7 +722,7 @@ export async function ownerDeleteChatMessage(
 export async function broadcastToActiveSchoolDms(
   formData: FormData,
 ): Promise<ChatActionResult> {
-  await requireProfile(["owner"]);
+  const owner = await requireProfile(["owner"]);
 
   const body = formText(formData, "body");
 
@@ -738,7 +739,7 @@ export async function broadcastToActiveSchoolDms(
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(
-    "broadcast_to_active_school_dms",
+    "broadcast_to_active_school_dms_with_receipt",
     { p_body: body },
   );
 
@@ -746,8 +747,51 @@ export async function broadcastToActiveSchoolDms(
     return { ok: false, error: error.message };
   }
 
+  const receipt = data as {
+    broadcast_id?: string;
+    channel_count?: number;
+  } | null;
+  if (
+    !receipt?.broadcast_id ||
+    !isUuid(receipt.broadcast_id) ||
+    !Number.isFinite(Number(receipt.channel_count))
+  ) {
+    return {
+      ok: false,
+      error: "The school broadcast was saved without a valid delivery receipt.",
+    };
+  }
+
+  let urgentSmsResult: UrgentSmsResult;
+  try {
+    urgentSmsResult = await sendUrgentSchoolBroadcastSmsNotifications({
+      broadcastId: receipt.broadcast_id,
+      authorId: owner.id,
+      authorRole: owner.role,
+      authorName: profileDisplayName(owner),
+      body,
+    });
+  } catch (notificationError) {
+    console.warn(
+      "Urgent school broadcast text notification failed",
+      notificationError,
+    );
+    urgentSmsResult = {
+      triggered: containsUrgentMention(body),
+      status: "failed",
+      recipientCount: 0,
+      queuedCount: 0,
+    };
+  }
+
   revalidatePath("/portal/chat");
   revalidatePath("/portal/notifications");
 
-  return { ok: true, count: Number(data ?? 0) };
+  return {
+    ok: true,
+    count: Number(receipt.channel_count),
+    urgentSmsStatus: urgentSmsResult.status,
+    urgentSmsRecipientCount: urgentSmsResult.recipientCount,
+    urgentSmsQueuedCount: urgentSmsResult.queuedCount,
+  };
 }

@@ -2557,10 +2557,29 @@ export function TeamsChat({
 
       form.reset();
       setShowBroadcastComposer(false);
+      const urgentStatus = (() => {
+        if (!result.urgentSmsStatus || result.urgentSmsStatus === "not_urgent") {
+          return "";
+        }
+        if (result.urgentSmsStatus === "queued") {
+          const count = result.urgentSmsQueuedCount ?? 0;
+          return ` Urgent text alert queued for ${count} distinct active-school ${count === 1 ? "member" : "members"}.`;
+        }
+        if (result.urgentSmsStatus === "partial_failure") {
+          return ` Urgent text alert queued for ${result.urgentSmsQueuedCount ?? 0} of ${result.urgentSmsRecipientCount ?? 0} distinct active-school members; some texts could not be queued.`;
+        }
+        if (result.urgentSmsStatus === "no_recipients") {
+          return " No active school members have a saved mobile number for the urgent text alert.";
+        }
+        if (result.urgentSmsStatus === "not_configured") {
+          return " The urgent tag was added, but Twilio text delivery is not configured yet.";
+        }
+        return " The urgent text alert could not be queued.";
+      })();
       setStatus(
         `Message sent to ${result.count ?? 0} active school ${
           result.count === 1 ? "DM" : "DMs"
-        }.`,
+        }.${urgentStatus}`,
       );
       await reloadChannels();
     });
