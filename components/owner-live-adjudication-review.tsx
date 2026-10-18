@@ -25,6 +25,7 @@ import {
   isAdjudicationCategoryComplete,
 } from "@/lib/adjudication-category-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { createClient } from "@/lib/supabase/client";
 import { richTextHasContent, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/rich-text";
 import type {
@@ -692,6 +693,10 @@ export function OwnerLiveAdjudicationReview({
       })),
     [assignments, scorecardByAssignmentId],
   );
+  const panelAveragePolicy = useMemo(
+    () => resolvePanelAveragePolicy(assignments, profiles),
+    [assignments, profiles],
+  );
   const ownAdvisoryScorecard = useMemo(
     () =>
       panelRoster.find(
@@ -716,6 +721,15 @@ export function OwnerLiveAdjudicationReview({
         scorecard ? [scorecard] : [],
       ),
     [panelRoster],
+  );
+  const panelAverageScorecards = useMemo(
+    () =>
+      visibleScorecards.filter((scorecard) =>
+        panelAveragePolicy.contributorUserIds.has(
+          scorecard.adjudicator_user_id,
+        ),
+      ),
+    [panelAveragePolicy, visibleScorecards],
   );
   const visibleScorecardIds = useMemo(
     () => new Set(visibleScorecards.map((scorecard) => scorecard.id)),
@@ -1114,7 +1128,7 @@ export function OwnerLiveAdjudicationReview({
         const average = categoryAverage(
           category.id,
           criteria,
-          visibleScorecards,
+          panelAverageScorecards,
           scores,
         );
         const isOverallProductionCategory =
@@ -1140,6 +1154,10 @@ export function OwnerLiveAdjudicationReview({
             criteria,
             scores,
           ),
+          contributesToPanelAverage:
+            panelAveragePolicy.contributorUserIds.has(
+              assignment.adjudicator_user_id,
+            ),
         }));
         const categoryComments = comments.filter(
           (comment) =>
@@ -1198,9 +1216,12 @@ export function OwnerLiveAdjudicationReview({
                         </span>
                         <span className="criterion-header-summary">
                           <small>
-                            {scorecard
-                              ? scorecardStatusLabel(scorecard.status)
-                              : "Not started"}
+                            {!panelistAverages[panelistIndex]
+                              ?.contributesToPanelAverage
+                              ? "Advisory reference"
+                              : scorecard
+                                ? scorecardStatusLabel(scorecard.status)
+                                : "Not started"}
                           </small>
                           <strong aria-label={`${panelistAverages[panelistIndex]?.name ?? "Panelist"} category average`}>
                             {formatScoreAverage(
@@ -1213,7 +1234,11 @@ export function OwnerLiveAdjudicationReview({
                     <th>
                       <span className="criterion-header-name">Average</span>
                       <span className="criterion-header-summary">
-                        <small>Full panel</small>
+                        <small>
+                          {panelAveragePolicy.adjudicatorOnly
+                            ? "Adjudicators only"
+                            : "Full panel"}
+                        </small>
                         <strong aria-label={`${category.title} full panel average`}>
                           {formatScoreAverage(average)}
                         </strong>
@@ -1234,6 +1259,11 @@ export function OwnerLiveAdjudicationReview({
                       }),
                     );
                     const numeric = criterionRows
+                      .filter(({ assignment }) =>
+                        panelAveragePolicy.contributorUserIds.has(
+                          assignment.adjudicator_user_id,
+                        ),
+                      )
                       .map(({ row }) => row?.score)
                       .filter((value): value is number => typeof value === "number")
                       .map(Number);

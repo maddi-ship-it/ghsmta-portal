@@ -97,4 +97,67 @@ describe("FullScoreOverviewModal", () => {
     expect(html).toContain("Music Direction");
     expect(html).toContain("Overall Production");
   });
+
+  it("shows an Advisory Committee score as reference when three adjudicators are present", () => {
+    const categories = [
+      {
+        id: "music",
+        category_key: "music_direction",
+        title: "Music Direction",
+        sort_order: 1,
+      },
+    ] as ScoringCategory[];
+    const criteria = [
+      { id: "pitch", category_id: "music" },
+    ] as ScoringCriterion[];
+    const assignments = ["adj-1", "adj-2", "adj-3", "acm-1"].map(
+      (userId) =>
+        ({
+          id: `assignment-${userId}`,
+          adjudicator_user_id: userId,
+          can_score: true,
+        }) as AdjudicatorAssignment,
+    );
+    const scorecards = assignments.map(
+      (assignment) =>
+        ({
+          id: `scorecard-${assignment.adjudicator_user_id}`,
+          assignment_id: assignment.id,
+          adjudicator_user_id: assignment.adjudicator_user_id,
+          status: "draft",
+        }) as AdjudicationScorecard,
+    );
+    const scores = scorecards.map(
+      (scorecard) =>
+        ({
+          scorecard_id: scorecard.id,
+          criterion_id: "pitch",
+          score: scorecard.adjudicator_user_id === "acm-1" ? 2 : 8,
+        }) as AdjudicationScore,
+    );
+    const profiles = [
+      { id: "adj-1", full_name: "One", role: "adjudicator" },
+      { id: "adj-2", full_name: "Two", role: "adjudicator" },
+      { id: "adj-3", full_name: "Three", role: "adjudicator" },
+      { id: "acm-1", full_name: "Committee", role: "advisory_member" },
+    ] as Profile[];
+
+    const html = renderToStaticMarkup(
+      <FullScoreOverviewModal
+        assignments={assignments}
+        categories={categories}
+        criteria={criteria}
+        onClose={() => undefined}
+        open
+        profiles={profiles}
+        scorecards={scorecards}
+        scores={scores}
+      />,
+    );
+
+    expect(html).toContain("Advisory reference only");
+    expect(html).toContain("3 adjudicators; committee shown as reference");
+    expect(html).toContain("8.00000");
+    expect(html).not.toContain("6.50000");
+  });
 });

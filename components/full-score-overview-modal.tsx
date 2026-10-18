@@ -10,6 +10,7 @@ import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
+import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import type {
   AdjudicationScore,
   AdjudicationScorecard,
@@ -27,6 +28,7 @@ type PanelMemberScore = {
   overallAverage: number | null;
   completedCategoryCount: number;
   scoreableCategoryCount: number;
+  contributesToPanelAverage: boolean;
 };
 
 function categoryAverage(
@@ -88,6 +90,10 @@ export function FullScoreOverviewModal({
       scorecards.map((scorecard) => [scorecard.assignment_id, scorecard]),
     );
     const scoresByScorecardId = new Map<string, AdjudicationScore[]>();
+    const panelAveragePolicy = resolvePanelAveragePolicy(
+      assignments,
+      profiles,
+    );
 
     for (const score of scores) {
       const scorecardScores = scoresByScorecardId.get(score.scorecard_id) ?? [];
@@ -120,6 +126,10 @@ export function FullScoreOverviewModal({
           overallAverage: overall.score,
           completedCategoryCount: overall.completedCategoryCount,
           scoreableCategoryCount: overall.scoreableCategoryCount,
+          contributesToPanelAverage:
+            panelAveragePolicy.contributorUserIds.has(
+              assignment.adjudicator_user_id,
+            ),
         };
       });
   }, [assignments, categories, criteria, profiles, scorecards, scores]);
@@ -138,8 +148,16 @@ export function FullScoreOverviewModal({
 
   const panelOverallAverage = scoreAverage(
     panelMembers.flatMap((member) =>
-      member.overallAverage == null ? [] : [member.overallAverage],
+      member.contributesToPanelAverage && member.overallAverage != null
+        ? [member.overallAverage]
+        : [],
     ),
+  );
+  const contributingMemberCount = panelMembers.filter(
+    (member) => member.contributesToPanelAverage,
+  ).length;
+  const advisoryReferenceMode = panelMembers.some(
+    (member) => !member.contributesToPanelAverage,
   );
 
   return (
@@ -193,8 +211,9 @@ export function FullScoreOverviewModal({
                             {formatScoreAverage(member.overallAverage)}
                           </strong>
                           <small>
-                            {member.completedCategoryCount}/
-                            {member.scoreableCategoryCount} categories complete
+                            {member.contributesToPanelAverage
+                              ? `${member.completedCategoryCount}/${member.scoreableCategoryCount} categories complete`
+                              : "Advisory reference only"}
                           </small>
                         </span>
                       </th>
@@ -204,7 +223,11 @@ export function FullScoreOverviewModal({
                       <span className="full-score-member-overall">
                         <small>Overall average</small>
                         <strong>{formatScoreAverage(panelOverallAverage)}</strong>
-                        <small>{panelMembers.length} scoring members</small>
+                        <small>
+                          {advisoryReferenceMode
+                            ? `${contributingMemberCount} adjudicators; committee shown as reference`
+                            : `${contributingMemberCount} scoring members`}
+                        </small>
                       </span>
                     </th>
                   </tr>
@@ -217,8 +240,11 @@ export function FullScoreOverviewModal({
                       categoryAverage(category, categoryCriteria, member),
                     );
                     const panelCategoryAverage = scoreAverage(
-                      memberAverages.flatMap((value) =>
-                        value == null ? [] : [value],
+                      memberAverages.flatMap((value, index) =>
+                        panelMembers[index]?.contributesToPanelAverage &&
+                        value != null
+                          ? [value]
+                          : [],
                       ),
                     );
 
@@ -233,10 +259,12 @@ export function FullScoreOverviewModal({
                             <strong>{formatScoreAverage(value)}</strong>
                             <small>
                               {panelMembers[index]?.scorecard
-                                ? panelMembers[index]?.scorecard?.status.replaceAll(
-                                    "_",
-                                    " ",
-                                  )
+                                ? panelMembers[index]?.contributesToPanelAverage
+                                  ? panelMembers[index]?.scorecard?.status.replaceAll(
+                                      "_",
+                                      " ",
+                                    )
+                                  : "Advisory reference"
                                 : "Not started"}
                             </small>
                           </td>
@@ -246,8 +274,15 @@ export function FullScoreOverviewModal({
                             {formatScoreAverage(panelCategoryAverage)}
                           </strong>
                           <small>
-                            {memberAverages.filter((value) => value != null).length}/
-                            {panelMembers.length} members reporting
+                            {memberAverages.filter(
+                              (value, index) =>
+                                value != null &&
+                                panelMembers[index]?.contributesToPanelAverage,
+                            ).length}
+                            /{contributingMemberCount}{" "}
+                            {advisoryReferenceMode
+                              ? "adjudicators reporting"
+                              : "members reporting"}
                           </small>
                         </td>
                       </tr>

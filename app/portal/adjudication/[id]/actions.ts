@@ -35,6 +35,7 @@ import {
   resolvePanelCommentScoringContext,
 } from "@/lib/panel-comment-context";
 import { resolvePanelCommentModel } from "@/lib/panel-comment-model";
+import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { OPENAI_REASONING_EFFORT } from "@/lib/openai-model";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -43,6 +44,7 @@ import type {
   AdjudicationCategoryComment,
   AdjudicationScore,
   AdjudicationScorecard,
+  AdjudicatorAssignment,
   AiPromptTemplate,
   Application,
   ApplicationAnswer,
@@ -52,6 +54,7 @@ import type {
   ScoringCriterion,
   ScoringRubric,
   ScoringScaleLevel,
+  Profile,
 } from "@/lib/types";
 
 function formText(formData: FormData, name: string) {
@@ -751,7 +754,7 @@ async function generatePanelCommentDraft(
       .in("status", ["draft", "reopened", "submitted", "locked"]),
     admin
       .from("adjudicator_assignments")
-      .select("id")
+      .select("id,adjudicator_user_id,can_score")
       .eq("application_id", applicationId)
       .is("removed_at", null),
     admin.from("award_cycles").select("*").eq("id", application.cycle_id).single(),
@@ -801,6 +804,26 @@ async function generatePanelCommentDraft(
 
   const activeAssignmentIds = new Set(
     (assignmentsResult.data ?? []).map((assignment) => assignment.id),
+  );
+  const panelAssignments = (assignmentsResult.data ?? []) as Pick<
+    AdjudicatorAssignment,
+    "id" | "adjudicator_user_id" | "can_score"
+  >[];
+  const panelUserIds = [
+    ...new Set(
+      panelAssignments.map((assignment) => assignment.adjudicator_user_id),
+    ),
+  ];
+  const { data: panelProfiles, error: panelProfilesError } = panelUserIds.length
+    ? await admin
+        .from("profiles")
+        .select("id,role")
+        .in("id", panelUserIds)
+    : { data: [], error: null };
+  if (panelProfilesError) throw new Error(panelProfilesError.message);
+  const panelAveragePolicy = resolvePanelAveragePolicy(
+    panelAssignments,
+    (panelProfiles ?? []) as Pick<Profile, "id" | "role">[],
   );
   const criteria = (criteriaResult.data ?? []) as ScoringCriterion[];
   const scorecards = ((cardsResult.data ?? []) as AdjudicationScorecard[]).filter(
@@ -895,7 +918,11 @@ async function generatePanelCommentDraft(
   const panelAverage = calculateLivePanelCategoryAverage(
     category.id,
     criteria,
-    scorecards,
+    scorecards.filter((scorecard) =>
+      panelAveragePolicy.contributorUserIds.has(
+        scorecard.adjudicator_user_id,
+      ),
+    ),
     scores,
   );
   const scoringContext = resolvePanelCommentScoringContext({
