@@ -14258,6 +14258,18 @@ html[data-theme="light"] .portal-shell .portal-header .user-avatar {
 .feedback-ticket-context dd small { display: block; margin-top: 0.25rem; color: var(--portal-muted); }
 .feedback-ticket-context code { white-space: pre-wrap; word-break: break-word; }
 .feedback-context-wide { grid-column: 1 / -1; }
+.feedback-diagnostics-notice { margin: 0; }
+.feedback-captured-errors { display: grid; gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
+.feedback-captured-errors li { display: grid; gap: 0.35rem; padding: 0.75rem 0.85rem; border: 1px solid var(--portal-line); border-radius: 0.75rem; background: var(--portal-surface-2); }
+.feedback-captured-errors li > div { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.feedback-captured-errors time { color: var(--portal-muted); font-size: 0.75rem; }
+.feedback-captured-errors strong { color: var(--portal-text); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.5; }
+.feedback-captured-errors small { color: var(--portal-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; overflow-wrap: anywhere; }
+.feedback-error-kind { width: max-content; text-transform: capitalize; }
+.feedback-error-kind-runtime,
+.feedback-error-kind-promise,
+.feedback-error-kind-react,
+.feedback-error-kind-resource { color: var(--portal-danger); border-color: color-mix(in srgb, var(--portal-danger) 28%, var(--portal-line)); background: color-mix(in srgb, var(--portal-danger) 9%, var(--portal-surface)); }
 .feedback-ticket-history { display: grid; gap: 0; margin: 0; padding: 1rem 1.2rem; list-style: none; }
 .feedback-ticket-history li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.8rem; padding-bottom: 1rem; }
 .feedback-ticket-history li > span { width: 0.7rem; height: 0.7rem; margin-top: 0.3rem; border: 2px solid var(--portal-gold); border-radius: 50%; background: var(--portal-surface); }

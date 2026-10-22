@@ -1,6 +1,14 @@
 "use client";
 
-export default function AppError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+import { useEffect } from "react";
+
+import { recordPortalErrorBoundary } from "@/lib/portal-error-diagnostics";
+
+export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    recordPortalErrorBoundary(error);
+  }, [error]);
+
   return (
     <main className="system-state-page safe-shell">
       <section className="system-state-card" role="alert">

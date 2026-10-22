@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 
 import { submitPortalFeedback } from "@/app/portal/feedback/actions";
 import { uploadPortalFiles } from "@/lib/portal-file-client";
+import {
+  collectPortalPageErrors,
+  recordPortalPageError,
+  sanitizePortalPageUrl,
+} from "@/lib/portal-error-diagnostics";
 import type { Profile } from "@/lib/types";
 
 export const FEEDBACK_DIALOG_EVENT = "ghsmta:open-feedback";
@@ -14,15 +19,46 @@ export function GlobalFeedbackDialog({ profile }: { profile: Profile }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
+  const [capturedErrorCount, setCapturedErrorCount] = useState(0);
 
   useEffect(() => {
     const handler = () => {
       setError(null);
       setReference(null);
+      setCapturedErrorCount(collectPortalPageErrors().length);
       setOpen(true);
     };
+    const captureRuntimeError = (event: ErrorEvent) => {
+      recordPortalPageError({
+        kind: "runtime",
+        message: event.message || event.error?.message || "Browser runtime error",
+        name: event.error?.name,
+        source: event.filename,
+        line: event.lineno,
+        column: event.colno,
+      });
+    };
+    const captureRejectedPromise = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      recordPortalPageError({
+        kind: "promise",
+        message:
+          reason instanceof Error
+            ? reason.message
+            : typeof reason === "string"
+              ? reason
+              : "An unexpected background request failed.",
+        name: reason instanceof Error ? reason.name : "Unhandled rejection",
+      });
+    };
     window.addEventListener(FEEDBACK_DIALOG_EVENT, handler);
-    return () => window.removeEventListener(FEEDBACK_DIALOG_EVENT, handler);
+    window.addEventListener("error", captureRuntimeError);
+    window.addEventListener("unhandledrejection", captureRejectedPromise);
+    return () => {
+      window.removeEventListener(FEEDBACK_DIALOG_EVENT, handler);
+      window.removeEventListener("error", captureRuntimeError);
+      window.removeEventListener("unhandledrejection", captureRejectedPromise);
+    };
   }, []);
 
   async function submit(form: HTMLFormElement) {
@@ -32,11 +68,14 @@ export function GlobalFeedbackDialog({ profile }: { profile: Profile }) {
     const requestType = String(formData.get("request_type") ?? "bug_report");
     const files = formData.getAll("files").filter((value): value is File => value instanceof File && value.size > 0);
     formData.delete("files");
-    formData.set("page_url", window.location.href);
+    formData.set("page_url", sanitizePortalPageUrl(window.location.href));
     formData.set("page_path", window.location.pathname);
     formData.set("browser_info", navigator.userAgent);
     formData.set("screen_width", String(window.innerWidth));
     formData.set("screen_height", String(window.innerHeight));
+    const pageErrors = collectPortalPageErrors();
+    formData.set("page_errors", JSON.stringify(pageErrors));
+    formData.set("diagnostics_captured_at", new Date().toISOString());
 
     try {
       const result = await submitPortalFeedback(formData);
@@ -66,7 +105,7 @@ export function GlobalFeedbackDialog({ profile }: { profile: Profile }) {
   if (!open) return null;
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+    <div className="modal-backdrop" data-feedback-dialog role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
       <div className="modal-card feedback-modal" role="dialog" aria-modal="true" aria-labelledby="global-feedback-title">
         <div className="modal-header">
           <div><p className="eyebrow">Portal feedback</p><h2 id="global-feedback-title">Report a bug or request a feature</h2></div>
@@ -90,7 +129,12 @@ export function GlobalFeedbackDialog({ profile }: { profile: Profile }) {
             <div className="field"><label htmlFor="feedback_title_input">Title</label><input className="input" id="feedback_title_input" name="title" minLength={3} maxLength={180} required /></div>
             <div className="field"><label htmlFor="feedback_description">What happened, or what would help?</label><textarea className="textarea" id="feedback_description" name="description" rows={7} minLength={10} required /></div>
             <div className="field"><label htmlFor="feedback_files">Screenshot or supporting file</label><input className="input file-input" id="feedback_files" name="files" type="file" multiple /></div>
-            <p className="privacy-note">The portal automatically includes your current page, role, browser, and screen size so the team can reproduce the issue.</p>
+            {capturedErrorCount > 0 && (
+              <div className="notice-banner feedback-diagnostics-notice" role="status">
+                {capturedErrorCount} recent page {capturedErrorCount === 1 ? "error was" : "errors were"} found and will be included securely with this request.
+              </div>
+            )}
+            <p className="privacy-note">The portal automatically includes your current page, role, browser, screen size, and recent technical errors so the team can reproduce the issue. Passwords, authentication tokens, and page form contents are not collected.</p>
             <div className="modal-actions"><Link className="button button-secondary" href="/portal/feedback" onClick={() => setOpen(false)}>View my requests</Link><button className="button button-secondary" type="button" onClick={() => setOpen(false)}>Cancel</button><button className="button button-gold" type="submit" disabled={busy}>{busy ? "Submitting…" : "Submit request"}</button></div>
           </form>
         )}

@@ -1,6 +1,14 @@
 "use client";
 
-export default function PortalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+import { useEffect } from "react";
+
+import { recordPortalErrorBoundary } from "@/lib/portal-error-diagnostics";
+
+export default function PortalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    recordPortalErrorBoundary(error);
+  }, [error]);
+
   return (
     <section className="panel system-state-card" role="alert">
       <span className="eyebrow">Portal error</span>

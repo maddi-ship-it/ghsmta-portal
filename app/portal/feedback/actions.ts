@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 
 import { requireProfile } from "@/lib/auth";
+import {
+  parsePortalPageErrors,
+  sanitizePortalPageUrl,
+} from "@/lib/portal-error-diagnostics";
 import { createClient } from "@/lib/supabase/server";
 
 export type FeedbackActionResult = {
@@ -41,6 +45,13 @@ export async function submitPortalFeedback(
   const supabase = await createClient();
   const width = Number(text(formData, "screen_width"));
   const height = Number(text(formData, "screen_height"));
+  const pageErrors = parsePortalPageErrors(text(formData, "page_errors"));
+  const diagnosticsCapturedAt = text(formData, "diagnostics_captured_at");
+  const normalizedDiagnosticsCapturedAt = Number.isFinite(
+    new Date(diagnosticsCapturedAt).getTime(),
+  )
+    ? new Date(diagnosticsCapturedAt).toISOString()
+    : null;
   const { data: request, error } = await supabase
     .from("portal_feedback_requests")
     .insert({
@@ -48,13 +59,15 @@ export async function submitPortalFeedback(
       title,
       description,
       priority,
-      page_url: text(formData, "page_url") || null,
+      page_url: sanitizePortalPageUrl(text(formData, "page_url")) || null,
       browser_info: text(formData, "browser_info") || null,
       screen_width: Number.isFinite(width) && width > 0 ? width : null,
       screen_height: Number.isFinite(height) && height > 0 ? height : null,
       client_context: {
         path: text(formData, "page_path") || null,
         role: profile.role,
+        diagnostics_captured_at: normalizedDiagnosticsCapturedAt,
+        page_errors: pageErrors,
       },
       submitted_by: profile.id,
       status: "new",

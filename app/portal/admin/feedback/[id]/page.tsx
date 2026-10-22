@@ -10,6 +10,7 @@ import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
 import { requireProfile } from "@/lib/auth";
 import { FEEDBACK_STATUS_LABELS, FEEDBACK_STATUSES } from "@/lib/feedback";
 import { roleLabel } from "@/lib/format";
+import { parsePortalPageErrors } from "@/lib/portal-error-diagnostics";
 import { createClient } from "@/lib/supabase/server";
 
 type DetailParams = { success?: string; error?: string };
@@ -77,6 +78,11 @@ export default async function FeedbackTicketDetailPage({
   );
   const pageUrl = safeHttpUrl(ticket.page_url);
   const closed = ticket.status === "closed";
+  const clientContext =
+    ticket.client_context && typeof ticket.client_context === "object"
+      ? (ticket.client_context as Record<string, unknown>)
+      : {};
+  const capturedPageErrors = parsePortalPageErrors(clientContext.page_errors);
 
   return (
     <div className="feedback-ticket-detail-page">
@@ -117,6 +123,37 @@ export default async function FeedbackTicketDetailPage({
               <div><dt>Screen</dt><dd>{ticket.screen_width && ticket.screen_height ? `${ticket.screen_width} × ${ticket.screen_height}` : "Not captured"}</dd></div>
               <div className="feedback-context-wide"><dt>Page</dt><dd>{pageUrl ? <a href={pageUrl} rel="noreferrer" target="_blank">{ticket.page_url}</a> : ticket.page_url ?? "Not captured"}</dd></div>
               <div className="feedback-context-wide"><dt>Browser</dt><dd><code>{ticket.browser_info ?? "Not captured"}</code></dd></div>
+              <div className="feedback-context-wide">
+                <dt>Captured page errors</dt>
+                <dd>
+                  {capturedPageErrors.length > 0 ? (
+                    <ol className="feedback-captured-errors">
+                      {capturedPageErrors.map((pageError, index) => (
+                        <li key={`${pageError.occurredAt}-${pageError.kind}-${index}`}>
+                          <div>
+                            <span className={`badge feedback-error-kind feedback-error-kind-${pageError.kind}`}>
+                              {pageError.kind}
+                            </span>
+                            <time>{formatDate(pageError.occurredAt)}</time>
+                          </div>
+                          <strong>{pageError.message}</strong>
+                          {(pageError.digest || pageError.source) && (
+                            <small>
+                              {pageError.digest ? `Digest: ${pageError.digest}` : ""}
+                              {pageError.digest && pageError.source ? " · " : ""}
+                              {pageError.source ?? ""}
+                              {pageError.line ? `:${pageError.line}` : ""}
+                              {pageError.column ? `:${pageError.column}` : ""}
+                            </small>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    "No browser or page errors were detected when this request was submitted."
+                  )}
+                </dd>
+              </div>
               <div className="feedback-context-wide"><dt>Client context</dt><dd><code>{JSON.stringify(ticket.client_context ?? {}, null, 2)}</code></dd></div>
             </dl>
           </section>
