@@ -20,6 +20,23 @@ export function resolveGeneratedNarrativeFinal({
   };
 }
 
+export function panelNarrativeSourceAssignmentIds(
+  assignments: ReadonlyArray<{
+    id: string;
+    can_comment?: boolean;
+    removed_at?: string | null;
+  }>,
+) {
+  return new Set(
+    assignments
+      .filter(
+        (assignment) =>
+          assignment.removed_at == null && assignment.can_comment === true,
+      )
+      .map((assignment) => assignment.id),
+  );
+}
+
 export function shouldRefreshGeneratedNarrative({
   status,
   generatedAt,

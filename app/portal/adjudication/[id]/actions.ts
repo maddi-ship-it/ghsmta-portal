@@ -26,6 +26,7 @@ import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import {
   isAssignedPanelNarrativeReviewer,
+  panelNarrativeSourceAssignmentIds,
   resolveGeneratedNarrativeFinal,
   shouldRefreshGeneratedNarrative,
 } from "@/lib/panel-narrative";
@@ -755,7 +756,7 @@ async function generatePanelCommentDraft(
       .in("status", ["draft", "reopened", "submitted", "locked"]),
     admin
       .from("adjudicator_assignments")
-      .select("id,adjudicator_user_id,can_score")
+      .select("id,adjudicator_user_id,can_score,can_comment")
       .eq("application_id", applicationId)
       .is("removed_at", null),
     admin.from("award_cycles").select("*").eq("id", application.cycle_id).single(),
@@ -808,7 +809,7 @@ async function generatePanelCommentDraft(
   );
   const panelAssignments = (assignmentsResult.data ?? []) as Pick<
     AdjudicatorAssignment,
-    "id" | "adjudicator_user_id" | "can_score"
+    "id" | "adjudicator_user_id" | "can_score" | "can_comment"
   >[];
   const panelUserIds = [
     ...new Set(
@@ -830,6 +831,16 @@ async function generatePanelCommentDraft(
   const scorecards = ((cardsResult.data ?? []) as AdjudicationScorecard[]).filter(
     (scorecard) => activeAssignmentIds.has(scorecard.assignment_id),
   );
+  const narrativeAssignmentIds = panelNarrativeSourceAssignmentIds(
+    panelAssignments,
+  );
+  const narrativeScorecardIds = new Set(
+    scorecards
+      .filter((scorecard) =>
+        narrativeAssignmentIds.has(scorecard.assignment_id),
+      )
+      .map((scorecard) => scorecard.id),
+  );
   const cycle = cycleResult.data as AwardCycle;
   const rubric = rubricResult.data as ScoringRubric;
   const scaleLevels = (scaleResult.data ?? []) as ScoringScaleLevel[];
@@ -839,11 +850,13 @@ async function generatePanelCommentDraft(
   const criterionIds = criteria.map((criterion) => criterion.id);
 
   const [commentsResult, scoresResult] = await Promise.all([
-    admin
-      .from("adjudication_category_comments")
-      .select("*")
-      .eq("category_id", categoryId)
-      .in("scorecard_id", scorecardIds),
+    narrativeScorecardIds.size
+      ? admin
+          .from("adjudication_category_comments")
+          .select("*")
+          .eq("category_id", categoryId)
+          .in("scorecard_id", [...narrativeScorecardIds])
+      : Promise.resolve({ data: [], error: null }),
     criterionIds.length
       ? admin
           .from("adjudication_scores")
@@ -866,7 +879,7 @@ async function generatePanelCommentDraft(
     category,
     criteria,
     comments,
-    scores,
+    scores.filter((score) => narrativeScorecardIds.has(score.scorecard_id)),
   );
   if (!rawComments.trim()) {
     throw new Error(
@@ -1038,11 +1051,26 @@ async function refreshLivePanelNarratives(
   generatedBy: string,
 ) {
   const admin = createAdminClient();
-  const { data: scorecards, error: scorecardError } = await admin
-    .from("adjudication_scorecards")
-    .select("id,rubric_id")
-    .eq("application_id", applicationId);
+  const [scorecardResult, assignmentResult] = await Promise.all([
+    admin
+      .from("adjudication_scorecards")
+      .select("id,rubric_id,assignment_id")
+      .eq("application_id", applicationId),
+    admin
+      .from("adjudicator_assignments")
+      .select("id,can_comment,removed_at")
+      .eq("application_id", applicationId)
+      .is("removed_at", null),
+  ]);
+  const { data: allScorecards, error: scorecardError } = scorecardResult;
   if (scorecardError) throw new Error(scorecardError.message);
+  if (assignmentResult.error) throw new Error(assignmentResult.error.message);
+  const narrativeAssignmentIds = panelNarrativeSourceAssignmentIds(
+    assignmentResult.data ?? [],
+  );
+  const scorecards = (allScorecards ?? []).filter((scorecard) =>
+    narrativeAssignmentIds.has(scorecard.assignment_id),
+  );
   if (!scorecards?.length) return;
 
   const rubricId = scorecards[0]?.rubric_id;

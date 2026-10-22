@@ -25,6 +25,7 @@ import {
   isAdjudicationCategoryComplete,
 } from "@/lib/adjudication-category-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import { panelNarrativeSourceAssignmentIds } from "@/lib/panel-narrative";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { createClient } from "@/lib/supabase/client";
 import { richTextHasContent, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/rich-text";
@@ -313,6 +314,7 @@ function LivePanelFeedbackEditor({
   category,
   feedback,
   liveDraft,
+  onRefreshLiveNotes,
   panelApproved,
 }: {
   applicationId: string;
@@ -320,6 +322,7 @@ function LivePanelFeedbackEditor({
   category: ScoringCategory;
   feedback: AdjudicationPanelFeedback | undefined;
   liveDraft: string;
+  onRefreshLiveNotes: () => Promise<boolean>;
   panelApproved: boolean;
 }) {
   const router = useRouter();
@@ -333,6 +336,7 @@ function LivePanelFeedbackEditor({
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [generationMessage, setGenerationMessage] = useState("");
+  const [refreshingLiveNotes, setRefreshingLiveNotes] = useState(false);
   const [isGenerating, startGeneration] = useTransition();
   const value = followingLiveDraft ? liveDraft : manualValue;
 
@@ -570,14 +574,36 @@ function LivePanelFeedbackEditor({
               </button>
               <button
                 className="text-button"
+                disabled={refreshingLiveNotes}
                 type="button"
-                onClick={() => {
-                  setFollowingLiveDraft(true);
-                  setManualValue("");
-                  setGenerationMessage("");
+                onClick={async () => {
+                  setRefreshingLiveNotes(true);
+                  setGenerationMessage("Refreshing live notes…");
+                  try {
+                    const refreshed = await onRefreshLiveNotes();
+                    if (refreshed) {
+                      window.localStorage.removeItem(storageKey);
+                      setHasLocalDraft(false);
+                      setFollowingLiveDraft(true);
+                      setManualValue("");
+                      setGenerationMessage(
+                        "Live notes refreshed from currently assigned commenters.",
+                      );
+                    } else {
+                      setGenerationMessage(
+                        "Live notes could not be refreshed. Try again in a moment.",
+                      );
+                    }
+                  } catch {
+                    setGenerationMessage(
+                      "Live notes could not be refreshed. Try again in a moment.",
+                    );
+                  } finally {
+                    setRefreshingLiveNotes(false);
+                  }
                 }}
               >
-                Refresh from live notes
+                {refreshingLiveNotes ? "Refreshing…" : "Refresh from live notes"}
               </button>
             </div>
           </div>
@@ -662,6 +688,7 @@ export function OwnerLiveAdjudicationReview({
   release: AdjudicationRelease | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const [panelAssignments, setPanelAssignments] = useState(assignments);
   const [scorecards, setScorecards] = useState(initialScorecards);
   const [scores, setScores] = useState(initialScores);
   const [comments, setComments] = useState(initialComments);
@@ -687,15 +714,15 @@ export function OwnerLiveAdjudicationReview({
   );
   const panelRoster = useMemo(
     () =>
-      assignments.map((assignment) => ({
+      panelAssignments.map((assignment) => ({
         assignment,
         scorecard: scorecardByAssignmentId.get(assignment.id) ?? null,
       })),
-    [assignments, scorecardByAssignmentId],
+    [panelAssignments, scorecardByAssignmentId],
   );
   const panelAveragePolicy = useMemo(
-    () => resolvePanelAveragePolicy(assignments, profiles),
-    [assignments, profiles],
+    () => resolvePanelAveragePolicy(panelAssignments, profiles),
+    [panelAssignments, profiles],
   );
   const ownAdvisoryScorecard = useMemo(
     () =>
@@ -731,9 +758,20 @@ export function OwnerLiveAdjudicationReview({
       ),
     [panelAveragePolicy, visibleScorecards],
   );
-  const visibleScorecardIds = useMemo(
-    () => new Set(visibleScorecards.map((scorecard) => scorecard.id)),
-    [visibleScorecards],
+  const narrativeSourceAssignmentIds = useMemo(
+    () => panelNarrativeSourceAssignmentIds(panelAssignments),
+    [panelAssignments],
+  );
+  const narrativeSourceScorecards = useMemo(
+    () =>
+      visibleScorecards.filter((scorecard) =>
+        narrativeSourceAssignmentIds.has(scorecard.assignment_id),
+      ),
+    [narrativeSourceAssignmentIds, visibleScorecards],
+  );
+  const narrativeSourceScorecardIds = useMemo(
+    () => new Set(narrativeSourceScorecards.map((scorecard) => scorecard.id)),
+    [narrativeSourceScorecards],
   );
   const scoreByCardAndCriterion = useMemo(
     () =>
@@ -775,20 +813,29 @@ export function OwnerLiveAdjudicationReview({
     [feedback, profileMap],
   );
   const refreshData = useCallback(async () => {
-    if (practiceMode) return;
+    if (practiceMode) return true;
 
-    const { data: scorecardData, error: scorecardError } = await supabase
-      .from("adjudication_scorecards")
-      .select("*")
-      .eq("application_id", applicationId)
-      .order("created_at");
+    const [scorecardResult, assignmentResult] = await Promise.all([
+      supabase
+        .from("adjudication_scorecards")
+        .select("*")
+        .eq("application_id", applicationId)
+        .order("created_at"),
+      supabase
+        .from("adjudicator_assignments")
+        .select("*")
+        .eq("application_id", applicationId)
+        .or("removed_at.is.null,status.eq.complete")
+        .order("assigned_at"),
+    ]);
 
-    if (scorecardError) {
+    if (scorecardResult.error || assignmentResult.error) {
       setConnectionState("error");
-      return;
+      return false;
     }
 
-    const nextScorecards = (scorecardData ?? []) as AdjudicationScorecard[];
+    const nextAssignments = (assignmentResult.data ?? []) as AdjudicatorAssignment[];
+    const nextScorecards = (scorecardResult.data ?? []) as AdjudicationScorecard[];
     const scorecardIds = nextScorecards.map((scorecard) => scorecard.id);
 
     const [scoreResult, commentResult, feedbackResult] = await Promise.all([
@@ -809,9 +856,10 @@ export function OwnerLiveAdjudicationReview({
 
     if (scoreResult.error || commentResult.error || feedbackResult.error) {
       setConnectionState("error");
-      return;
+      return false;
     }
 
+    setPanelAssignments(nextAssignments);
     setScorecards(nextScorecards);
     setScores((scoreResult.data ?? []) as AdjudicationScore[]);
     setComments((commentResult.data ?? []) as AdjudicationCategoryComment[]);
@@ -823,6 +871,7 @@ export function OwnerLiveAdjudicationReview({
     );
     setLastUpdated(new Date());
     setConnectionState("live");
+    return true;
   }, [applicationId, isOwner, practiceMode, supabase]);
 
   const scheduleRefresh = useCallback(() => {
@@ -906,6 +955,19 @@ export function OwnerLiveAdjudicationReview({
 
     const channels = [
       supabase
+        .channel(`panel-review-assignments:${applicationId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "adjudicator_assignments",
+            filter: `application_id=eq.${applicationId}`,
+          },
+          scheduleRefresh,
+        )
+        .subscribe(),
+      supabase
         .channel(`panel-review-scorecards:${applicationId}`)
         .on(
           "postgres_changes",
@@ -980,7 +1042,7 @@ export function OwnerLiveAdjudicationReview({
   return (
     <>
       <FullScoreOverviewModal
-        assignments={assignments}
+        assignments={panelAssignments}
         categories={categories}
         criteria={criteria}
         onClose={closeFullScoreOverview}
@@ -1026,7 +1088,7 @@ export function OwnerLiveAdjudicationReview({
       <section className="metric-grid adjudication-review-metrics" aria-label="Panel progress">
         <article className="metric-card">
           <span className="metric-label">Assigned</span>
-          <strong className="metric-value">{assignments.length}</strong>
+          <strong className="metric-value">{panelAssignments.length}</strong>
         </article>
         <article className="metric-card">
           <span className="metric-label">Started</span>
@@ -1108,7 +1170,7 @@ export function OwnerLiveAdjudicationReview({
               </article>
             );
           })}
-          {assignments.length === 0 && <p>No adjudicators have been assigned.</p>}
+          {panelAssignments.length === 0 && <p>No adjudicators have been assigned.</p>}
         </div>
       </section>
 
@@ -1162,12 +1224,12 @@ export function OwnerLiveAdjudicationReview({
         const categoryComments = comments.filter(
           (comment) =>
             comment.category_id === category.id &&
-            visibleScorecardIds.has(comment.scorecard_id),
+            narrativeSourceScorecardIds.has(comment.scorecard_id),
         );
         const liveDraft = composeLiveCommentDraft(
           category,
           categoryCriteria,
-          visibleScorecards,
+          narrativeSourceScorecards,
           scores,
           categoryComments,
         );
@@ -1396,6 +1458,7 @@ export function OwnerLiveAdjudicationReview({
                   category={category}
                   feedback={categoryFeedback}
                   liveDraft={liveDraft}
+                  onRefreshLiveNotes={refreshData}
                   panelApproved={Boolean(
                     categoryFeedback?.approved_by &&
                       ["adjudicator", "advisory_member"].includes(

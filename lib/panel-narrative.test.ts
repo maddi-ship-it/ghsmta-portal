@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAssignedPanelNarrativeReviewer,
   isPanelNarrativeApprovalComplete,
+  panelNarrativeSourceAssignmentIds,
   resolveGeneratedNarrativeFinal,
   shouldRefreshGeneratedNarrative,
 } from "./panel-narrative";
@@ -58,6 +59,21 @@ describe("Owner panel narrative generation", () => {
         cooldownMs: 90_000,
       }),
     ).toBe(true);
+  });
+
+  it("uses notes only from active assignments with commenting enabled", () => {
+    expect(
+      [...panelNarrativeSourceAssignmentIds([
+        { id: "active-commenter", can_comment: true, removed_at: null },
+        { id: "scoring-only", can_comment: false, removed_at: null },
+        {
+          id: "removed-commenter",
+          can_comment: true,
+          removed_at: "2026-10-20T18:00:00.000Z",
+        },
+        { id: "legacy-without-permission", removed_at: null },
+      ])],
+    ).toEqual(["active-commenter"]);
   });
 
   it("only lets the assigned panel member approve a final comment", () => {
