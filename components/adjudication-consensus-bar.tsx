@@ -29,6 +29,10 @@ import {
   formatTwoPointRangeStart,
   isValidTwoPointRange,
 } from "@/lib/adjudication-ranges";
+import {
+  buildRangeApprovalRoster,
+  type RangeApprovalReviewer,
+} from "@/lib/adjudication-range-approvals";
 import { createClient } from "@/lib/supabase/client";
 import type {
   ActingCandidateReviewer,
@@ -171,6 +175,7 @@ export function AdjudicationConsensusBar({
   narrativeAssignments,
   narrativesReady,
   panelReviewers,
+  rangeReviewers,
   proposals,
   scoreability,
   review,
@@ -194,6 +199,7 @@ export function AdjudicationConsensusBar({
   narrativesReady: boolean;
   narrativeAssignments: NarrativeAssignment[];
   panelReviewers: PanelReviewer[];
+  rangeReviewers: RangeApprovalReviewer[];
   compact?: boolean;
 }) {
   const [matrixOpen, setMatrixOpen] = useState(false);
@@ -202,6 +208,11 @@ export function AdjudicationConsensusBar({
   const [livePanelAverages, setLivePanelAverages] = useState<
     LivePanelScoreSpread[]
   >([]);
+  const [liveApprovals, setLiveApprovals] =
+    useState<CategoryApproval[]>(approvals);
+  const [liveApprovalStatus, setLiveApprovalStatus] = useState<
+    "loading" | "live" | "error"
+  >("loading");
   const [rangeSelections, setRangeSelections] = useState<Record<string, string>>(
     () => initialRangeSelections(categories, proposals),
   );
@@ -284,6 +295,7 @@ export function AdjudicationConsensusBar({
       ),
     [approvals, currentUserId],
   );
+
   const panelAverageByCategory = useMemo(
     () =>
       new Map(
@@ -320,8 +332,10 @@ export function AdjudicationConsensusBar({
     touchedRangeSelections.current.clear();
     autoSuggestedRanges.current.clear();
     setRangeSelections(initialRangeSelections(categories, proposals));
+    setLiveApprovals(approvals);
+    setLiveApprovalStatus(proposals.length > 0 ? "loading" : "live");
     setMatrixOpen(true);
-  }, [categories, proposals]);
+  }, [approvals, categories, proposals]);
   const openRangeReview = useCallback(() => {
     setAdjudicatorCategoryAverages(
       adjudicatorCategoryScores.map((source) =>
@@ -459,6 +473,47 @@ export function AdjudicationConsensusBar({
     rangeReviewOpen,
     supabase,
   ]);
+
+  useEffect(() => {
+    if (!matrixOpen || !canSetDecisions) return;
+
+    const proposalIds = proposals.map((proposal) => proposal.id);
+    if (proposalIds.length === 0) return;
+
+    let disposed = false;
+    let requestInFlight = false;
+
+    const loadApprovals = async (showLoading: boolean) => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      if (showLoading) setLiveApprovalStatus("loading");
+
+      const { data, error } = await supabase
+        .from("adjudication_category_approvals")
+        .select("id,proposal_id,adjudicator_user_id,response,comment")
+        .in("proposal_id", proposalIds);
+      requestInFlight = false;
+
+      if (disposed) return;
+      if (error) {
+        setLiveApprovalStatus("error");
+        return;
+      }
+
+      setLiveApprovals((data ?? []) as CategoryApproval[]);
+      setLiveApprovalStatus("live");
+    };
+
+    void loadApprovals(true);
+    const timer = window.setInterval(() => {
+      void loadApprovals(false);
+    }, 3_000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [canSetDecisions, matrixOpen, proposals, supabase]);
 
   return (
     <>
@@ -917,6 +972,28 @@ export function AdjudicationConsensusBar({
                         : naturalRange
                           ? "within"
                           : "outside";
+                      const rangeApprovalRoster = buildRangeApprovalRoster({
+                        approvals: liveApprovals,
+                        proposalId: proposal?.id ?? null,
+                        proposalStatus: proposal?.status ?? null,
+                        reviewers: rangeReviewers,
+                      });
+                      const approvedRangeCount = rangeApprovalRoster.filter(
+                        (reviewer) => reviewer.status === "approved",
+                      ).length;
+                      const disputedRangeCount = rangeApprovalRoster.filter(
+                        (reviewer) => reviewer.status === "disputed",
+                      ).length;
+                      const rangeApprovalSummary =
+                        !proposal || proposal.status === "draft"
+                          ? "Not sent for approval"
+                          : rangeApprovalRoster.length === 0
+                            ? "No scoring panel members assigned"
+                            : disputedRangeCount > 0
+                              ? `${disputedRangeCount} disputed`
+                              : approvedRangeCount === rangeApprovalRoster.length
+                                ? "All approved"
+                                : `${approvedRangeCount}/${rangeApprovalRoster.length} approved`;
 
                       return (
                         <article
@@ -1131,6 +1208,76 @@ export function AdjudicationConsensusBar({
                               </div>
                             )}
                           </div>
+                          <section
+                            aria-label={`${category.title} two-point range approvals`}
+                            className="advisory-range-approvals"
+                          >
+                            <div className="advisory-range-approvals-header">
+                              <div>
+                                <strong>Two-point range approvals</strong>
+                                <small>
+                                  See who has approved the range and who still
+                                  needs to respond.
+                                </small>
+                              </div>
+                              <span
+                                className={`badge ${
+                                  disputedRangeCount > 0
+                                    ? "badge-warning"
+                                    : approvedRangeCount > 0 &&
+                                        approvedRangeCount ===
+                                          rangeApprovalRoster.length
+                                      ? "badge-complete"
+                                      : ""
+                                }`}
+                              >
+                                {liveApprovalStatus === "loading" && proposal
+                                  ? "Loading approvals…"
+                                  : liveApprovalStatus === "error"
+                                    ? "Approval status unavailable"
+                                    : rangeApprovalSummary}
+                              </span>
+                            </div>
+                            {rangeApprovalRoster.length > 0 ? (
+                              <div className="advisory-range-approval-roster">
+                                {rangeApprovalRoster.map((reviewer) => (
+                                  <div
+                                    className={`advisory-range-approval-person advisory-range-approval-person-${reviewer.status}`}
+                                    key={reviewer.id}
+                                    title={reviewer.comment ?? undefined}
+                                  >
+                                    <span
+                                      aria-hidden="true"
+                                      className="advisory-range-approval-icon"
+                                    >
+                                      {reviewer.status === "approved"
+                                        ? "✓"
+                                        : reviewer.status === "disputed"
+                                          ? "!"
+                                          : "○"}
+                                    </span>
+                                    <span>
+                                      <strong>{reviewer.name}</strong>
+                                      <small>
+                                        {reviewer.status === "approved"
+                                          ? "Approved"
+                                          : reviewer.status === "disputed"
+                                            ? "Disputed"
+                                            : reviewer.status === "not_sent"
+                                              ? "Not sent"
+                                              : "Awaiting approval"}
+                                        {!reviewer.active ? " · Inactive" : ""}
+                                      </small>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="advisory-range-approvals-empty">
+                                No scoring panel members are currently assigned.
+                              </p>
+                            )}
+                          </section>
                         </article>
                       );
                     })}

@@ -13549,6 +13549,113 @@ html[data-theme="light"] .regal-path-section {
   grid-column: span 2;
 }
 
+.advisory-range-approvals {
+  display: grid;
+  gap: 12px;
+  margin: 0 20px 20px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--portal-gold) 30%, var(--portal-line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--portal-gold) 5%, var(--portal-surface));
+}
+
+.advisory-range-approvals-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.advisory-range-approvals-header strong,
+.advisory-range-approvals-header small {
+  display: block;
+}
+
+.advisory-range-approvals-header strong {
+  color: var(--portal-ivory);
+}
+
+.advisory-range-approvals-header small,
+.advisory-range-approvals-empty {
+  margin-top: 3px;
+  color: var(--portal-muted);
+  font-size: 0.78rem;
+}
+
+.advisory-range-approval-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.advisory-range-approval-person {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--portal-line);
+  border-radius: 11px;
+  background: var(--portal-surface-3);
+}
+
+.advisory-range-approval-person strong,
+.advisory-range-approval-person small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advisory-range-approval-person strong {
+  color: var(--portal-text);
+  font-size: 0.84rem;
+}
+
+.advisory-range-approval-person small {
+  margin-top: 1px;
+  color: var(--portal-muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.advisory-range-approval-icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--portal-muted);
+  background: color-mix(in srgb, var(--portal-muted) 12%, transparent);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.advisory-range-approval-person-approved {
+  border-color: color-mix(in srgb, var(--portal-success) 52%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-success) 8%, var(--portal-surface-3));
+}
+
+.advisory-range-approval-person-approved .advisory-range-approval-icon {
+  color: #ffffff;
+  background: var(--portal-success);
+}
+
+.advisory-range-approval-person-disputed {
+  border-color: color-mix(in srgb, var(--portal-danger) 56%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-danger) 8%, var(--portal-surface-3));
+}
+
+.advisory-range-approval-person-disputed .advisory-range-approval-icon {
+  color: #ffffff;
+  background: var(--portal-danger);
+}
+
+.advisory-range-approvals-empty {
+  margin: 0;
+}
+
 .advisory-decision-footer {
   align-items: center;
   justify-content: space-between;
@@ -13581,8 +13688,13 @@ html[data-theme="light"] .advisory-decision-help {
 }
 
 html[data-theme="light"] .advisory-decision-toggle,
-html[data-theme="light"] .advisory-decision-field {
+html[data-theme="light"] .advisory-decision-field,
+html[data-theme="light"] .advisory-range-approval-person {
   background: #ffffff;
+}
+
+html[data-theme="light"] .advisory-range-approvals-header strong {
+  color: #142039;
 }
 
 /* Acting-candidate confirmation inside Review All Categories */
@@ -13781,6 +13893,15 @@ html[data-theme="light"] .acting-candidate-approval {
 
   .advisory-decision-summary {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .advisory-range-approvals {
+    margin: 0 14px 14px;
+  }
+
+  .advisory-range-approvals-header {
+    align-items: flex-start;
     flex-direction: column;
   }
 

@@ -399,7 +399,6 @@ export default async function AdjudicationApplicationPage({
           .from("profiles")
           .select("id,full_name,email,role,active")
           .in("id", panelReviewerIds)
-          .eq("active", true)
           .in("role", ["adjudicator", "advisory_member"]),
       )
     : Promise.resolve({ data: [], error: null });
@@ -682,6 +681,7 @@ export default async function AdjudicationApplicationPage({
     throw new Error(panelReviewerProfilesError.message);
   }
   const candidatePanelReviewers = (panelReviewerProfiles ?? [])
+    .filter((reviewer) => reviewer.active)
     .map((reviewer) => ({
       id: reviewer.id,
       name: reviewer.full_name ?? reviewer.email ?? "Panel member",
@@ -691,6 +691,20 @@ export default async function AdjudicationApplicationPage({
   const panelNarrativeReviewers = candidatePanelReviewers.filter((reviewer) =>
     commentingPanelMemberIds.has(reviewer.id),
   );
+  const scoringPanelMemberIds = new Set(
+    (panelAssignmentsResult.data ?? [])
+      .filter((assignment) => assignment.can_score)
+      .map((assignment) => assignment.adjudicator_user_id),
+  );
+  const rangeApprovalReviewers = (panelReviewerProfiles ?? [])
+    .filter((reviewer) => scoringPanelMemberIds.has(reviewer.id))
+    .map((reviewer) => ({
+      id: reviewer.id,
+      name: reviewer.full_name ?? reviewer.email ?? "Panel member",
+      role: reviewer.role as "adjudicator" | "advisory_member",
+      active: reviewer.active,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
   const originalActingCandidates = extractActingCandidates(
     applicationReferencePanels,
   );
@@ -1024,6 +1038,7 @@ export default async function AdjudicationApplicationPage({
         scoreability={categoryScoreability}
         review={reviewResult.data as { status: string; owner_note: string | null } | null}
         panelReviewers={panelNarrativeReviewers}
+        rangeReviewers={rangeApprovalReviewers}
         role={profile.role}
         compact={compactConsensusControls}
       />
