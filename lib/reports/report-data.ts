@@ -81,7 +81,6 @@ type ProfileRow = {
   organization?: string | null;
   notification_preferences?: Record<string, unknown> | null;
   force_password_reset?: boolean | null;
-  mfa_required?: boolean | null;
 };
 
 type ApplicationMemberRow = {
@@ -378,7 +377,7 @@ async function loadBaseMaps(supabase: SupabaseLike, filters: ReportFilters, warn
     safeFetchPaged<ProfileRow>(warnings, "Profiles", () =>
       supabase
         .from("profiles")
-        .select("id,email,full_name,phone_e164,role,active,organization,notification_preferences,force_password_reset,mfa_required")
+        .select("id,email,full_name,phone_e164,role,active,organization,notification_preferences,force_password_reset")
         .order("full_name"),
     ),
   ]);
@@ -1193,7 +1192,7 @@ async function loadUsersReport(
     safeFetchPaged<ProfileRow>(warnings, "Profiles", () =>
       supabase
         .from("profiles")
-        .select("id,email,full_name,phone_e164,role,active,organization,notification_preferences,force_password_reset,mfa_required")
+        .select("id,email,full_name,phone_e164,role,active,organization,notification_preferences,force_password_reset")
         .order("full_name"),
     ),
     safeFetchPaged<ApplicationMemberRow>(warnings, "Application members", () =>
@@ -1238,7 +1237,6 @@ async function loadUsersReport(
       organization: profile.organization ?? "",
       associated_applications: memberships.get(profile.id)?.length ?? 0,
       account_status: profile.active ? "Active" : "Inactive",
-      mfa_status: profile.mfa_required ? "Required" : "Not required",
       password_reset_status: profile.force_password_reset ? "Reset required" : "Current",
       communication_preferences: JSON.stringify(profile.notification_preferences ?? {}),
       digest_preferences: setting ? `${setting.enabled ? "Enabled" : "Disabled"} · ${setting.delivery_hour}:00 ${setting.time_zone}` : "",

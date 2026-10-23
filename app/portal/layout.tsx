@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -22,9 +21,6 @@ export default async function PortalLayout({ children }: { children: React.React
     readImpersonationCookieValue(cookieStore.get(IMPERSONATION_COOKIE_NAME)?.value),
   );
 
-  const graceDeadline = profile.mfa_grace_until ? new Date(profile.mfa_grace_until) : null;
-  const showMfaGrace = Boolean(profile.mfa_required && graceDeadline);
-
   return (
     <div className="portal-shell" data-portal-role={profile.role}>
       <ThemeProfileSync preference={profile.theme_preference ?? "system"} />
@@ -43,11 +39,6 @@ export default async function PortalLayout({ children }: { children: React.React
               </button>
             </form>
           </div>
-        </div>
-      )}
-      {showMfaGrace && graceDeadline && (
-        <div className="security-grace-banner">
-          <div className="container"><span>Multi-factor authentication is required for your role by {graceDeadline.toLocaleDateString("en-US", { dateStyle: "medium" })}.</span><Link href="/portal/account">Set it up now</Link></div>
         </div>
       )}
       <main className="portal-main"><div className="container">{children}</div></main>

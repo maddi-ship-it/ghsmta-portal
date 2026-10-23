@@ -163,8 +163,8 @@ export function MfaManager({ verifiedPhone }: { verifiedPhone?: string | null })
           <p className="eyebrow">Account security</p>
           <h2>Multi-factor authentication</h2>
           <p>
-            Authenticator-app MFA is recommended. Text-message MFA uses your
-            verified mobile number.
+            Optional extra account protection. Authenticator-app MFA is
+            recommended, and text-message MFA uses your verified mobile number.
           </p>
         </div>
       </div>

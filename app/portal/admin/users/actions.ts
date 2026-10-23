@@ -8,7 +8,6 @@ import { requireProfile } from "@/lib/auth";
 import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { sendSmtpEmail } from "@/lib/email/smtp";
-import { mfaGraceDeadline } from "@/lib/security-features";
 import { portalAuthCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -258,7 +257,6 @@ export async function updateUserAccess(userId: string, formData: FormData) {
   const active = formData.get("active") === "on";
   const phoneInput = String(formData.get("phone_e164") ?? "").trim();
   const phone = phoneInput ? normalizePhoneE164(phoneInput) : null;
-  const mfaRequired = formData.get("mfa_required") === "on";
   if (phoneInput && !phone) throw new Error("Enter a valid mobile number.");
 
   if (owner.id === userId && (role !== "owner" || !active)) {
@@ -268,17 +266,10 @@ export async function updateUserAccess(userId: string, formData: FormData) {
   const supabase = await createClient();
   const { data: existing } = await supabase
     .from("profiles")
-    .select("phone_e164,mfa_required,mfa_grace_until")
+    .select("phone_e164")
     .eq("id", userId)
     .single();
   const phoneChanged = (existing?.phone_e164 ?? null) !== phone;
-  const nextMfaRequired =
-    role === "owner" ||
-    role === "advisory_member" ||
-    role === "program_manager"
-      ? true
-      : mfaRequired;
-  const mfaWasEnabled = existing?.mfa_required === true;
   const { error } = await supabase.from("profiles").update({
     role,
     active,
@@ -286,11 +277,6 @@ export async function updateUserAccess(userId: string, formData: FormData) {
     phone_verified_at:
       phoneChanged && phone ? new Date().toISOString() : phone ? undefined : null,
     phone_required_at: phoneChanged ? null : undefined,
-    mfa_required: nextMfaRequired,
-    mfa_grace_until:
-      nextMfaRequired && !mfaWasEnabled
-        ? mfaGraceDeadline().toISOString()
-        : undefined,
   }).eq("id", userId);
   if (error) throw new Error(error.message);
   revalidateUsers();
@@ -317,10 +303,6 @@ export async function bulkUpdateUsers(formData: FormData) {
   if (operation === "role") {
     const role = String(formData.get("bulk_role") ?? "applicant") as AppRole;
     updates.role = role;
-    if (["advisory_member", "program_manager", "owner"].includes(role)) {
-      updates.mfa_required = true;
-      updates.mfa_grace_until = mfaGraceDeadline().toISOString();
-    }
   } else if (operation === "activate") {
     updates.active = true;
   } else if (operation === "deactivate") {

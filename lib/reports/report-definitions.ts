@@ -161,7 +161,6 @@ const userColumns: ReportColumn[] = [
   { key: "organization", label: "Organization" },
   { key: "associated_applications", label: "Associated Applications" },
   { key: "account_status", label: "Account Status" },
-  { key: "mfa_status", label: "MFA Status" },
   { key: "password_reset_status", label: "Password Reset Status" },
   { key: "communication_preferences", label: "Communication Preferences" },
   { key: "digest_preferences", label: "Digest Preferences" },
@@ -303,7 +302,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     supportsExternalVariant: false,
     confidentialityNote: "Owner-only. Contains payment, billing contact, and delivery information.",
   }),
-  report("user-access", "User and Access Report", "Users", "users", userColumns, "User access, school-team membership, MFA/reset state, duplicate indicators, and digest preferences."),
+  report("user-access", "User and Access Report", "Users", "users", userColumns, "User access, school-team membership, password-reset state, duplicate indicators, and digest preferences."),
   report("notification-communication-log", "Notification and Communication Log", "Communications", "notifications", [
     { key: "notification_id", label: "Notification ID" },
     { key: "recipient", label: "Recipient", contactInfo: true },

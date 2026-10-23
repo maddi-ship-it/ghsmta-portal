@@ -87,7 +87,7 @@ export default async function UsersPage({
   const [profileResult, membershipResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,email,full_name,preferred_name,phone_e164,phone_verified_at,role,active,mfa_required,mfa_grace_until,force_password_reset,password_reset_requested_at"),
+      .select("id,email,full_name,preferred_name,phone_e164,phone_verified_at,role,active,force_password_reset,password_reset_requested_at"),
     supabase
       .from("application_members")
       .select("user_id,member_role,can_edit_application,active,applications!application_members_application_id_fkey(id,school_name,production_title,is_archived)"),
@@ -212,7 +212,6 @@ export default async function UsersPage({
               <div className="user-status-stack">
                 <span className={`badge ${profile.active ? "badge-complete" : "badge-warning"}`}>{profile.active ? "Active" : "Inactive"}</span>
                 {profile.force_password_reset && <span className="badge badge-warning">Reset required</span>}
-                {profile.mfa_required && <span className="badge">MFA</span>}
               </div>
             </td>
             <td>
@@ -286,7 +285,6 @@ export default async function UsersPage({
                         <select className="select" defaultValue={profile.role} id={`role-${profile.id}`} name="role">{roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}</select>
                       </div>
                       <label className="inline-check"><input defaultChecked={profile.active} name="active" type="checkbox" /> Active</label>
-                      <label className="inline-check"><input defaultChecked={profile.mfa_required} name="mfa_required" type="checkbox" /> Require MFA</label>
                       <button className="button button-secondary button-compact" type="submit">Save user</button>
                     </form>
                     <form action={forcePasswordReset.bind(null, profile.id)}><button className="text-button" type="submit">Force password reset</button></form>

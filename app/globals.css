@@ -7195,9 +7195,6 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 .portal-nav a:hover { background: rgba(212,175,55,.1); color: var(--regal-gold-light); }
 .user-meta-link:hover strong { color: var(--regal-gold-light); }
 .mobile-portal-nav { background: rgba(5,8,18,.98); border-color: rgba(212,175,55,.18); }
-.security-grace-banner { background: linear-gradient(90deg, rgba(212,175,55,.18), rgba(24,54,164,.18)); border-bottom: 1px solid var(--regal-line); }
-.security-grace-banner .container { display: flex; justify-content: center; gap: 16px; padding: 10px; font-size: .86rem; }
-.security-grace-banner a { color: var(--regal-gold-light); font-weight: 800; }
 .impersonation-banner { background: #7f1d1d; border-bottom: 1px solid rgba(255,255,255,.24); color: white; }
 .impersonation-banner .container { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 10px; font-size: .88rem; }
 .impersonation-banner strong { color: white; }
@@ -7718,18 +7715,6 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
   background: rgba(98, 135, 239, 0.13);
 }
 
-.security-grace-banner {
-  color: #e8edf7;
-  background:
-    linear-gradient(90deg, rgba(213, 177, 79, 0.12), rgba(49, 79, 156, 0.18));
-}
-
-.security-grace-banner .container {
-  width: min(1480px, calc(100% - 48px));
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
 @media (max-width: 1280px) {
   .portal-account-summary-copy {
     display: none;
@@ -7769,8 +7754,7 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 }
 
 @media (max-width: 700px) {
-  .portal-shell .container,
-  .security-grace-banner .container {
+  .portal-shell .container {
     width: min(100% - 28px, 1480px);
   }
 
@@ -10134,8 +10118,7 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 
 /* Phones */
 @media (max-width: 640px) {
-  .portal-shell .container,
-  .security-grace-banner .container {
+  .portal-shell .container {
     width: min(100% - 22px, 1480px);
   }
 

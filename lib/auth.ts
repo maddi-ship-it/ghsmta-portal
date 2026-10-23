@@ -7,10 +7,7 @@ import {
 } from "@/lib/impersonation";
 import { isActiveOwnerImpersonation } from "@/lib/impersonation-access";
 import { createClient } from "@/lib/supabase/server";
-import {
-  isMfaEnforcementActive,
-  PHONE_VERIFICATION_ENABLED,
-} from "@/lib/security-features";
+import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
 import type { AppRole, Profile } from "@/lib/types";
 
 const PROFILE_COLUMNS = [
@@ -24,8 +21,6 @@ const PROFILE_COLUMNS = [
   "pronouns",
   "organization",
   "notification_preferences",
-  "mfa_required",
-  "mfa_grace_until",
   "role",
   "active",
   "force_password_reset",
@@ -81,28 +76,6 @@ export async function requireProfile(
       redirect("/verify-phone");
     }
 
-    if (isMfaEnforcementActive() && typedProfile.mfa_required) {
-      const graceDeadline = typedProfile.mfa_grace_until
-        ? new Date(typedProfile.mfa_grace_until).getTime()
-        : 0;
-      const graceExpired = graceDeadline <= Date.now();
-
-      if (graceExpired) {
-        const { data: aal, error: aalError } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-        if (aalError) {
-          redirect("/mfa/enroll?error=assurance");
-        }
-
-        if (aal.currentLevel !== "aal2") {
-          if (aal.nextLevel === "aal2") {
-            redirect("/mfa/verify");
-          }
-          redirect("/mfa/enroll");
-        }
-      }
-    }
   }
 
   return typedProfile;

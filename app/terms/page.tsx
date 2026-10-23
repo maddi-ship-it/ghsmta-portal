@@ -53,9 +53,10 @@ export default function TermsPage() {
             program information has been compromised.
           </li>
           <li>
-            ArtsBridge Foundation may require password resets, multi-factor
-            authentication, or other safeguards and may suspend access when
-            reasonably necessary to protect the portal or program.
+            ArtsBridge Foundation may require password resets or other
+            safeguards and may suspend access when reasonably necessary to
+            protect the portal or program. Multi-factor authentication is
+            available as an optional account-security feature.
           </li>
         </ul>
 
