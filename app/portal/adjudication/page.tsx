@@ -82,17 +82,28 @@ export default async function AdjudicationDashboard({
         .select("*")
         .in("cycle_id", adjudicationCycleIds)
         .eq("is_archived", false)
-        .in("status", ["submitted", "under_review", "complete"])
         .order("school_name"),
       supabase.from("adjudicator_assignments").select("*").order("assigned_at", { ascending: false }),
     ]);
     if (applicationError) throw new Error(applicationError.message);
     if (assignmentError) throw new Error(assignmentError.message);
-    applications = (applicationData ?? []) as Application[];
+    const currentAssignments = (
+      (assignmentData ?? []) as AdjudicatorAssignment[]
+    ).filter((assignment) => !assignment.removed_at);
+    const assignedApplicationIds = new Set(
+      currentAssignments.map((assignment) => assignment.application_id),
+    );
+    const reviewableStatuses = new Set(["submitted", "under_review", "complete"]);
+    applications = ((applicationData ?? []) as Application[]).filter(
+      (application) =>
+        profile.role === "advisory_member" ||
+        reviewableStatuses.has(application.status) ||
+        assignedApplicationIds.has(application.id),
+    );
     const activeApplicationIds = new Set(
       applications.map((application) => application.id),
     );
-    assignments = ((assignmentData ?? []) as AdjudicatorAssignment[]).filter(
+    assignments = currentAssignments.filter(
       (assignment) => activeApplicationIds.has(assignment.application_id),
     );
   }

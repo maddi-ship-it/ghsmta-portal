@@ -15,6 +15,7 @@ import {
 } from "react";
 
 import {
+  addOwnerChatChannelMembers,
   broadcastToActiveSchoolDms,
   createOwnerChatChannel,
   createChatMessage,
@@ -552,6 +553,7 @@ function useDialogFocus<T extends HTMLElement>(
 }
 
 function MemberDirectoryDialog({
+  canAddMembers,
   allowDirectMessages,
   channel,
   currentUserId,
@@ -559,8 +561,10 @@ function MemberDirectoryDialog({
   members,
   pending,
   onClose,
+  onAddMembers,
   onMessage,
 }: {
+  canAddMembers: boolean;
   allowDirectMessages: boolean;
   channel: ChatChannel;
   currentUserId: string;
@@ -568,6 +572,7 @@ function MemberDirectoryDialog({
   members: ChatMember[];
   pending: boolean;
   onClose: () => void;
+  onAddMembers: () => void;
   onMessage: (member: ChatMember) => void;
 }) {
   const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
@@ -599,6 +604,17 @@ function MemberDirectoryDialog({
             ×
           </button>
         </div>
+
+        {canAddMembers && (
+          <button
+            className="button button-secondary button-compact"
+            disabled={pending}
+            onClick={onAddMembers}
+            type="button"
+          >
+            Add people
+          </button>
+        )}
 
         {error && <div className={styles.directoryError} role="alert">{error}</div>}
         <div className={styles.memberList}>
@@ -741,6 +757,9 @@ function OwnerChannelDialog({
   onCreate: (formData: FormData) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const normalizedSearch = search.trim().toLowerCase();
   const filteredCandidates = candidates.filter((candidate) =>
     `${candidate.display_name} ${roleName(candidate.user_role)}`
@@ -762,6 +781,9 @@ function OwnerChannelDialog({
           onCreate(new FormData(event.currentTarget));
         }}
       >
+        {[...selectedUserIds].map((userId) => (
+          <input key={userId} name="user_ids" type="hidden" value={userId} />
+        ))}
         <div className={styles.broadcastModalHeader}>
           <div>
             <span className="eyebrow">Private channel</span>
@@ -833,6 +855,11 @@ function OwnerChannelDialog({
           />
         </div>
 
+        <div className={styles.memberSelectionSummary} aria-live="polite">
+          <strong>{selectedUserIds.size} selected</strong>
+          <span>Your selections stay checked while you search.</span>
+        </div>
+
         {error && <div className={styles.directoryError} role="alert">{error}</div>}
         <div className={styles.memberList}>
           {filteredCandidates.map((candidate) => (
@@ -840,7 +867,19 @@ function OwnerChannelDialog({
               className={`${styles.memberListRow} ${styles.ownerChannelMemberRow}`}
               key={candidate.user_id}
             >
-              <input name="user_ids" type="checkbox" value={candidate.user_id} />
+              <input
+                checked={selectedUserIds.has(candidate.user_id)}
+                onChange={(event) => {
+                  setSelectedUserIds((current) => {
+                    const next = new Set(current);
+                    if (event.target.checked) next.add(candidate.user_id);
+                    else next.delete(candidate.user_id);
+                    return next;
+                  });
+                }}
+                type="checkbox"
+                value={candidate.user_id}
+              />
               <span className={styles.memberListAvatar} aria-hidden="true">
                 {initials(candidate.display_name)}
               </span>
@@ -861,6 +900,143 @@ function OwnerChannelDialog({
           </button>
           <button className="button button-dark" disabled={pending} type="submit">
             {pending ? "Creating…" : "Create channel"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function OwnerAddMembersDialog({
+  candidates,
+  channel,
+  error,
+  pending,
+  onAdd,
+  onClose,
+}: {
+  candidates: ChatMember[];
+  channel: ChatChannel;
+  error: string | null;
+  pending: boolean;
+  onAdd: (formData: FormData) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredCandidates = candidates.filter((candidate) =>
+    `${candidate.display_name} ${roleName(candidate.user_role)}`
+      .toLowerCase()
+      .includes(normalizedSearch),
+  );
+
+  return (
+    <div
+      aria-labelledby="owner-add-members-title"
+      aria-modal="true"
+      className={styles.modalBackdrop}
+      ref={dialogRef}
+      role="dialog"
+      tabIndex={-1}
+    >
+      <form
+        className={`${styles.broadcastModal} ${styles.memberModal}`}
+        onSubmit={(event) => {
+          event.preventDefault();
+          onAdd(new FormData(event.currentTarget));
+        }}
+      >
+        <input name="channel_id" type="hidden" value={channel.channel_id} />
+        {[...selectedUserIds].map((userId) => (
+          <input key={userId} name="user_ids" type="hidden" value={userId} />
+        ))}
+
+        <div className={styles.broadcastModalHeader}>
+          <div>
+            <span className="eyebrow">Channel access</span>
+            <h2 id="owner-add-members-title">Add people to {channel.channel_name}</h2>
+            <p>Choose active portal staff who should be able to open this channel.</p>
+          </div>
+          <button
+            aria-label="Close member picker"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <label className="sr-only" htmlFor="owner-add-member-search">
+          Search people
+        </label>
+        <input
+          autoFocus
+          className={`input ${styles.memberSearch}`}
+          id="owner-add-member-search"
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search people by name or role"
+          type="search"
+          value={search}
+        />
+
+        <div className={styles.memberSelectionSummary} aria-live="polite">
+          <strong>{selectedUserIds.size} selected</strong>
+          <span>Your selections stay checked while you search.</span>
+        </div>
+
+        {error && <div className={styles.directoryError} role="alert">{error}</div>}
+        <div className={styles.memberList}>
+          {filteredCandidates.map((candidate) => (
+            <label
+              className={`${styles.memberListRow} ${styles.ownerChannelMemberRow}`}
+              key={candidate.user_id}
+            >
+              <input
+                checked={selectedUserIds.has(candidate.user_id)}
+                onChange={(event) => {
+                  setSelectedUserIds((current) => {
+                    const next = new Set(current);
+                    if (event.target.checked) next.add(candidate.user_id);
+                    else next.delete(candidate.user_id);
+                    return next;
+                  });
+                }}
+                type="checkbox"
+                value={candidate.user_id}
+              />
+              <span className={styles.memberListAvatar} aria-hidden="true">
+                {initials(candidate.display_name)}
+              </span>
+              <span className={styles.memberListIdentity}>
+                <strong>{candidate.display_name}</strong>
+                <small>{roleName(candidate.user_role)}</small>
+              </span>
+            </label>
+          ))}
+          {filteredCandidates.length === 0 ? (
+            <div className={styles.memberListEmpty}>
+              {candidates.length === 0
+                ? "Everyone available is already in this channel."
+                : "No matching staff members."}
+            </div>
+          ) : null}
+        </div>
+
+        <div className={styles.broadcastActions}>
+          <button className="button button-secondary" onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button
+            className="button button-dark"
+            disabled={pending || selectedUserIds.size === 0}
+            type="submit"
+          >
+            {pending ? "Adding…" : "Add selected people"}
           </button>
         </div>
       </form>
@@ -1851,12 +2027,14 @@ export function TeamsChat({
   const [showMembers, setShowMembers] = useState(false);
   const [showDirectMessagePicker, setShowDirectMessagePicker] = useState(false);
   const [showOwnerChannelCreator, setShowOwnerChannelCreator] = useState(false);
+  const [showOwnerChannelMemberAdder, setShowOwnerChannelMemberAdder] = useState(false);
   const [showVisitDetails, setShowVisitDetails] = useState(false);
   const [directMessageContacts, setDirectMessageContacts] = useState<ChatMember[]>([]);
   const [directMessageContactsLoaded, setDirectMessageContactsLoaded] = useState(false);
   const [directMessageSearch, setDirectMessageSearch] = useState("");
   const [directMessageError, setDirectMessageError] = useState<string | null>(null);
   const [ownerChannelError, setOwnerChannelError] = useState<string | null>(null);
+  const [ownerChannelMemberError, setOwnerChannelMemberError] = useState<string | null>(null);
   const [loadingDirectMessageContacts, setLoadingDirectMessageContacts] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [realtimeState, setRealtimeState] =
@@ -1896,6 +2074,15 @@ export function TeamsChat({
   const isPortalUpdates = activeChannel?.channel_type === "portal_updates";
   const canPostToActiveChannel = !isPortalUpdates || profile.role === "owner";
   const canSeeActiveChannelMembers = !isPortalUpdates || profile.role === "owner";
+  const canAddActiveChannelMembers =
+    profile.role === "owner" &&
+    activeChannel?.channel_type === "group_direct_message";
+  const availableOwnerChannelCandidates = useMemo(() => {
+    const memberIds = new Set(members.map((member) => member.user_id));
+    return ownerChannelCandidates.filter(
+      (candidate) => !memberIds.has(candidate.user_id),
+    );
+  }, [members, ownerChannelCandidates]);
   const allowDirectMessages = profile.role !== "applicant";
   const activeChannelTitle =
     activeChannel && isSchoolConversation(activeChannel)
@@ -2738,6 +2925,29 @@ export function TeamsChat({
       setStatus("Channel created.");
       router.push(`/portal/chat?channel=${result.channelId}`);
       router.refresh();
+    });
+  };
+
+  const addOwnerChannelMembers = (formData: FormData) => {
+    setOwnerChannelMemberError(null);
+    startTransition(async () => {
+      const result = await addOwnerChatChannelMembers(formData);
+
+      if (!result.ok) {
+        setOwnerChannelMemberError(
+          result.error ?? "The selected people could not be added.",
+        );
+        return;
+      }
+
+      const addedCount = result.count ?? 0;
+      setShowOwnerChannelMemberAdder(false);
+      setStatus(
+        addedCount === 1
+          ? "1 person added to the channel."
+          : `${addedCount} people added to the channel.`,
+      );
+      await loadChannel();
     });
   };
 
@@ -3707,16 +3917,38 @@ export function TeamsChat({
 
       {showMembers && canSeeActiveChannelMembers && (
         <MemberDirectoryDialog
+          canAddMembers={canAddActiveChannelMembers}
           allowDirectMessages={allowDirectMessages}
           channel={activeChannel}
           currentUserId={profile.id}
           error={directMessageError}
           members={members}
           onClose={() => setShowMembers(false)}
+          onAddMembers={() => {
+            setShowMembers(false);
+            setOwnerChannelMemberError(null);
+            setShowOwnerChannelMemberAdder(true);
+          }}
           onMessage={beginDirectMessage}
           pending={isPending}
         />
       )}
+
+      {showOwnerChannelMemberAdder &&
+        profile.role === "owner" &&
+        activeChannel.channel_type === "group_direct_message" && (
+          <OwnerAddMembersDialog
+            candidates={availableOwnerChannelCandidates}
+            channel={activeChannel}
+            error={ownerChannelMemberError}
+            onAdd={addOwnerChannelMembers}
+            onClose={() => {
+              setShowOwnerChannelMemberAdder(false);
+              setOwnerChannelMemberError(null);
+            }}
+            pending={isPending}
+          />
+        )}
 
       {showDirectMessagePicker && allowDirectMessages && (
         <DirectMessageDialog

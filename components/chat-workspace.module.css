@@ -1371,6 +1371,20 @@
   margin-bottom: 14px;
 }
 
+.memberSelectionSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 0 12px;
+  color: var(--portal-muted, #9ca9be);
+  font-size: .74rem;
+}
+
+.memberSelectionSummary strong {
+  color: var(--portal-gold-bright, #f0d37e);
+}
+
 .memberList {
   display: grid;
   max-height: min(56vh, 520px);

@@ -220,6 +220,95 @@ export async function createOwnerChatChannel(
   return { ok: true, channelId: channel.id };
 }
 
+export async function addOwnerChatChannelMembers(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  const owner = await requireProfile(["owner"]);
+  const channelId = formText(formData, "channel_id");
+  const selectedUserIds = [
+    ...new Set(
+      formData
+        .getAll("user_ids")
+        .map(String)
+        .filter((value) => isUuid(value) && value !== owner.id),
+    ),
+  ];
+
+  if (!isUuid(channelId)) {
+    return { ok: false, error: "Choose a valid channel." };
+  }
+  if (selectedUserIds.length === 0) {
+    return { ok: false, error: "Choose at least one person to add." };
+  }
+
+  const admin = createAdminClient();
+  const { data: channel, error: channelError } = await admin
+    .from("chat_channels")
+    .select("id,channel_type,active")
+    .eq("id", channelId)
+    .maybeSingle();
+
+  if (channelError) return { ok: false, error: channelError.message };
+  if (
+    !channel ||
+    !channel.active ||
+    channel.channel_type !== "group_direct_message"
+  ) {
+    return {
+      ok: false,
+      error: "People can only be added to active Owner-created channels.",
+    };
+  }
+
+  const { data: selectedProfiles, error: profileError } = await admin
+    .from("profiles")
+    .select("id")
+    .in("id", selectedUserIds)
+    .eq("active", true)
+    .neq("role", "applicant");
+
+  if (profileError) return { ok: false, error: profileError.message };
+  if ((selectedProfiles ?? []).length !== selectedUserIds.length) {
+    return {
+      ok: false,
+      error: "One or more selected people are no longer available.",
+    };
+  }
+
+  const { data: existingParticipants, error: existingError } = await admin
+    .from("chat_direct_participants")
+    .select("user_id")
+    .eq("channel_id", channelId)
+    .in("user_id", selectedUserIds);
+
+  if (existingError) return { ok: false, error: existingError.message };
+
+  const existingIds = new Set(
+    (existingParticipants ?? []).map((participant) => participant.user_id),
+  );
+  const newUserIds = selectedUserIds.filter((userId) => !existingIds.has(userId));
+
+  if (newUserIds.length > 0) {
+    const { error: participantError } = await admin
+      .from("chat_direct_participants")
+      .insert(
+        newUserIds.map((userId) => ({
+          channel_id: channelId,
+          user_id: userId,
+          added_by: owner.id,
+        })),
+      );
+
+    if (participantError) {
+      return { ok: false, error: participantError.message };
+    }
+  }
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+  return { ok: true, channelId, count: newUserIds.length };
+}
+
 async function readChannelMode(channelId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
