@@ -142,27 +142,20 @@ function drawHeader(
     height: 7,
     color: COLORS.gold,
   });
-  page.drawRectangle({
-    x: 0,
-    y: PAGE_HEIGHT - HEADER_HEIGHT,
-    width: 174,
-    height: HEADER_HEIGHT - 7,
-    color: COLORS.white,
-  });
   page.drawLine({
-    start: { x: 174, y: PAGE_HEIGHT - HEADER_HEIGHT + 14 },
-    end: { x: 174, y: PAGE_HEIGHT - 21 },
+    start: { x: 140, y: PAGE_HEIGHT - HEADER_HEIGHT + 14 },
+    end: { x: 140, y: PAGE_HEIGHT - 21 },
     color: COLORS.gold,
     thickness: 1.2,
   });
-  const logoWidth = 150;
-  const logoHeight = logoWidth * (logo.height / logo.width);
+  const logoHeight = HEADER_HEIGHT - 20;
+  const logoWidth = logoHeight * (logo.width / logo.height);
   const logoY =
     PAGE_HEIGHT - HEADER_HEIGHT +
     (HEADER_HEIGHT - 7 - logoHeight) / 2;
-  const headerTextX = 194;
+  const headerTextX = 158;
   page.drawImage(logo, {
-    x: 12,
+    x: 16,
     y: logoY,
     width: logoWidth,
     height: logoHeight,

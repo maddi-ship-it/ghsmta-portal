@@ -51,13 +51,13 @@ function releaseWithFeedback(): AdjudicationRelease {
 }
 
 describe("buildReleasedResultsPdf", () => {
-  it("uses an opaque RGB logo that PDF renderers can embed consistently", async () => {
+  it("uses a transparent RGBA logo prepared for the dark PDF header", async () => {
     const logo = await readFile(
       path.join(process.cwd(), "public", "ghsmta-logo-pdf.png"),
     );
 
     expect(logo.subarray(1, 4).toString()).toBe("PNG");
-    expect(logo[25]).toBe(2);
+    expect(logo[25]).toBe(6);
   });
 
   it("starts each released comment category on its own page", async () => {

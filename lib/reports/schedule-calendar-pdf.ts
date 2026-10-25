@@ -183,24 +183,17 @@ function drawHeader({
     height: 6,
     color: COLORS.gold,
   });
-  page.drawRectangle({
-    x: 0,
-    y: PAGE_HEIGHT - HEADER_HEIGHT,
-    width: 120,
-    height: HEADER_HEIGHT - 6,
-    color: COLORS.white,
-  });
   page.drawLine({
-    start: { x: 120, y: PAGE_HEIGHT - HEADER_HEIGHT + 10 },
-    end: { x: 120, y: PAGE_HEIGHT - 18 },
+    start: { x: 108, y: PAGE_HEIGHT - HEADER_HEIGHT + 10 },
+    end: { x: 108, y: PAGE_HEIGHT - 18 },
     color: COLORS.gold,
     thickness: 1.1,
   });
 
-  const logoWidth = 108;
-  const logoHeight = logoWidth * (logo.height / logo.width);
+  const logoHeight = HEADER_HEIGHT - 18;
+  const logoWidth = logoHeight * (logo.width / logo.height);
   page.drawImage(logo, {
-    x: 6,
+    x: 18,
     y:
       PAGE_HEIGHT - HEADER_HEIGHT +
       (HEADER_HEIGHT - 6 - logoHeight) / 2,
@@ -208,14 +201,14 @@ function drawHeader({
     height: logoHeight,
   });
   page.drawText("GHSMTA AWARDS PORTAL", {
-    x: 138,
+    x: 126,
     y: PAGE_HEIGHT - 24,
     size: 7.7,
     font: fonts.bold,
     color: COLORS.gold,
   });
   page.drawText("Monthly Adjudication Schedule", {
-    x: 138,
+    x: 126,
     y: PAGE_HEIGHT - 50,
     size: 19.5,
     font: fonts.bold,
@@ -229,7 +222,7 @@ function drawHeader({
     year: "numeric",
   }).format(new Date(report.generatedAt));
   page.drawText([cycle, `Generated ${generated}`].filter(Boolean).join("  |  "), {
-    x: 138,
+    x: 126,
     y: PAGE_HEIGHT - 68,
     size: 7.5,
     font: fonts.regular,
