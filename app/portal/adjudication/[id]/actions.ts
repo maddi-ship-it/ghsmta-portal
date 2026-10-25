@@ -17,6 +17,7 @@ import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
+import { mergeReleasedFeedback } from "@/lib/adjudication-release";
 import {
   canCompleteAdjudication,
   outstandingAssignedFinalComments,
@@ -51,6 +52,7 @@ import type {
   ApplicationAnswer,
   ApplicationQuestion,
   AwardCycle,
+  ReleasedFeedbackSummary,
   ScoringCategory,
   ScoringCriterion,
   ScoringRubric,
@@ -61,6 +63,9 @@ import type {
 function formText(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
 }
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type PersistScorecardResult = {
   missing: string[];
@@ -2174,6 +2179,191 @@ export async function assignPanelNarrativeReviewer(
 
   revalidatePath(returnPath);
   redirect(`${returnPath}?assigned=1`);
+}
+
+export async function releaseSelectedAdjudicationFeedback(
+  applicationId: string,
+  categoryIds: string[],
+) {
+  try {
+    const owner = await requireProfile(["owner"]);
+    const selectedCategoryIds = [
+      ...new Set(categoryIds.map((categoryId) => categoryId.trim())),
+    ];
+
+    if (!UUID_PATTERN.test(applicationId)) {
+      return { ok: false as const, error: "The application is not valid." };
+    }
+    if (
+      selectedCategoryIds.length === 0 ||
+      selectedCategoryIds.some((categoryId) => !UUID_PATTERN.test(categoryId))
+    ) {
+      return {
+        ok: false as const,
+        error: "Choose at least one approved comment to release.",
+      };
+    }
+
+    const admin = createAdminClient();
+    const { data: application, error: applicationError } = await admin
+      .from("applications")
+      .select("id,form_version_id,is_archived")
+      .eq("id", applicationId)
+      .maybeSingle();
+
+    if (applicationError) throw new Error(applicationError.message);
+    if (!application || application.is_archived) {
+      return {
+        ok: false as const,
+        error: "This school application is no longer available.",
+      };
+    }
+
+    const { data: formVersion, error: formVersionError } = await admin
+      .from("application_form_versions")
+      .select("scoring_rubric_id")
+      .eq("id", application.form_version_id)
+      .maybeSingle();
+
+    if (formVersionError) throw new Error(formVersionError.message);
+    if (!formVersion?.scoring_rubric_id) {
+      return {
+        ok: false as const,
+        error: "This application does not have an assigned scoring rubric.",
+      };
+    }
+
+    const [categoriesResult, feedbackResult, releaseResult] = await Promise.all([
+      admin
+        .from("scoring_categories")
+        .select("id,title,sort_order,rubric_id")
+        .in("id", selectedCategoryIds)
+        .eq("rubric_id", formVersion.scoring_rubric_id)
+        .eq("active", true),
+      admin
+        .from("adjudication_panel_feedback")
+        .select("category_id,final_comment,status,approved_by")
+        .eq("application_id", applicationId)
+        .in("category_id", selectedCategoryIds),
+      admin
+        .from("adjudication_releases")
+        .select("id,feedback_snapshot")
+        .eq("application_id", applicationId)
+        .maybeSingle(),
+    ]);
+
+    if (categoriesResult.error) throw new Error(categoriesResult.error.message);
+    if (feedbackResult.error) throw new Error(feedbackResult.error.message);
+    if (releaseResult.error) throw new Error(releaseResult.error.message);
+
+    const categories = categoriesResult.data ?? [];
+    const feedback = feedbackResult.data ?? [];
+    const feedbackByCategory = new Map(
+      feedback.map((item) => [item.category_id, item]),
+    );
+    const approverIds = [
+      ...new Set(
+        feedback
+          .map((item) => item.approved_by)
+          .filter((userId): userId is string => Boolean(userId)),
+      ),
+    ];
+    const { data: approvers, error: approverError } = approverIds.length
+      ? await admin
+          .from("profiles")
+          .select("id,role")
+          .in("id", approverIds)
+      : { data: [], error: null };
+
+    if (approverError) throw new Error(approverError.message);
+    const panelApproverIds = new Set(
+      (approvers ?? [])
+        .filter((approver) =>
+          ["adjudicator", "advisory_member"].includes(approver.role),
+        )
+        .map((approver) => approver.id),
+    );
+
+    if (categories.length !== selectedCategoryIds.length) {
+      return {
+        ok: false as const,
+        error: "One or more selected categories are not part of this rubric.",
+      };
+    }
+
+    const selectedFeedback: ReleasedFeedbackSummary[] = [];
+    for (const category of categories) {
+      const item = feedbackByCategory.get(category.id);
+      if (
+        !item ||
+        item.status !== "approved" ||
+        !item.approved_by ||
+        !panelApproverIds.has(item.approved_by) ||
+        !item.final_comment?.trim()
+      ) {
+        return {
+          ok: false as const,
+          error:
+            "Every selected comment must be approved by its assigned panel reviewer before school release.",
+        };
+      }
+
+      selectedFeedback.push({
+        category_id: category.id,
+        final_comment: item.final_comment.trim(),
+        sort_order: category.sort_order,
+        title: category.title,
+      });
+    }
+
+    const currentSnapshot = Array.isArray(releaseResult.data?.feedback_snapshot)
+      ? (releaseResult.data.feedback_snapshot as ReleasedFeedbackSummary[])
+      : [];
+    const mergedSnapshot = mergeReleasedFeedback(
+      currentSnapshot,
+      selectedFeedback,
+    );
+    const releasedAt = new Date().toISOString();
+    const saveResult = releaseResult.data
+      ? await admin
+          .from("adjudication_releases")
+          .update({
+            feedback_released_at: releasedAt,
+            feedback_snapshot: mergedSnapshot,
+            released_by: owner.id,
+          })
+          .eq("id", releaseResult.data.id)
+      : await admin.from("adjudication_releases").insert({
+          application_id: applicationId,
+          feedback_released_at: releasedAt,
+          feedback_snapshot: mergedSnapshot,
+          released_by: owner.id,
+        });
+
+    if (saveResult.error) throw new Error(saveResult.error.message);
+
+    revalidatePath(`/portal/adjudication/${applicationId}`);
+    revalidatePath("/portal/results");
+
+    return {
+      ok: true as const,
+      releasedCategoryIds: selectedCategoryIds,
+      releasedCount: selectedCategoryIds.length,
+    };
+  } catch (error) {
+    console.error("Unable to release selected adjudication comments.", {
+      applicationId,
+      categoryIds,
+      error,
+    });
+    return {
+      ok: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : "The selected comments could not be released.",
+    };
+  }
 }
 
 export async function releaseAdjudicationResults(

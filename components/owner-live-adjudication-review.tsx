@@ -1130,6 +1130,11 @@ export function OwnerLiveAdjudicationReview({
               categories={categories}
               feedback={feedback}
               panelApprovedCategoryIds={ownerPanelApprovedCategoryIds}
+              releasedCategoryIds={
+                release?.feedback_snapshot?.map(
+                  (item) => item.category_id,
+                ) ?? []
+              }
             />
           </div>
         </section>
