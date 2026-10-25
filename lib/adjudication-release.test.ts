@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeReleasedFeedback } from "@/lib/adjudication-release";
+import {
+  mergeReleasedFeedback,
+  updateSelectedCategoryIds,
+} from "@/lib/adjudication-release";
 import type { ReleasedFeedbackSummary } from "@/lib/types";
 
 function feedback(
@@ -42,5 +45,23 @@ describe("mergeReleasedFeedback", () => {
       feedback("category-1", 1, "Updated first"),
       feedback("category-2", 2, "Second"),
     ]);
+  });
+});
+
+describe("updateSelectedCategoryIds", () => {
+  it("adds the checked category without mutating the prior selection", () => {
+    const current = new Set(["category-1"]);
+    const next = updateSelectedCategoryIds(current, "category-2", true);
+
+    expect([...current]).toEqual(["category-1"]);
+    expect([...next]).toEqual(["category-1", "category-2"]);
+  });
+
+  it("removes an unchecked category while preserving other selections", () => {
+    const current = new Set(["category-1", "category-2"]);
+
+    expect([
+      ...updateSelectedCategoryIds(current, "category-1", false),
+    ]).toEqual(["category-2"]);
   });
 });

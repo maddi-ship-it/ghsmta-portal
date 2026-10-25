@@ -19,3 +19,17 @@ export function mergeReleasedFeedback(
       left.title.localeCompare(right.title),
   );
 }
+
+export function updateSelectedCategoryIds(
+  current: Set<string>,
+  categoryId: string,
+  checked: boolean,
+) {
+  const next = new Set(current);
+  if (checked) {
+    next.add(categoryId);
+  } else {
+    next.delete(categoryId);
+  }
+  return next;
+}

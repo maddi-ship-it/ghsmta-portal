@@ -11,6 +11,7 @@ import {
 } from "@/app/portal/adjudication/[id]/actions";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import { updateSelectedCategoryIds } from "@/lib/adjudication-release";
 import type {
   AdjudicationPanelFeedback,
   ScoringCategory,
@@ -91,6 +92,15 @@ function statusLabel(status: ReviewDraftStatus) {
   return "Not generated";
 }
 
+function statusDetail(status: ReviewDraftStatus) {
+  if (status === "school_released") return "Visible to the school";
+  if (status === "panel_approved") return "Ready for school release";
+  if (status === "sent") return "Waiting for panel approval";
+  if (status === "ready") return "Owner draft ready to review";
+  if (status === "error") return "Resolve before continuing";
+  return "Generate an Owner draft";
+}
+
 export function OwnerCommentReviewModal({
   applicationId,
   categories,
@@ -132,6 +142,9 @@ export function OwnerCommentReviewModal({
   const [drafts, setDrafts] = useState(initialDrafts);
   const [message, setMessage] = useState("");
   const [selectedReleaseIds, setSelectedReleaseIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [showReleaseConfirmation, setShowReleaseConfirmation] = useState(false);
@@ -186,12 +199,24 @@ export function OwnerCommentReviewModal({
   const releasedCount = drafts.filter(
     (draft) => draft.status === "school_released",
   ).length;
+  const panelApprovedCount = drafts.filter(
+    (draft) => draft.status === "panel_approved",
+  ).length;
+  const waitingOnPanelCount = drafts.filter(
+    (draft) => draft.status === "sent",
+  ).length;
+  const ownerWorkCount = drafts.filter((draft) =>
+    ["error", "needs_generation", "ready"].includes(draft.status),
+  ).length;
   const releaseCandidates = drafts.filter(
     (draft) => draft.status === "panel_approved",
   );
   const allReleaseCandidatesSelected =
     releaseCandidates.length > 0 &&
     releaseCandidates.every((draft) => selectedReleaseIds.has(draft.categoryId));
+  const allCommentsExpanded =
+    drafts.length > 0 &&
+    drafts.every((draft) => expandedCategoryIds.has(draft.categoryId));
   const canSendAll =
     readyDrafts.length > 0 &&
     unresolvedDrafts.length === 0 &&
@@ -201,6 +226,9 @@ export function OwnerCommentReviewModal({
     setDrafts(initialDrafts);
     setMessage("");
     setSelectedReleaseIds(new Set());
+    setExpandedCategoryIds(
+      new Set(initialDrafts.slice(0, 1).map((draft) => draft.categoryId)),
+    );
     setShowReleaseConfirmation(false);
     setOpen(true);
   };
@@ -362,11 +390,10 @@ export function OwnerCommentReviewModal({
                 <header className="application-reference-modal-header">
                   <div>
                     <span className="eyebrow">Owner comment review</span>
-                    <h2 id={titleId}>Review every panel comment</h2>
+                    <h2 id={titleId}>Panel comment review</h2>
                     <p>
-                      Generate every school-facing category comment, edit the
-                      drafts together, send them to the panel, and release
-                      selected panel-approved comments to the school.
+                      Review panel comments and choose what the school can see
+                      now. Scores stay private.
                     </p>
                   </div>
                   <button
@@ -382,46 +409,28 @@ export function OwnerCommentReviewModal({
                 </header>
 
                 <div className="application-reference-modal-body owner-comment-review-body">
-                  <div className="owner-comment-review-summary">
-                    <div>
-                      <strong>{drafts.length}</strong>
-                      <span>Category comments</span>
-                    </div>
-                    <div>
-                      <strong>{readyDrafts.length}</strong>
-                      <span>Ready to send</span>
-                    </div>
-                    <div>
-                      <strong>{completedCount}</strong>
-                      <span>Already with panel</span>
-                    </div>
-                    <div>
-                      <strong>{releasedCount}</strong>
-                      <span>Released to school</span>
-                    </div>
-                  </div>
-
-                  <div className="owner-comment-review-toolbar">
-                    <button
-                      className="button button-secondary"
-                      disabled={busy}
-                      onClick={generateAll}
-                      type="button"
+                  <div className="owner-comment-review-overview">
+                    <div
+                      aria-label="Comment review status"
+                      className="owner-comment-review-status-chips"
                     >
-                      {isGenerating ? "Generating all comments…" : "Generate all comments"}
-                    </button>
-                    <p aria-live="polite">{message}</p>
-                  </div>
-
-                  <div className="owner-comment-school-release-toolbar">
-                    <div>
-                      <strong>Early school feedback</strong>
-                      <p>
-                        Select panel-approved comments to release now. Scores
-                        and every unselected comment remain private.
-                      </p>
+                      <span>
+                        <strong>{drafts.length}</strong> Total
+                      </span>
+                      <span>
+                        <strong>{ownerWorkCount}</strong> Owner work
+                      </span>
+                      <span>
+                        <strong>{waitingOnPanelCount}</strong> With panel
+                      </span>
+                      <span className="is-approved">
+                        <strong>{panelApprovedCount}</strong> Approved
+                      </span>
+                      <span className="is-released">
+                        <strong>{releasedCount}</strong> Released
+                      </span>
                     </div>
-                    <div className="button-row">
+                    <div className="owner-comment-review-controls">
                       <button
                         className="button button-secondary button-compact"
                         disabled={busy || releaseCandidates.length === 0}
@@ -442,16 +451,57 @@ export function OwnerCommentReviewModal({
                           ? "Clear selection"
                           : "Select all approved"}
                       </button>
-                      <span aria-live="polite">
+                      <strong aria-live="polite">
                         {selectedReleaseIds.size} selected
-                      </span>
+                      </strong>
+                      <span className="owner-comment-review-control-divider" />
+                      <button
+                        className="button button-secondary button-compact"
+                        disabled={busy || drafts.length === 0}
+                        onClick={() => {
+                          setExpandedCategoryIds(
+                            allCommentsExpanded
+                              ? new Set()
+                              : new Set(
+                                  drafts.map((draft) => draft.categoryId),
+                                ),
+                          );
+                        }}
+                        type="button"
+                      >
+                        {allCommentsExpanded ? "Collapse all" : "Expand all"}
+                      </button>
+                      {ownerWorkCount > 0 ? (
+                        <button
+                          className="button button-dark button-compact"
+                          disabled={busy}
+                          onClick={generateAll}
+                          type="button"
+                        >
+                          {isGenerating
+                            ? "Generating…"
+                            : "Generate Owner drafts"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
+
+                  {message ? (
+                    <div
+                      aria-live="polite"
+                      className="owner-comment-review-message"
+                    >
+                      {message}
+                    </div>
+                  ) : null}
 
                   <div className="owner-comment-review-list">
                     {drafts.map((draft) => {
                       const editable = draft.status === "ready";
                       const canRelease = draft.status === "panel_approved";
+                      const expanded = expandedCategoryIds.has(
+                        draft.categoryId,
+                      );
                       return (
                         <article
                           className={`owner-comment-review-item owner-comment-review-item-${draft.status}${
@@ -461,78 +511,134 @@ export function OwnerCommentReviewModal({
                           }`}
                           key={draft.categoryId}
                         >
-                          <div className="panel-narrative-card-heading">
-                            <h3>{draft.title}</h3>
-                            <span
-                              className={`badge ${
-                                draft.status === "panel_approved" ||
-                                draft.status === "school_released"
-                                  ? "badge-complete"
-                                  : "badge-warning"
-                              }`}
-                            >
-                              {statusLabel(draft.status)}
-                            </span>
-                          </div>
-                          {canRelease ? (
-                            <label className="owner-comment-release-choice">
+                          <div className="owner-comment-review-item-header">
+                            {canRelease ? (
+                              <label
+                                className="owner-comment-review-select"
+                                title={`Select ${draft.title} for school release`}
+                              >
                               <input
+                                aria-label={`Select ${draft.title} for school release`}
                                 checked={selectedReleaseIds.has(
                                   draft.categoryId,
                                 )}
                                 disabled={busy}
                                 onChange={(event) => {
-                                  setSelectedReleaseIds((current) => {
-                                    const next = new Set(current);
-                                    if (event.currentTarget.checked) {
-                                      next.add(draft.categoryId);
-                                    } else {
-                                      next.delete(draft.categoryId);
-                                    }
-                                    return next;
-                                  });
+                                  const checked = event.currentTarget.checked;
+                                  setSelectedReleaseIds((current) =>
+                                    updateSelectedCategoryIds(
+                                      current,
+                                      draft.categoryId,
+                                      checked,
+                                    ),
+                                  );
                                 }}
                                 type="checkbox"
                               />
-                              <span>
-                                <strong>Select for school release</strong>
-                                <small>
-                                  This comment has panel approval and is ready
-                                  to share.
-                                </small>
+                                <span aria-hidden="true" />
+                              </label>
+                            ) : draft.status === "school_released" ? (
+                              <span
+                                aria-label="Released to school"
+                                className="owner-comment-review-state-icon is-released"
+                                role="img"
+                              >
+                                ✓
                               </span>
-                            </label>
-                          ) : draft.status === "school_released" ? (
-                            <div className="owner-comment-release-complete">
-                              <span aria-hidden="true">✓</span>
-                              This comment is already visible to the school.
+                            ) : (
+                              <span
+                                aria-hidden="true"
+                                className="owner-comment-review-state-icon"
+                              >
+                                •
+                              </span>
+                            )}
+                            <button
+                              aria-controls={`owner-comment-body-${draft.categoryId}`}
+                              aria-expanded={expanded}
+                              className="owner-comment-review-item-toggle"
+                              onClick={() => {
+                                setExpandedCategoryIds((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(draft.categoryId)) {
+                                    next.delete(draft.categoryId);
+                                  } else {
+                                    next.add(draft.categoryId);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              type="button"
+                            >
+                              <span className="owner-comment-review-item-copy">
+                                <strong>{draft.title}</strong>
+                                <small>{statusDetail(draft.status)}</small>
+                              </span>
+                              <span
+                                className={`badge ${
+                                  draft.status === "panel_approved" ||
+                                  draft.status === "school_released"
+                                    ? "badge-complete"
+                                    : "badge-warning"
+                                }`}
+                              >
+                                {statusLabel(draft.status)}
+                              </span>
+                              <span
+                                aria-hidden="true"
+                                className={`owner-comment-review-chevron${
+                                  expanded ? " is-expanded" : ""
+                                }`}
+                              >
+                                ⌄
+                              </span>
+                            </button>
+                          </div>
+                          {expanded ? (
+                            <div
+                              className="owner-comment-review-item-body"
+                              id={`owner-comment-body-${draft.categoryId}`}
+                            >
+                              {editable ? (
+                                <>
+                                  <label
+                                    className="owner-comment-review-field-label"
+                                    htmlFor={`owner-comment-${draft.categoryId}`}
+                                  >
+                                    School-facing comment
+                                  </label>
+                                  <textarea
+                                    className="textarea owner-comment-review-textarea"
+                                    disabled={busy}
+                                    id={`owner-comment-${draft.categoryId}`}
+                                    onChange={(event) => {
+                                      const value = event.target.value;
+                                      setDrafts((current) =>
+                                        current.map((item) =>
+                                          item.categoryId === draft.categoryId
+                                            ? { ...item, value }
+                                            : item,
+                                        ),
+                                      );
+                                    }}
+                                    placeholder="Generate this category comment to begin review."
+                                    value={draft.value}
+                                  />
+                                </>
+                              ) : (
+                                <>
+                                  <span className="owner-comment-review-field-label">
+                                    School-facing comment
+                                  </span>
+                                  <div className="owner-comment-review-comment-copy">
+                                    {draft.value || "No comment available yet."}
+                                  </div>
+                                </>
+                              )}
+                              {draft.error ? (
+                                <p className="form-error">{draft.error}</p>
+                              ) : null}
                             </div>
-                          ) : null}
-                          <label
-                            className="owner-comment-review-field-label"
-                            htmlFor={`owner-comment-${draft.categoryId}`}
-                          >
-                            School-facing comment
-                          </label>
-                          <textarea
-                            className="textarea owner-comment-review-textarea"
-                            disabled={!editable || busy}
-                            id={`owner-comment-${draft.categoryId}`}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              setDrafts((current) =>
-                                current.map((item) =>
-                                  item.categoryId === draft.categoryId
-                                    ? { ...item, value }
-                                    : item,
-                                ),
-                              );
-                            }}
-                            placeholder="Generate this category comment to begin review."
-                            value={draft.value}
-                          />
-                          {draft.error ? (
-                            <p className="form-error">{draft.error}</p>
                           ) : null}
                         </article>
                       );
@@ -540,10 +646,14 @@ export function OwnerCommentReviewModal({
                   </div>
 
                   <footer className="owner-comment-review-footer">
-                    <p>
-                      Release panel-approved comments individually, or finish
-                      every draft before sending the complete set to the panel.
-                    </p>
+                    <div className="owner-comment-review-footer-copy">
+                      <strong>
+                        {selectedReleaseIds.size > 0
+                          ? `${selectedReleaseIds.size} ready to release`
+                          : "Choose approved comments to release"}
+                      </strong>
+                      <span>Scores and unselected comments stay private.</span>
+                    </div>
                     <div className="button-row">
                       <button
                         className="button button-secondary"
@@ -553,6 +663,18 @@ export function OwnerCommentReviewModal({
                       >
                         Close
                       </button>
+                      {readyDrafts.length > 0 ? (
+                        <button
+                          className="button button-dark"
+                          disabled={!canSendAll || busy}
+                          onClick={sendAll}
+                          type="button"
+                        >
+                          {isSending
+                            ? "Sending…"
+                            : "Send ready set to panel"}
+                        </button>
+                      ) : null}
                       <button
                         className="button button-gold"
                         disabled={selectedReleaseIds.size === 0 || busy}
@@ -562,16 +684,6 @@ export function OwnerCommentReviewModal({
                         {isReleasing
                           ? "Releasing…"
                           : `Release selected (${selectedReleaseIds.size})`}
-                      </button>
-                      <button
-                        className="button button-dark"
-                        disabled={!canSendAll || busy}
-                        onClick={sendAll}
-                        type="button"
-                      >
-                        {isSending
-                          ? "Sending to panel…"
-                          : "Send all comments to panel"}
                       </button>
                     </div>
                   </footer>
