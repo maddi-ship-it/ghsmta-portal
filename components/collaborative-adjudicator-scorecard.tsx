@@ -124,10 +124,15 @@ function panelMembersFromRows(
   rows: PanelObservationRow[],
   currentUserId: string,
   currentUserName: string,
+  includeCurrentUser = true,
 ): PanelMember[] {
   const members = new Map<string, PanelMember>();
 
   for (const row of rows) {
+    if (!includeCurrentUser && row.adjudicator_user_id === currentUserId) {
+      continue;
+    }
+
     if (!members.has(row.adjudicator_user_id)) {
       members.set(row.adjudicator_user_id, {
         userId: row.adjudicator_user_id,
@@ -137,7 +142,7 @@ function panelMembersFromRows(
     }
   }
 
-  if (!members.has(currentUserId)) {
+  if (includeCurrentUser && !members.has(currentUserId)) {
     members.set(currentUserId, {
       userId: currentUserId,
       name: currentUserName,
@@ -333,6 +338,8 @@ function CategoryScoreSection({
   ownScoreMap,
   scoreOptions,
   canComment,
+  canScore,
+  observerMode,
   readOnly,
   currentUserId,
   commentColumnsStyle,
@@ -358,6 +365,8 @@ function CategoryScoreSection({
   ownScoreMap: Map<string, AdjudicationScore>;
   scoreOptions: ScoreOption[];
   canComment: boolean;
+  canScore: boolean;
+  observerMode: boolean;
   readOnly: boolean;
   currentUserId: string;
   commentColumnsStyle: CSSProperties;
@@ -528,6 +537,8 @@ function CategoryScoreSection({
   });
 
   useEffect(() => {
+    if (!canScore && !canComment) return;
+
     window.dispatchEvent(
       new CustomEvent(ADJUDICATION_CATEGORY_COMPLETION_EVENT, {
         detail: {
@@ -536,7 +547,7 @@ function CategoryScoreSection({
         },
       }),
     );
-  }, [category.id, categoryComplete]);
+  }, [canComment, canScore, category.id, categoryComplete]);
 
   return (
     <section
@@ -552,7 +563,8 @@ function CategoryScoreSection({
         .join(" ")}
       id={`category-${category.id}`}
     >
-      {!isOverallProduction &&
+      {canScore &&
+        !isOverallProduction &&
         proposalRangeIsValid &&
         officialProposal?.range_min != null && (
           <input
@@ -561,7 +573,8 @@ function CategoryScoreSection({
             value={Number(officialProposal.range_min).toFixed(2)}
           />
         )}
-      {!isOverallProduction &&
+      {canScore &&
+        !isOverallProduction &&
         proposalRangeIsValid &&
         officialProposal &&
         categoryDecisionApprovedForUser({
@@ -593,7 +606,7 @@ function CategoryScoreSection({
         </button>
 
         <div className="scoring-category-header-actions">
-          {isOverallProduction ? (
+          {!canScore ? null : isOverallProduction ? (
             <div className="category-average-summary category-overall-summary">
               <span>Your derived overall score</span>
               <strong>{formatAverage(overallProductionScore.score)}</strong>
@@ -615,7 +628,7 @@ function CategoryScoreSection({
             />
           )}
 
-          {!isOverallProduction && (
+          {canScore && !isOverallProduction && (
             <section
               aria-labelledby={`category-decision-${category.id}`}
               className={[
@@ -756,7 +769,14 @@ function CategoryScoreSection({
           </div>
         )}
 
-        <div className="collaborative-criterion-table">
+        <div
+          className={[
+            "collaborative-criterion-table",
+            observerMode ? "collaborative-criterion-table-observer" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           <div className="collaborative-criterion-table-header">
             <span>Criterion</span>
 
@@ -773,7 +793,9 @@ function CategoryScoreSection({
               ))}
             </div>
 
-            <span className="personal-score-heading">Your score</span>
+            {canScore ? (
+              <span className="personal-score-heading">Your score</span>
+            ) : null}
           </div>
 
           {categoryCriteria.map((criterion) => {
@@ -844,6 +866,7 @@ function CategoryScoreSection({
                   })}
                 </div>
 
+                {canScore ? (
                 <div className="personal-score-column">
                   <label htmlFor={`score_${criterion.id}`}>Your score</label>
                   {isOverallProduction ? (
@@ -883,6 +906,7 @@ function CategoryScoreSection({
                     />
                   ) : null}
                 </div>
+                ) : null}
               </article>
             );
           })}
@@ -981,7 +1005,7 @@ function CategoryScoreSection({
 
       </div>
 
-      {reviewOpen && !readOnly && !isOverallProduction && (
+      {canScore && reviewOpen && !readOnly && !isOverallProduction && (
         <div
           className="score-range-modal-backdrop"
           onMouseDown={(event) => {
@@ -1104,6 +1128,8 @@ export function CollaborativeAdjudicatorScorecard({
   activePanelUserIds,
   scoreOptions,
   canComment,
+  canScore = true,
+  observerMode = false,
   readOnly,
   afterCategory,
   afterCategoryTitle,
@@ -1129,6 +1155,8 @@ export function CollaborativeAdjudicatorScorecard({
   activePanelUserIds?: string[];
   scoreOptions: ScoreOption[];
   canComment: boolean;
+  canScore?: boolean;
+  observerMode?: boolean;
   readOnly: boolean;
   afterCategory?: ReactNode;
   afterCategoryTitle?: string;
@@ -1282,9 +1310,12 @@ export function CollaborativeAdjudicatorScorecard({
   const activePanelUserIdSet = useMemo(
     () =>
       activePanelUserIds
-        ? new Set([...activePanelUserIds, currentUserId])
+        ? new Set([
+            ...activePanelUserIds,
+            ...(canScore || canComment ? [currentUserId] : []),
+          ])
         : null,
-    [activePanelUserIds, currentUserId],
+    [activePanelUserIds, canComment, canScore, currentUserId],
   );
 
   const activePanelRows = useMemo(
@@ -1303,16 +1334,17 @@ export function CollaborativeAdjudicatorScorecard({
         activePanelRows,
         currentUserId,
         currentUserName,
+        canScore || canComment,
       ),
-    [activePanelRows, currentUserId, currentUserName],
+    [activePanelRows, canComment, canScore, currentUserId, currentUserName],
   );
 
   const visiblePanelMembers = useMemo(
     () =>
-      showPeerComments
+      observerMode || showPeerComments
         ? panelMembers
         : panelMembers.filter((member) => member.userId === currentUserId),
-    [currentUserId, panelMembers, showPeerComments],
+    [currentUserId, observerMode, panelMembers, showPeerComments],
   );
 
   useEffect(() => {
@@ -1441,7 +1473,9 @@ export function CollaborativeAdjudicatorScorecard({
         <span className="status-dot" />
         <div>
           <strong>
-            {practiceMode
+            {observerMode
+              ? "Shadow view updates live"
+              : practiceMode
               ? "Practice workspace"
               : refreshError
               ? "Live refresh interrupted"
@@ -1450,7 +1484,9 @@ export function CollaborativeAdjudicatorScorecard({
                 : "Comments and two-point ranges refresh automatically"}
           </strong>
           <small>
-            {practiceMode
+            {observerMode
+              ? "Read-only panel observations refresh automatically."
+              : practiceMode
               ? "Entries stay in this browser and are never saved to a school."
               : lastRefreshed
               ? `Last refreshed ${lastRefreshed.toLocaleTimeString()}`
@@ -1487,6 +1523,8 @@ export function CollaborativeAdjudicatorScorecard({
             ownScoreMap={ownScoreMap}
             panelMembers={visiblePanelMembers}
             canComment={canComment}
+            canScore={canScore}
+            observerMode={observerMode}
             readOnly={readOnly}
             scoreOptions={scoreOptions}
             overallProductionScore={overallProductionScore}

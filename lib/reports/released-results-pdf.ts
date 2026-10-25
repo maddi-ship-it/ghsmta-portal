@@ -1,8 +1,12 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import {
   PDFDocument,
   StandardFonts,
   rgb,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
 } from "pdf-lib";
 
@@ -39,6 +43,7 @@ type PdfContext = {
   bold: PDFFont;
   application: Application;
   cycle: AwardCycle | null;
+  logo: PDFImage;
   page: PDFPage;
   y: number;
 };
@@ -119,6 +124,7 @@ function drawHeader(
   page: PDFPage,
   bold: PDFFont,
   regular: PDFFont,
+  logo: PDFImage,
   application: Application,
   cycle: AwardCycle | null,
 ) {
@@ -136,22 +142,29 @@ function drawHeader(
     height: 7,
     color: COLORS.gold,
   });
-  page.drawText("GHSMTA AWARDS PORTAL", {
+  const logoSize = 45;
+  page.drawImage(logo, {
     x: MARGIN,
+    y: PAGE_HEIGHT - 75,
+    width: logoSize,
+    height: logoSize,
+  });
+  page.drawText("GHSMTA AWARDS PORTAL", {
+    x: MARGIN + logoSize + 12,
     y: PAGE_HEIGHT - 31,
     size: 8.5,
     font: bold,
     color: COLORS.gold,
   });
   page.drawText("Released Adjudication Results", {
-    x: MARGIN,
+    x: MARGIN + logoSize + 12,
     y: PAGE_HEIGHT - 59,
     size: 21,
     font: bold,
     color: COLORS.white,
   });
   page.drawText(cleanText(application.school_name), {
-    x: MARGIN,
+    x: MARGIN + logoSize + 12,
     y: PAGE_HEIGHT - 82,
     size: 12,
     font: bold,
@@ -160,7 +173,7 @@ function drawHeader(
   page.drawText(
     cleanText(application.production_title || "Untitled production"),
     {
-      x: MARGIN,
+      x: MARGIN + logoSize + 12,
       y: PAGE_HEIGHT - 98,
       size: 9,
       font: regular,
@@ -187,6 +200,7 @@ function addPage(context: Omit<PdfContext, "page" | "y">): PdfContext {
     page,
     context.bold,
     context.regular,
+    context.logo,
     context.application,
     context.cycle,
   );
@@ -320,7 +334,11 @@ function drawScoreRows(context: PdfContext, release: AdjudicationRelease) {
   return next;
 }
 
-function drawFeedback(context: PdfContext, release: AdjudicationRelease) {
+function drawFeedback(
+  context: PdfContext,
+  release: AdjudicationRelease,
+  startFirstCategoryOnNewPage: boolean,
+) {
   const feedback = Array.isArray(release.feedback_snapshot)
     ? release.feedback_snapshot
         .slice()
@@ -336,8 +354,17 @@ function drawFeedback(context: PdfContext, release: AdjudicationRelease) {
     );
   }
 
-  for (const item of feedback) {
-    next = ensureSpace(next, 58);
+  for (const [index, item] of feedback.entries()) {
+    if (index > 0 || startFirstCategoryOnNewPage) {
+      next = addPage(next);
+    }
+    if (index === 0) {
+      next = drawSectionTitle(
+        next,
+        "Adjudication Panel Feedback",
+        `Released ${formatDate(release.feedback_released_at)}`,
+      );
+    }
     next.page.drawRectangle({
       x: MARGIN,
       y: next.y - 24,
@@ -404,6 +431,9 @@ export async function buildReleasedResultsPdf({
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const logo = await pdf.embedPng(
+    await readFile(path.join(process.cwd(), "public", "ghsmta-icon-512.png")),
+  );
 
   pdf.setTitle(
     `GHSMTA Released Results - ${cleanText(application.school_name)}`,
@@ -417,6 +447,7 @@ export async function buildReleasedResultsPdf({
     pdf,
     regular,
     bold,
+    logo,
     application,
     cycle,
   });
@@ -437,12 +468,11 @@ export async function buildReleasedResultsPdf({
   }
 
   if (release.feedback_released_at) {
-    context = drawSectionTitle(
+    context = drawFeedback(
       context,
-      "Adjudication Panel Feedback",
-      `Released ${formatDate(release.feedback_released_at)}`,
+      release,
+      Boolean(release.scores_released_at),
     );
-    context = drawFeedback(context, release);
   }
 
   if (release.release_notes) {

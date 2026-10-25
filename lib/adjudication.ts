@@ -15,17 +15,22 @@ export const SCORE_AVERAGE_DECIMALS = 5;
 export type AdjudicationWorkspaceMode =
   | "personal_scorecard"
   | "panel_review"
+  | "read_only_observer"
   | "access_notice";
 
 export function resolveAdjudicationWorkspaceMode({
   role,
   isScoringParticipant,
   canPanelReview,
+  isReadOnlyObserver = false,
 }: {
   role: AppRole;
   isScoringParticipant: boolean;
   canPanelReview: boolean;
+  isReadOnlyObserver?: boolean;
 }): AdjudicationWorkspaceMode {
+  if (isReadOnlyObserver) return "read_only_observer";
+
   if (
     role === "owner" ||
     (role === "advisory_member" && canPanelReview)

@@ -144,4 +144,15 @@ describe("resolveAdjudicationWorkspaceMode", () => {
       }),
     ).toBe("panel_review");
   });
+
+  it("prioritizes a read-only workspace for an assigned shadow", () => {
+    expect(
+      resolveAdjudicationWorkspaceMode({
+        role: "advisory_member",
+        isScoringParticipant: true,
+        canPanelReview: true,
+        isReadOnlyObserver: true,
+      }),
+    ).toBe("read_only_observer");
+  });
 });

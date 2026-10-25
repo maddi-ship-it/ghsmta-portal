@@ -16,6 +16,17 @@ type AdjudicationSearchParams = {
   q?: string;
 };
 
+type ScheduleBookingReference = {
+  slot_id: string;
+  application_id: string;
+};
+
+type ScheduleStaffReference = {
+  slot_id: string;
+  user_id: string;
+  participation_mode: "panel" | "understudy" | "shadow";
+};
+
 function normalizeSearch(value: string) {
   return value.trim().toLocaleLowerCase();
 }
@@ -40,6 +51,30 @@ export default async function AdjudicationDashboard({
   const cycles = (cyclesResult.data ?? []) as AwardCycle[];
   const adjudicationCycleIds = cycles.map((cycle) => cycle.id);
   const cycleMap = new Map(cycles.map((cycle) => [cycle.id, cycle]));
+  const [scheduleBookingsResult, scheduleStaffResult] = await Promise.all([
+    supabase.rpc("get_schedule_bookings_for_staff"),
+    supabase.rpc("get_schedule_staff_directory"),
+  ]);
+  if (scheduleBookingsResult.error) {
+    throw new Error(scheduleBookingsResult.error.message);
+  }
+  if (scheduleStaffResult.error) {
+    throw new Error(scheduleStaffResult.error.message);
+  }
+  const shadowSlotIds = new Set(
+    ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
+      .filter(
+        (staff) =>
+          staff.user_id === profile.id &&
+          staff.participation_mode === "shadow",
+      )
+      .map((staff) => staff.slot_id),
+  );
+  const scheduledShadowApplicationIds = new Set(
+    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[])
+      .filter((booking) => shadowSlotIds.has(booking.slot_id))
+      .map((booking) => booking.application_id),
+  );
 
   let applications: Application[] = [];
   let assignments: AdjudicatorAssignment[] = [];
@@ -54,9 +89,14 @@ export default async function AdjudicationDashboard({
     if (assignmentError) throw new Error(assignmentError.message);
     const candidateAssignments = (assignmentData ?? []) as AdjudicatorAssignment[];
 
-    const applicationIds = candidateAssignments.map(
-      (assignment) => assignment.application_id,
-    );
+    const applicationIds = [
+      ...new Set([
+        ...candidateAssignments.map(
+          (assignment) => assignment.application_id,
+        ),
+        ...scheduledShadowApplicationIds,
+      ]),
+    ];
     if (applicationIds.length > 0 && adjudicationCycleIds.length > 0) {
       const { data, error } = await supabase
         .from("applications")
@@ -122,10 +162,24 @@ export default async function AdjudicationDashboard({
       (row: { application_id: string }) => row.application_id,
     ),
   );
+  const readOnlyObserverApplicationIds = new Set(
+    scheduledShadowApplicationIds,
+  );
+  for (const assignment of assignments) {
+    if (
+      assignment.adjudicator_user_id === profile.id &&
+      !assignment.can_score &&
+      !assignment.can_comment
+    ) {
+      readOnlyObserverApplicationIds.add(assignment.application_id);
+    }
+  }
 
   if (profile.role === "advisory_member") {
-    applications = applications.filter((application) =>
-      advisoryReviewApplicationIds.has(application.id),
+    applications = applications.filter(
+      (application) =>
+        advisoryReviewApplicationIds.has(application.id) ||
+        readOnlyObserverApplicationIds.has(application.id),
     );
     const visibleApplicationIds = new Set(
       applications.map((application) => application.id),
@@ -142,16 +196,47 @@ export default async function AdjudicationDashboard({
     : { data: [], error: null };
   if (scorecardError) throw new Error(scorecardError.message);
   const scorecards = (scorecardData ?? []) as AdjudicationScorecard[];
+  const assignmentByApplicationId = new Map(
+    assignments
+      .filter((assignment) => assignment.adjudicator_user_id === profile.id)
+      .map((assignment) => [assignment.application_id, assignment]),
+  );
+  const assignmentsByApplicationId = new Map<
+    string,
+    AdjudicatorAssignment[]
+  >();
+  for (const assignment of assignments) {
+    const applicationAssignments =
+      assignmentsByApplicationId.get(assignment.application_id) ?? [];
+    applicationAssignments.push(assignment);
+    assignmentsByApplicationId.set(
+      assignment.application_id,
+      applicationAssignments,
+    );
+  }
 
-  const applicationMap = new Map(applications.map((application) => [application.id, application]));
   const relevantRows = profile.role === "adjudicator"
-    ? assignments.map((assignment) => ({ assignment, application: applicationMap.get(assignment.application_id) })).filter((row) => row.application)
+    ? applications.map((application) => ({
+        assignment: assignmentByApplicationId.get(application.id) ?? null,
+        application,
+        isReadOnlyObserver: readOnlyObserverApplicationIds.has(application.id),
+      }))
     : applications.map((application) => ({
       application,
-      assignments: assignments.filter((assignment) => assignment.application_id === application.id),
+      assignments: assignmentsByApplicationId.get(application.id) ?? [],
+      isReadOnlyObserver: readOnlyObserverApplicationIds.has(application.id),
     }));
 
-  const submittedCards = scorecards.filter((card) => card.status === "submitted" || card.status === "locked").length;
+  const actionableAssignments = assignments.filter(
+    (assignment) =>
+      !readOnlyObserverApplicationIds.has(assignment.application_id) &&
+      Boolean(assignment.can_score || assignment.can_comment),
+  );
+  const submittedCards = scorecards.filter(
+    (card) =>
+      !readOnlyObserverApplicationIds.has(card.application_id) &&
+      (card.status === "submitted" || card.status === "locked"),
+  ).length;
 
   const matchesSearch = (application: Application | undefined) => {
     if (!application) return false;
@@ -193,11 +278,13 @@ export default async function AdjudicationDashboard({
     const reviewMap = new Map((reviews ?? []).map((review) => [review.application_id, review.status]));
     advisoryQueue = applications
       .filter((application) =>
-        advisoryReviewApplicationIds.has(application.id),
+        advisoryReviewApplicationIds.has(application.id) &&
+        !readOnlyObserverApplicationIds.has(application.id),
       )
       .map((application) => {
       const applicationProposals = (proposals ?? []).filter((proposal) => proposal.application_id === application.id);
-      const applicationAssignments = assignments.filter((assignment) => assignment.application_id === application.id);
+      const applicationAssignments =
+        assignmentsByApplicationId.get(application.id) ?? [];
       const applicationCards = scorecards.filter((card) => card.application_id === application.id);
       return {
         application,
@@ -244,9 +331,9 @@ export default async function AdjudicationDashboard({
 
       <section className="metric-grid" aria-label="Adjudication overview">
         <article className="metric-card"><span className="metric-label">Productions</span><strong className="metric-value">{applications.length}</strong></article>
-        <article className="metric-card"><span className="metric-label">Assignments</span><strong className="metric-value">{assignments.length}</strong></article>
+        <article className="metric-card"><span className="metric-label">Assignments</span><strong className="metric-value">{relevantRows.length}</strong></article>
         <article className="metric-card"><span className="metric-label">Submitted scorecards</span><strong className="metric-value">{submittedCards}</strong></article>
-        <article className="metric-card"><span className="metric-label">Pending</span><strong className="metric-value">{Math.max(assignments.length - submittedCards, 0)}</strong></article>
+        <article className="metric-card"><span className="metric-label">Pending</span><strong className="metric-value">{Math.max(actionableAssignments.length - submittedCards, 0)}</strong></article>
       </section>
 
       <section className="panel adjudication-search-panel">
@@ -304,18 +391,28 @@ export default async function AdjudicationDashboard({
             visibleRows.map((row) => {
               if (!("assignment" in row) || !row.application) return null;
               const cycle = cycleMap.get(row.application.cycle_id);
-              const card = scorecards.find((item) => item.assignment_id === row.assignment.id);
-              const status = card?.status ?? row.assignment.status;
+              const card = row.assignment
+                ? scorecards.find(
+                    (item) => item.assignment_id === row.assignment?.id,
+                  )
+                : null;
+              const status = row.isReadOnlyObserver
+                ? "shadow"
+                : card?.status ?? row.assignment?.status ?? "assigned";
               return (
-                <Link className="adjudication-card" href={`/portal/adjudication/${row.application.id}`} key={row.assignment.id}>
+                <Link className="adjudication-card" href={`/portal/adjudication/${row.application.id}`} key={row.assignment?.id ?? `shadow-${row.application.id}`}>
                   <div>
                     <span className="eyebrow">{cycle ? `${cycle.season_year} · ${cycle.name}` : "Assigned production"}</span>
                     <h3>{row.application.school_name}</h3>
                     <p>{row.application.production_title ?? "Untitled production"}</p>
                   </div>
                   <div className="adjudication-card-meta">
-                    <span className={`badge badge-scorecard-${status}`}>{status.replaceAll("_", " ")}</span>
-                    <small>{row.assignment.due_at ? `Due ${new Date(row.assignment.due_at).toLocaleDateString()}` : "No due date"}</small>
+                    <span className={`badge badge-scorecard-${status}`}>
+                      {row.isReadOnlyObserver
+                        ? "Shadow · read only"
+                        : status.replaceAll("_", " ")}
+                    </span>
+                    <small>{row.isReadOnlyObserver ? "View panel adjudication" : row.assignment?.due_at ? `Due ${new Date(row.assignment.due_at).toLocaleDateString()}` : "No due date"}</small>
                   </div>
                 </Link>
               );
@@ -337,12 +434,16 @@ export default async function AdjudicationDashboard({
                     {profile.role === "advisory_member" && (
                       <span
                         className={`badge ${
-                          advisoryReviewApplicationIds.has(row.application.id)
+                          row.isReadOnlyObserver
+                            ? "badge-draft"
+                            : advisoryReviewApplicationIds.has(row.application.id)
                             ? "badge-submitted"
                             : "badge-draft"
                         }`}
                       >
-                        Review enabled
+                        {row.isReadOnlyObserver
+                          ? "Shadow · read only"
+                          : "Review enabled"}
                       </span>
                     )}
                     <strong>{complete} / {row.assignments.length}</strong>

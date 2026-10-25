@@ -604,6 +604,7 @@ details summary { cursor: pointer; color: var(--navy-700); font-weight: 800; }
 
 .badge-scorecard-draft,
 .badge-scorecard-assigned,
+.badge-scorecard-shadow,
 .badge-scorecard-in_progress { color: #344054; background: #f2f4f7; }
 .badge-scorecard-submitted,
 .badge-scorecard-complete,
@@ -19125,6 +19126,19 @@ html[data-theme="light"] .advisory-live-range-outside {
   .full-score-overview-table tbody th {
     min-width: 190px;
   }
+}
+
+@media (min-width: 901px) {
+  .collaborative-criterion-table-observer
+    :is(.collaborative-criterion-table-header, .collaborative-criterion-row) {
+    grid-template-columns:
+      minmax(260px, 0.75fr)
+      minmax(0, 2.25fr);
+  }
+}
+
+.shadow-adjudication-notice {
+  border-color: color-mix(in srgb, var(--portal-gold) 65%, var(--portal-line));
 }
 
 .sr-only {

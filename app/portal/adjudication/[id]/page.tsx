@@ -86,6 +86,7 @@ type ScheduleStaffReference = {
   full_name: string | null;
   email: string | null;
   role: string;
+  participation_mode: "panel" | "understudy" | "shadow";
 };
 
 type ScheduleSlotReference = {
@@ -157,6 +158,10 @@ export default async function AdjudicationApplicationPage({
   const supabase = await createClient();
   const admin = createAdminClient();
   const referenceLinksPromise = loadAdjudicationReferenceLinks(supabase);
+  const scheduleContextPromise = Promise.all([
+    supabase.rpc("get_schedule_bookings_for_staff"),
+    supabase.rpc("get_schedule_staff_directory"),
+  ]);
 
   const { data: applicationData, error: applicationError } = await supabase
     .from("applications")
@@ -243,10 +248,41 @@ export default async function AdjudicationApplicationPage({
     throw new Error(ownParticipantResult.error.message);
   }
 
+  const [scheduleBookingsResult, scheduleStaffResult] =
+    await scheduleContextPromise;
+  if (scheduleBookingsResult.error) {
+    throw new Error(scheduleBookingsResult.error.message);
+  }
+  if (scheduleStaffResult.error) {
+    throw new Error(scheduleStaffResult.error.message);
+  }
+
+  const scheduleBooking =
+    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[])
+      .find((booking) => booking.application_id === id) ?? null;
+  const scheduledStaff =
+    ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
+      .filter((staff) => staff.slot_id === scheduleBooking?.slot_id);
+  const currentScheduleEnrollment = scheduledStaff.find(
+    (staff) => staff.user_id === profile.id,
+  );
+  const isScheduledShadow =
+    currentScheduleEnrollment?.participation_mode === "shadow";
+  const hasReadOnlyAssignment = Boolean(
+    ownParticipantResult.data &&
+      !ownParticipantResult.data.can_score &&
+      !ownParticipantResult.data.can_comment,
+  );
+  const isReadOnlyObserver =
+    profile.role !== "owner" &&
+    (isScheduledShadow || hasReadOnlyAssignment);
+
   const isScoringParticipant =
-    profile.role === "adjudicator" ||
-    (profile.role === "advisory_member" &&
-      Boolean(ownParticipantResult.data?.can_score));
+    !isReadOnlyObserver &&
+    Boolean(
+      ownParticipantResult.data?.can_score ||
+        ownParticipantResult.data?.can_comment,
+    );
 
   const advisoryReviewAccessResult =
     profile.role === "advisory_member"
@@ -263,11 +299,13 @@ export default async function AdjudicationApplicationPage({
   const canPanelReview =
     profile.role === "owner" ||
     (profile.role === "advisory_member" &&
-      Boolean(advisoryReviewAccessResult.data));
+      Boolean(advisoryReviewAccessResult.data) &&
+      !isReadOnlyObserver);
   const workspaceMode = resolveAdjudicationWorkspaceMode({
     role: profile.role,
     isScoringParticipant,
     canPanelReview,
+    isReadOnlyObserver,
   });
   const showPersonalScorecard = workspaceMode === "personal_scorecard";
   const canEditAdvisoryScorecard =
@@ -296,8 +334,6 @@ export default async function AdjudicationApplicationPage({
     scorecardsResult,
     feedbackResult,
     releaseResult,
-    scheduleBookingsResult,
-    scheduleStaffResult,
     panelAssignmentsResult,
     appealsResult,
     candidateReviewResult,
@@ -325,9 +361,7 @@ export default async function AdjudicationApplicationPage({
     profile.role === "adjudicator"
       ? Promise.resolve({ data: null, error: null })
       : supabase.from("adjudication_releases").select("*").eq("application_id", id).maybeSingle(),
-    supabase.rpc("get_schedule_bookings_for_staff"),
-    supabase.rpc("get_schedule_staff_directory"),
-    isScoringParticipant || canPanelReview
+    isScoringParticipant || canPanelReview || isReadOnlyObserver
       ? admin
           .from("adjudicator_assignments")
           .select("adjudicator_user_id,can_comment,can_score")
@@ -468,18 +502,6 @@ export default async function AdjudicationApplicationPage({
       (profile.role !== "adjudicator" || item.assigned_to === profile.id),
   );
 
-  if (scheduleBookingsResult.error) {
-    throw new Error(scheduleBookingsResult.error.message);
-  }
-
-  if (scheduleStaffResult.error) {
-    throw new Error(scheduleStaffResult.error.message);
-  }
-
-  const scheduleBooking =
-    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[])
-      .find((booking) => booking.application_id === id) ?? null;
-
   let scheduleSlot: ScheduleSlotReference | null = null;
   let scheduleSchoolDetails: ScheduleSchoolDetailReference | null = null;
   if (scheduleBooking) {
@@ -503,10 +525,6 @@ export default async function AdjudicationApplicationPage({
     if (detailError) throw new Error(detailError.message);
     scheduleSchoolDetails = detailData as ScheduleSchoolDetailReference | null;
   }
-
-  const scheduledStaff =
-    ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
-      .filter((staff) => staff.slot_id === scheduleBooking?.slot_id);
 
   const adjudicationReferencePanel: ApplicationReferencePanel = {
     key: "adjudication-calendar",
@@ -584,7 +602,13 @@ export default async function AdjudicationApplicationPage({
     ],
   };
 
-  if (isScoringParticipant && !ownParticipantResult.data) notFound();
+  if (
+    profile.role === "adjudicator" &&
+    !ownParticipantResult.data &&
+    !isScheduledShadow
+  ) {
+    notFound();
+  }
 
   const categoryIds = categories.map((category) => category.id);
   const scorecardIds = scorecards.map((card) => card.id);
@@ -680,7 +704,7 @@ export default async function AdjudicationApplicationPage({
   }
 
   const sharedObservationResult =
-    showPersonalScorecard
+    showPersonalScorecard || isReadOnlyObserver
       ? await supabase.rpc("get_shared_adjudication_observations", {
           p_application_id: id,
         })
@@ -922,6 +946,9 @@ export default async function AdjudicationApplicationPage({
         </div>
         <div className="heading-actions">
           {showEditableScorecard && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
+          {isReadOnlyObserver ? (
+            <span className="badge badge-draft">Shadow · read only</span>
+          ) : null}
           <Link className="button button-secondary" href="/portal/adjudication">Back to adjudication</Link>
         </div>
       </div>
@@ -1173,6 +1200,86 @@ export default async function AdjudicationApplicationPage({
           />
 
         </form>
+        </>
+      ) : workspaceMode === "read_only_observer" ? (
+        <>
+          <section className="panel shadow-adjudication-notice" role="status">
+            <div className="panel-header">
+              <div>
+                <span className="eyebrow">Shadow view</span>
+                <h2>Adjudication is available in read-only mode</h2>
+                <p>
+                  You can follow the categories and the assigned panel&apos;s live
+                  observations. Shadows do not receive score, comment,
+                  brain-dump, approval, or submission fields.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel score-guide-panel">
+            <div className="panel-header">
+              <AdjudicationScoringGuideHeading
+                initialCategoryTitle={narrativeCategories[0]?.title ?? ""}
+              />
+            </div>
+            <div className="score-scale-grid">
+              {scale.map((level) => (
+                <div key={level.id}>
+                  <strong>{formatScore(level.score)}</strong>
+                  <span>{level.label}</span>
+                  <small>{level.description}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <CollaborativeAdjudicatorScorecard
+            activePanelUserIds={panelReviewerIds}
+            applicationId={id}
+            categories={narrativeCategories}
+            categoryApprovals={(approvalResult.data ?? []) as Array<{
+              proposal_id: string;
+              adjudicator_user_id: string;
+              response: string;
+              comment: string | null;
+            }>}
+            categoryProposals={(proposalResult.data ?? []) as Array<{
+              id: string;
+              category_id: string;
+              is_eligible: boolean;
+              range_min: number | null;
+              range_max: number | null;
+              status: string;
+              advisory_note: string | null;
+            }>}
+            categorySubjectDefaults={categorySubjectDefaults}
+            criteria={scoreableCriteria}
+            currentUserId={profile.id}
+            currentUserName={profile.full_name ?? profile.email ?? "Shadow"}
+            initialPanelRows={(sharedObservationResult.data ?? []) as Array<{
+              panel_order: number;
+              adjudicator_user_id: string;
+              adjudicator_name: string;
+              criterion_id: string | null;
+              observation: string | null;
+              updated_at: string | null;
+            }>}
+            ownComments={[]}
+            ownScores={[]}
+            panelApprovedCategoryIds={panelApprovedCategoryIds}
+            panelFeedback={panelVisibleFeedback}
+            panelReviewers={panelNarrativeReviewers}
+            productionTitle={
+              application.production_title ?? "Untitled production"
+            }
+            readOnly
+            reviewStatus={reviewResult.data?.status ?? "draft"}
+            scoreOptions={scoreChoices}
+            canComment={false}
+            canScore={false}
+            observerMode
+          />
         </>
       ) : workspaceMode === "access_notice" ? (
         <section className="panel advisory-read-only-panel">
