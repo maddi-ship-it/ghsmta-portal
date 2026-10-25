@@ -15,6 +15,12 @@ export type ScheduleWorkflowChecklist = Record<
   boolean
 >;
 
+export type ScheduleWorkflowMilestones = {
+  releasedFeedbackCount?: number | null;
+  scoresReleased?: boolean | null;
+  sectionCStatus?: string | null;
+};
+
 export const EMPTY_SCHEDULE_WORKFLOW_CHECKLIST: ScheduleWorkflowChecklist = {
   pick_six_sent: false,
   moved_to_section_c: false,
@@ -38,6 +44,28 @@ export function readScheduleWorkflowChecklist(
     moved_to_section_c: stored.moved_to_section_c === true,
     section_c_complete: stored.section_c_complete === true,
     final_results_released: stored.final_results_released === true,
+  };
+}
+
+export function resolveScheduleWorkflowChecklist(
+  formData: Record<string, unknown> | null | undefined,
+  milestones: ScheduleWorkflowMilestones = {},
+): ScheduleWorkflowChecklist {
+  const stored = readScheduleWorkflowChecklist(formData);
+  const sectionCStatus = String(milestones.sectionCStatus ?? "")
+    .trim()
+    .toLowerCase();
+  const sectionCStarted = Boolean(sectionCStatus) && sectionCStatus !== "locked";
+
+  return {
+    pick_six_sent:
+      stored.pick_six_sent ||
+      Number(milestones.releasedFeedbackCount ?? 0) >= 6,
+    moved_to_section_c: stored.moved_to_section_c || sectionCStarted,
+    section_c_complete:
+      stored.section_c_complete || sectionCStatus === "complete",
+    final_results_released:
+      stored.final_results_released || milestones.scoresReleased === true,
   };
 }
 

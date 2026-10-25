@@ -531,4 +531,6 @@ export async function respondActingCandidateReview(
   revalidatePath("/portal/chat");
   revalidatePath("/portal/files");
   revalidatePath("/portal/notifications");
+  revalidatePath("/portal/schedule");
+  revalidatePath("/portal/admin/reports");
 }

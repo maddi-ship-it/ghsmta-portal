@@ -77,6 +77,11 @@ export default async function AdjudicationDashboard({
       .filter((booking) => shadowSlotIds.has(booking.slot_id))
       .map((booking) => booking.application_id),
   );
+  const scheduledApplicationIds = new Set(
+    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[]).map(
+      (booking) => booking.application_id,
+    ),
+  );
 
   let applications: Application[] = [];
   let assignments: AdjudicatorAssignment[] = [];
@@ -140,7 +145,9 @@ export default async function AdjudicationDashboard({
       (application) =>
         profile.role === "advisory_member" ||
         reviewableStatuses.has(application.status) ||
-        assignedApplicationIds.has(application.id),
+        assignedApplicationIds.has(application.id) ||
+        (profile.role === "owner" &&
+          scheduledApplicationIds.has(application.id)),
     );
     const activeApplicationIds = new Set(
       applications.map((application) => application.id),

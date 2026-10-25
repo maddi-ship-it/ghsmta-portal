@@ -240,6 +240,8 @@ export async function submitApplicationStage(
     if (error) throw new Error(error.message);
 
     revalidatePath(`/portal/applications/${applicationId}`);
+    revalidatePath("/portal/schedule");
+    revalidatePath("/portal/admin/reports");
     redirect(`/portal/applications/${applicationId}?stage=${nextStage.id}&stage_submitted=1`);
   }
 
@@ -252,6 +254,8 @@ export async function submitApplicationStage(
   revalidatePath(`/portal/applications/${applicationId}`);
   revalidatePath("/portal/admin/applications");
   revalidatePath("/portal");
+  revalidatePath("/portal/schedule");
+  revalidatePath("/portal/admin/reports");
   redirect(`/portal/applications/${applicationId}?stage=${stageId}&submitted=1`);
 }
 

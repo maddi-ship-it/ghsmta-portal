@@ -2459,6 +2459,8 @@ export async function releaseSelectedAdjudicationFeedback(
 
     revalidatePath(`/portal/adjudication/${applicationId}`);
     revalidatePath("/portal/results");
+    revalidatePath("/portal/schedule");
+    revalidatePath("/portal/admin/reports");
 
     return {
       ok: true as const,
@@ -2522,6 +2524,8 @@ export async function releaseAdjudicationResults(
 
   revalidatePath(`/portal/adjudication/${applicationId}`);
   revalidatePath("/portal/results");
+  revalidatePath("/portal/schedule");
+  revalidatePath("/portal/admin/reports");
   redirect(
     `/portal/adjudication/${applicationId}?released=1&channel_notice=${
       schoolChannelNotified ? "sent" : "failed"

@@ -16,6 +16,8 @@ export type SchoolFilePronunciationRequirement = { applicationId: string; approv
 
 const FILE_TYPES = [
   ["playbill", "Playbill", ".pdf"],
+  ["process_to_performance", "Process to Performance", ".pdf,.doc,.docx,image/*,video/*"],
+  ["virtual_audition_packet", "Virtual Audition Packet", ".pdf,.doc,.docx,image/*,video/*"],
   ["poster", "Poster", "image/*,.pdf"],
   ["logo", "Logo", "image/*,.pdf,.svg,.eps"],
   ["scenic", "Scenic Drawings / Renderings", "image/*,.pdf"],

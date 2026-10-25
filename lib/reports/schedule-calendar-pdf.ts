@@ -462,41 +462,7 @@ function drawScheduleCard({
     color: COLORS.line,
   });
 
-  const adjudicators = splitNames(row.assigned_adjudicators);
-  const understudies = splitNames(row.understudies);
-  const shadows = splitNames(row.shadows);
-  const staffRows = [
-    ["ADVISORY", splitNames(row.advisory_member)[0] ?? ""],
-    ["ADJUDICATOR 1", adjudicators[0] ?? ""],
-    ["ADJUDICATOR 2", adjudicators[1] ?? ""],
-    ["ADJUDICATOR 3", adjudicators[2] ?? ""],
-    ["UNDERSTUDY", understudies[0] ?? ""],
-    ["SHADOW 1", shadows[0] ?? ""],
-    ["SHADOW 2", shadows[1] ?? ""],
-    ["SHADOW 3", shadows[2] ?? ""],
-  ];
-  let staffY = y + height - 70;
-  staffRows.forEach(([label, value], index) => {
-    drawStaffRow({
-      page,
-      fonts,
-      x,
-      y: staffY,
-      width,
-      label,
-      value,
-      alternate: index % 2 === 1,
-    });
-    staffY -= 10.2;
-  });
-
-  const checklistTop = y + height - 157;
-  page.drawLine({
-    start: { x: x + 5, y: checklistTop + 8 },
-    end: { x: x + width - 5, y: checklistTop + 8 },
-    thickness: 0.5,
-    color: COLORS.line,
-  });
+  const checklistTop = y + height - 68;
   page.drawText("OWNER TRACKING", {
     x: x + 6,
     y: checklistTop - 1,
@@ -521,6 +487,40 @@ function drawScheduleCard({
       label: String(label),
       checked: Boolean(checked),
     });
+  });
+  page.drawLine({
+    start: { x: x + 5, y: checklistTop - 35 },
+    end: { x: x + width - 5, y: checklistTop - 35 },
+    thickness: 0.5,
+    color: COLORS.line,
+  });
+
+  const adjudicators = splitNames(row.assigned_adjudicators);
+  const understudies = splitNames(row.understudies);
+  const shadows = splitNames(row.shadows);
+  const staffRows = [
+    ["ADVISORY", splitNames(row.advisory_member)[0] ?? ""],
+    ["ADJUDICATOR 1", adjudicators[0] ?? ""],
+    ["ADJUDICATOR 2", adjudicators[1] ?? ""],
+    ["ADJUDICATOR 3", adjudicators[2] ?? ""],
+    ["UNDERSTUDY", understudies[0] ?? ""],
+    ["SHADOW 1", shadows[0] ?? ""],
+    ["SHADOW 2", shadows[1] ?? ""],
+    ["SHADOW 3", shadows[2] ?? ""],
+  ];
+  let staffY = y + height - 113;
+  staffRows.forEach(([label, value], index) => {
+    drawStaffRow({
+      page,
+      fonts,
+      x,
+      y: staffY,
+      width,
+      label,
+      value,
+      alternate: index % 2 === 1,
+    });
+    staffY -= 10.2;
   });
 }
 

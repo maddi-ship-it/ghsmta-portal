@@ -10,7 +10,7 @@ import {
 } from "@/lib/reports/report-definitions";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import { cityFromVenueAddress, scheduleCityLabel } from "@/lib/schedule-location";
-import { readScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
+import { resolveScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { portalSiteUrl } from "@/lib/site-url";
 
 type SupabaseLike = {
@@ -813,6 +813,56 @@ async function loadScheduleReport(
   const cycleById = new Map(cycles.map((cycle) => [cycle.id, cycle]));
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const appById = new Map(applications.map((application) => [application.id, application]));
+  const applicationIds = applications.map((application) => application.id);
+  const formVersionIds = [
+    ...new Set(
+      applications
+        .map((application) => application.form_version_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const [workflowReleases, sectionCStages] = await Promise.all([
+    applicationIds.length
+      ? safeFetchPaged<any>(warnings, "Schedule release milestones", () =>
+          supabase
+            .from("adjudication_releases")
+            .select("application_id,scores_released_at,feedback_snapshot")
+            .in("application_id", applicationIds),
+        )
+      : Promise.resolve([]),
+    formVersionIds.length
+      ? safeFetchPaged<any>(warnings, "Schedule Section C stages", () =>
+          supabase
+            .from("application_stages")
+            .select("id,form_version_id")
+            .in("form_version_id", formVersionIds)
+            .eq("stage_key", "section_c_postproduction"),
+        )
+      : Promise.resolve([]),
+  ]);
+  const sectionCStageIds = sectionCStages.map((stage) => stage.id);
+  const sectionCProgress =
+    applicationIds.length && sectionCStageIds.length
+      ? await safeFetchPaged<any>(warnings, "Schedule Section C progress", () =>
+          supabase
+            .from("application_stage_progress")
+            .select("application_id,stage_id,status")
+            .in("application_id", applicationIds)
+            .in("stage_id", sectionCStageIds),
+        )
+      : [];
+  const workflowReleaseByApplication = new Map(
+    workflowReleases.map((release) => [release.application_id, release]),
+  );
+  const sectionCStageByFormVersion = new Map(
+    sectionCStages.map((stage) => [stage.form_version_id, stage.id]),
+  );
+  const sectionCProgressByApplicationAndStage = new Map(
+    sectionCProgress.map((progress) => [
+      `${progress.application_id}:${progress.stage_id}`,
+      progress,
+    ]),
+  );
   const bookingsBySlot = new Map<string, any[]>();
   const staffBySlot = new Map<string, any[]>();
   const schoolDetailsBySlot = new Map(
@@ -931,7 +981,28 @@ async function loadScheduleReport(
       .join("; ");
     return slotBookings.map((booking) => {
       const application = booking ? appById.get(booking.application_id) : null;
-      const checklist = readScheduleWorkflowChecklist(application?.form_data);
+      const workflowRelease = application
+        ? workflowReleaseByApplication.get(application.id)
+        : null;
+      const sectionCStageId = application?.form_version_id
+        ? sectionCStageByFormVersion.get(application.form_version_id)
+        : null;
+      const sectionCProgress =
+        application && sectionCStageId
+          ? sectionCProgressByApplicationAndStage.get(
+              `${application.id}:${sectionCStageId}`,
+            )
+          : null;
+      const checklist = resolveScheduleWorkflowChecklist(
+        application?.form_data,
+        {
+          releasedFeedbackCount: Array.isArray(workflowRelease?.feedback_snapshot)
+            ? workflowRelease.feedback_snapshot.length
+            : 0,
+          scoresReleased: Boolean(workflowRelease?.scores_released_at),
+          sectionCStatus: sectionCProgress?.status ?? null,
+        },
+      );
       const detail = schoolDetailsBySlot.get(slot.id);
       const applicationLocation = application
         ? applicationDetails.get(application.id)

@@ -34,7 +34,7 @@ import {
   scheduleStaffCapacity,
   scheduleSlotHasPrimaryAdvisoryMember,
 } from "@/lib/schedule-staff";
-import { readScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
+import { resolveScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
@@ -139,6 +139,23 @@ type ScoringPermission = {
   adjudicator_user_id: string;
   can_score: boolean;
   can_comment: boolean;
+};
+
+type ScheduleWorkflowRelease = {
+  application_id: string;
+  scores_released_at: string | null;
+  feedback_snapshot: unknown;
+};
+
+type SectionCStage = {
+  id: string;
+  form_version_id: string;
+};
+
+type SectionCProgress = {
+  application_id: string;
+  stage_id: string;
+  status: string;
 };
 
 type ScheduleSort =
@@ -769,6 +786,73 @@ export default async function SchedulePage({
     })),
     ...(missingScheduleApplicationsResult.data ?? []),
   ];
+  const ownerWorkflowApplicationIds =
+    profile.role === "owner" ? scheduleApplicationIds : [];
+  const ownerWorkflowFormVersionIds = [
+    ...new Set(
+      scheduleApplicationsForLocations
+        .map((application) => application.form_version_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const [workflowReleaseResult, sectionCStageResult] = await Promise.all([
+    ownerWorkflowApplicationIds.length
+      ? admin
+          .from("adjudication_releases")
+          .select("application_id,scores_released_at,feedback_snapshot")
+          .in("application_id", ownerWorkflowApplicationIds)
+      : Promise.resolve({ data: [], error: null }),
+    profile.role === "owner" && ownerWorkflowFormVersionIds.length
+      ? admin
+          .from("application_stages")
+          .select("id,form_version_id")
+          .in("form_version_id", ownerWorkflowFormVersionIds)
+          .eq("stage_key", "section_c_postproduction")
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (workflowReleaseResult.error) {
+    console.error("Unable to load schedule release milestones.", {
+      message: workflowReleaseResult.error.message,
+    });
+  }
+  if (sectionCStageResult.error) {
+    console.error("Unable to load schedule Section C stages.", {
+      message: sectionCStageResult.error.message,
+    });
+  }
+  const sectionCStages = (sectionCStageResult.data ?? []) as SectionCStage[];
+  const sectionCProgressResult =
+    ownerWorkflowApplicationIds.length && sectionCStages.length
+      ? await admin
+          .from("application_stage_progress")
+          .select("application_id,stage_id,status")
+          .in("application_id", ownerWorkflowApplicationIds)
+          .in(
+            "stage_id",
+            sectionCStages.map((stage) => stage.id),
+          )
+      : { data: [], error: null };
+  if (sectionCProgressResult.error) {
+    console.error("Unable to load schedule Section C progress.", {
+      message: sectionCProgressResult.error.message,
+    });
+  }
+  const workflowReleaseByApplication = new Map(
+    ((workflowReleaseResult.data ?? []) as ScheduleWorkflowRelease[]).map(
+      (release) => [release.application_id, release],
+    ),
+  );
+  const sectionCStageByFormVersion = new Map(
+    sectionCStages.map((stage) => [stage.form_version_id, stage.id]),
+  );
+  const sectionCProgressByApplicationAndStage = new Map(
+    ((sectionCProgressResult.data ?? []) as SectionCProgress[]).map(
+      (progress) => [
+        `${progress.application_id}:${progress.stage_id}`,
+        progress,
+      ],
+    ),
+  );
   let applicationCityById = new Map<string, string>();
   try {
     const applicationDetails = await loadBillingApplicationDetails(
@@ -932,6 +1016,17 @@ export default async function SchedulePage({
                   participationMode,
                 })
               : false;
+          const workflowRelease = workflowReleaseByApplication.get(
+            booking.application_id,
+          );
+          const sectionCStageId = application?.form_version_id
+            ? sectionCStageByFormVersion.get(application.form_version_id)
+            : null;
+          const sectionCProgress = sectionCStageId
+            ? sectionCProgressByApplicationAndStage.get(
+                `${booking.application_id}:${sectionCStageId}`,
+              )
+            : null;
 
           return [{
             id: slot.id,
@@ -949,7 +1044,18 @@ export default async function SchedulePage({
             adjudicators,
             understudy,
             shadows,
-            checklist: readScheduleWorkflowChecklist(application?.form_data),
+            checklist: resolveScheduleWorkflowChecklist(
+              application?.form_data,
+              {
+                releasedFeedbackCount: Array.isArray(
+                  workflowRelease?.feedback_snapshot,
+                )
+                  ? workflowRelease.feedback_snapshot.length
+                  : 0,
+                scoresReleased: Boolean(workflowRelease?.scores_released_at),
+                sectionCStatus: sectionCProgress?.status ?? null,
+              },
+            ),
             canOpenAdjudication:
               profile.role === "owner" ||
               participants.some((participant) => participant.user_id === profile.id),
