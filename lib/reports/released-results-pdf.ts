@@ -144,22 +144,11 @@ function drawHeader(
   });
   const logoWidth = 102;
   const logoHeight = logoWidth * (logo.height / logo.width);
-  const logoCardPadding = 5;
-  const logoCardHeight = logoHeight + logoCardPadding * 2;
-  const logoCardY = PAGE_HEIGHT - 89;
-  const headerTextX = MARGIN + logoWidth + logoCardPadding * 2 + 14;
-  page.drawRectangle({
-    x: MARGIN,
-    y: logoCardY,
-    width: logoWidth + logoCardPadding * 2,
-    height: logoCardHeight,
-    color: COLORS.white,
-    borderColor: COLORS.gold,
-    borderWidth: 0.6,
-  });
+  const logoY = PAGE_HEIGHT - 84;
+  const headerTextX = MARGIN + logoWidth + 14;
   page.drawImage(logo, {
-    x: MARGIN + logoCardPadding,
-    y: logoCardY + logoCardPadding,
+    x: MARGIN,
+    y: logoY,
     width: logoWidth,
     height: logoHeight,
   });
@@ -445,8 +434,10 @@ export async function buildReleasedResultsPdf({
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const logo = await pdf.embedJpg(
-    await readFile(path.join(process.cwd(), "public", "ghsmta-logo.jpg")),
+  const logo = await pdf.embedPng(
+    await readFile(
+      path.join(process.cwd(), "public", "ghsmta-logo-header.png"),
+    ),
   );
 
   pdf.setTitle(
