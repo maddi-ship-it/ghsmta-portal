@@ -25,6 +25,20 @@ export type ExistingCategoryProposal = {
 
 export type CategorySaveIntent = "draft" | "approval";
 
+export function categoryDecisionApprovedForUser({
+  proposalStatus,
+  ownResponse,
+}: {
+  proposalStatus: string | null | undefined;
+  ownResponse: string | null | undefined;
+}) {
+  return (
+    proposalStatus === "approved" ||
+    proposalStatus === "overridden" ||
+    ownResponse === "approved"
+  );
+}
+
 function numbersMatch(
   left: number | string | null,
   right: number | null,

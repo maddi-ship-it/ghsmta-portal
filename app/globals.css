@@ -16510,6 +16510,23 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   justify-content: flex-end;
 }
 
+.owner-comment-pick-six-trigger {
+  gap: 0.45rem;
+}
+
+.owner-comment-pick-six-trigger > span {
+  display: grid;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  color: #111827;
+  background: var(--portal-gold);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
 .owner-comment-review-controls > strong {
   min-width: 4.5rem;
   color: var(--portal-muted);
@@ -16770,6 +16787,123 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   flex-wrap: nowrap;
 }
 
+.acceptd-pick-six-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(2, 8, 23, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.acceptd-pick-six-modal {
+  display: grid;
+  width: min(660px, 100%);
+  max-height: min(82vh, 720px);
+  max-height: min(82dvh, 720px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--portal-gold) 55%, var(--portal-line));
+  border-radius: 1.15rem;
+  background: var(--portal-surface-1);
+  box-shadow: 0 30px 90px rgba(2, 8, 23, 0.48);
+}
+
+.acceptd-pick-six-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  border-bottom: 1px solid var(--portal-line);
+  background: var(--portal-surface-2);
+}
+
+.acceptd-pick-six-header h2 {
+  margin: 0.12rem 0 0;
+  color: var(--portal-text);
+  font-size: clamp(1.5rem, 4vw, 2.15rem);
+}
+
+.acceptd-pick-six-header p {
+  max-width: 32rem;
+  margin: 0.28rem 0 0;
+  color: var(--portal-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.acceptd-pick-six-body {
+  min-height: 0;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.acceptd-pick-six-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.acceptd-pick-six-list li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.4rem;
+  padding: 0.58rem 0.75rem;
+  border: 1px solid var(--portal-line);
+  border-radius: 0.75rem;
+  background: var(--portal-surface-2);
+}
+
+.acceptd-pick-six-list li > span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #111827;
+  background: var(--portal-gold);
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.acceptd-pick-six-list strong {
+  color: var(--portal-text);
+  font-size: 0.92rem;
+}
+
+.acceptd-pick-six-empty {
+  display: grid;
+  gap: 0.35rem;
+  padding: 2.5rem 1.25rem;
+  border: 1px dashed var(--portal-line);
+  border-radius: 0.85rem;
+  color: var(--portal-muted);
+  text-align: center;
+}
+
+.acceptd-pick-six-empty strong {
+  color: var(--portal-text);
+}
+
+.acceptd-pick-six-empty p {
+  margin: 0;
+}
+
+.acceptd-pick-six-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.8rem 1.25rem;
+  border-top: 1px solid var(--portal-line);
+  background: var(--portal-surface-2);
+}
+
 @media (max-width: 760px) {
   .owner-comment-review-modal {
     height: 96dvh;
@@ -16820,6 +16954,14 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
 
   .owner-comment-review-item-toggle .badge {
     display: none;
+  }
+
+  .acceptd-pick-six-backdrop {
+    padding: 0.65rem;
+  }
+
+  .acceptd-pick-six-modal {
+    max-height: 92dvh;
   }
 }
 

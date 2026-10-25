@@ -103,12 +103,14 @@ function statusDetail(status: ReviewDraftStatus) {
 
 export function OwnerCommentReviewModal({
   applicationId,
+  acceptdPickSix = [],
   categories,
   feedback,
   panelApprovedCategoryIds,
   releasedCategoryIds,
 }: {
   applicationId: string;
+  acceptdPickSix?: string[];
   categories: ScoringCategory[];
   feedback: AdjudicationPanelFeedback[];
   panelApprovedCategoryIds: string[];
@@ -117,9 +119,13 @@ export function OwnerCommentReviewModal({
   const router = useRouter();
   const reactId = useId();
   const titleId = `owner-comment-review-${reactId.replaceAll(":", "")}`;
+  const pickSixTitleId = `acceptd-pick-six-${reactId.replaceAll(":", "")}`;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const pickSixTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const pickSixCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const releaseConfirmationRef = useRef(false);
+  const pickSixOpenRef = useRef(false);
   const approvedCategoryIds = useMemo(
     () => new Set(panelApprovedCategoryIds),
     [panelApprovedCategoryIds],
@@ -148,6 +154,7 @@ export function OwnerCommentReviewModal({
     () => new Set(),
   );
   const [showReleaseConfirmation, setShowReleaseConfirmation] = useState(false);
+  const [pickSixOpen, setPickSixOpen] = useState(false);
   const [isGenerating, startGeneration] = useTransition();
   const [isReleasing, startRelease] = useTransition();
   const [isSending, startSending] = useTransition();
@@ -155,6 +162,20 @@ export function OwnerCommentReviewModal({
   useEffect(() => {
     releaseConfirmationRef.current = showReleaseConfirmation;
   }, [showReleaseConfirmation]);
+
+  useEffect(() => {
+    pickSixOpenRef.current = pickSixOpen;
+    if (!pickSixOpen) return;
+
+    const triggerElement = pickSixTriggerRef.current;
+    const focusFrame = window.requestAnimationFrame(() => {
+      pickSixCloseButtonRef.current?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      triggerElement?.focus();
+    };
+  }, [pickSixOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -167,7 +188,11 @@ export function OwnerCommentReviewModal({
     });
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !releaseConfirmationRef.current) {
-        setOpen(false);
+        if (pickSixOpenRef.current) {
+          setPickSixOpen(false);
+        } else {
+          setOpen(false);
+        }
       }
     };
 
@@ -230,6 +255,7 @@ export function OwnerCommentReviewModal({
       new Set(initialDrafts.slice(0, 1).map((draft) => draft.categoryId)),
     );
     setShowReleaseConfirmation(false);
+    setPickSixOpen(false);
     setOpen(true);
   };
 
@@ -384,6 +410,7 @@ export function OwnerCommentReviewModal({
               <section
                 aria-labelledby={titleId}
                 aria-modal="true"
+                aria-hidden={pickSixOpen || undefined}
                 className="application-reference-modal owner-comment-review-modal"
                 role="dialog"
               >
@@ -431,6 +458,19 @@ export function OwnerCommentReviewModal({
                       </span>
                     </div>
                     <div className="owner-comment-review-controls">
+                      <button
+                        aria-haspopup="dialog"
+                        className="button button-secondary button-compact owner-comment-pick-six-trigger"
+                        disabled={busy}
+                        onClick={() => setPickSixOpen(true)}
+                        ref={pickSixTriggerRef}
+                        type="button"
+                      >
+                        Acceptd Pick 6
+                        <span aria-label={`${acceptdPickSix.length} selections`}>
+                          {acceptdPickSix.length}
+                        </span>
+                      </button>
                       <button
                         className="button button-secondary button-compact"
                         disabled={busy || releaseCandidates.length === 0}
@@ -689,6 +729,74 @@ export function OwnerCommentReviewModal({
                   </footer>
                 </div>
               </section>
+
+              {pickSixOpen ? (
+                <div
+                  className="acceptd-pick-six-backdrop"
+                  onMouseDown={(event) => {
+                    if (event.currentTarget === event.target) {
+                      setPickSixOpen(false);
+                    }
+                  }}
+                  role="presentation"
+                >
+                  <section
+                    aria-labelledby={pickSixTitleId}
+                    aria-modal="true"
+                    className="acceptd-pick-six-modal"
+                    role="dialog"
+                  >
+                    <header className="acceptd-pick-six-header">
+                      <div>
+                        <span className="eyebrow">Acceptd application</span>
+                        <h2 id={pickSixTitleId}>Early feedback Pick 6</h2>
+                        <p>
+                          Categories the school selected to receive feedback on
+                          within three weeks of adjudication.
+                        </p>
+                      </div>
+                      <button
+                        aria-label="Close Acceptd Pick 6"
+                        className="application-reference-close"
+                        onClick={() => setPickSixOpen(false)}
+                        ref={pickSixCloseButtonRef}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </header>
+                    <div className="acceptd-pick-six-body">
+                      {acceptdPickSix.length > 0 ? (
+                        <ol className="acceptd-pick-six-list">
+                          {acceptdPickSix.map((selection, index) => (
+                            <li key={`${index}-${selection}`}>
+                              <span>{index + 1}</span>
+                              <strong>{selection}</strong>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <div className="acceptd-pick-six-empty">
+                          <strong>No Pick 6 selections found</strong>
+                          <p>
+                            The latest synced Acceptd application does not
+                            contain a Pick 6 selection yet.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <footer className="acceptd-pick-six-footer">
+                      <button
+                        className="button button-dark"
+                        onClick={() => setPickSixOpen(false)}
+                        type="button"
+                      >
+                        Back to comment review
+                      </button>
+                    </footer>
+                  </section>
+                </div>
+              ) : null}
             </div>,
             document.querySelector(".portal-shell") ?? document.body,
           )

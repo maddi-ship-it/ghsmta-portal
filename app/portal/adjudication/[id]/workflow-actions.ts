@@ -54,6 +54,83 @@ function numbersMatch(
   return Number(left) === right;
 }
 
+async function autoApproveAdvisorySubmittedCategories({
+  applicationId,
+  advisoryUserId,
+  categoryIds,
+}: {
+  applicationId: string;
+  advisoryUserId: string;
+  categoryIds: string[];
+}) {
+  const admin = createAdminClient();
+  const { data: assignment, error: assignmentError } = await admin
+    .from("adjudicator_assignments")
+    .select("id")
+    .eq("application_id", applicationId)
+    .eq("adjudicator_user_id", advisoryUserId)
+    .eq("can_score", true)
+    .is("removed_at", null)
+    .maybeSingle();
+
+  if (assignmentError) throw new Error(assignmentError.message);
+  if (!assignment || categoryIds.length === 0) return 0;
+
+  const { data: proposals, error: proposalError } = await admin
+    .from("adjudication_category_proposals")
+    .select("id,range_min,range_max,status")
+    .eq("application_id", applicationId)
+    .neq("status", "draft")
+    .in("category_id", categoryIds);
+
+  if (proposalError) throw new Error(proposalError.message);
+
+  const validProposals = (proposals ?? []).filter((proposal) =>
+    proposal.status !== "approved" &&
+    proposal.status !== "overridden" &&
+    isValidTwoPointRange(proposal.range_min, proposal.range_max),
+  );
+  if (validProposals.length === 0) return 0;
+
+  const proposalIds = validProposals.map((proposal) => proposal.id);
+  const { data: existingApprovals, error: approvalReadError } = await admin
+    .from("adjudication_category_approvals")
+    .select("proposal_id,response")
+    .eq("adjudicator_user_id", advisoryUserId)
+    .in("proposal_id", proposalIds);
+
+  if (approvalReadError) throw new Error(approvalReadError.message);
+
+  const approvedProposalIds = new Set(
+    (existingApprovals ?? [])
+      .filter((approval) => approval.response === "approved")
+      .map((approval) => approval.proposal_id),
+  );
+  const proposalsToApprove = validProposals.filter(
+    (proposal) => !approvedProposalIds.has(proposal.id),
+  );
+  if (proposalsToApprove.length === 0) return 0;
+
+  const respondedAt = new Date().toISOString();
+  const { error: approvalSaveError } = await admin
+    .from("adjudication_category_approvals")
+    .upsert(
+      proposalsToApprove.map((proposal) => ({
+        proposal_id: proposal.id,
+        adjudicator_user_id: advisoryUserId,
+        eligibility_approved: true,
+        range_approved: true,
+        response: "approved",
+        comment: null,
+        responded_at: respondedAt,
+      })),
+      { onConflict: "proposal_id,adjudicator_user_id" },
+    );
+
+  if (approvalSaveError) throw new Error(approvalSaveError.message);
+  return proposalsToApprove.length;
+}
+
 async function saveAssignedWorkspaceCategoryProposals({
   applicationId,
   actorId,
@@ -728,6 +805,32 @@ export async function saveAllCategoryProposals(
     }
   }
 
+  let autoApprovedCount = 0;
+  if (intent === "approval" && profile.role === "advisory_member") {
+    try {
+      autoApprovedCount = await autoApproveAdvisorySubmittedCategories({
+        applicationId,
+        advisoryUserId: profile.id,
+        categoryIds,
+      });
+    } catch (approvalError) {
+      const message =
+        approvalError instanceof Error
+          ? approvalError.message
+          : "Your category approvals could not be recorded.";
+      logEvent("error", "adjudication.advisory_auto_approval_failed", {
+        applicationId,
+        actorId: profile.id,
+        message,
+      });
+      return {
+        ok: false,
+        error: "The decisions were saved, but your approvals could not be recorded. Please try again.",
+        attemptId,
+      };
+    }
+  }
+
   if (changedScoreability.length > 0) {
     const { error: scoreabilityError } = await supabase
       .from("adjudication_category_scoreability")
@@ -813,9 +916,13 @@ export async function saveAllCategoryProposals(
         ? changedCount === 0
           ? "Your draft is already up to date."
           : `${changedCount} draft change${changedCount === 1 ? "" : "s"} saved.`
+        : autoApprovedCount > 0
+        ? changedCount === 0
+          ? `Your approval was recorded automatically for ${autoApprovedCount} categor${autoApprovedCount === 1 ? "y" : "ies"}.`
+          : `${changedCount} category decision or assignment change${changedCount === 1 ? "" : "s"} saved. Your approval was recorded automatically for ${autoApprovedCount} categor${autoApprovedCount === 1 ? "y" : "ies"}.`
         : changedCount === 0
-        ? "All category decisions and assignments are already up to date."
-        : `${changedCount} category decision or assignment change${changedCount === 1 ? "" : "s"} saved.`,
+          ? "All category decisions and assignments are already up to date."
+          : `${changedCount} category decision or assignment change${changedCount === 1 ? "" : "s"} saved.`,
     attemptId,
   };
 }

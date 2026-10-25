@@ -22,6 +22,7 @@ import {
   canCompleteAdjudication,
   outstandingAssignedFinalComments,
 } from "@/lib/adjudication-completion";
+import { categoryDecisionApprovedForUser } from "@/lib/adjudication-category-decisions";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
@@ -147,11 +148,29 @@ async function persistAdjudicatorScorecard(
 
   const { data: proposalData, error: proposalError } = await supabase
     .from("adjudication_category_proposals")
-    .select("category_id,is_eligible,range_min,range_max,status")
+    .select("id,category_id,is_eligible,range_min,range_max,status")
     .eq("application_id", applicationId)
     .neq("status", "draft");
 
   if (proposalError) throw new Error(proposalError.message);
+
+  const proposalIds = (proposalData ?? []).map((proposal) => proposal.id);
+  const { data: ownApprovalData, error: ownApprovalError } = proposalIds.length
+    ? await supabase
+        .from("adjudication_category_approvals")
+        .select("proposal_id,response")
+        .eq("adjudicator_user_id", adjudicator.id)
+        .in("proposal_id", proposalIds)
+    : { data: [], error: null };
+
+  if (ownApprovalError) throw new Error(ownApprovalError.message);
+
+  const ownApprovalByProposalId = new Map(
+    (ownApprovalData ?? []).map((approval) => [
+      approval.proposal_id,
+      approval.response,
+    ]),
+  );
 
   const { data: scoreabilityData, error: scoreabilityError } = await supabase
     .from("adjudication_category_scoreability")
@@ -283,9 +302,13 @@ async function persistAdjudicatorScorecard(
 
     if (
       submit &&
-      (!officialProposal || !["approved", "overridden"].includes(String(officialProposal.status)))
+      (!officialProposal ||
+        !categoryDecisionApprovedForUser({
+          proposalStatus: officialProposal.status,
+          ownResponse: ownApprovalByProposalId.get(officialProposal.id),
+        }))
     ) {
-      missing.push(`${category.title}: eligibility and range approval`);
+      missing.push(`${category.title}: your eligibility and range approval`);
     }
 
     if (submit && !validRange) {

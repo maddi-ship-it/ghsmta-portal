@@ -7,6 +7,7 @@ import {
   resolveAdjudicationWorkspaceMode,
 } from "@/lib/adjudication";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
+import { extractAcceptdPickSix } from "@/lib/acceptd/pick-six";
 import {
   buildApplicationReferencePanels,
   type ApplicationEligibilityAppeal,
@@ -41,6 +42,7 @@ import { SpecialtyAwardModal } from "@/components/specialty-award-modal";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
 import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
+import { categoryDecisionApprovedForUser } from "@/lib/adjudication-category-decisions";
 import { outstandingAssignedFinalComments } from "@/lib/adjudication-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
@@ -298,6 +300,7 @@ export default async function AdjudicationApplicationPage({
     panelAssignmentsResult,
     appealsResult,
     candidateReviewResult,
+    acceptdSnapshotResult,
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
@@ -343,6 +346,15 @@ export default async function AdjudicationApplicationPage({
       .select("state,updated_at")
       .eq("application_id", id)
       .maybeSingle(),
+    profile.role === "owner" && application.source_system === "acceptd-api-v2"
+      ? admin
+          .from("acceptd_application_snapshots")
+          .select("payload")
+          .eq("portal_application_id", id)
+          .order("last_synced_at", { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
@@ -369,11 +381,21 @@ export default async function AdjudicationApplicationPage({
   const scorecards = (scorecardsResult.data ?? []) as AdjudicationScorecard[];
   const feedback = (feedbackResult.data ?? []) as AdjudicationPanelFeedback[];
   const release = releaseResult.data as AdjudicationRelease | null;
+  const acceptdPickSix = extractAcceptdPickSix(
+    acceptdSnapshotResult.data?.payload,
+  );
 
   if (feedbackResult.error) throw new Error(feedbackResult.error.message);
   if (appealsResult.error) throw new Error(appealsResult.error.message);
   if (panelAssignmentsResult.error) {
     throw new Error(panelAssignmentsResult.error.message);
+  }
+  if (acceptdSnapshotResult.error) {
+    console.error("Acceptd Pick 6 selections could not be loaded", {
+      applicationId: id,
+      code: acceptdSnapshotResult.error.code,
+      message: acceptdSnapshotResult.error.message,
+    });
   }
   // Candidate confirmation is an add-on to the adjudication workspace. If its
   // audit lookup is unavailable, keep the scorecard usable and start from the
@@ -835,14 +857,10 @@ export default async function AdjudicationApplicationPage({
         return false;
       }
 
-      if (["approved", "overridden"].includes(proposal.status)) {
-        return true;
-      }
-
-      return (
-        profile.role === "adjudicator" &&
-        ownApprovalByProposalId.get(proposal.id)?.response === "approved"
-      );
+      return categoryDecisionApprovedForUser({
+        proposalStatus: proposal.status,
+        ownResponse: ownApprovalByProposalId.get(proposal.id)?.response,
+      });
     });
   const candidateReviewComplete =
     profile.role === "adjudicator"
@@ -853,6 +871,7 @@ export default async function AdjudicationApplicationPage({
   const panelReviewWorkspace = (
     <OwnerLiveAdjudicationReview
       applicationId={id}
+      acceptdPickSix={acceptdPickSix}
       isOwner={profile.role === "owner"}
       advisoryNarrativeReview={
         profile.role === "advisory_member"
@@ -1212,7 +1231,11 @@ export default async function AdjudicationApplicationPage({
                       type="hidden"
                       value={
                         proposal &&
-                        ["approved", "overridden"].includes(proposal.status)
+                        categoryDecisionApprovedForUser({
+                          proposalStatus: proposal.status,
+                          ownResponse:
+                            ownApprovalByProposalId.get(proposal.id)?.response,
+                        })
                           ? "1"
                           : "0"
                       }

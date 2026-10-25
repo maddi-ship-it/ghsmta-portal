@@ -1,11 +1,44 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  categoryDecisionApprovedForUser,
   categoryDecisionHasChanges,
   categoryDecisionNeedsSave,
   type CategoryDecision,
   type ExistingCategoryProposal,
 } from "./adjudication-category-decisions";
+
+describe("categoryDecisionApprovedForUser", () => {
+  it("unlocks an adjudicator after their own approval without waiting for the panel", () => {
+    expect(
+      categoryDecisionApprovedForUser({
+        proposalStatus: "proposed",
+        ownResponse: "approved",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps a proposed category locked for someone who has not approved it", () => {
+    expect(
+      categoryDecisionApprovedForUser({
+        proposalStatus: "proposed",
+        ownResponse: null,
+      }),
+    ).toBe(false);
+  });
+
+  it.each(["approved", "overridden"])(
+    "accepts a globally %s decision",
+    (proposalStatus) => {
+      expect(
+        categoryDecisionApprovedForUser({
+          proposalStatus,
+          ownResponse: null,
+        }),
+      ).toBe(true);
+    },
+  );
+});
 
 const baseDecision: CategoryDecision = {
   category_id: "category-1",

@@ -654,6 +654,7 @@ function LivePanelFeedbackEditor({
 
 export function OwnerLiveAdjudicationReview({
   applicationId,
+  acceptdPickSix = [],
   isOwner,
   advisoryNarrativeReview,
   advisoryScoreEntry,
@@ -671,6 +672,7 @@ export function OwnerLiveAdjudicationReview({
   release,
 }: {
   applicationId: string;
+  acceptdPickSix?: string[];
   isOwner: boolean;
   advisoryNarrativeReview?: AdvisoryNarrativeReview;
   advisoryScoreEntry?: AdvisoryScoreEntry;
@@ -1127,6 +1129,7 @@ export function OwnerLiveAdjudicationReview({
             </div>
             <OwnerCommentReviewModal
               applicationId={applicationId}
+              acceptdPickSix={acceptdPickSix}
               categories={categories}
               feedback={feedback}
               panelApprovedCategoryIds={ownerPanelApprovedCategoryIds}

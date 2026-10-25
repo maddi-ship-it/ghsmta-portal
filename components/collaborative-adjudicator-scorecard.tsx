@@ -25,6 +25,7 @@ import {
   ADJUDICATION_CATEGORY_COMPLETION_EVENT,
   isAdjudicationCategoryComplete,
 } from "@/lib/adjudication-category-completion";
+import { categoryDecisionApprovedForUser } from "@/lib/adjudication-category-decisions";
 import {
   ADJUDICATION_SCORE_CHANGE_EVENT,
   type AdjudicationScoreChangeDetail,
@@ -563,7 +564,10 @@ function CategoryScoreSection({
       {!isOverallProduction &&
         proposalRangeIsValid &&
         officialProposal &&
-        ["approved", "overridden"].includes(officialProposal.status) && (
+        categoryDecisionApprovedForUser({
+          proposalStatus: officialProposal.status,
+          ownResponse: ownApproval?.response,
+        }) && (
           <input
             name={`category_decision_finalized_${category.id}`}
             type="hidden"
