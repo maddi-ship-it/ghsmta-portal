@@ -8,6 +8,7 @@ import {
 
 import type { LoadedReport, ReportRow } from "@/lib/reports/report-data";
 import type { ReportColumn } from "@/lib/reports/report-definitions";
+import { buildScheduleCalendarPdf } from "@/lib/reports/schedule-calendar-pdf";
 
 const LANDSCAPE_WIDTH = 792;
 const LANDSCAPE_HEIGHT = 612;
@@ -278,6 +279,10 @@ function rowsForPdf(report: LoadedReport) {
 }
 
 export async function buildReportPdf(report: LoadedReport) {
+  if (report.definition.id === "adjudication-schedule-master") {
+    return buildScheduleCalendarPdf(report);
+  }
+
   const pdf = await PDFDocument.create();
   const fonts = {
     regular: await pdf.embedFont(StandardFonts.Helvetica),

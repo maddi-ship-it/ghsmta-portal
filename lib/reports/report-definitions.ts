@@ -106,6 +106,7 @@ const scheduleColumns: ReportColumn[] = [
   { key: "production", label: "Production" },
   { key: "venue", label: "Venue" },
   { key: "region", label: "Region" },
+  { key: "advisory_member", label: "Advisory Committee Member", adjudicatorIdentity: true },
   { key: "assigned_adjudicators", label: "Assigned Adjudicators", adjudicatorIdentity: true },
   { key: "shadows", label: "Shadows", adjudicatorIdentity: true },
   { key: "understudies", label: "Understudies", adjudicatorIdentity: true },

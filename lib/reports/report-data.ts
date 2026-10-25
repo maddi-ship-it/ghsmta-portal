@@ -8,6 +8,8 @@ import {
   type ReportFormat,
   type ReportVariant,
 } from "@/lib/reports/report-definitions";
+import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
+import { cityFromVenueAddress, scheduleCityLabel } from "@/lib/schedule-location";
 import { portalSiteUrl } from "@/lib/site-url";
 
 type SupabaseLike = {
@@ -764,7 +766,7 @@ async function loadScheduleReport(
       supabase.from("award_cycles").select("id,name,season_year").order("season_year", { ascending: false }),
     ),
     safeFetchPaged<ApplicationRow>(warnings, "Applications", () =>
-      supabase.from("applications").select("id,cycle_id,school_name,production_title,is_archived").order("school_name"),
+      supabase.from("applications").select("id,cycle_id,school_name,production_title,is_archived,form_version_id").order("school_name"),
     ),
     safeFetchPaged<ProfileRow>(warnings, "Profiles", () =>
       supabase.from("profiles").select("id,email,full_name,role,phone_e164").order("full_name"),
@@ -772,7 +774,7 @@ async function loadScheduleReport(
   ]);
 
   const slotIds = slots.map((slot) => slot.id);
-  const [bookings, staff, waitlist] = await Promise.all([
+  const [bookings, staff, waitlist, schoolDetails] = await Promise.all([
     slotIds.length
       ? safeFetchPaged<any>(warnings, "Schedule bookings", () =>
           supabase
@@ -797,6 +799,14 @@ async function loadScheduleReport(
             .order("queue_rank"),
         )
       : Promise.resolve([]),
+    slotIds.length
+      ? safeFetchPaged<any>(warnings, "Schedule school details", () =>
+          supabase
+            .from("schedule_slot_school_details")
+            .select("slot_id,venue_name,venue_address")
+            .in("slot_id", slotIds),
+        )
+      : Promise.resolve([]),
   ]);
 
   const cycleById = new Map(cycles.map((cycle) => [cycle.id, cycle]));
@@ -804,6 +814,33 @@ async function loadScheduleReport(
   const appById = new Map(applications.map((application) => [application.id, application]));
   const bookingsBySlot = new Map<string, any[]>();
   const staffBySlot = new Map<string, any[]>();
+  const schoolDetailsBySlot = new Map(
+    schoolDetails.map((detail) => [detail.slot_id, detail]),
+  );
+  let applicationDetails = new Map<
+    string,
+    {
+      schoolAddress: string | null;
+      schoolCity: string | null;
+      schoolPhone: string | null;
+      schoolType: string | null;
+      selectedTrack: string | null;
+    }
+  >();
+
+  try {
+    applicationDetails = await loadBillingApplicationDetails(
+      supabase,
+      applications.map((application) => ({
+        id: application.id,
+        form_version_id: application.form_version_id,
+      })),
+    );
+  } catch (error) {
+    warnings.push(
+      `Application city fallbacks: ${error instanceof Error ? error.message : "Could not load application locations."}`,
+    );
+  }
 
   for (const booking of bookings) {
     const collection = bookingsBySlot.get(booking.slot_id) ?? [];
@@ -861,30 +898,64 @@ async function loadScheduleReport(
   return slots.flatMap((slot) => {
     const slotBookings = bookingsBySlot.get(slot.id) ?? [null];
     const slotStaff = staffBySlot.get(slot.id) ?? [];
+    const displayName = (member: any) =>
+      profileById.get(member.user_id)?.full_name ??
+      profileById.get(member.user_id)?.email ??
+      member.user_id;
+    const participationMode = (member: any) =>
+      String(member.participation_mode ?? "panel").toLowerCase();
+    const advisoryMembers = slotStaff
+      .filter(
+        (member) =>
+          member.joined_as === "advisory_member" &&
+          participationMode(member) === "panel",
+      )
+      .map(displayName)
+      .join("; ");
     const adjudicators = slotStaff
-      .filter((member) => member.joined_as === "adjudicator")
-      .map((member) => profileById.get(member.user_id)?.full_name ?? profileById.get(member.user_id)?.email ?? member.user_id)
+      .filter(
+        (member) =>
+          member.joined_as === "adjudicator" &&
+          participationMode(member) === "panel",
+      )
+      .map(displayName)
       .join("; ");
     const shadows = slotStaff
-      .filter((member) => String(member.joined_as).includes("shadow"))
-      .map((member) => profileById.get(member.user_id)?.full_name ?? profileById.get(member.user_id)?.email ?? member.user_id)
+      .filter((member) => participationMode(member) === "shadow")
+      .map(displayName)
       .join("; ");
     const understudies = slotStaff
-      .filter((member) => String(member.joined_as).includes("understudy"))
-      .map((member) => profileById.get(member.user_id)?.full_name ?? profileById.get(member.user_id)?.email ?? member.user_id)
+      .filter((member) => participationMode(member) === "understudy")
+      .map(displayName)
       .join("; ");
     return slotBookings.map((booking) => {
       const application = booking ? appById.get(booking.application_id) : null;
+      const detail = schoolDetailsBySlot.get(slot.id);
+      const applicationLocation = application
+        ? applicationDetails.get(application.id)
+        : null;
+      const city = scheduleCityLabel({
+        venueAddress: detail?.venue_address,
+        applicationCity:
+          applicationLocation?.schoolCity ??
+          cityFromVenueAddress(applicationLocation?.schoolAddress),
+        fallbackLocation: slot.location,
+      });
       return {
         cycle: cycleLabel(cycleById.get(slot.cycle_id)),
+        starts_at: slot.starts_at ?? "",
+        ends_at: slot.ends_at ?? "",
+        slot_title: slot.title ?? "",
         date: formatDate(slot.starts_at),
         day_of_week: dayName(slot.starts_at),
         performance_time: timeRange(slot.starts_at, slot.ends_at),
         required_arrival_time: "",
         school: application?.school_name ?? "",
         production: application?.production_title ?? "",
-        venue: slot.location ?? "",
+        venue: detail?.venue_name ?? slot.location ?? "",
+        city,
         region: "",
+        advisory_member: advisoryMembers,
         assigned_adjudicators: adjudicators,
         shadows,
         understudies,
