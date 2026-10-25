@@ -61,6 +61,19 @@ function report(rows: ReportRow[]): LoadedReport {
 }
 
 describe("buildScheduleCalendarPdf", () => {
+  it("fits nine adjudications from one month on a single page", async () => {
+    const bytes = await buildScheduleCalendarPdf(
+      report(
+        Array.from({ length: 9 }, (_, index) =>
+          row(index + 1, `2027-01-${String(index + 2).padStart(2, "0")}T00:00:00.000Z`),
+        ),
+      ),
+    );
+    const pdf = await PDFDocument.load(bytes);
+
+    expect(pdf.getPageCount()).toBe(1);
+  });
+
   it("uses continuation pages after nine schools and starts each month on a new page", async () => {
     const januaryRows = Array.from({ length: 10 }, (_, index) =>
       row(index + 1, `2027-01-${String(index + 2).padStart(2, "0")}T00:00:00.000Z`),

@@ -19,9 +19,9 @@ const HEADER_HEIGHT = 88;
 const MONTH_HEIGHT = 28;
 const FOOTER_HEIGHT = 25;
 const CARD_GAP = 8;
-const CARDS_PER_PAGE = 6;
+const CARDS_PER_PAGE = 9;
 const CARD_COLUMNS = 3;
-const CARD_ROWS = 2;
+const CARD_ROWS = 3;
 
 const COLORS = {
   midnight: rgb(7 / 255, 11 / 255, 23 / 255),
@@ -297,11 +297,11 @@ function drawStaffRow({
   value: string;
   alternate: boolean;
 }) {
-  const rowHeight = 10.2;
+  const rowHeight = 7.2;
   if (alternate) {
     page.drawRectangle({
       x,
-      y: y - 2.1,
+      y: y - 1.4,
       width,
       height: rowHeight,
       color: COLORS.soft,
@@ -311,7 +311,7 @@ function drawStaffRow({
   if (!hasValue) {
     page.drawRectangle({
       x: x + 61,
-      y: y - 2.1,
+      y: y - 1.4,
       width: width - 61,
       height: rowHeight,
       color: COLORS.open,
@@ -320,16 +320,16 @@ function drawStaffRow({
   page.drawText(label, {
     x: x + 5,
     y,
-    size: 5.5,
+    size: 4.4,
     font: fonts.bold,
     color: COLORS.muted,
   });
   page.drawText(
-    truncate(fonts.regular, hasValue ? value : "Open", 6.2, width - 70),
+    truncate(fonts.regular, hasValue ? value : "Open", 5.1, width - 70),
     {
       x: x + 65,
-      y: y - 0.2,
-      size: 6.2,
+      y: y - 0.1,
+      size: 5.1,
       font: fonts.regular,
       color: hasValue ? COLORS.text : COLORS.muted,
     },
@@ -353,26 +353,26 @@ function drawChecklistItem({
 }) {
   page.drawRectangle({
     x,
-    y: y - 0.5,
-    width: 6,
-    height: 6,
+    y: y - 0.2,
+    width: 5,
+    height: 5,
     borderColor: checked ? COLORS.navy : COLORS.muted,
     borderWidth: 0.7,
     color: checked ? COLORS.navy : COLORS.white,
   });
   if (checked) {
     page.drawText("X", {
-      x: x + 1.1,
-      y: y + 0.2,
-      size: 4.8,
+      x: x + 0.9,
+      y: y + 0.1,
+      size: 4,
       font: fonts.bold,
       color: COLORS.white,
     });
   }
   page.drawText(label, {
-    x: x + 9,
+    x: x + 7.5,
     y,
-    size: 5.3,
+    size: 4.6,
     font: fonts.regular,
     color: COLORS.text,
   });
@@ -409,64 +409,64 @@ function drawScheduleCard({
   });
   page.drawRectangle({
     x,
-    y: y + height - 20,
+    y: y + height - 16,
     width,
-    height: 20,
+    height: 16,
     color: accent,
   });
   page.drawText(formatCardDate(startsAt), {
     x: x + 6,
-    y: y + height - 13,
-    size: 7,
+    y: y + height - 10.8,
+    size: 5.8,
     font: fonts.bold,
     color: COLORS.white,
   });
   const timeLabel = formatCardTime(startsAt, row.ends_at);
-  const timeWidth = fonts.bold.widthOfTextAtSize(timeLabel, 6.6);
+  const timeWidth = fonts.bold.widthOfTextAtSize(timeLabel, 5.6);
   page.drawText(timeLabel, {
     x: x + width - timeWidth - 6,
-    y: y + height - 13,
-    size: 6.6,
+    y: y + height - 10.8,
+    size: 5.6,
     font: fonts.bold,
     color: COLORS.white,
   });
 
-  page.drawText(truncate(fonts.bold, row.school, 7.7, width - 12), {
+  page.drawText(truncate(fonts.bold, row.school, 6.4, width - 12), {
     x: x + 6,
-    y: y + height - 33,
-    size: 7.7,
+    y: y + height - 26,
+    size: 6.4,
     font: fonts.bold,
     color: COLORS.text,
   });
   const city = cleanText(row.city);
   const venue = cleanText(row.venue);
   const location = city && city !== "City not provided" ? `${city}, GA` : venue;
-  page.drawText(truncate(fonts.regular, location || "Location pending", 6.4, width - 12), {
+  page.drawText(truncate(fonts.regular, location || "Location pending", 5.1, width - 12), {
     x: x + 6,
-    y: y + height - 44,
-    size: 6.4,
+    y: y + height - 34.5,
+    size: 5.1,
     font: fonts.regular,
     color: COLORS.muted,
   });
-  page.drawText(truncate(fonts.oblique, row.production || "Production pending", 6.4, width - 12), {
+  page.drawText(truncate(fonts.oblique, row.production || "Production pending", 5.1, width - 12), {
     x: x + 6,
-    y: y + height - 55,
-    size: 6.4,
+    y: y + height - 42.5,
+    size: 5.1,
     font: fonts.oblique,
     color: COLORS.text,
   });
   page.drawLine({
-    start: { x: x + 5, y: y + height - 60 },
-    end: { x: x + width - 5, y: y + height - 60 },
+    start: { x: x + 5, y: y + height - 46 },
+    end: { x: x + width - 5, y: y + height - 46 },
     thickness: 0.5,
     color: COLORS.line,
   });
 
-  const checklistTop = y + height - 68;
+  const checklistTop = y + height - 52;
   page.drawText("OWNER TRACKING", {
     x: x + 6,
     y: checklistTop - 1,
-    size: 5.4,
+    size: 4.6,
     font: fonts.bold,
     color: COLORS.muted,
   });
@@ -483,14 +483,14 @@ function drawScheduleCard({
       page,
       fonts,
       x: x + 6 + column * checklistColumnWidth,
-      y: checklistTop - 14 - checklistRow * 13,
+      y: checklistTop - 11 - checklistRow * 9.5,
       label: String(label),
       checked: Boolean(checked),
     });
   });
   page.drawLine({
-    start: { x: x + 5, y: checklistTop - 35 },
-    end: { x: x + width - 5, y: checklistTop - 35 },
+    start: { x: x + 5, y: checklistTop - 27 },
+    end: { x: x + width - 5, y: checklistTop - 27 },
     thickness: 0.5,
     color: COLORS.line,
   });
@@ -508,7 +508,7 @@ function drawScheduleCard({
     ["SHADOW 2", shadows[1] ?? ""],
     ["SHADOW 3", shadows[2] ?? ""],
   ];
-  let staffY = y + height - 113;
+  let staffY = y + height - 86;
   staffRows.forEach(([label, value], index) => {
     drawStaffRow({
       page,
@@ -520,7 +520,7 @@ function drawScheduleCard({
       value,
       alternate: index % 2 === 1,
     });
-    staffY -= 10.2;
+    staffY -= 7.2;
   });
 }
 
