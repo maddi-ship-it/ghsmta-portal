@@ -198,8 +198,12 @@ function nonNegativeInteger(
   return value;
 }
 
-function scheduleRedirect(kind: "success" | "error", message: string): never {
-  const params = new URLSearchParams({ [kind]: message });
+function scheduleRedirect(
+  kind: "success" | "error",
+  message: string,
+  context: Record<string, string> = {},
+): never {
+  const params = new URLSearchParams({ ...context, [kind]: message });
   redirect(`${SCHEDULE_PATH}?${params.toString()}`);
 }
 
@@ -750,7 +754,13 @@ export async function joinScheduleSlot(formData: FormData) {
   await requireProfile(["adjudicator", "advisory_member"]);
 
   const slotId = text(formData, "slot_id");
-  if (!slotId) scheduleRedirect("error", "Schedule slot not found.");
+  const redirectContext: Record<string, string> =
+    text(formData, "return_view") === "monthly"
+      ? { view: "monthly" }
+      : {};
+  if (!slotId) {
+    scheduleRedirect("error", "Schedule slot not found.", redirectContext);
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("join_schedule_slot", {
@@ -758,12 +768,13 @@ export async function joinScheduleSlot(formData: FormData) {
     p_participation_mode: text(formData, "participation_mode") || "panel",
   });
 
-  if (error) scheduleRedirect("error", error.message);
+  if (error) scheduleRedirect("error", error.message, redirectContext);
 
   revalidateSchedule();
   scheduleRedirect(
     "success",
     "Your schedule participation was saved. An Owner or Advisory member can change it.",
+    redirectContext,
   );
 }
 

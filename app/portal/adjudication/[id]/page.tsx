@@ -44,6 +44,10 @@ import { requireProfile } from "@/lib/auth";
 import { isAdjudicationCategoryComplete } from "@/lib/adjudication-category-completion";
 import { categoryDecisionApprovedForUser } from "@/lib/adjudication-category-decisions";
 import { outstandingAssignedFinalComments } from "@/lib/adjudication-completion";
+import {
+  loadAdjudicationObserverSnapshot,
+  resolveAdjudicationObserverAccess,
+} from "@/lib/adjudication-observer";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
@@ -162,9 +166,23 @@ export default async function AdjudicationApplicationPage({
     supabase.rpc("get_schedule_bookings_for_staff"),
     supabase.rpc("get_schedule_staff_directory"),
   ]);
+  const observerAccessPromise =
+    profile.role === "owner"
+      ? Promise.resolve({
+          allowed: false,
+          scheduledShadow: false,
+          readOnlyAssignment: false,
+        })
+      : resolveAdjudicationObserverAccess({
+          admin,
+          applicationId: id,
+          userId: profile.id,
+        });
 
-  const [scheduleBookingsResult, scheduleStaffResult] =
-    await scheduleContextPromise;
+  const [
+    [scheduleBookingsResult, scheduleStaffResult],
+    observerAccess,
+  ] = await Promise.all([scheduleContextPromise, observerAccessPromise]);
   if (scheduleBookingsResult.error) {
     throw new Error(scheduleBookingsResult.error.message);
   }
@@ -178,12 +196,8 @@ export default async function AdjudicationApplicationPage({
   const scheduledStaff =
     ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
       .filter((staff) => staff.slot_id === scheduleBooking?.slot_id);
-  const currentScheduleEnrollment = scheduledStaff.find(
-    (staff) => staff.user_id === profile.id,
-  );
-  const isScheduledShadow =
-    currentScheduleEnrollment?.participation_mode === "shadow";
-  const applicationReadClient = isScheduledShadow ? admin : supabase;
+  const isScheduledShadow = observerAccess.scheduledShadow;
+  const applicationReadClient = observerAccess.allowed ? admin : supabase;
 
   const { data: applicationData, error: applicationError } = await applicationReadClient
     .from("applications")
@@ -270,14 +284,11 @@ export default async function AdjudicationApplicationPage({
     throw new Error(ownParticipantResult.error.message);
   }
 
-  const hasReadOnlyAssignment = Boolean(
-    ownParticipantResult.data &&
-      !ownParticipantResult.data.can_score &&
-      !ownParticipantResult.data.can_comment,
-  );
+  const hasReadOnlyAssignment = observerAccess.readOnlyAssignment;
   const isReadOnlyObserver =
     profile.role !== "owner" &&
     (isScheduledShadow || hasReadOnlyAssignment);
+  const workspaceReadClient = isReadOnlyObserver ? admin : supabase;
 
   const isScoringParticipant =
     !isReadOnlyObserver &&
@@ -508,7 +519,7 @@ export default async function AdjudicationApplicationPage({
   let scheduleSchoolDetails: ScheduleSchoolDetailReference | null = null;
   if (scheduleBooking) {
     const { data: scheduleSlotData, error: scheduleSlotError } =
-      await supabase
+      await workspaceReadClient
         .from("schedule_slots")
         .select(
           "id,title,starts_at,ends_at,location,school_instructions,status",
@@ -519,7 +530,7 @@ export default async function AdjudicationApplicationPage({
     if (scheduleSlotError) throw new Error(scheduleSlotError.message);
     scheduleSlot = scheduleSlotData as ScheduleSlotReference | null;
 
-    const { data: detailData, error: detailError } = await supabase
+    const { data: detailData, error: detailError } = await workspaceReadClient
       .from("schedule_slot_school_details")
       .select("venue_name,venue_address,arrival_entrance,parking_instructions,accessibility_notes,wifi_network,wifi_password,day_of_contact_name,day_of_contact_phone")
       .eq("slot_id", scheduleBooking.slot_id)
@@ -629,8 +640,11 @@ export default async function AdjudicationApplicationPage({
   const criteria = (criteriaResult.data ?? []) as ScoringCriterion[];
   const scores = (scoresResult.data ?? []) as AdjudicationScore[];
   const comments = (commentsResult.data ?? []) as AdjudicationCategoryComment[];
+  const observerSnapshot = isReadOnlyObserver
+    ? await loadAdjudicationObserverSnapshot({ admin, applicationId: id })
+    : null;
 
-  let proposalQuery = supabase
+  let proposalQuery = workspaceReadClient
     .from("adjudication_category_proposals")
     .select("*")
     .eq("application_id", id);
@@ -639,12 +653,14 @@ export default async function AdjudicationApplicationPage({
   }
 
   const [proposalResult, scoreabilityResult, reviewResult] = await Promise.all([
-    proposalQuery,
-    supabase
+    observerSnapshot
+      ? Promise.resolve({ data: observerSnapshot.proposals, error: null })
+      : proposalQuery,
+    workspaceReadClient
       .from("adjudication_category_scoreability")
       .select("category_id,is_scoreable,reason")
       .eq("application_id", id),
-    supabase
+    workspaceReadClient
       .from("adjudication_reviews")
       .select("status,owner_note")
       .eq("application_id", id)
@@ -660,7 +676,9 @@ export default async function AdjudicationApplicationPage({
   );
 
   const approvalResult = proposalIds.length
-    ? await supabase
+    ? observerSnapshot
+      ? { data: observerSnapshot.approvals, error: null }
+      : await workspaceReadClient
         .from("adjudication_category_approvals")
         .select("*")
         .in("proposal_id", proposalIds)
@@ -706,7 +724,9 @@ export default async function AdjudicationApplicationPage({
   }
 
   const sharedObservationResult =
-    showPersonalScorecard || isReadOnlyObserver
+    isReadOnlyObserver && observerSnapshot
+      ? { data: observerSnapshot.panelRows, error: null }
+      : showPersonalScorecard
       ? await supabase.rpc("get_shared_adjudication_observations", {
           p_application_id: id,
         })

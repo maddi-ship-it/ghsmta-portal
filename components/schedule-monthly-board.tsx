@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-import { ownerSaveScheduleWorkflowChecklist } from "@/app/portal/schedule/actions";
+import {
+  joinScheduleSlot,
+  ownerSaveScheduleWorkflowChecklist,
+} from "@/app/portal/schedule/actions";
 import type { ScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -19,6 +22,10 @@ export type MonthlyScheduleItem = {
   shadows: string[];
   checklist: ScheduleWorkflowChecklist;
   canOpenAdjudication: boolean;
+  canJoinPanel: boolean;
+  canJoinUnderstudy: boolean;
+  canJoinShadow: boolean;
+  panelRole: "adjudicator" | "advisory_member" | null;
 };
 
 function monthKey(value: string) {
@@ -58,11 +65,38 @@ function timeLabel(start: string, end: string) {
   return `${formatter.format(new Date(start))}–${formatter.format(new Date(end))}`;
 }
 
-function StaffRow({ label, value }: { label: string; value: string }) {
+function StaffRow({
+  item,
+  joinMode,
+  label,
+  value,
+}: {
+  item: MonthlyScheduleItem;
+  joinMode?: "panel" | "understudy" | "shadow";
+  label: string;
+  value: string;
+}) {
   return (
     <div className={`schedule-monthly-staff-row ${value ? "" : "is-open"}`}>
       <span>{label}</span>
-      <strong>{value || "Open"}</strong>
+      {value ? (
+        <strong>{value}</strong>
+      ) : joinMode ? (
+        <form action={joinScheduleSlot}>
+          <input name="slot_id" type="hidden" value={item.id} />
+          <input name="participation_mode" type="hidden" value={joinMode} />
+          <input name="return_view" type="hidden" value="monthly" />
+          <button
+            aria-label={`Join ${item.schoolName} as ${label}`}
+            className="schedule-monthly-seat-button"
+            type="submit"
+          >
+            Open
+          </button>
+        </form>
+      ) : (
+        <strong>Open</strong>
+      )}
     </div>
   );
 }
@@ -140,17 +174,39 @@ export function ScheduleMonthlyBoard({
                   <em>{item.productionTitle}</em>
                 </div>
                 <div className="schedule-monthly-staff">
-                  <StaffRow label="Advisory" value={item.advisoryMember} />
+                  <StaffRow
+                    item={item}
+                    joinMode={
+                      item.canJoinPanel && item.panelRole === "advisory_member"
+                        ? "panel"
+                        : undefined
+                    }
+                    label="Advisory"
+                    value={item.advisoryMember}
+                  />
                   {[0, 1, 2].map((index) => (
                     <StaffRow
+                      item={item}
+                      joinMode={
+                        item.canJoinPanel && item.panelRole === "adjudicator"
+                          ? "panel"
+                          : undefined
+                      }
                       key={`adjudicator-${index}`}
                       label={`Adjudicator ${index + 1}`}
                       value={item.adjudicators[index] ?? ""}
                     />
                   ))}
-                  <StaffRow label="Understudy" value={item.understudy} />
+                  <StaffRow
+                    item={item}
+                    joinMode={item.canJoinUnderstudy ? "understudy" : undefined}
+                    label="Understudy"
+                    value={item.understudy}
+                  />
                   {[0, 1, 2].map((index) => (
                     <StaffRow
+                      item={item}
+                      joinMode={item.canJoinShadow ? "shadow" : undefined}
                       key={`shadow-${index}`}
                       label={`Shadow ${index + 1}`}
                       value={item.shadows[index] ?? ""}

@@ -6844,6 +6844,35 @@ body.modal-open {
   padding: 0.4rem 0.65rem;
 }
 
+.schedule-monthly-staff-row.is-open form {
+  align-self: stretch;
+  margin: -0.35rem -0.65rem -0.35rem 0;
+}
+
+.schedule-monthly-seat-button {
+  align-items: center;
+  background: #fff8da;
+  border: 0;
+  color: #7a5a04;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 900;
+  height: 100%;
+  min-height: 1.85rem;
+  padding: 0.4rem 0.65rem;
+  text-align: left;
+  width: 100%;
+}
+
+.schedule-monthly-seat-button:hover,
+.schedule-monthly-seat-button:focus-visible {
+  background: #f9eaa3;
+  color: #553e00;
+  text-decoration: underline;
+}
+
 .schedule-monthly-staff-row span {
   color: var(--portal-muted, #5e687a);
   font-size: 0.64rem;

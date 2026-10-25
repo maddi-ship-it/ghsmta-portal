@@ -910,6 +910,28 @@ export default async function SchedulePage({
           const shadows = participantNames(
             (participant) => participant.participation_mode === "shadow",
           );
+          const currentEnrollment = participants.some(
+            (participant) => participant.user_id === profile.id,
+          );
+          const isPast = new Date(slot.starts_at).getTime() <= serverTime;
+          const panelRole =
+            profile.role === "adjudicator" ||
+            profile.role === "advisory_member"
+              ? profile.role
+              : null;
+          const canJoinMode = (
+            participationMode: "panel" | "understudy" | "shadow",
+          ) =>
+            panelRole
+              ? canSelfJoinScheduleSlot({
+                  currentEnrollment,
+                  isPast,
+                  participants,
+                  role: panelRole,
+                  status: slot.status,
+                  participationMode,
+                })
+              : false;
 
           return [{
             id: slot.id,
@@ -931,6 +953,10 @@ export default async function SchedulePage({
             canOpenAdjudication:
               profile.role === "owner" ||
               participants.some((participant) => participant.user_id === profile.id),
+            canJoinPanel: canJoinMode("panel"),
+            canJoinUnderstudy: canJoinMode("understudy"),
+            canJoinShadow: canJoinMode("shadow"),
+            panelRole,
           }];
         });
 

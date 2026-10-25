@@ -97,6 +97,12 @@ type PanelNarrativeReviewer = {
   role: "adjudicator" | "advisory_member";
 };
 
+type ObserverWorkspaceResponse = {
+  panelRows: PanelObservationRow[];
+  proposals: CategoryProposal[];
+  approvals: CategoryApproval[];
+};
+
 function RichTextPreview({
   value,
 }: {
@@ -1191,6 +1197,28 @@ export function CollaborativeAdjudicatorScorecard({
   const refreshWorkspace = useCallback(async () => {
     if (practiceMode) return;
 
+    if (observerMode) {
+      try {
+        const response = await fetch(
+          `/api/adjudication/observer/${applicationId}`,
+          {
+            cache: "no-store",
+            credentials: "same-origin",
+          },
+        );
+        if (!response.ok) throw new Error("Observer refresh failed.");
+        const snapshot = (await response.json()) as ObserverWorkspaceResponse;
+        setPanelRows(snapshot.panelRows);
+        setLiveCategoryProposals(snapshot.proposals);
+        setLiveCategoryApprovals(snapshot.approvals);
+        setLastRefreshed(new Date());
+        setRefreshError(false);
+      } catch {
+        setRefreshError(true);
+      }
+      return;
+    }
+
     const [panelResult, proposalResult, feedbackResult] = await Promise.all([
       supabase.rpc("get_shared_adjudication_observations", {
         p_application_id: applicationId,
@@ -1242,7 +1270,7 @@ export function CollaborativeAdjudicatorScorecard({
     }
     setLastRefreshed(new Date());
     setRefreshError(false);
-  }, [applicationId, canComment, practiceMode, supabase]);
+  }, [applicationId, canComment, observerMode, practiceMode, supabase]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
