@@ -1,6 +1,10 @@
 import Link from "next/link";
 
 import { ApplicantScheduleBoard } from "@/components/applicant-schedule-board";
+import {
+  ScheduleMonthlyBoard,
+  type MonthlyScheduleItem,
+} from "@/components/schedule-monthly-board";
 import { ScheduleDistanceLink } from "@/components/schedule-distance-link";
 import { ScheduleOwnerTools } from "@/components/schedule-owner-tools";
 import { OwnerScheduleMessages } from "@/components/owner-schedule-messages";
@@ -30,6 +34,7 @@ import {
   scheduleStaffCapacity,
   scheduleSlotHasPrimaryAdvisoryMember,
 } from "@/lib/schedule-staff";
+import { readScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, Application, AwardCycle, Profile } from "@/lib/types";
@@ -54,7 +59,7 @@ import {
 type ScheduleSlotStatus = "draft" | "open" | "closed" | "cancelled";
 
 const SCHEDULE_APPLICATION_COLUMNS =
-  "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status";
+  "id,cycle_id,form_version_id,applicant_user_id,school_name,production_title,status,form_data";
 const OWNER_SLOTS_PER_PAGE = 24;
 
 type ScheduleSlot = {
@@ -145,7 +150,7 @@ type ScheduleSort =
   | "staff_desc"
   | "waitlist_desc";
 
-type ScheduleView = "list" | "cards";
+type ScheduleView = "list" | "cards" | "monthly";
 
 type ScheduleWaitlistEntry = {
   id: string;
@@ -290,7 +295,12 @@ export default async function SchedulePage({
   const selectedSort: ScheduleSort = allowedSorts.includes(params.sort as ScheduleSort)
     ? (params.sort as ScheduleSort)
     : "date_asc";
-  const selectedView: ScheduleView = params.view === "cards" ? "cards" : "list";
+  const selectedView: ScheduleView =
+    params.view === "cards"
+      ? "cards"
+      : params.view === "monthly" && profile.role !== "applicant"
+        ? "monthly"
+        : "list";
   const defaultFilter = defaultScheduleFilter(profile.role);
   const selectedFilter = resolveScheduleFilter(
     profile.role,
@@ -871,6 +881,59 @@ export default async function SchedulePage({
       })
     : [];
 
+  const monthlyScheduleItems: MonthlyScheduleItem[] =
+    profile.role === "applicant"
+      ? []
+      : visibleDisplaySlots.flatMap((slot) => {
+          const booking = bookingMap.get(slot.id);
+          if (!booking) return [];
+
+          const participants = staffBySlot.get(slot.id) ?? [];
+          const visitDetails = schoolDetailsMap.get(slot.id) ?? null;
+          const application = applicationLookup.get(booking.application_id);
+          const participantNames = (
+            predicate: (participant: StaffEnrollment) => boolean,
+          ) => participants.filter(predicate).map(personName);
+          const advisoryMember = participantNames(
+            (participant) =>
+              participant.role === "advisory_member" &&
+              participant.participation_mode === "panel",
+          )[0] ?? "";
+          const adjudicators = participantNames(
+            (participant) =>
+              participant.role === "adjudicator" &&
+              participant.participation_mode === "panel",
+          );
+          const understudy = participantNames(
+            (participant) => participant.participation_mode === "understudy",
+          )[0] ?? "";
+          const shadows = participantNames(
+            (participant) => participant.participation_mode === "shadow",
+          );
+
+          return [{
+            id: slot.id,
+            applicationId: booking.application_id,
+            startsAt: slot.starts_at,
+            endsAt: slot.ends_at,
+            schoolName: booking.school_name,
+            productionTitle: booking.production_title ?? "Production pending",
+            city: scheduleCityLabel({
+              venueAddress: visitDetails?.venue_address,
+              applicationCity: bookedApplicationCityBySlot.get(slot.id),
+              fallbackLocation: slot.location,
+            }),
+            advisoryMember,
+            adjudicators,
+            understudy,
+            shadows,
+            checklist: readScheduleWorkflowChecklist(application?.form_data),
+            canOpenAdjudication:
+              profile.role === "owner" ||
+              participants.some((participant) => participant.user_id === profile.id),
+          }];
+        });
+
   return (
     <div className={`schedule-page-shell ${profile.role === "owner" ? `schedule-owner-section-${ownerSection}` : ""}`}>
       <div className="page-heading schedule-page-heading">
@@ -1065,6 +1128,17 @@ export default async function SchedulePage({
           >
             Cards
           </Link>
+          {profile.role !== "applicant" && (
+            <Link
+              className={selectedView === "monthly" ? "active" : ""}
+              href={{
+                pathname: "/portal/schedule",
+                query: { ...params, view: "monthly" },
+              }}
+            >
+              Monthly
+            </Link>
+          )}
         </div>
 
         <form className="schedule-workspace-filters" method="get">
@@ -1196,7 +1270,12 @@ export default async function SchedulePage({
         <ApplicantScheduleBoard
           initialAvailability={availability}
           slots={applicantScheduleSlots}
-          view={selectedView}
+          view={selectedView === "cards" ? "cards" : "list"}
+        />
+      ) : selectedView === "monthly" ? (
+        <ScheduleMonthlyBoard
+          items={monthlyScheduleItems}
+          showOwnerChecklist={profile.role === "owner"}
         />
       ) : (
         <section className={`schedule-slot-grid schedule-slot-grid-${selectedView}`}>
@@ -1436,6 +1515,14 @@ export default async function SchedulePage({
                             <>
                               <strong>{booking.school_name}</strong>
                               <span>{booking.production_title || "Production title not entered"}</span>
+                              {(profile.role === "owner" || currentEnrollment) && (
+                                <Link
+                                  className="text-button"
+                                  href={`/portal/adjudication/${booking.application_id}`}
+                                >
+                                  Open adjudication
+                                </Link>
+                              )}
                             </>
                           ) : (
                             <span>No school has selected this slot.</span>

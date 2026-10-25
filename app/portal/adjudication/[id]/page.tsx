@@ -163,7 +163,29 @@ export default async function AdjudicationApplicationPage({
     supabase.rpc("get_schedule_staff_directory"),
   ]);
 
-  const { data: applicationData, error: applicationError } = await supabase
+  const [scheduleBookingsResult, scheduleStaffResult] =
+    await scheduleContextPromise;
+  if (scheduleBookingsResult.error) {
+    throw new Error(scheduleBookingsResult.error.message);
+  }
+  if (scheduleStaffResult.error) {
+    throw new Error(scheduleStaffResult.error.message);
+  }
+
+  const scheduleBooking =
+    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[])
+      .find((booking) => booking.application_id === id) ?? null;
+  const scheduledStaff =
+    ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
+      .filter((staff) => staff.slot_id === scheduleBooking?.slot_id);
+  const currentScheduleEnrollment = scheduledStaff.find(
+    (staff) => staff.user_id === profile.id,
+  );
+  const isScheduledShadow =
+    currentScheduleEnrollment?.participation_mode === "shadow";
+  const applicationReadClient = isScheduledShadow ? admin : supabase;
+
+  const { data: applicationData, error: applicationError } = await applicationReadClient
     .from("applications")
     .select("*")
     .eq("id", id)
@@ -174,13 +196,13 @@ export default async function AdjudicationApplicationPage({
   const [applicationQuestionsResult, applicationAnswersResult] =
     application.form_version_id
       ? await Promise.all([
-          supabase
+          applicationReadClient
             .from("application_questions")
             .select(
               "id,form_version_id,section_id,question_key,label,description,question_type,required,options,settings,visibility_rule,sort_order,active,source_column_index,source_label,imported,created_at,updated_at",
             )
             .eq("form_version_id", application.form_version_id),
-          supabase
+          applicationReadClient
             .from("application_answers")
             .select("id,application_id,question_id,value,updated_at")
             .eq("application_id", id),
@@ -209,12 +231,12 @@ export default async function AdjudicationApplicationPage({
     answers: applicationAnswers,
   });
 
-  const { data: cycleData } = await supabase.from("award_cycles").select("*").eq("id", application.cycle_id).single();
+  const { data: cycleData } = await applicationReadClient.from("award_cycles").select("*").eq("id", application.cycle_id).single();
   const cycle = cycleData as AwardCycle | null;
 
   const { data: formVersionData, error: formVersionError } =
     application.form_version_id
-      ? await supabase
+      ? await applicationReadClient
           .from("application_form_versions")
           .select("id,cycle_id,scoring_rubric_id,version_number,name,status,published_at,created_at,updated_at")
           .eq("id", application.form_version_id)
@@ -224,7 +246,7 @@ export default async function AdjudicationApplicationPage({
   const applicationForm = formVersionData as ApplicationFormVersion | null;
 
   const { data: rubricData, error: rubricError } = applicationForm?.scoring_rubric_id
-    ? await supabase
+    ? await applicationReadClient
         .from("scoring_rubrics")
         .select("*")
         .eq("id", applicationForm.scoring_rubric_id)
@@ -248,26 +270,6 @@ export default async function AdjudicationApplicationPage({
     throw new Error(ownParticipantResult.error.message);
   }
 
-  const [scheduleBookingsResult, scheduleStaffResult] =
-    await scheduleContextPromise;
-  if (scheduleBookingsResult.error) {
-    throw new Error(scheduleBookingsResult.error.message);
-  }
-  if (scheduleStaffResult.error) {
-    throw new Error(scheduleStaffResult.error.message);
-  }
-
-  const scheduleBooking =
-    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[])
-      .find((booking) => booking.application_id === id) ?? null;
-  const scheduledStaff =
-    ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
-      .filter((staff) => staff.slot_id === scheduleBooking?.slot_id);
-  const currentScheduleEnrollment = scheduledStaff.find(
-    (staff) => staff.user_id === profile.id,
-  );
-  const isScheduledShadow =
-    currentScheduleEnrollment?.participation_mode === "shadow";
   const hasReadOnlyAssignment = Boolean(
     ownParticipantResult.data &&
       !ownParticipantResult.data.can_score &&

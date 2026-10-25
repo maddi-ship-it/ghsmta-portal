@@ -18,6 +18,10 @@ function row(index: number, startsAt: string): ReportRow {
     assigned_adjudicators: "Julie Ann Rice; Amy Bridges; John Su",
     understudies: "Under Study",
     shadows: "Shadow One; Shadow Two; Shadow Three",
+    pick_six_sent: true,
+    moved_to_section_c: true,
+    section_c_complete: false,
+    final_results_released: false,
   };
 }
 

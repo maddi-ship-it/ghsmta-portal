@@ -19,9 +19,9 @@ const HEADER_HEIGHT = 88;
 const MONTH_HEIGHT = 28;
 const FOOTER_HEIGHT = 25;
 const CARD_GAP = 8;
-const CARDS_PER_PAGE = 9;
+const CARDS_PER_PAGE = 6;
 const CARD_COLUMNS = 3;
-const CARD_ROWS = 3;
+const CARD_ROWS = 2;
 
 const COLORS = {
   midnight: rgb(7 / 255, 11 / 255, 23 / 255),
@@ -336,6 +336,48 @@ function drawStaffRow({
   );
 }
 
+function drawChecklistItem({
+  page,
+  fonts,
+  x,
+  y,
+  label,
+  checked,
+}: {
+  page: PDFPage;
+  fonts: Fonts;
+  x: number;
+  y: number;
+  label: string;
+  checked: boolean;
+}) {
+  page.drawRectangle({
+    x,
+    y: y - 0.5,
+    width: 6,
+    height: 6,
+    borderColor: checked ? COLORS.navy : COLORS.muted,
+    borderWidth: 0.7,
+    color: checked ? COLORS.navy : COLORS.white,
+  });
+  if (checked) {
+    page.drawText("X", {
+      x: x + 1.1,
+      y: y + 0.2,
+      size: 4.8,
+      font: fonts.bold,
+      color: COLORS.white,
+    });
+  }
+  page.drawText(label, {
+    x: x + 9,
+    y,
+    size: 5.3,
+    font: fonts.regular,
+    color: COLORS.text,
+  });
+}
+
 function drawScheduleCard({
   page,
   fonts,
@@ -446,6 +488,39 @@ function drawScheduleCard({
       alternate: index % 2 === 1,
     });
     staffY -= 10.2;
+  });
+
+  const checklistTop = y + height - 157;
+  page.drawLine({
+    start: { x: x + 5, y: checklistTop + 8 },
+    end: { x: x + width - 5, y: checklistTop + 8 },
+    thickness: 0.5,
+    color: COLORS.line,
+  });
+  page.drawText("OWNER TRACKING", {
+    x: x + 6,
+    y: checklistTop - 1,
+    size: 5.4,
+    font: fonts.bold,
+    color: COLORS.muted,
+  });
+  const checklistColumnWidth = (width - 12) / 2;
+  [
+    ["Pick 6 Sent", Boolean(row.pick_six_sent)],
+    ["Moved to Section C", Boolean(row.moved_to_section_c)],
+    ["Section C Complete", Boolean(row.section_c_complete)],
+    ["Final Comments/scores released", Boolean(row.final_results_released)],
+  ].forEach(([label, checked], index) => {
+    const column = index % 2;
+    const checklistRow = Math.floor(index / 2);
+    drawChecklistItem({
+      page,
+      fonts,
+      x: x + 6 + column * checklistColumnWidth,
+      y: checklistTop - 14 - checklistRow * 13,
+      label: String(label),
+      checked: Boolean(checked),
+    });
   });
 }
 

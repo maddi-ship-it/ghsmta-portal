@@ -10,6 +10,11 @@ import { requireProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { sendSmtpEmail } from "@/lib/email/smtp";
+import {
+  readScheduleWorkflowChecklist,
+  SCHEDULE_WORKFLOW_CHECKLIST_FIELDS,
+  writeScheduleWorkflowChecklist,
+} from "@/lib/schedule-workflow-checklist";
 
 const SCHEDULE_PATH = "/portal/schedule";
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -1173,4 +1178,45 @@ export async function ownerDeclineScheduleBooking(
     "success",
     "School selection declined and the timeslot reopened.",
   );
+}
+
+export async function ownerSaveScheduleWorkflowChecklist(
+  applicationId: string,
+  formData: FormData,
+) {
+  const owner = await requireProfile(["owner"]);
+  const admin = createAdminClient();
+  const { data: application, error: applicationError } = await admin
+    .from("applications")
+    .select("id,form_data")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (applicationError || !application) {
+    throw new Error(
+      applicationError?.message ?? "The scheduled school could not be found.",
+    );
+  }
+
+  const checklist = readScheduleWorkflowChecklist(
+    application.form_data as Record<string, unknown> | null,
+  );
+  for (const field of SCHEDULE_WORKFLOW_CHECKLIST_FIELDS) {
+    checklist[field] = formData.get(field) === "on";
+  }
+
+  const { error } = await admin
+    .from("applications")
+    .update({
+      form_data: writeScheduleWorkflowChecklist(
+        application.form_data as Record<string, unknown> | null,
+        checklist,
+        owner.id,
+      ),
+    })
+    .eq("id", applicationId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath(SCHEDULE_PATH);
+  revalidatePath("/portal/admin/reports");
 }

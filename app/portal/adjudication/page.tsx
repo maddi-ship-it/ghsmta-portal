@@ -4,6 +4,7 @@ import { AdjudicationReferenceLinks } from "@/components/adjudication-reference-
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   AdjudicationScorecard,
   AdjudicatorAssignment,
@@ -41,6 +42,7 @@ export default async function AdjudicationDashboard({
   const searchQuery = String(params.q ?? "").trim();
   const normalizedSearchQuery = normalizeSearch(searchQuery);
   const supabase = await createClient();
+  const admin = createAdminClient();
   const referenceLinksPromise = loadAdjudicationReferenceLinks(supabase);
 
   const cyclesResult = await supabase
@@ -98,7 +100,7 @@ export default async function AdjudicationDashboard({
       ]),
     ];
     if (applicationIds.length > 0 && adjudicationCycleIds.length > 0) {
-      const { data, error } = await supabase
+      const { data, error } = await admin
         .from("applications")
         .select("*")
         .in("id", applicationIds)

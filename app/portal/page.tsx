@@ -15,10 +15,8 @@ type DashboardScheduleSlot = {
 type DashboardBooking = {
   slot_id: string;
   application_id: string;
-  applications:
-    | { id: string; school_name: string; production_title: string | null }
-    | Array<{ id: string; school_name: string; production_title: string | null }>
-    | null;
+  school_name: string;
+  production_title: string | null;
 };
 
 function formatAdjudicationDate(value: string) {
@@ -89,22 +87,23 @@ export default async function PortalDashboard() {
           .select("id,title,starts_at,ends_at,location")
           .in("id", slotIds)
           .order("starts_at"),
-        supabase
-          .from("schedule_school_bookings")
-          .select("slot_id,application_id,applications(id,school_name,production_title)")
-          .in("slot_id", slotIds),
+        supabase.rpc("get_schedule_bookings_for_staff"),
       ]);
 
       if (slotResult.error) throw new Error(slotResult.error.message);
       if (bookingResult.error) throw new Error(bookingResult.error.message);
 
       const bookingBySlot = new Map(
-        ((bookingResult.data ?? []) as DashboardBooking[]).map((booking) => {
-          const application = Array.isArray(booking.applications)
-            ? booking.applications[0] ?? null
-            : booking.applications;
-          return [booking.slot_id, application] as const;
-        }),
+        ((bookingResult.data ?? []) as DashboardBooking[])
+          .filter((booking) => slotIds.includes(booking.slot_id))
+          .map((booking) => [
+            booking.slot_id,
+            {
+              id: booking.application_id,
+              school_name: booking.school_name,
+              production_title: booking.production_title,
+            },
+          ] as const),
       );
 
       adjudicationVisits = ((slotResult.data ?? []) as DashboardScheduleSlot[]).map((slot) => ({

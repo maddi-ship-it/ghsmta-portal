@@ -10,6 +10,7 @@ import {
 } from "@/lib/reports/report-definitions";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import { cityFromVenueAddress, scheduleCityLabel } from "@/lib/schedule-location";
+import { readScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { portalSiteUrl } from "@/lib/site-url";
 
 type SupabaseLike = {
@@ -766,7 +767,7 @@ async function loadScheduleReport(
       supabase.from("award_cycles").select("id,name,season_year").order("season_year", { ascending: false }),
     ),
     safeFetchPaged<ApplicationRow>(warnings, "Applications", () =>
-      supabase.from("applications").select("id,cycle_id,school_name,production_title,is_archived,form_version_id").order("school_name"),
+      supabase.from("applications").select("id,cycle_id,school_name,production_title,is_archived,form_version_id,form_data").order("school_name"),
     ),
     safeFetchPaged<ProfileRow>(warnings, "Profiles", () =>
       supabase.from("profiles").select("id,email,full_name,role,phone_e164").order("full_name"),
@@ -930,6 +931,7 @@ async function loadScheduleReport(
       .join("; ");
     return slotBookings.map((booking) => {
       const application = booking ? appById.get(booking.application_id) : null;
+      const checklist = readScheduleWorkflowChecklist(application?.form_data);
       const detail = schoolDetailsBySlot.get(slot.id);
       const applicationLocation = application
         ? applicationDetails.get(application.id)
@@ -962,6 +964,10 @@ async function loadScheduleReport(
         coverage_status: slotStaff.length >= 3 ? "Covered" : `${slotStaff.length} staff assigned`,
         confirmation_status: booking?.approval_status ?? slot.status ?? "",
         notes: slot.school_instructions ?? "",
+        pick_six_sent: checklist.pick_six_sent,
+        moved_to_section_c: checklist.moved_to_section_c,
+        section_c_complete: checklist.section_c_complete,
+        final_results_released: checklist.final_results_released,
         portal_link: portalLink("/portal/schedule"),
       };
     });

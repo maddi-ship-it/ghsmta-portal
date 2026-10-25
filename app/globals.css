@@ -6715,6 +6715,218 @@ body.modal-open {
   display: block;
 }
 
+.schedule-monthly-board {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.schedule-monthly-section {
+  --schedule-month-accent: #2d55a0;
+  background: var(--portal-surface, #fff);
+  border: 1px solid var(--portal-line, #daddE6);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.schedule-monthly-section:nth-child(3n + 2) {
+  --schedule-month-accent: #197b71;
+}
+
+.schedule-monthly-section:nth-child(3n) {
+  --schedule-month-accent: #625093;
+}
+
+.schedule-monthly-heading {
+  align-items: center;
+  background: var(--portal-surface, #fff);
+  border-left: 0.4rem solid var(--schedule-month-accent);
+  display: flex;
+  justify-content: space-between;
+  padding: 0.8rem 1rem;
+}
+
+.schedule-monthly-heading h2 {
+  color: var(--portal-text, #202838);
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  margin: 0;
+}
+
+.schedule-monthly-heading span {
+  color: var(--portal-muted, #5e687a);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.schedule-monthly-grid {
+  background: var(--portal-surface-2, #f7f9fc);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0.75rem;
+}
+
+.schedule-monthly-card {
+  background: var(--portal-surface, #fff);
+  border: 1px solid var(--portal-line, #daddE6);
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.schedule-monthly-card-header {
+  align-items: center;
+  background: var(--schedule-month-accent);
+  color: #fff;
+  display: flex;
+  font-size: 0.72rem;
+  justify-content: space-between;
+  letter-spacing: 0.04em;
+  padding: 0.65rem 0.75rem;
+  text-transform: uppercase;
+}
+
+.schedule-monthly-card-header span {
+  font-weight: 750;
+}
+
+.schedule-monthly-school {
+  border-bottom: 1px solid var(--portal-line, #daddE6);
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.75rem;
+}
+
+.schedule-monthly-school h3 {
+  color: var(--portal-text, #202838);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.schedule-monthly-school span,
+.schedule-monthly-school em {
+  color: var(--portal-muted, #5e687a);
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-monthly-school em {
+  color: var(--portal-text, #202838);
+}
+
+.schedule-monthly-staff {
+  display: grid;
+}
+
+.schedule-monthly-staff-row {
+  align-items: center;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: 7.2rem minmax(0, 1fr);
+  min-height: 1.85rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.schedule-monthly-staff-row:nth-child(even) {
+  background: var(--portal-surface-2, #f7f9fc);
+}
+
+.schedule-monthly-staff-row.is-open strong {
+  background: #fff8da;
+  color: #7a5a04;
+  margin: -0.35rem -0.65rem -0.35rem 0;
+  min-height: 1.85rem;
+  padding: 0.4rem 0.65rem;
+}
+
+.schedule-monthly-staff-row span {
+  color: var(--portal-muted, #5e687a);
+  font-size: 0.64rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.schedule-monthly-staff-row strong {
+  color: var(--portal-text, #202838);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-monthly-checklist {
+  border-top: 1px solid var(--portal-line, #daddE6);
+  display: grid;
+  gap: 0.45rem 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: auto;
+  padding: 0.7rem;
+}
+
+.schedule-monthly-checklist-title {
+  color: var(--portal-gold-bright, #815f08);
+  font-size: 0.65rem;
+  font-weight: 900;
+  grid-column: 1 / -1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.schedule-monthly-checklist label {
+  align-items: flex-start;
+  color: var(--portal-text, #202838);
+  display: flex;
+  font-size: 0.69rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  line-height: 1.25;
+}
+
+.schedule-monthly-checklist input {
+  accent-color: var(--schedule-month-accent);
+  margin-top: 0.08rem;
+}
+
+.schedule-monthly-checklist .text-button {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.schedule-monthly-open-link {
+  border-top: 1px solid var(--portal-line, #daddE6);
+  color: var(--portal-link, #001699);
+  font-size: 0.75rem;
+  font-weight: 850;
+  padding: 0.6rem 0.75rem;
+  text-decoration: none;
+}
+
+.schedule-monthly-open-link:hover {
+  background: var(--portal-surface-2, #f7f9fc);
+  text-decoration: underline;
+}
+
+@media (max-width: 1200px) {
+  .schedule-monthly-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .schedule-monthly-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-monthly-checklist {
+    grid-template-columns: 1fr;
+  }
+}
+
 .schedule-waitlist-panel,
 .schedule-owner-waitlist-panel {
   margin: 1rem 0;
