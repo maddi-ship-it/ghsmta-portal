@@ -20,7 +20,7 @@ import type {
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const MARGIN = 44;
-const HEADER_HEIGHT = 112;
+const HEADER_HEIGHT = 124;
 const FOOTER_HEIGHT = 34;
 const CONTENT_TOP = PAGE_HEIGHT - HEADER_HEIGHT - 26;
 const CONTENT_BOTTOM = MARGIN + FOOTER_HEIGHT;
@@ -142,34 +142,49 @@ function drawHeader(
     height: 7,
     color: COLORS.gold,
   });
-  const logoWidth = 102;
+  page.drawRectangle({
+    x: 0,
+    y: PAGE_HEIGHT - HEADER_HEIGHT,
+    width: 174,
+    height: HEADER_HEIGHT - 7,
+    color: rgb(10 / 255, 17 / 255, 32 / 255),
+  });
+  page.drawLine({
+    start: { x: 174, y: PAGE_HEIGHT - HEADER_HEIGHT + 14 },
+    end: { x: 174, y: PAGE_HEIGHT - 21 },
+    color: COLORS.gold,
+    thickness: 1.2,
+  });
+  const logoWidth = 138;
   const logoHeight = logoWidth * (logo.height / logo.width);
-  const logoY = PAGE_HEIGHT - 84;
-  const headerTextX = MARGIN + logoWidth + 14;
+  const logoY =
+    PAGE_HEIGHT - HEADER_HEIGHT +
+    (HEADER_HEIGHT - 7 - logoHeight) / 2;
+  const headerTextX = 194;
   page.drawImage(logo, {
-    x: MARGIN,
+    x: 18,
     y: logoY,
     width: logoWidth,
     height: logoHeight,
   });
   page.drawText("GHSMTA AWARDS PORTAL", {
     x: headerTextX,
-    y: PAGE_HEIGHT - 31,
+    y: PAGE_HEIGHT - 29,
     size: 8.5,
     font: bold,
     color: COLORS.gold,
   });
   page.drawText("Released Adjudication Results", {
     x: headerTextX,
-    y: PAGE_HEIGHT - 59,
-    size: 21,
+    y: PAGE_HEIGHT - 57,
+    size: 19.5,
     font: bold,
     color: COLORS.white,
   });
   page.drawText(cleanText(application.school_name), {
     x: headerTextX,
-    y: PAGE_HEIGHT - 82,
-    size: 12,
+    y: PAGE_HEIGHT - 84,
+    size: 11.5,
     font: bold,
     color: COLORS.ivory,
   });
@@ -177,7 +192,7 @@ function drawHeader(
     cleanText(application.production_title || "Untitled production"),
     {
       x: headerTextX,
-      y: PAGE_HEIGHT - 98,
+      y: PAGE_HEIGHT - 101,
       size: 9,
       font: regular,
       color: rgb(205 / 255, 216 / 255, 234 / 255),
@@ -190,7 +205,7 @@ function drawHeader(
   const cycleWidth = regular.widthOfTextAtSize(cleanText(cycleLabel), 8);
   page.drawText(cleanText(cycleLabel), {
     x: PAGE_WIDTH - MARGIN - cycleWidth,
-    y: PAGE_HEIGHT - 31,
+    y: PAGE_HEIGHT - 29,
     size: 8,
     font: regular,
     color: COLORS.ivory,

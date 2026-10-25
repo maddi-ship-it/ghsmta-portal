@@ -15,7 +15,7 @@ import type { LoadedReport, ReportRow } from "@/lib/reports/report-data";
 const PAGE_WIDTH = 792;
 const PAGE_HEIGHT = 612;
 const MARGIN = 24;
-const HEADER_HEIGHT = 76;
+const HEADER_HEIGHT = 88;
 const MONTH_HEIGHT = 28;
 const FOOTER_HEIGHT = 25;
 const CARD_GAP = 8;
@@ -183,25 +183,40 @@ function drawHeader({
     height: 6,
     color: COLORS.gold,
   });
+  page.drawRectangle({
+    x: 0,
+    y: PAGE_HEIGHT - HEADER_HEIGHT,
+    width: 120,
+    height: HEADER_HEIGHT - 6,
+    color: rgb(10 / 255, 17 / 255, 32 / 255),
+  });
+  page.drawLine({
+    start: { x: 120, y: PAGE_HEIGHT - HEADER_HEIGHT + 10 },
+    end: { x: 120, y: PAGE_HEIGHT - 18 },
+    color: COLORS.gold,
+    thickness: 1.1,
+  });
 
-  const logoWidth = 74;
+  const logoWidth = 96;
   const logoHeight = logoWidth * (logo.height / logo.width);
   page.drawImage(logo, {
-    x: MARGIN,
-    y: PAGE_HEIGHT - 62,
+    x: 12,
+    y:
+      PAGE_HEIGHT - HEADER_HEIGHT +
+      (HEADER_HEIGHT - 6 - logoHeight) / 2,
     width: logoWidth,
     height: logoHeight,
   });
   page.drawText("GHSMTA AWARDS PORTAL", {
-    x: 111,
-    y: PAGE_HEIGHT - 25,
+    x: 138,
+    y: PAGE_HEIGHT - 24,
     size: 7.7,
     font: fonts.bold,
     color: COLORS.gold,
   });
   page.drawText("Monthly Adjudication Schedule", {
-    x: 111,
-    y: PAGE_HEIGHT - 49,
+    x: 138,
+    y: PAGE_HEIGHT - 50,
     size: 19.5,
     font: fonts.bold,
     color: COLORS.white,
@@ -214,8 +229,8 @@ function drawHeader({
     year: "numeric",
   }).format(new Date(report.generatedAt));
   page.drawText([cycle, `Generated ${generated}`].filter(Boolean).join("  |  "), {
-    x: 111,
-    y: PAGE_HEIGHT - 64,
+    x: 138,
+    y: PAGE_HEIGHT - 68,
     size: 7.5,
     font: fonts.regular,
     color: COLORS.ivory,
