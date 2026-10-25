@@ -373,7 +373,11 @@ export function OwnerCommentReviewModal({
       setMessage(
         `${result.releasedCount} ${
           result.releasedCount === 1 ? "comment is" : "comments are"
-        } now visible to the school. Scores remain private.`,
+        } now visible to the school. Scores remain private. ${
+          result.schoolChannelNotified
+            ? "The school channel was notified."
+            : "The comments were released, but the school-channel notice could not be posted."
+        }`,
       );
       router.refresh();
     });
@@ -410,7 +414,9 @@ export function OwnerCommentReviewModal({
               <section
                 aria-labelledby={titleId}
                 aria-modal="true"
-                aria-hidden={pickSixOpen || undefined}
+                aria-hidden={
+                  pickSixOpen || showReleaseConfirmation || undefined
+                }
                 className="application-reference-modal owner-comment-review-modal"
                 role="dialog"
               >
@@ -797,27 +803,27 @@ export function OwnerCommentReviewModal({
                   </section>
                 </div>
               ) : null}
+
+              <RegalConfirmDialog
+                confirmLabel={`Release ${selectedReleaseIds.size} ${
+                  selectedReleaseIds.size === 1 ? "comment" : "comments"
+                }`}
+                description="The selected comments will become immediately visible to the school. Scores and unselected comments will remain private until a later release."
+                onCancel={() => setShowReleaseConfirmation(false)}
+                onConfirm={releaseSelected}
+                open={showReleaseConfirmation}
+                pending={isReleasing}
+                title="Release selected comments to the school?"
+              >
+                <div className="owner-comment-release-confirmation">
+                  <strong>{selectedReleaseIds.size} selected</strong>
+                  <span>This does not release any scores.</span>
+                </div>
+              </RegalConfirmDialog>
             </div>,
             document.querySelector(".portal-shell") ?? document.body,
           )
         : null}
-
-      <RegalConfirmDialog
-        confirmLabel={`Release ${selectedReleaseIds.size} ${
-          selectedReleaseIds.size === 1 ? "comment" : "comments"
-        }`}
-        description="The selected comments will become immediately visible to the school. Scores and unselected comments will remain private until a later release."
-        onCancel={() => setShowReleaseConfirmation(false)}
-        onConfirm={releaseSelected}
-        open={showReleaseConfirmation}
-        pending={isReleasing}
-        title="Release selected comments to the school?"
-      >
-        <div className="owner-comment-release-confirmation">
-          <strong>{selectedReleaseIds.size} selected</strong>
-          <span>This does not release any scores.</span>
-        </div>
-      </RegalConfirmDialog>
     </>
   );
 }

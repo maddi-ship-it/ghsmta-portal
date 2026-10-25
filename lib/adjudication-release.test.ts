@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAdjudicationReleaseAnnouncement,
   mergeReleasedFeedback,
+  PICK_SIX_RELEASE_MESSAGE,
   updateSelectedCategoryIds,
 } from "@/lib/adjudication-release";
 import type { ReleasedFeedbackSummary } from "@/lib/types";
@@ -63,5 +65,70 @@ describe("updateSelectedCategoryIds", () => {
     expect([
       ...updateSelectedCategoryIds(current, "category-1", false),
     ]).toEqual(["category-2"]);
+  });
+});
+
+describe("buildAdjudicationReleaseAnnouncement", () => {
+  it("uses the director-facing Pick 6 letter when exactly six comments are released without scores", () => {
+    expect(
+      buildAdjudicationReleaseAnnouncement({
+        schoolName: "Demo School",
+        productionTitle: "Newsies",
+        releaseScores: false,
+        releaseComments: true,
+        releasedCommentTitles: [
+          "Music Direction",
+          "Choreography",
+          "Lighting Design",
+          "Sound Design",
+          "Scenic",
+          "Direction",
+        ],
+      }),
+    ).toEqual({
+      subject: "Your Pick 6 Report is ready",
+      body: PICK_SIX_RELEASE_MESSAGE,
+    });
+  });
+
+  it("describes a selected comment release without implying scores were released", () => {
+    expect(
+      buildAdjudicationReleaseAnnouncement({
+        schoolName: "Demo School",
+        productionTitle: "Newsies",
+        releaseScores: false,
+        releaseComments: true,
+        releasedCommentTitles: ["Music Direction", "Choreography"],
+      }),
+    ).toEqual({
+      subject: "Adjudication comments released",
+      body: "GHSMTA has released adjudication comments for Demo School — Newsies.\n\nReleased comments: Music Direction, Choreography.\n\nOpen Results in the portal to review what is now available.",
+    });
+  });
+
+  it("announces scores and comments together", () => {
+    const announcement = buildAdjudicationReleaseAnnouncement({
+      schoolName: "Demo School",
+      productionTitle: null,
+      releaseScores: true,
+      releaseComments: true,
+      releasedCommentTitles: ["Music Direction"],
+    });
+
+    expect(announcement.subject).toBe(
+      "Adjudication scores and comments released",
+    );
+    expect(announcement.body).toContain("Demo School — Untitled production");
+  });
+
+  it("announces a scores-only release", () => {
+    expect(
+      buildAdjudicationReleaseAnnouncement({
+        schoolName: "Demo School",
+        productionTitle: "Newsies",
+        releaseScores: true,
+        releaseComments: false,
+      }).subject,
+    ).toBe("Adjudication scores released");
   });
 });

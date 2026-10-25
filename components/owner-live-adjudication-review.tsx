@@ -66,6 +66,30 @@ type AdvisoryScoreEntry = {
   }>;
 };
 
+const PORTAL_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "America/New_York",
+});
+
+const PORTAL_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "America/New_York",
+});
+
+function formatPortalDateTime(value: string | Date) {
+  return PORTAL_DATE_TIME_FORMATTER.format(
+    typeof value === "string" ? new Date(value) : value,
+  );
+}
+
+function formatPortalTime(value: string | Date) {
+  return PORTAL_TIME_FORMATTER.format(
+    typeof value === "string" ? new Date(value) : value,
+  );
+}
+
 function scorecardStatusLabel(status: string) {
   return status.replaceAll("_", " ");
 }
@@ -1076,7 +1100,7 @@ export function OwnerLiveAdjudicationReview({
             {practiceMode
               ? "Sample panel scores and comments mirror the live review workspace."
               : lastUpdated
-              ? `Last database update ${lastUpdated.toLocaleTimeString()}`
+              ? `Last database update ${formatPortalTime(lastUpdated)}`
               : "Draft scores and comments will appear here as panel members save."}
           </small>
         </div>
@@ -1159,9 +1183,9 @@ export function OwnerLiveAdjudicationReview({
                   <strong>{adjudicator?.full_name ?? adjudicator?.email ?? "Adjudicator"}</strong>
                   <small>
                     {card
-                      ? `Last saved ${new Date(card.updated_at).toLocaleString()}`
+                      ? `Last saved ${formatPortalDateTime(card.updated_at)}`
                       : assignment.due_at
-                        ? `Due ${new Date(assignment.due_at).toLocaleString()}`
+                        ? `Due ${formatPortalDateTime(assignment.due_at)}`
                         : "Not started"}
                   </small>
                 </div>

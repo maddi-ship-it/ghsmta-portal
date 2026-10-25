@@ -145,6 +145,7 @@ export default async function AdjudicationApplicationPage({
     saved?: string;
     submitted?: string;
     released?: string;
+    channel_notice?: string;
     assigned?: string;
     error?: string;
     missing?: string;
@@ -928,6 +929,8 @@ export default async function AdjudicationApplicationPage({
       {query.saved && <div className="notice page-message">Your scorecard draft was saved.</div>}
       {query.submitted && <div className="notice page-message">Your scorecard was submitted. Scores and brain-dump tools are now locked while you finish any assigned final comments.</div>}
       {query.released && <div className="notice page-message">The selected results were released to the school as a snapshot.</div>}
+      {query.released && query.channel_notice === "sent" && <div className="notice page-message">A release notice was posted in the school channel.</div>}
+      {query.released && query.channel_notice === "failed" && <div className="form-error page-message">The results were released, but the school-channel notice could not be posted. You can safely try the release again or notify the school manually.</div>}
       {query.assigned && <div className="notice page-message">The final comment assignment was saved.</div>}
       {query.error === "required" && <div className="form-error page-message">Complete every required subject field and score{canComment ? ", including criterion comments," : ""} before submitting. Missing items: {query.missing ?? "one or more"}.</div>}
       {query.error === "assignment" && <div className="form-error page-message">The final comment assignment could not be saved. Refresh the page and try again.</div>}

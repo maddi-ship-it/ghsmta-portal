@@ -17,7 +17,11 @@ import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
-import { mergeReleasedFeedback } from "@/lib/adjudication-release";
+import {
+  ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE,
+  buildAdjudicationReleaseAnnouncement,
+  mergeReleasedFeedback,
+} from "@/lib/adjudication-release";
 import {
   canCompleteAdjudication,
   outstandingAssignedFinalComments,
@@ -40,6 +44,7 @@ import {
 import { resolvePanelCommentModel } from "@/lib/panel-comment-model";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { OPENAI_REASONING_EFFORT } from "@/lib/openai-model";
+import { logEvent } from "@/lib/observability";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -77,6 +82,83 @@ type PersistScorecardResult = {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to save the scorecard.";
+}
+
+async function announceAdjudicationRelease({
+  applicationId,
+  authorId,
+  releaseScores,
+  releaseComments,
+  releasedCommentTitles = [],
+}: {
+  applicationId: string;
+  authorId: string;
+  releaseScores: boolean;
+  releaseComments: boolean;
+  releasedCommentTitles?: string[];
+}) {
+  const admin = createAdminClient();
+  const [applicationResult, channelResult] = await Promise.all([
+    admin
+      .from("applications")
+      .select("school_name,production_title")
+      .eq("id", applicationId)
+      .maybeSingle(),
+    admin
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", applicationId)
+      .eq("channel_type", ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (applicationResult.error || channelResult.error) {
+    logEvent("warn", "adjudication.release_school_channel_lookup_failed", {
+      applicationId,
+      authorId,
+      applicationError: applicationResult.error?.message,
+      channelError: channelResult.error?.message,
+    });
+    return false;
+  }
+
+  if (!applicationResult.data || !channelResult.data) {
+    logEvent("warn", "adjudication.release_school_channel_missing", {
+      applicationId,
+      authorId,
+      applicationFound: Boolean(applicationResult.data),
+      channelFound: Boolean(channelResult.data),
+    });
+    return false;
+  }
+
+  const announcement = buildAdjudicationReleaseAnnouncement({
+    schoolName: applicationResult.data.school_name,
+    productionTitle: applicationResult.data.production_title,
+    releaseScores,
+    releaseComments,
+    releasedCommentTitles,
+  });
+  const { error: postError } = await admin.from("chat_posts").insert({
+    channel_id: channelResult.data.id,
+    author_id: authorId,
+    subject: announcement.subject,
+    body: announcement.body,
+  });
+
+  if (postError) {
+    logEvent("warn", "adjudication.release_school_channel_post_failed", {
+      applicationId,
+      authorId,
+      message: postError.message,
+    });
+    return false;
+  }
+
+  revalidatePath("/portal/chat");
+  return true;
 }
 
 async function persistAdjudicatorScorecard(
@@ -2365,6 +2447,16 @@ export async function releaseSelectedAdjudicationFeedback(
 
     if (saveResult.error) throw new Error(saveResult.error.message);
 
+    const schoolChannelNotified = await announceAdjudicationRelease({
+      applicationId,
+      authorId: owner.id,
+      releaseScores: false,
+      releaseComments: true,
+      releasedCommentTitles: [...selectedFeedback]
+        .sort((left, right) => left.sort_order - right.sort_order)
+        .map((item) => item.title),
+    });
+
     revalidatePath(`/portal/adjudication/${applicationId}`);
     revalidatePath("/portal/results");
 
@@ -2372,6 +2464,7 @@ export async function releaseSelectedAdjudicationFeedback(
       ok: true as const,
       releasedCategoryIds: selectedCategoryIds,
       releasedCount: selectedCategoryIds.length,
+      schoolChannelNotified,
     };
   } catch (error) {
     console.error("Unable to release selected adjudication comments.", {
@@ -2420,7 +2513,18 @@ export async function releaseAdjudicationResults(
   });
   if (error) throw new Error(error.message);
 
+  const schoolChannelNotified = await announceAdjudicationRelease({
+    applicationId,
+    authorId: owner.id,
+    releaseScores,
+    releaseComments: releaseFeedback,
+  });
+
   revalidatePath(`/portal/adjudication/${applicationId}`);
   revalidatePath("/portal/results");
-  redirect(`/portal/adjudication/${applicationId}?released=1`);
+  redirect(
+    `/portal/adjudication/${applicationId}?released=1&channel_notice=${
+      schoolChannelNotified ? "sent" : "failed"
+    }`,
+  );
 }
