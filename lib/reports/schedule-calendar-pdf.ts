@@ -188,7 +188,7 @@ function drawHeader({
     y: PAGE_HEIGHT - HEADER_HEIGHT,
     width: 120,
     height: HEADER_HEIGHT - 6,
-    color: rgb(10 / 255, 17 / 255, 32 / 255),
+    color: COLORS.white,
   });
   page.drawLine({
     start: { x: 120, y: PAGE_HEIGHT - HEADER_HEIGHT + 10 },
@@ -197,10 +197,10 @@ function drawHeader({
     thickness: 1.1,
   });
 
-  const logoWidth = 96;
+  const logoWidth = 108;
   const logoHeight = logoWidth * (logo.height / logo.width);
   page.drawImage(logo, {
-    x: 12,
+    x: 6,
     y:
       PAGE_HEIGHT - HEADER_HEIGHT +
       (HEADER_HEIGHT - 6 - logoHeight) / 2,
@@ -494,7 +494,7 @@ export async function buildScheduleCalendarPdf(report: LoadedReport) {
     oblique: await pdf.embedFont(StandardFonts.HelveticaOblique),
   };
   const logo = await pdf.embedPng(
-    await readFile(path.join(process.cwd(), "public", "ghsmta-logo-header.png")),
+    await readFile(path.join(process.cwd(), "public", "ghsmta-logo-pdf.png")),
   );
   const items = scheduleItems(report.rows);
   const monthGroups = new Map<string, ScheduleItem[]>();

@@ -147,7 +147,7 @@ function drawHeader(
     y: PAGE_HEIGHT - HEADER_HEIGHT,
     width: 174,
     height: HEADER_HEIGHT - 7,
-    color: rgb(10 / 255, 17 / 255, 32 / 255),
+    color: COLORS.white,
   });
   page.drawLine({
     start: { x: 174, y: PAGE_HEIGHT - HEADER_HEIGHT + 14 },
@@ -155,14 +155,14 @@ function drawHeader(
     color: COLORS.gold,
     thickness: 1.2,
   });
-  const logoWidth = 138;
+  const logoWidth = 150;
   const logoHeight = logoWidth * (logo.height / logo.width);
   const logoY =
     PAGE_HEIGHT - HEADER_HEIGHT +
     (HEADER_HEIGHT - 7 - logoHeight) / 2;
   const headerTextX = 194;
   page.drawImage(logo, {
-    x: 18,
+    x: 12,
     y: logoY,
     width: logoWidth,
     height: logoHeight,
@@ -451,7 +451,7 @@ export async function buildReleasedResultsPdf({
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const logo = await pdf.embedPng(
     await readFile(
-      path.join(process.cwd(), "public", "ghsmta-logo-header.png"),
+      path.join(process.cwd(), "public", "ghsmta-logo-pdf.png"),
     ),
   );
 

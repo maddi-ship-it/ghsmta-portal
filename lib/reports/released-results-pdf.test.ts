@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
@@ -48,6 +51,15 @@ function releaseWithFeedback(): AdjudicationRelease {
 }
 
 describe("buildReleasedResultsPdf", () => {
+  it("uses an opaque RGB logo that PDF renderers can embed consistently", async () => {
+    const logo = await readFile(
+      path.join(process.cwd(), "public", "ghsmta-logo-pdf.png"),
+    );
+
+    expect(logo.subarray(1, 4).toString()).toBe("PNG");
+    expect(logo[25]).toBe(2);
+  });
+
   it("starts each released comment category on its own page", async () => {
     const bytes = await buildReleasedResultsPdf({
       application,
