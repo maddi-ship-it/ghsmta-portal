@@ -142,29 +142,43 @@ function drawHeader(
     height: 7,
     color: COLORS.gold,
   });
-  const logoSize = 45;
-  page.drawImage(logo, {
+  const logoWidth = 102;
+  const logoHeight = logoWidth * (logo.height / logo.width);
+  const logoCardPadding = 5;
+  const logoCardHeight = logoHeight + logoCardPadding * 2;
+  const logoCardY = PAGE_HEIGHT - 89;
+  const headerTextX = MARGIN + logoWidth + logoCardPadding * 2 + 14;
+  page.drawRectangle({
     x: MARGIN,
-    y: PAGE_HEIGHT - 75,
-    width: logoSize,
-    height: logoSize,
+    y: logoCardY,
+    width: logoWidth + logoCardPadding * 2,
+    height: logoCardHeight,
+    color: COLORS.white,
+    borderColor: COLORS.gold,
+    borderWidth: 0.6,
+  });
+  page.drawImage(logo, {
+    x: MARGIN + logoCardPadding,
+    y: logoCardY + logoCardPadding,
+    width: logoWidth,
+    height: logoHeight,
   });
   page.drawText("GHSMTA AWARDS PORTAL", {
-    x: MARGIN + logoSize + 12,
+    x: headerTextX,
     y: PAGE_HEIGHT - 31,
     size: 8.5,
     font: bold,
     color: COLORS.gold,
   });
   page.drawText("Released Adjudication Results", {
-    x: MARGIN + logoSize + 12,
+    x: headerTextX,
     y: PAGE_HEIGHT - 59,
     size: 21,
     font: bold,
     color: COLORS.white,
   });
   page.drawText(cleanText(application.school_name), {
-    x: MARGIN + logoSize + 12,
+    x: headerTextX,
     y: PAGE_HEIGHT - 82,
     size: 12,
     font: bold,
@@ -173,7 +187,7 @@ function drawHeader(
   page.drawText(
     cleanText(application.production_title || "Untitled production"),
     {
-      x: MARGIN + logoSize + 12,
+      x: headerTextX,
       y: PAGE_HEIGHT - 98,
       size: 9,
       font: regular,
@@ -431,8 +445,8 @@ export async function buildReleasedResultsPdf({
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const logo = await pdf.embedPng(
-    await readFile(path.join(process.cwd(), "public", "ghsmta-icon-512.png")),
+  const logo = await pdf.embedJpg(
+    await readFile(path.join(process.cwd(), "public", "ghsmta-logo.jpg")),
   );
 
   pdf.setTitle(
