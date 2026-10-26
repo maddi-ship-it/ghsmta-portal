@@ -1005,12 +1005,12 @@ export function AdjudicationConsensusBar({
                           key={category.id}
                         >
                           <header className="advisory-decision-card-header">
-                            <div>
-                            <input
-                              name="category_id"
-                              type="hidden"
-                              value={category.id}
-                            />
+                            <div className="advisory-decision-card-copy">
+                              <input
+                                name="category_id"
+                                type="hidden"
+                                value={category.id}
+                              />
                               <span className="advisory-decision-category-number">
                                 Category {category.sort_order}
                               </span>
@@ -1021,38 +1021,42 @@ export function AdjudicationConsensusBar({
                             </div>
                             <div className="advisory-decision-summary">
                               <div className="advisory-live-average">
-                                <span>Live panel average</span>
-                                <strong>
-                                  {liveAverageStatus === "loading" && average == null
-                                    ? "Loading…"
-                                    : average == null
-                                      ? "—"
-                                      : average.toFixed(5)}
-                                </strong>
-                                <small>
-                                  {panelAverage
-                                    ? `${Number(panelAverage.score_count)} scores from ${Number(
-                                        panelAverage.scoring_member_count,
-                                      )}/${Number(
-                                        panelAverage.assigned_scorer_count,
-                                      )} scoring members`
-                                    : "Updates as panel scores are entered"}
-                                </small>
-                                {naturalRange ? (
-                                  <small className="advisory-live-range advisory-live-range-within">
-                                    Natural range {naturalRange.rangeMinimum.toFixed(2)}–
-                                    {naturalRange.rangeMaximum.toFixed(2)}
+                                <div className="advisory-live-average-value">
+                                  <span>Live panel average</span>
+                                  <strong>
+                                    {liveAverageStatus === "loading" && average == null
+                                      ? "Loading…"
+                                      : average == null
+                                        ? "—"
+                                        : average.toFixed(2)}
+                                  </strong>
+                                </div>
+                                <div className="advisory-live-average-details">
+                                  <small>
+                                    {panelAverage
+                                      ? `${Number(panelAverage.score_count)} scores · ${Number(
+                                          panelAverage.scoring_member_count,
+                                        )}/${Number(
+                                          panelAverage.assigned_scorer_count,
+                                        )} members reporting`
+                                      : "Updates as panel scores are entered"}
                                   </small>
-                                ) : hasComparableScores ? (
-                                  <small className="advisory-live-range advisory-live-range-outside">
-                                    Outside two points: {minimumMemberAverage?.toFixed(2)}–
-                                    {maximumMemberAverage?.toFixed(2)}
-                                  </small>
-                                ) : (
-                                  <small className="advisory-live-range">
-                                    Waiting for at least two panel scores
-                                  </small>
-                                )}
+                                  {naturalRange ? (
+                                    <small className="advisory-live-range advisory-live-range-within">
+                                      Natural range {naturalRange.rangeMinimum.toFixed(2)}–
+                                      {naturalRange.rangeMaximum.toFixed(2)}
+                                    </small>
+                                  ) : hasComparableScores ? (
+                                    <small className="advisory-live-range advisory-live-range-outside">
+                                      Outside two points: {minimumMemberAverage?.toFixed(2)}–
+                                      {maximumMemberAverage?.toFixed(2)}
+                                    </small>
+                                  ) : (
+                                    <small className="advisory-live-range">
+                                      Waiting for two panel scores
+                                    </small>
+                                  )}
+                                </div>
                               </div>
                               <span
                                 className={`badge ${
@@ -1070,7 +1074,7 @@ export function AdjudicationConsensusBar({
                           </header>
 
                           <div className="advisory-decision-grid">
-                            <label className="advisory-decision-toggle">
+                            <label className="advisory-decision-toggle advisory-decision-eligibility">
                               <input
                                 defaultChecked={proposal?.is_eligible ?? true}
                                 name={`eligible_${category.id}`}
@@ -1081,7 +1085,7 @@ export function AdjudicationConsensusBar({
                                 <small>Awards consideration</small>
                               </span>
                             </label>
-                            <label className="advisory-decision-toggle">
+                            <label className="advisory-decision-toggle advisory-decision-applicability">
                               <input
                                 defaultChecked={
                                   scoreabilityDecision?.is_scoreable ?? true
@@ -1094,7 +1098,7 @@ export function AdjudicationConsensusBar({
                                 <small>Counts toward Overall Production</small>
                               </span>
                             </label>
-                            <div className="advisory-decision-field">
+                            <div className="advisory-decision-field advisory-decision-reason">
                               <label htmlFor={`scoreability_reason_${category.id}`}>
                                 Reason not applicable
                               </label>
@@ -1109,7 +1113,7 @@ export function AdjudicationConsensusBar({
                                 Shown when the category is not applicable.
                               </small>
                             </div>
-                            <div className="advisory-decision-field">
+                            <div className="advisory-decision-field advisory-decision-range">
                               <label htmlFor={`range_${category.id}`}>
                                 Two-point range
                               </label>
