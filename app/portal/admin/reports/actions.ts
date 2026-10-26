@@ -131,6 +131,9 @@ export async function saveReportSchedule(formData: FormData) {
   const reportKey = text(formData, "report_key");
   const definition = findReportDefinition(reportKey);
   if (!definition) throw new Error("Choose a valid report.");
+  if (!definition.supportsScheduling) {
+    throw new Error("This report is available for on-demand export only.");
+  }
   const name = text(formData, "schedule_name");
   if (!name) throw new Error("Name the schedule before saving.");
   const deliveryEmails = text(formData, "delivery_emails")

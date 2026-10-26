@@ -1,6 +1,6 @@
 import type { AppRole } from "@/lib/types";
 
-export type ReportFormat = "pdf" | "csv" | "zip";
+export type ReportFormat = "pdf" | "csv" | "xlsx" | "zip";
 export type ReportVariant = "internal" | "external";
 export type ReportCategory =
   | "Executive"
@@ -29,6 +29,7 @@ export type ReportSource =
   | "roster"
   | "score-completion"
   | "raw-scores"
+  | "audit-school-scores"
   | "school-score-summary"
   | "category-rankings"
   | "score-variance"
@@ -134,6 +135,77 @@ const scoringColumns: ReportColumn[] = [
   { key: "comment", label: "Comment", protectedScore: true },
   { key: "owner_notes", label: "Owner Notes", internalOnly: true },
   { key: "portal_link", label: "Portal Link" },
+];
+
+export const auditSchoolScoreColumns: ReportColumn[] = [
+  { key: "school_name", label: "SCHOOL NAME" },
+  { key: "musical_production", label: "NAMDE OF MUSICAL PRODUCTION" },
+  { key: "reviewer", label: "REVIEWER", adjudicatorIdentity: true },
+  { key: "direction_name", label: "Director's Name" },
+  { key: "direction_score", label: "Direction Score", protectedScore: true },
+  { key: "direction_eligible", label: "Direction - Eligible?" },
+  { key: "direction_range", label: "Direction 2-Point Range", protectedScore: true },
+  { key: "music_direction_name", label: "Music Director's Name" },
+  { key: "music_direction_score", label: "Music Direction Score", protectedScore: true },
+  { key: "music_direction_eligible", label: "Music Direction - Eligible?" },
+  { key: "music_direction_range", label: "Music Direction 2-Point Range", protectedScore: true },
+  { key: "orchestra_name", label: "Orchestra Conductor's Name" },
+  { key: "orchestra_score", label: "Orchestra Score", protectedScore: true },
+  { key: "orchestra_eligible", label: "Orchestra - Eligible?" },
+  { key: "orchestra_range", label: "Orchestra 2-Point Range", protectedScore: true },
+  { key: "choreography_name", label: "Choreographer's Name" },
+  { key: "choreography_score", label: "Choreography Score", protectedScore: true },
+  { key: "choreography_eligible", label: "Choreography - Eligible?" },
+  { key: "choreography_range", label: "Choreography 2-Point Range", protectedScore: true },
+  { key: "ensemble_score", label: "Ensemble Score", protectedScore: true },
+  { key: "ensemble_eligible", label: "Ensemble - Eligible?" },
+  { key: "ensemble_range", label: "Ensemble 2-Point Range", protectedScore: true },
+  { key: "technical_director_name", label: "Technical Director's Name" },
+  { key: "stage_manager_name", label: "Stage Manager's Name" },
+  { key: "lighting_engineer_name", label: "Lighting Engineer's Name" },
+  { key: "sound_engineer_name", label: "Sound Engineer's Name" },
+  { key: "technical_execution_score", label: "Technical Execution Score", protectedScore: true },
+  { key: "technical_execution_eligible", label: "Technical Execution - Eligible?" },
+  { key: "technical_execution_range", label: "Technical Execution 2-Point Range", protectedScore: true },
+  { key: "lighting_design_name", label: "Lighting Designer's Name" },
+  { key: "lighting_design_score", label: "Lighting Score", protectedScore: true },
+  { key: "lighting_design_eligible", label: "Lighting - Eligible?" },
+  { key: "lighting_design_range", label: "Lighting 2-Point Range", protectedScore: true },
+  { key: "sound_design_name", label: "Sound Designer's Name" },
+  { key: "sound_design_score", label: "Sound Score", protectedScore: true },
+  { key: "sound_design_eligible", label: "Sound - Eligible?" },
+  { key: "sound_design_range", label: "Sound 2-Point Range", protectedScore: true },
+  { key: "scenic_design_name", label: "Scenic Designer's Name" },
+  { key: "scenic_design_score", label: "Scenic Design Score", protectedScore: true },
+  { key: "scenic_design_eligible", label: "Scenic Design - Eligible?" },
+  { key: "scenic_design_range", label: "Scenic Design 2-Point Range", protectedScore: true },
+  { key: "costume_design_name", label: "Costume Designer's Name" },
+  { key: "costume_design_score", label: "Costumes Score", protectedScore: true },
+  { key: "costume_design_eligible", label: "Costumes - Eligible?" },
+  { key: "costume_design_range", label: "Costumes 2-Point Range", protectedScore: true },
+  { key: "leading_actress_name", label: "Leading Actress Name" },
+  { key: "leading_actress_score", label: "Leading Actress Score", protectedScore: true },
+  { key: "leading_actress_eligible", label: "Leading Actress - Eligible?" },
+  { key: "leading_actress_range", label: "Leading Actress 2-Point Range", protectedScore: true },
+  { key: "leading_actor_name", label: "Leading Actor's Name" },
+  { key: "leading_actor_score", label: "Leading Actor Score", protectedScore: true },
+  { key: "leading_actor_eligible", label: "Leading Actor - Eligible?" },
+  { key: "leading_actor_range", label: "Leading Actor 2-Point Range", protectedScore: true },
+  { key: "supporting_performer_a_name", label: "Supporting Performer A's Name" },
+  { key: "supporting_performer_a_score", label: "Supporting Performer [A] Score", protectedScore: true },
+  { key: "supporting_performer_a_eligible", label: "Supporting Performer [A] - Eligible?" },
+  { key: "supporting_performer_a_range", label: "Supporting Performer [A] 2-Point Range", protectedScore: true },
+  { key: "supporting_performer_b_name", label: "Supporting Performer B's Name" },
+  { key: "supporting_performer_b_score", label: "Supporting Performer [B] Score", protectedScore: true },
+  { key: "supporting_performer_b_eligible", label: "Supporting Performer [B] - Eligible?" },
+  { key: "supporting_performer_b_range", label: "Supporting Performer [B] 2-Point Range", protectedScore: true },
+  { key: "featured_performer_name", label: "Featured Performer's Name" },
+  { key: "featured_performer_score", label: "Featured Performer Score", protectedScore: true },
+  { key: "featured_performer_eligible", label: "Featured Performer - Eligible?" },
+  { key: "featured_performer_range", label: "Featured Performer 2-Point Range", protectedScore: true },
+  { key: "overall_production_score", label: "Overall Production Score", protectedScore: true },
+  { key: "overall_production_eligible", label: "Overall Production - Eligible?" },
+  { key: "overall_production_range", label: "Overall Production 2-Point Range", protectedScore: true },
 ];
 
 const appealColumns: ReportColumn[] = [
@@ -274,6 +346,21 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   ], "Roster for shadows, understudies, group-shadow participation, and waitlist capacity."),
   report("score-completion", "Score Completion Report", "Scoring", "score-completion", scoringColumns, "Completion status, missing scores/comments, deadlines, reopened scorecards, and owner review readiness."),
   report("detailed-raw-score-export", "Detailed Raw Score Export", "Scoring", "raw-scores", scoringColumns, "Criterion-level score export preserving quarter-point values and stable record IDs.", { formats: ["csv"] }),
+  report(
+    "audit-school-scores",
+    "Audit School Scores",
+    "Scoring",
+    "audit-school-scores",
+    auditSchoolScoreColumns,
+    "Auditor-ready Excel workbook with one row per scoring panelist and the submitted school, category, eligibility, and two-point-range fields.",
+    {
+      formats: ["xlsx"],
+      supportsScheduling: false,
+      supportsExternalVariant: false,
+      confidentialityNote:
+        "Owner-only. Contains protected adjudicator identities and individual scores.",
+    },
+  ),
   report("school-adjudication-report", "School Adjudication Report", "Scoring", "school-score-summary", scoringColumns, "Polished school-level adjudication report with internal, advisory, and school-facing variants.", { formats: ["pdf"], supportsBatch: true }),
   report("category-rankings", "Category Rankings Report", "Scoring", "category-rankings", scoringColumns, "Award-category ranking report. Leading Actor and Leading Actress remain separate datasets."),
   report("score-variance-outliers", "Score Variance and Outlier Report", "Scoring", "score-variance", scoringColumns, "Statistical and operational scoring variance review without implying misconduct."),

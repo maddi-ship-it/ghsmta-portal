@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireProfile } from "@/lib/auth";
+import { buildAuditSchoolScoresXlsx } from "@/lib/reports/audit-school-scores-xlsx";
 import { buildReportCsv, buildReportPdf, reportFilename } from "@/lib/reports/report-export";
 import { loadReport, parseReportFilters } from "@/lib/reports/report-data";
 import { createClient } from "@/lib/supabase/server";
@@ -75,6 +76,29 @@ export async function GET(
 
   try {
     const report = await loadReport(supabase, reportId, filters);
+
+    if (report.filters.format === "xlsx") {
+      const body = Buffer.from(buildAuditSchoolScoresXlsx(report));
+      const filename = reportFilename(report, "xlsx");
+      const mimeType =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      await logReportRun({
+        supabase,
+        report,
+        ownerId: owner.id,
+        filename,
+        byteSize: body.byteLength,
+        mimeType,
+      });
+      return new NextResponse(body, {
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Length": String(body.byteLength),
+          "Content-Type": mimeType,
+        },
+      });
+    }
 
     if (report.filters.format === "csv") {
       const csv = buildReportCsv(report);

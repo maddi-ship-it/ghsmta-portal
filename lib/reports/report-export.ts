@@ -108,7 +108,10 @@ function safeFilename(value: string) {
     .slice(0, 90) || "report";
 }
 
-export function reportFilename(report: LoadedReport, extension: "pdf" | "csv") {
+export function reportFilename(
+  report: LoadedReport,
+  extension: "pdf" | "csv" | "xlsx",
+) {
   const date = new Date(report.generatedAt).toISOString().slice(0, 10);
   return `ghsmta-${safeFilename(report.definition.id)}-${date}.${extension}`;
 }

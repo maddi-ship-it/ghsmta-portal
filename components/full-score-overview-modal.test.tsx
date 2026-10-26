@@ -117,6 +117,7 @@ describe("FullScoreOverviewModal", () => {
     expect(html).toContain("Scores fit naturally");
     expect(html).toContain("Two-point range");
     expect(html).toContain("Synced with full category review");
+    expect(html).not.toContain(">Natural range<");
     expect(html).toContain('<option value="7.00" selected="">7.00–9.00</option>');
     expect(html).toContain("Save ranges");
   });

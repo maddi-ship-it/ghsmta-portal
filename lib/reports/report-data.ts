@@ -8,10 +8,22 @@ import {
   type ReportFormat,
   type ReportVariant,
 } from "@/lib/reports/report-definitions";
+import { calculateOverallProductionScore } from "@/lib/adjudication-overall-score";
+import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
+import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { cityFromVenueAddress, scheduleCityLabel } from "@/lib/schedule-location";
 import { resolveScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { portalSiteUrl } from "@/lib/site-url";
+import type {
+  AdjudicationScore,
+  AdjudicatorAssignment,
+  ApplicationAnswer,
+  ApplicationQuestion,
+  Profile,
+  ScoringCategory,
+  ScoringCriterion,
+} from "@/lib/types";
 
 type SupabaseLike = {
   from: (table: string) => any;
@@ -64,6 +76,7 @@ type ApplicationRow = {
   is_archived: boolean | null;
   form_version_id: string | null;
   form_data?: Record<string, unknown> | null;
+  archived_payload?: Record<string, unknown> | null;
 };
 
 type CycleRow = {
@@ -357,7 +370,12 @@ export function parseReportFilters(searchParams: URLSearchParams): ReportFilters
     dateTo: searchParams.get("date_to")?.trim() ?? "",
     school: searchParams.get("school")?.trim().slice(0, 120) ?? "",
     status: searchParams.get("status")?.trim() ?? "",
-    format: requestedFormat === "csv" || requestedFormat === "zip" ? requestedFormat : "pdf",
+    format:
+      requestedFormat === "csv" ||
+      requestedFormat === "xlsx" ||
+      requestedFormat === "zip"
+        ? requestedFormat
+        : "pdf",
     variant: requestedVariant === "external" ? "external" : "internal",
     includeArchived: parseBool(searchParams, "include_archived"),
     includeInternalNotes: parseBool(searchParams, "include_internal_notes", true),
@@ -388,7 +406,7 @@ async function loadBaseMaps(supabase: SupabaseLike, filters: ReportFilters, warn
   const appQuery = () => {
     let query = supabase
       .from("applications")
-      .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,updated_at,owner_notes,external_applicant_name,external_applicant_email,source_stage,is_archived,form_version_id,form_data")
+      .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,updated_at,owner_notes,external_applicant_name,external_applicant_email,source_stage,is_archived,form_version_id,form_data,archived_payload")
       .order("school_name");
 
     if (!filters.includeArchived) query = query.eq("is_archived", false);
@@ -1159,6 +1177,411 @@ async function loadScoringReport(
   return rows;
 }
 
+const AUDIT_CATEGORY_KEYS = [
+  "direction",
+  "music_direction",
+  "orchestra",
+  "choreography",
+  "ensemble",
+  "technical_execution",
+  "lighting_design",
+  "sound_design",
+  "scenic_design",
+  "costume_design",
+  "leading_actress",
+  "leading_actor",
+  "supporting_performer_a",
+  "supporting_performer_b",
+  "featured_performer",
+] as const;
+
+function roundedAuditScore(value: number | null) {
+  return value == null || !Number.isFinite(value)
+    ? ""
+    : Number(value.toFixed(5));
+}
+
+function auditRangeText(minimum: unknown, maximum: unknown) {
+  const min = Number(minimum);
+  const max = Number(maximum);
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return "";
+  const formatted = (value: number) =>
+    value.toFixed(2).replace(/\.?0+$/, "");
+  return `${formatted(min)} – ${formatted(max)}`;
+}
+
+function completeCategoryAverage(
+  category: ScoringCategory | undefined,
+  criteria: ScoringCriterion[],
+  scoreByCriterion: Map<string, number | null>,
+) {
+  if (!category) return null;
+  const categoryCriteria = criteria.filter(
+    (criterion) => criterion.category_id === category.id && criterion.active,
+  );
+  if (categoryCriteria.length === 0) return null;
+  const values = categoryCriteria.map((criterion) =>
+    scoreByCriterion.get(criterion.id),
+  );
+  if (
+    values.some(
+      (value) => value == null || !Number.isFinite(Number(value)),
+    )
+  ) {
+    return null;
+  }
+  return (
+    values.reduce<number>((sum, value) => sum + Number(value), 0) /
+    values.length
+  );
+}
+
+function labeledAuditSubject(value: string, label: string) {
+  const prefix = `${label}:`;
+  return (
+    value
+      .split(" · ")
+      .find((item) => item.startsWith(prefix))
+      ?.slice(prefix.length)
+      .trim() ?? ""
+  );
+}
+
+function performerAuditName(value: string) {
+  return value.split(" | ")[0]?.trim() ?? "";
+}
+
+async function loadAuditSchoolScoresReport(
+  supabase: SupabaseLike,
+  filters: ReportFilters,
+  warnings: string[],
+) {
+  const maps = await loadBaseMaps(supabase, filters, warnings);
+  const applicationIds = new Set(
+    maps.applications.map((application) => application.id),
+  );
+  const [
+    assignments,
+    scorecards,
+    scores,
+    categories,
+    criteria,
+    proposals,
+    scoreability,
+    comments,
+    actingReviews,
+  ] = await Promise.all([
+    safeFetchPaged<any>(warnings, "Adjudicator assignments", () =>
+      supabase
+        .from("adjudicator_assignments")
+        .select(
+          "id,application_id,adjudicator_user_id,status,participant_role,can_score,removed_at",
+        )
+        .is("removed_at", null),
+    ),
+    safeFetchPaged<any>(warnings, "Audit scorecards", () =>
+      supabase
+        .from("adjudication_scorecards")
+        .select(
+          "id,assignment_id,application_id,adjudicator_user_id,rubric_id,status,submitted_at",
+        )
+        .order("created_at"),
+    ),
+    safeFetchPaged<any>(warnings, "Audit scores", () =>
+      supabase
+        .from("adjudication_scores")
+        .select("scorecard_id,criterion_id,score")
+        .order("created_at"),
+    ),
+    safeFetchPaged<ScoringCategory>(warnings, "Audit scoring categories", () =>
+      supabase
+        .from("scoring_categories")
+        .select(
+          "id,rubric_id,category_key,title,description,guidance,subject_label,sort_order,required,allow_not_applicable,active,created_at,updated_at",
+        )
+        .eq("active", true)
+        .order("sort_order"),
+    ),
+    safeFetchPaged<ScoringCriterion>(warnings, "Audit scoring criteria", () =>
+      supabase
+        .from("scoring_criteria")
+        .select(
+          "id,category_id,criterion_key,title,description,weight,sort_order,active,created_at,updated_at",
+        )
+        .eq("active", true)
+        .order("sort_order"),
+    ),
+    safeFetchPaged<any>(warnings, "Audit category decisions", () =>
+      supabase
+        .from("adjudication_category_proposals")
+        .select(
+          "application_id,category_id,is_eligible,range_min,range_max,status",
+        ),
+    ),
+    safeFetchPaged<any>(warnings, "Audit category applicability", () =>
+      supabase
+        .from("adjudication_category_scoreability")
+        .select("application_id,category_id,is_scoreable,reason"),
+    ),
+    safeFetchPaged<any>(warnings, "Audit category comments", () =>
+      supabase
+        .from("adjudication_category_comments")
+        .select(
+          "scorecard_id,category_id,is_applicable,is_eligible,score_range_min,score_range_max",
+        ),
+    ),
+    safeFetchPaged<any>(warnings, "Acting candidate reviews", () =>
+      supabase.from("acting_candidate_reviews").select("application_id,state"),
+    ),
+  ]);
+
+  const currentAssignments = assignments.filter(
+    (assignment) =>
+      applicationIds.has(assignment.application_id) &&
+      assignment.can_score !== false &&
+      !assignment.removed_at,
+  );
+  const assignmentById = new Map(
+    currentAssignments.map((assignment) => [assignment.id, assignment]),
+  );
+  const currentScorecards = scorecards.filter(
+    (scorecard) =>
+      applicationIds.has(scorecard.application_id) &&
+      assignmentById.has(scorecard.assignment_id),
+  );
+  const scorecardIds = new Set(currentScorecards.map((scorecard) => scorecard.id));
+  const currentScores = scores.filter((score) =>
+    scorecardIds.has(score.scorecard_id),
+  );
+  const scorecardByAssignment = new Map(
+    currentScorecards.map((scorecard) => [scorecard.assignment_id, scorecard]),
+  );
+  const scoresByScorecard = new Map<string, AdjudicationScore[]>();
+  for (const score of currentScores) {
+    const collection = scoresByScorecard.get(score.scorecard_id) ?? [];
+    collection.push(score as AdjudicationScore);
+    scoresByScorecard.set(score.scorecard_id, collection);
+  }
+  const categoriesByRubric = new Map<string, ScoringCategory[]>();
+  for (const category of categories) {
+    const collection = categoriesByRubric.get(category.rubric_id) ?? [];
+    collection.push(category);
+    categoriesByRubric.set(category.rubric_id, collection);
+  }
+  const proposalByApplicationAndCategory = new Map(
+    proposals.map((proposal) => [
+      `${proposal.application_id}:${proposal.category_id}`,
+      proposal,
+    ]),
+  );
+  const scoreabilityByApplicationAndCategory = new Map(
+    scoreability.map((decision) => [
+      `${decision.application_id}:${decision.category_id}`,
+      decision,
+    ]),
+  );
+  const commentByScorecardAndCategory = new Map(
+    comments.map((comment) => [
+      `${comment.scorecard_id}:${comment.category_id}`,
+      comment,
+    ]),
+  );
+  const actingReviewByApplication = new Map(
+    actingReviews.map((review) => [review.application_id, review.state]),
+  );
+
+  const rows: ReportRow[] = [];
+  for (const application of maps.applications) {
+    const applicationAssignments = currentAssignments.filter(
+      (assignment) => assignment.application_id === application.id,
+    );
+    const panelProfiles = applicationAssignments.map((assignment) => {
+      const profile = maps.profileById.get(assignment.adjudicator_user_id);
+      return {
+        id: assignment.adjudicator_user_id,
+        role: (profile?.role ?? assignment.participant_role ?? "adjudicator") as Profile["role"],
+      };
+    });
+    const panelPolicy = resolvePanelAveragePolicy(
+      applicationAssignments as AdjudicatorAssignment[],
+      panelProfiles,
+    );
+    const contributingAssignments = applicationAssignments
+      .filter((assignment) =>
+        panelPolicy.contributorUserIds.has(assignment.adjudicator_user_id),
+      )
+      .sort((left, right) => {
+        const leftProfile = maps.profileById.get(left.adjudicator_user_id);
+        const rightProfile = maps.profileById.get(right.adjudicator_user_id);
+        return (leftProfile?.full_name ?? leftProfile?.email ?? "").localeCompare(
+          rightProfile?.full_name ?? rightProfile?.email ?? "",
+        );
+      });
+    const rowAssignments =
+      contributingAssignments.length > 0 ? contributingAssignments : [null];
+    const questions = application.form_version_id
+      ? maps.questionsByFormVersion.get(application.form_version_id) ?? []
+      : [];
+    const answerMap = maps.answersByApplication.get(application.id) ?? new Map();
+    const subjects = resolveScoringCategorySubjects({
+      application: {
+        form_data: application.form_data ?? {},
+        archived_payload: application.archived_payload ?? {},
+      },
+      questions: questions as unknown as ApplicationQuestion[],
+      answers: [...answerMap.entries()].map(([questionId, value]) => ({
+        id: `${application.id}:${questionId}`,
+        application_id: application.id,
+        question_id: questionId,
+        value,
+        updated_at: "",
+      })) as ApplicationAnswer[],
+    });
+    const actingReview = actingReviewByApplication.get(application.id) as
+      | {
+          candidates?: Array<{ slot?: string; name?: string }>;
+          directorName?: string | null;
+        }
+      | undefined;
+    for (const candidate of actingReview?.candidates ?? []) {
+      if (candidate.slot && candidate.name) {
+        subjects[candidate.slot] = candidate.name;
+      }
+    }
+    if (actingReview?.directorName) {
+      subjects.direction = actingReview.directorName;
+    }
+    const subjectFields: ReportRow = {
+      direction_name: subjects.direction,
+      music_direction_name: subjects.music_direction,
+      orchestra_name: subjects.orchestra,
+      choreography_name: subjects.choreography,
+      technical_director_name: labeledAuditSubject(
+        subjects.technical_execution,
+        "Technical Director",
+      ),
+      stage_manager_name: labeledAuditSubject(
+        subjects.technical_execution,
+        "Stage Manager",
+      ),
+      lighting_engineer_name: labeledAuditSubject(
+        subjects.technical_execution,
+        "Lighting Engineer",
+      ),
+      sound_engineer_name: labeledAuditSubject(
+        subjects.technical_execution,
+        "Sound Engineer",
+      ),
+      lighting_design_name: subjects.lighting_design,
+      sound_design_name:
+        labeledAuditSubject(subjects.sound_design, "Designer") ||
+        subjects.sound_design,
+      scenic_design_name: subjects.scenic_design,
+      costume_design_name: subjects.costume_design,
+      leading_actress_name: performerAuditName(subjects.leading_actress),
+      leading_actor_name: performerAuditName(subjects.leading_actor),
+      supporting_performer_a_name: performerAuditName(
+        subjects.supporting_performer_a,
+      ),
+      supporting_performer_b_name: performerAuditName(
+        subjects.supporting_performer_b,
+      ),
+      featured_performer_name: performerAuditName(subjects.featured_performer),
+    };
+
+    for (const assignment of rowAssignments) {
+      const profile = assignment
+        ? maps.profileById.get(assignment.adjudicator_user_id)
+        : null;
+      const scorecard = assignment
+        ? scorecardByAssignment.get(assignment.id)
+        : null;
+      const cardScores = scorecard
+        ? scoresByScorecard.get(scorecard.id) ?? []
+        : [];
+      const scoreByCriterion = new Map(
+        cardScores.map((score) => [score.criterion_id, score.score]),
+      );
+      const rubricCategories = scorecard
+        ? categoriesByRubric.get(scorecard.rubric_id) ?? []
+        : [];
+      const categoryByKey = new Map(
+        rubricCategories.map((category) => [category.category_key, category]),
+      );
+      const unscoreableCategoryIds = new Set(
+        rubricCategories
+          .filter(
+            (category) =>
+              scoreabilityByApplicationAndCategory.get(
+                `${application.id}:${category.id}`,
+              )?.is_scoreable === false,
+          )
+          .map((category) => category.id),
+      );
+      const row: ReportRow = {
+        audit_application_id: application.id,
+        school_name: application.school_name ?? "",
+        musical_production: application.production_title ?? "",
+        reviewer:
+          profile?.full_name ??
+          profile?.email ??
+          (assignment?.adjudicator_user_id ?? ""),
+        ...subjectFields,
+      };
+
+      for (const categoryKey of AUDIT_CATEGORY_KEYS) {
+        const category = categoryByKey.get(categoryKey);
+        const comment =
+          scorecard && category
+            ? commentByScorecardAndCategory.get(
+                `${scorecard.id}:${category.id}`,
+              )
+            : null;
+        const scoreabilityDecision = category
+          ? scoreabilityByApplicationAndCategory.get(
+              `${application.id}:${category.id}`,
+            )
+          : null;
+        const applicable =
+          scoreabilityDecision?.is_scoreable ?? comment?.is_applicable ?? true;
+        if (!applicable) {
+          row[`${categoryKey}_score`] = "Not-Applicable";
+          row[`${categoryKey}_eligible`] = "Not-Applicable";
+          row[`${categoryKey}_range`] = "Not-Applicable";
+          continue;
+        }
+        const proposal = category
+          ? proposalByApplicationAndCategory.get(
+              `${application.id}:${category.id}`,
+            )
+          : null;
+        row[`${categoryKey}_score`] = roundedAuditScore(
+          completeCategoryAverage(category, criteria, scoreByCriterion),
+        );
+        row[`${categoryKey}_eligible`] =
+          (proposal?.is_eligible ?? comment?.is_eligible ?? true) ? 1 : 0;
+        row[`${categoryKey}_range`] = auditRangeText(
+          proposal?.range_min ?? comment?.score_range_min,
+          proposal?.range_max ?? comment?.score_range_max,
+        );
+      }
+
+      const overall = calculateOverallProductionScore({
+        categories: rubricCategories,
+        criteria,
+        scores: scoreByCriterion,
+        unscoreableCategoryIds,
+      });
+      row.overall_production_score = roundedAuditScore(overall.score);
+      row.overall_production_eligible = 1;
+      row.overall_production_range = "Not Required";
+      rows.push(row);
+    }
+  }
+
+  return rows;
+}
+
 async function loadAppealsReport(
   supabase: SupabaseLike,
   filters: ReportFilters,
@@ -1764,6 +2187,9 @@ export async function loadReport(
     case "secondary":
     case "score-history":
       rows = await loadScoringReport(supabase, definition, filters, warnings);
+      break;
+    case "audit-school-scores":
+      rows = await loadAuditSchoolScoresReport(supabase, filters, warnings);
       break;
     case "appeals":
       rows = await loadAppealsReport(supabase, filters, warnings);

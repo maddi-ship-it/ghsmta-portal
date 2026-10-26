@@ -207,6 +207,8 @@ export function FullScoreOverviewModal({
   const advisoryReferenceMode = panelMembers.some(
     (member) => !member.contributesToPanelAverage,
   );
+  const scoreTableWidth =
+    210 + panelMembers.length * 140 + 160 + 215;
 
   return (
     <div
@@ -245,12 +247,32 @@ export function FullScoreOverviewModal({
           <div className="full-score-overview-body">
           {panelMembers.length > 0 ? (
             <div className="full-score-overview-table-wrap">
-              <table className="data-table full-score-overview-table">
+              <table
+                className="data-table full-score-overview-table"
+                style={{
+                  minWidth: `${scoreTableWidth}px`,
+                  width: `${scoreTableWidth}px`,
+                }}
+              >
+                <colgroup>
+                  <col className="full-score-category-column" />
+                  {panelMembers.map((member) => (
+                    <col
+                      className="full-score-member-column"
+                      key={member.assignment.id}
+                    />
+                  ))}
+                  <col className="full-score-panel-column" />
+                  <col className="full-score-selected-range-column" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Category</th>
                     {panelMembers.map((member) => (
-                      <th key={member.assignment.id}>
+                      <th
+                        className="full-score-member-column"
+                        key={member.assignment.id}
+                      >
                         <span className="full-score-member-name">
                           {member.name}
                         </span>
@@ -277,14 +299,6 @@ export function FullScoreOverviewModal({
                             ? `${contributingMemberCount} adjudicators; committee shown as reference`
                             : `${contributingMemberCount} scoring members`}
                         </small>
-                      </span>
-                    </th>
-                    <th className="full-score-range-column">
-                      <span className="full-score-member-name">
-                        Natural range
-                      </span>
-                      <span className="full-score-member-overall">
-                        <small>Automatic two-point check</small>
                       </span>
                     </th>
                     <th className="full-score-selected-range-column">
@@ -361,7 +375,10 @@ export function FullScoreOverviewModal({
                           <strong>{category.title}</strong>
                         </th>
                         {memberAverages.map((value, index) => (
-                          <td key={panelMembers[index]?.assignment.id}>
+                          <td
+                            className="full-score-member-column"
+                            key={panelMembers[index]?.assignment.id}
+                          >
                             <strong>{formatScoreAverage(value)}</strong>
                             <small>
                               {panelMembers[index]?.scorecard
@@ -391,42 +408,40 @@ export function FullScoreOverviewModal({
                               : "members reporting"}
                           </small>
                         </td>
-                        <td className="full-score-range-column">
-                          {rangeStatus === "not-required" ? (
-                            <>
-                              <strong>Not required</strong>
-                              <small>Overall Production</small>
-                            </>
-                          ) : naturalRange ? (
-                            <>
-                              <strong>
-                                {naturalRange.rangeMinimum.toFixed(2)}–
-                                {naturalRange.rangeMaximum.toFixed(2)}
-                              </strong>
-                              <small>Scores fit naturally</small>
-                            </>
-                          ) : hasComparableScores ? (
-                            <>
-                              <strong>Outside two points</strong>
-                              <small>
-                                {scoreMinimum?.toFixed(2)}–
-                                {scoreMaximum?.toFixed(2)} live spread
-                              </small>
-                            </>
-                          ) : (
-                            <>
-                              <strong>Waiting</strong>
-                              <small>Two scores needed</small>
-                            </>
-                          )}
-                        </td>
                         <td className="full-score-selected-range-column">
                           {rangeStatus === "not-required" ? (
-                            <span className="full-score-range-not-required">
-                              No range needed
-                            </span>
+                            <>
+                              <strong className="full-score-range-state">
+                                Not required
+                              </strong>
+                              <small>Overall Production</small>
+                            </>
                           ) : (
                             <>
+                              <span className="full-score-range-summary">
+                                {naturalRange ? (
+                                  <>
+                                    <strong>
+                                      {naturalRange.rangeMinimum.toFixed(2)}–
+                                      {naturalRange.rangeMaximum.toFixed(2)}
+                                    </strong>
+                                    <small>Scores fit naturally</small>
+                                  </>
+                                ) : hasComparableScores ? (
+                                  <>
+                                    <strong>Outside two points</strong>
+                                    <small>
+                                      {scoreMinimum?.toFixed(2)}–
+                                      {scoreMaximum?.toFixed(2)} live spread
+                                    </small>
+                                  </>
+                                ) : (
+                                  <>
+                                    <strong>Waiting</strong>
+                                    <small>Two scores needed</small>
+                                  </>
+                                )}
+                              </span>
                               <input
                                 name="range_category_id"
                                 type="hidden"

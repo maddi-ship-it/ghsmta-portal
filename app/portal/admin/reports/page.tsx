@@ -547,6 +547,15 @@ export default async function OwnerReportsPage({
                     Export CSV
                   </Link>
                 )}
+                {selectedDefinition.formats.includes("xlsx") && (
+                  <Link
+                    className="button button-gold"
+                    href={downloadHref(params, selectedDefinition, "xlsx")}
+                    prefetch={false}
+                  >
+                    Export Excel
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -871,7 +880,8 @@ export default async function OwnerReportsPage({
                 </form>
               </details>
 
-              <details className="report-setup-details">
+              {selectedDefinition.supportsScheduling && (
+                <details className="report-setup-details">
                 <summary>
                   <span><strong>Schedule email delivery</strong><small>Send this report automatically each day.</small></span>
                   <b>Open</b>
@@ -943,7 +953,8 @@ export default async function OwnerReportsPage({
                     Schedule report
                   </button>
                 </form>
-              </details>
+                </details>
+              )}
             </div>
 
             <div className="report-saved-lists">
