@@ -11,16 +11,14 @@ import {
 import { calculateOverallProductionScore } from "@/lib/adjudication-overall-score";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
-import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
+import { selectAuditPanelAssignments } from "@/lib/reports/audit-panel-selection";
 import { cityFromVenueAddress, scheduleCityLabel } from "@/lib/schedule-location";
 import { resolveScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { portalSiteUrl } from "@/lib/site-url";
 import type {
   AdjudicationScore,
-  AdjudicatorAssignment,
   ApplicationAnswer,
   ApplicationQuestion,
-  Profile,
   ScoringCategory,
   ScoringCriterion,
 } from "@/lib/types";
@@ -1276,8 +1274,7 @@ async function loadAuditSchoolScoresReport(
         .from("adjudicator_assignments")
         .select(
           "id,application_id,adjudicator_user_id,status,participant_role,can_score,removed_at",
-        )
-        .is("removed_at", null),
+        ),
     ),
     safeFetchPaged<any>(warnings, "Audit scorecards", () =>
       supabase
@@ -1335,33 +1332,29 @@ async function loadAuditSchoolScoresReport(
     ),
   ]);
 
-  const currentAssignments = assignments.filter(
-    (assignment) =>
-      applicationIds.has(assignment.application_id) &&
-      assignment.can_score !== false &&
-      !assignment.removed_at,
+  const reportAssignments = assignments.filter((assignment) =>
+    applicationIds.has(assignment.application_id),
   );
-  const assignmentById = new Map(
-    currentAssignments.map((assignment) => [assignment.id, assignment]),
+  const reportScorecards = scorecards.filter((scorecard) =>
+    applicationIds.has(scorecard.application_id),
   );
-  const currentScorecards = scorecards.filter(
-    (scorecard) =>
-      applicationIds.has(scorecard.application_id) &&
-      assignmentById.has(scorecard.assignment_id),
-  );
-  const scorecardIds = new Set(currentScorecards.map((scorecard) => scorecard.id));
-  const currentScores = scores.filter((score) =>
-    scorecardIds.has(score.scorecard_id),
-  );
+  const scorecardIds = new Set(reportScorecards.map((scorecard) => scorecard.id));
+  const reportScores = scores.filter((score) => scorecardIds.has(score.scorecard_id));
   const scorecardByAssignment = new Map(
-    currentScorecards.map((scorecard) => [scorecard.assignment_id, scorecard]),
+    reportScorecards.map((scorecard) => [scorecard.assignment_id, scorecard]),
   );
   const scoresByScorecard = new Map<string, AdjudicationScore[]>();
-  for (const score of currentScores) {
+  for (const score of reportScores) {
     const collection = scoresByScorecard.get(score.scorecard_id) ?? [];
     collection.push(score as AdjudicationScore);
     scoresByScorecard.set(score.scorecard_id, collection);
   }
+  const scoreCountByScorecardId = new Map(
+    [...scoresByScorecard.entries()].map(([scorecardId, cardScores]) => [
+      scorecardId,
+      cardScores.filter((score) => score.score !== null).length,
+    ]),
+  );
   const categoriesByRubric = new Map<string, ScoringCategory[]>();
   for (const category of categories) {
     const collection = categoriesByRubric.get(category.rubric_id) ?? [];
@@ -1392,24 +1385,22 @@ async function loadAuditSchoolScoresReport(
 
   const rows: ReportRow[] = [];
   for (const application of maps.applications) {
-    const applicationAssignments = currentAssignments.filter(
+    const applicationAssignments = reportAssignments.filter(
       (assignment) => assignment.application_id === application.id,
     );
-    const panelProfiles = applicationAssignments.map((assignment) => {
-      const profile = maps.profileById.get(assignment.adjudicator_user_id);
-      return {
-        id: assignment.adjudicator_user_id,
-        role: (profile?.role ?? assignment.participant_role ?? "adjudicator") as Profile["role"],
-      };
-    });
-    const panelPolicy = resolvePanelAveragePolicy(
-      applicationAssignments as AdjudicatorAssignment[],
-      panelProfiles,
-    );
-    const contributingAssignments = applicationAssignments
-      .filter((assignment) =>
-        panelPolicy.contributorUserIds.has(assignment.adjudicator_user_id),
-      )
+    const contributingAssignments = selectAuditPanelAssignments({
+      assignments: applicationAssignments,
+      scorecards: reportScorecards.filter(
+        (scorecard) => scorecard.application_id === application.id,
+      ),
+      scoreCountByScorecardId,
+      profileRoleByUserId: new Map(
+        applicationAssignments.map((assignment) => [
+          assignment.adjudicator_user_id,
+          maps.profileById.get(assignment.adjudicator_user_id)?.role,
+        ]),
+      ),
+    })
       .sort((left, right) => {
         const leftProfile = maps.profileById.get(left.adjudicator_user_id);
         const rightProfile = maps.profileById.get(right.adjudicator_user_id);
