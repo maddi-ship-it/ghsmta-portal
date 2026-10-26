@@ -1,5 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/app/portal/adjudication/[id]/workflow-actions", () => ({
+  saveFullScoreCategoryRanges: vi.fn(),
+}));
 
 import type {
   AdjudicationScore,
@@ -76,8 +80,20 @@ describe("FullScoreOverviewModal", () => {
 
     const html = renderToStaticMarkup(
       <FullScoreOverviewModal
+        applicationId="application-one"
         assignments={assignments}
         categories={categories}
+        categoryProposals={[
+          {
+            category_id: "music",
+            is_eligible: true,
+            range_min: 7,
+            range_max: 9,
+            status: "proposed",
+            advisory_note: null,
+            owner_override_note: null,
+          },
+        ]}
         criteria={criteria}
         onClose={() => undefined}
         open
@@ -99,6 +115,10 @@ describe("FullScoreOverviewModal", () => {
     expect(html).toContain("full-score-range-within");
     expect(html).toContain("7.00–9.00");
     expect(html).toContain("Scores fit naturally");
+    expect(html).toContain("Two-point range");
+    expect(html).toContain("Synced with full category review");
+    expect(html).toContain('<option value="7.00" selected="">7.00–9.00</option>');
+    expect(html).toContain("Save ranges");
   });
 
   it("shows an Advisory Committee score as reference when three adjudicators are present", () => {
@@ -147,8 +167,10 @@ describe("FullScoreOverviewModal", () => {
 
     const html = renderToStaticMarkup(
       <FullScoreOverviewModal
+        applicationId="application-one"
         assignments={assignments}
         categories={categories}
+        categoryProposals={[]}
         criteria={criteria}
         onClose={() => undefined}
         open
@@ -207,8 +229,10 @@ describe("FullScoreOverviewModal", () => {
 
     const html = renderToStaticMarkup(
       <FullScoreOverviewModal
+        applicationId="application-one"
         assignments={assignments}
         categories={categories}
+        categoryProposals={[]}
         criteria={criteria}
         onClose={() => undefined}
         open

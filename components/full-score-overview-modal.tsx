@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useActionState, useEffect, useMemo } from "react";
 
+import {
+  saveFullScoreCategoryRanges,
+  type FullScoreRangeSaveResult,
+} from "@/app/portal/adjudication/[id]/workflow-actions";
+import { ScheduleSubmitButton } from "@/components/schedule-submit-button";
 import {
   average as scoreAverage,
   formatScoreAverage,
@@ -10,7 +15,10 @@ import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
 } from "@/lib/adjudication-overall-score";
-import { deriveNaturalTwoPointRange } from "@/lib/adjudication-ranges";
+import {
+  deriveNaturalTwoPointRange,
+  formatTwoPointRangeStart,
+} from "@/lib/adjudication-ranges";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import type {
   AdjudicationScore,
@@ -32,6 +40,23 @@ type PanelMemberScore = {
   contributesToPanelAverage: boolean;
 };
 
+export type FullScoreCategoryProposal = {
+  category_id: string;
+  is_eligible: boolean;
+  range_min: number | null;
+  range_max: number | null;
+  status: string;
+  advisory_note: string | null;
+  owner_override_note: string | null;
+};
+
+const rangeOptions = Array.from(
+  { length: 29 },
+  (_, index) => 1 + index * 0.25,
+).filter((value) => value <= 8);
+
+const initialRangeSaveResult: FullScoreRangeSaveResult = { ok: false };
+
 function categoryAverage(
   category: ScoringCategory,
   categoryCriteria: ScoringCriterion[],
@@ -50,8 +75,10 @@ function categoryAverage(
 }
 
 export function FullScoreOverviewModal({
+  applicationId,
   assignments,
   categories,
+  categoryProposals,
   criteria,
   onClose,
   open,
@@ -59,8 +86,10 @@ export function FullScoreOverviewModal({
   scorecards,
   scores,
 }: {
+  applicationId: string;
   assignments: AdjudicatorAssignment[];
   categories: ScoringCategory[];
+  categoryProposals: FullScoreCategoryProposal[];
   criteria: ScoringCriterion[];
   onClose: () => void;
   open: boolean;
@@ -68,6 +97,14 @@ export function FullScoreOverviewModal({
   scorecards: AdjudicationScorecard[];
   scores: AdjudicationScore[];
 }) {
+  const saveRangeAction = useMemo(
+    () => saveFullScoreCategoryRanges.bind(null, applicationId),
+    [applicationId],
+  );
+  const [rangeSaveResult, saveRanges] = useActionState(
+    saveRangeAction,
+    initialRangeSaveResult,
+  );
   useEffect(() => {
     if (!open) return;
 
@@ -144,6 +181,16 @@ export function FullScoreOverviewModal({
     }
     return grouped;
   }, [criteria]);
+  const proposalByCategory = useMemo(
+    () =>
+      new Map(
+        categoryProposals.map((proposal) => [
+          proposal.category_id,
+          proposal,
+        ]),
+      ),
+    [categoryProposals],
+  );
 
   if (!open) return null;
 
@@ -194,7 +241,8 @@ export function FullScoreOverviewModal({
           </button>
         </header>
 
-        <div className="full-score-overview-body">
+        <form action={saveRanges} className="full-score-overview-form">
+          <div className="full-score-overview-body">
           {panelMembers.length > 0 ? (
             <div className="full-score-overview-table-wrap">
               <table className="data-table full-score-overview-table">
@@ -237,6 +285,14 @@ export function FullScoreOverviewModal({
                       </span>
                       <span className="full-score-member-overall">
                         <small>Automatic two-point check</small>
+                      </span>
+                    </th>
+                    <th className="full-score-selected-range-column">
+                      <span className="full-score-member-name">
+                        Two-point range
+                      </span>
+                      <span className="full-score-member-overall">
+                        <small>Synced with full category review</small>
                       </span>
                     </th>
                   </tr>
@@ -287,6 +343,13 @@ export function FullScoreOverviewModal({
                           : naturalRange
                             ? "within"
                             : "outside";
+                    const savedRangeStart = formatTwoPointRangeStart(
+                      proposalByCategory.get(category.id)?.range_min,
+                    );
+                    const selectedRangeStart =
+                      savedRangeStart ||
+                      naturalRange?.rangeMinimum.toFixed(2) ||
+                      "";
 
                     return (
                       <tr
@@ -357,6 +420,49 @@ export function FullScoreOverviewModal({
                             </>
                           )}
                         </td>
+                        <td className="full-score-selected-range-column">
+                          {rangeStatus === "not-required" ? (
+                            <span className="full-score-range-not-required">
+                              No range needed
+                            </span>
+                          ) : (
+                            <>
+                              <input
+                                name="range_category_id"
+                                type="hidden"
+                                value={category.id}
+                              />
+                              <label
+                                className="sr-only"
+                                htmlFor={`full-score-range-${category.id}`}
+                              >
+                                Two-point range for {category.title}
+                              </label>
+                              <select
+                                className="select full-score-range-select"
+                                defaultValue={selectedRangeStart}
+                                id={`full-score-range-${category.id}`}
+                                name={`full_score_range_${category.id}`}
+                              >
+                                <option value="">Not set</option>
+                                {rangeOptions.map((value) => (
+                                  <option key={value} value={value.toFixed(2)}>
+                                    {value.toFixed(2)}–{(value + 2).toFixed(2)}
+                                  </option>
+                                ))}
+                              </select>
+                              <small>
+                                {proposalByCategory.get(category.id)?.status === "draft"
+                                  ? "Saved draft"
+                                  : proposalByCategory.has(category.id)
+                                    ? "Current approved workflow value"
+                                    : naturalRange
+                                      ? "Suggested from live scores"
+                                      : "Not selected"}
+                              </small>
+                            </>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -369,14 +475,37 @@ export function FullScoreOverviewModal({
               <p>Assign scoring adjudicators to populate this view.</p>
             </div>
           )}
-        </div>
+          </div>
 
-        <footer className="sticky-modal-footer full-score-overview-footer">
-          <span>Scores update as panel members save their scorecards.</span>
-          <button className="button button-dark" onClick={onClose} type="button">
-            Done
-          </button>
-        </footer>
+          <footer className="sticky-modal-footer full-score-overview-footer">
+            <div className="full-score-overview-footer-status">
+              <span>Scores update as panel members save their scorecards.</span>
+              {rangeSaveResult.message && (
+                <strong aria-live="polite">{rangeSaveResult.message}</strong>
+              )}
+              {rangeSaveResult.error && (
+                <strong className="form-error" role="alert">
+                  {rangeSaveResult.error}
+                </strong>
+              )}
+            </div>
+            <div className="button-row">
+              <button
+                className="button button-secondary"
+                onClick={onClose}
+                type="button"
+              >
+                Done
+              </button>
+              <ScheduleSubmitButton
+                className="button button-gold"
+                pendingLabel="Saving ranges…"
+              >
+                Save ranges
+              </ScheduleSubmitButton>
+            </div>
+          </footer>
+        </form>
       </section>
     </div>
   );

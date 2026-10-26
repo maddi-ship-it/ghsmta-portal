@@ -864,6 +864,10 @@ export function AdjudicationSandbox({
               applicationId={SANDBOX_APPLICATION_ID}
               assignments={panelData.assignments}
               categories={scoreableCategories}
+              categoryProposals={proposals.map((proposal) => ({
+                ...proposal,
+                owner_override_note: null,
+              }))}
               categorySubjectDefaults={categorySubjectDefaults}
               criteria={scoreableCriteria}
               initialComments={panelData.comments}

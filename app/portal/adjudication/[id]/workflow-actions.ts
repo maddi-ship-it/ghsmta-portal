@@ -44,7 +44,171 @@ export type PanelAssignmentAnnouncementResult = {
   attemptId?: string;
 };
 
+export type FullScoreRangeSaveResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  changedCount?: number;
+  attemptId?: string;
+};
+
 const ACTIVE_APPLICATION_ERROR = "The active application was not found.";
+
+export async function saveFullScoreCategoryRanges(
+  applicationId: string,
+  _previous: FullScoreRangeSaveResult,
+  formData: FormData,
+): Promise<FullScoreRangeSaveResult> {
+  const profile = await requireProfile(["advisory_member", "owner"]);
+  const attemptId = new Date().toISOString();
+  const categoryIds = [
+    ...new Set(
+      formData
+        .getAll("range_category_id")
+        .map(String)
+        .filter(Boolean),
+    ),
+  ];
+
+  if (categoryIds.length === 0) {
+    return {
+      ok: false,
+      error: "No category ranges were submitted.",
+      attemptId,
+    };
+  }
+
+  const selectedRanges = new Map<
+    string,
+    { rangeMinimum: number; rangeMaximum: number } | null
+  >();
+
+  for (const categoryId of categoryIds) {
+    const selectedValue = text(formData, `full_score_range_${categoryId}`);
+    const range = selectedValue ? twoPointRangeFromStart(selectedValue) : null;
+
+    if (selectedValue && !range) {
+      return {
+        ok: false,
+        error: "Choose a valid two-point range for every edited category.",
+        attemptId,
+      };
+    }
+    selectedRanges.set(categoryId, range);
+  }
+
+  const supabase = await createClient();
+  const { data: canReview, error: accessError } = await supabase.rpc(
+    "can_advisory_review_application",
+    {
+      p_application_id: applicationId,
+      p_user_id: profile.id,
+    },
+  );
+
+  if (accessError || !canReview) {
+    return {
+      ok: false,
+      error: accessError
+        ? "We couldn't confirm access to this review. Please try again."
+        : "You are no longer assigned to review this application.",
+      attemptId,
+    };
+  }
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("adjudication_category_proposals")
+    .select(
+      "category_id,is_eligible,range_min,range_max,status,advisory_note,owner_override_note",
+    )
+    .eq("application_id", applicationId)
+    .in("category_id", categoryIds);
+
+  if (existingError) {
+    logEvent("error", "adjudication.full_score_range_load_failed", {
+      applicationId,
+      actorId: profile.id,
+      code: existingError.code,
+      message: existingError.message,
+    });
+    return {
+      ok: false,
+      error: "We couldn't load the saved category ranges. Please try again.",
+      attemptId,
+    };
+  }
+
+  const existingByCategory = new Map(
+    (existingRows ?? []).map((proposal) => [proposal.category_id, proposal]),
+  );
+  const decisions = categoryIds.flatMap((categoryId) => {
+    const existing = existingByCategory.get(categoryId);
+    const selectedRange = selectedRanges.get(categoryId) ?? null;
+    const rangeMinimum = selectedRange?.rangeMinimum ?? null;
+    const rangeMaximum = selectedRange?.rangeMaximum ?? null;
+
+    if (
+      (!existing && selectedRange == null) ||
+      (existing &&
+        numbersMatch(existing.range_min, rangeMinimum) &&
+        numbersMatch(existing.range_max, rangeMaximum))
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        category_id: categoryId,
+        is_eligible: existing?.is_eligible ?? true,
+        range_min: rangeMinimum,
+        range_max: rangeMaximum,
+        advisory_note: existing?.advisory_note ?? null,
+        owner_override_note: existing?.owner_override_note ?? null,
+      },
+    ];
+  });
+
+  if (decisions.length === 0) {
+    return {
+      ok: true,
+      changedCount: 0,
+      message: "The two-point ranges are already up to date.",
+      attemptId,
+    };
+  }
+
+  const { data: changedCount, error: saveError } = await supabase.rpc(
+    "save_adjudication_category_proposal_drafts",
+    {
+      p_application_id: applicationId,
+      p_decisions: decisions,
+    },
+  );
+
+  if (saveError) {
+    logEvent("error", "adjudication.full_score_range_save_failed", {
+      applicationId,
+      actorId: profile.id,
+      code: saveError.code,
+      message: saveError.message,
+    });
+    return {
+      ok: false,
+      error: "We couldn't save the two-point ranges. Please try again.",
+      attemptId,
+    };
+  }
+
+  const savedCount = Number(changedCount ?? decisions.length);
+  revalidatePath(`/portal/adjudication/${applicationId}`);
+
+  return {
+    ok: true,
+    changedCount: savedCount,
+    message: `${savedCount} two-point range${savedCount === 1 ? "" : "s"} saved to Review All Categories.`,
+    attemptId,
+  };
+}
 
 function numbersMatch(
   left: number | string | null,

@@ -943,6 +943,15 @@ export default async function AdjudicationApplicationPage({
           : undefined
       }
       categories={scoreableCategories}
+      categoryProposals={(proposalResult.data ?? []) as Array<{
+        category_id: string;
+        is_eligible: boolean;
+        range_min: number | null;
+        range_max: number | null;
+        status: string;
+        advisory_note: string | null;
+        owner_override_note: string | null;
+      }>}
       categorySubjectDefaults={categorySubjectDefaults}
       criteria={scoreableCriteria}
       assignments={assignments}

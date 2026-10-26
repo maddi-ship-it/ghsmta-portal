@@ -11,7 +11,10 @@ import {
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
 import { AdjudicationBigPictureComment } from "@/components/adjudication-overall-production";
 import { OPEN_FULL_SCORE_VIEW_EVENT } from "@/components/application-reference-bar";
-import { FullScoreOverviewModal } from "@/components/full-score-overview-modal";
+import {
+  FullScoreOverviewModal,
+  type FullScoreCategoryProposal,
+} from "@/components/full-score-overview-modal";
 import { OwnerCommentReviewModal } from "@/components/owner-comment-review-modal";
 import { PanelNarrativeReviewEditor } from "@/components/panel-narrative-review-editor";
 import { RichTextField } from "@/components/rich-text-field";
@@ -683,6 +686,7 @@ export function OwnerLiveAdjudicationReview({
   advisoryNarrativeReview,
   advisoryScoreEntry,
   categories,
+  categoryProposals,
   criteria,
   assignments,
   profiles,
@@ -701,6 +705,7 @@ export function OwnerLiveAdjudicationReview({
   advisoryNarrativeReview?: AdvisoryNarrativeReview;
   advisoryScoreEntry?: AdvisoryScoreEntry;
   categories: ScoringCategory[];
+  categoryProposals: FullScoreCategoryProposal[];
   criteria: ScoringCriterion[];
   assignments: AdjudicatorAssignment[];
   profiles: Profile[];
@@ -1068,8 +1073,10 @@ export function OwnerLiveAdjudicationReview({
   return (
     <>
       <FullScoreOverviewModal
+        applicationId={applicationId}
         assignments={panelAssignments}
         categories={categories}
+        categoryProposals={categoryProposals}
         criteria={criteria}
         onClose={closeFullScoreOverview}
         open={fullScoreOverviewOpen}

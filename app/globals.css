@@ -19243,6 +19243,13 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
   background: var(--portal-surface);
 }
 
+.full-score-overview-form {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 .full-score-overview-body {
   min-height: 0;
   flex: 1 1 auto;
@@ -19346,6 +19353,29 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
   border-left: 1px solid var(--portal-line);
 }
 
+.full-score-selected-range-column {
+  min-width: 205px;
+  border-left: 1px solid var(--portal-line);
+  background: color-mix(in srgb, var(--portal-blue) 6%, var(--portal-surface-2)) !important;
+}
+
+.full-score-range-select {
+  width: 100%;
+  min-width: 170px;
+  height: 42px;
+  padding-block: 7px;
+  font-weight: 800;
+}
+
+.full-score-selected-range-column > small,
+.full-score-range-not-required {
+  display: block;
+  margin-top: 5px;
+  color: var(--portal-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
 .full-score-overview-table tbody tr.full-score-range-within > :where(th, td) {
   background: color-mix(in srgb, #2fa86f 16%, var(--portal-surface)) !important;
   box-shadow: inset 0 1px color-mix(in srgb, #56d79a 38%, transparent),
@@ -19368,8 +19398,24 @@ html:not([data-theme="light"]) .portal-shell .score-range-modal-actions .button:
 
 .full-score-overview-footer {
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
   color: var(--portal-muted);
   background: var(--portal-surface);
+}
+
+.full-score-overview-footer-status {
+  display: grid;
+  gap: 3px;
+}
+
+.full-score-overview-footer-status strong:not(.form-error) {
+  color: var(--portal-success);
+  font-size: 0.78rem;
+}
+
+.full-score-overview-footer .button-row {
+  flex: 0 0 auto;
 }
 
 html[data-theme="light"] .full-score-overview-table tbody th strong,
@@ -19430,6 +19476,16 @@ html[data-theme="light"] .advisory-live-range-outside {
   .full-score-overview-modal > .sticky-modal-header,
   .full-score-overview-footer {
     padding: 14px;
+  }
+
+  .full-score-overview-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .full-score-overview-footer .button-row,
+  .full-score-overview-footer .button {
+    width: 100%;
   }
 
   .full-score-overview-table thead th {
