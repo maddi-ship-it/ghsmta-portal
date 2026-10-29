@@ -167,6 +167,12 @@ function buildNavigation(profile: Profile) {
         icon: "⚙",
       },
       {
+        href: "/portal/admin/operations",
+        label: "Production operations",
+        shortLabel: "Operations",
+        icon: "◈",
+      },
+      {
         href: "/portal/admin/users",
         label: "Users",
         icon: "♙",
