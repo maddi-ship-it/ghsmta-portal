@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 const OPERATIONS_ROOT = "/portal/admin/operations";
+const EASTERN_TIME_ZONE = "America/New_York";
 
 function value(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -27,6 +28,51 @@ function checkbox(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }
 
+function localDateTimeToIso(raw: string) {
+  const match = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/,
+  );
+  if (!match) throw new Error("Enter a valid date and time.");
+
+  const [, year, month, day, hour, minute] = match;
+  const targetUtc = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+  );
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: EASTERN_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date(targetUtc))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const representedUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return new Date(targetUtc - (representedUtc - targetUtc)).toISOString();
+}
+
+function optionalLocalDateTime(formData: FormData, key: string) {
+  const raw = value(formData, key);
+  return raw ? localDateTimeToIso(raw) : null;
+}
+
 function requireValue(formData: FormData, key: string, label: string) {
   const result = value(formData, key);
   if (!result) throw new Error(`${label} is required.`);
@@ -38,6 +84,7 @@ function revalidateOperations(extraPath?: string) {
   revalidatePath(`${OPERATIONS_ROOT}/schedule`);
   revalidatePath(`${OPERATIONS_ROOT}/calls`);
   revalidatePath(`${OPERATIONS_ROOT}/budgets`);
+  revalidatePath(`${OPERATIONS_ROOT}/trucking`);
   if (extraPath) revalidatePath(extraPath);
 }
 
@@ -491,4 +538,237 @@ export async function deleteBudgetTransaction(formData: FormData) {
     .eq("id", transactionId);
   if (error) throw new Error(error.message);
   revalidateOperations(`${OPERATIONS_ROOT}/budgets/${productionId}`);
+}
+
+export async function createTruckVehicle(formData: FormData) {
+  const { profile, supabase } = await ownerContext();
+  const { error } = await supabase
+    .from("ghsmta_operations_truck_vehicles")
+    .insert({
+      vehicle_name: requireValue(formData, "vehicle_name", "Vehicle name"),
+      vehicle_type: nullable(formData, "vehicle_type"),
+      plate_number: nullable(formData, "plate_number"),
+      current_location: nullable(formData, "current_location"),
+      door_type: nullable(formData, "door_type"),
+      capacity_notes: nullable(formData, "capacity_notes"),
+      notes: nullable(formData, "notes"),
+      sort_order: numberValue(formData, "sort_order"),
+      created_by: profile.id,
+      updated_by: profile.id,
+    });
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function updateTruckVehicle(formData: FormData) {
+  const { profile, supabase } = await ownerContext();
+  const id = requireValue(formData, "vehicle_id", "Vehicle");
+  const { error } = await supabase
+    .from("ghsmta_operations_truck_vehicles")
+    .update({
+      vehicle_name: requireValue(formData, "vehicle_name", "Vehicle name"),
+      vehicle_type: nullable(formData, "vehicle_type"),
+      plate_number: nullable(formData, "plate_number"),
+      current_location: nullable(formData, "current_location"),
+      door_type: nullable(formData, "door_type"),
+      capacity_notes: nullable(formData, "capacity_notes"),
+      notes: nullable(formData, "notes"),
+      active: checkbox(formData, "active"),
+      sort_order: numberValue(formData, "sort_order"),
+      updated_by: profile.id,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function deleteTruckVehicle(formData: FormData) {
+  const { supabase } = await ownerContext();
+  const id = requireValue(formData, "vehicle_id", "Vehicle");
+  const { error } = await supabase
+    .from("ghsmta_operations_truck_vehicles")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function createTruckMove(formData: FormData) {
+  const { profile, supabase } = await ownerContext();
+  const { error } = await supabase.from("ghsmta_operations_truck_moves").insert({
+    production_id: nullable(formData, "production_id"),
+    move_title: requireValue(formData, "move_title", "Move title"),
+    move_type: value(formData, "move_type") || "delivery",
+    move_status: value(formData, "move_status") || "draft",
+    priority: value(formData, "priority") || "normal",
+    scheduled_start: optionalLocalDateTime(formData, "scheduled_start"),
+    scheduled_end: optionalLocalDateTime(formData, "scheduled_end"),
+    truck_vehicle_id: nullable(formData, "truck_vehicle_id"),
+    driver_profile_id: nullable(formData, "driver_profile_id"),
+    driver_name: nullable(formData, "driver_name"),
+    public_notes: nullable(formData, "public_notes"),
+    internal_notes: nullable(formData, "internal_notes"),
+    created_by: profile.id,
+    updated_by: profile.id,
+  });
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function updateTruckMove(formData: FormData) {
+  const { profile, supabase } = await ownerContext();
+  const id = requireValue(formData, "move_id", "Truck move");
+  const { error } = await supabase
+    .from("ghsmta_operations_truck_moves")
+    .update({
+      production_id: nullable(formData, "production_id"),
+      move_title: requireValue(formData, "move_title", "Move title"),
+      move_type: value(formData, "move_type") || "delivery",
+      move_status: value(formData, "move_status") || "draft",
+      priority: value(formData, "priority") || "normal",
+      scheduled_start: optionalLocalDateTime(formData, "scheduled_start"),
+      scheduled_end: optionalLocalDateTime(formData, "scheduled_end"),
+      truck_vehicle_id: nullable(formData, "truck_vehicle_id"),
+      driver_profile_id: nullable(formData, "driver_profile_id"),
+      driver_name: nullable(formData, "driver_name"),
+      public_notes: nullable(formData, "public_notes"),
+      internal_notes: nullable(formData, "internal_notes"),
+      updated_by: profile.id,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function duplicateTruckMove(formData: FormData) {
+  const { profile, supabase } = await ownerContext();
+  const id = requireValue(formData, "move_id", "Truck move");
+  const [{ data: move, error: moveError }, { data: stops, error: stopsError }] =
+    await Promise.all([
+      supabase
+        .from("ghsmta_operations_truck_moves")
+        .select(
+          "production_id,move_title,move_type,priority,scheduled_start,scheduled_end,truck_vehicle_id,driver_profile_id,driver_name,internal_notes,public_notes",
+        )
+        .eq("id", id)
+        .single(),
+      supabase
+        .from("ghsmta_operations_truck_stops")
+        .select(
+          "stop_order,stop_type,action_label,location_id,custom_location_name,custom_address,scheduled_arrival,scheduled_departure,contact_name,contact_phone,contact_email,stop_notes,trailer_label,show_on_schedule,driver_profile_id,driver_name,truck_vehicle_id",
+        )
+        .eq("truck_move_id", id),
+    ]);
+  if (moveError || !move) throw new Error(moveError?.message || "Truck move not found.");
+  if (stopsError) throw new Error(stopsError.message);
+  const { data: copy, error } = await supabase
+    .from("ghsmta_operations_truck_moves")
+    .insert({
+      ...move,
+      move_title: `${move.move_title} (copy)`,
+      move_status: "draft",
+      created_by: profile.id,
+      updated_by: profile.id,
+    })
+    .select("id")
+    .single();
+  if (error || !copy) throw new Error(error?.message || "Unable to duplicate truck move.");
+  if (stops?.length) {
+    const { error: stopCopyError } = await supabase
+      .from("ghsmta_operations_truck_stops")
+      .insert(
+        stops.map((stop) => ({
+          ...stop,
+          truck_move_id: copy.id,
+          is_complete: false,
+          created_by: profile.id,
+          updated_by: profile.id,
+        })),
+      );
+    if (stopCopyError) throw new Error(stopCopyError.message);
+  }
+  revalidateOperations();
+}
+
+export async function deleteTruckMove(formData: FormData) {
+  const { supabase } = await ownerContext();
+  const id = requireValue(formData, "move_id", "Truck move");
+  const { error } = await supabase
+    .from("ghsmta_operations_truck_moves")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function createTruckStop(formData: FormData) {
+  const { profile, supabase } = await ownerContext();
+  const moveId = requireValue(formData, "move_id", "Truck move");
+  const { error } = await supabase.from("ghsmta_operations_truck_stops").insert({
+    truck_move_id: moveId,
+    stop_order: numberValue(formData, "stop_order"),
+    stop_type: value(formData, "stop_type") || "stop",
+    action_label: nullable(formData, "action_label"),
+    location_id: nullable(formData, "location_id"),
+    custom_location_name: nullable(formData, "custom_location_name"),
+    custom_address: nullable(formData, "custom_address"),
+    scheduled_arrival: optionalLocalDateTime(formData, "scheduled_arrival"),
+    scheduled_departure: optionalLocalDateTime(formData, "scheduled_departure"),
+    contact_name: nullable(formData, "contact_name"),
+    contact_phone: nullable(formData, "contact_phone"),
+    contact_email: nullable(formData, "contact_email"),
+    stop_notes: nullable(formData, "stop_notes"),
+    trailer_label: nullable(formData, "trailer_label"),
+    show_on_schedule: checkbox(formData, "show_on_schedule"),
+    is_complete: checkbox(formData, "is_complete"),
+    driver_profile_id: nullable(formData, "driver_profile_id"),
+    driver_name: nullable(formData, "driver_name"),
+    truck_vehicle_id: nullable(formData, "truck_vehicle_id"),
+    created_by: profile.id,
+    updated_by: profile.id,
+  });
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function updateTruckStop(formData: FormData) {
+  const { profile, supabase } = await ownerContext();
+  const id = requireValue(formData, "stop_id", "Truck stop");
+  const { error } = await supabase
+    .from("ghsmta_operations_truck_stops")
+    .update({
+      stop_order: numberValue(formData, "stop_order"),
+      stop_type: value(formData, "stop_type") || "stop",
+      action_label: nullable(formData, "action_label"),
+      location_id: nullable(formData, "location_id"),
+      custom_location_name: nullable(formData, "custom_location_name"),
+      custom_address: nullable(formData, "custom_address"),
+      scheduled_arrival: optionalLocalDateTime(formData, "scheduled_arrival"),
+      scheduled_departure: optionalLocalDateTime(formData, "scheduled_departure"),
+      contact_name: nullable(formData, "contact_name"),
+      contact_phone: nullable(formData, "contact_phone"),
+      contact_email: nullable(formData, "contact_email"),
+      stop_notes: nullable(formData, "stop_notes"),
+      trailer_label: nullable(formData, "trailer_label"),
+      show_on_schedule: checkbox(formData, "show_on_schedule"),
+      is_complete: checkbox(formData, "is_complete"),
+      driver_profile_id: nullable(formData, "driver_profile_id"),
+      driver_name: nullable(formData, "driver_name"),
+      truck_vehicle_id: nullable(formData, "truck_vehicle_id"),
+      updated_by: profile.id,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateOperations();
+}
+
+export async function deleteTruckStop(formData: FormData) {
+  const { supabase } = await ownerContext();
+  const id = requireValue(formData, "stop_id", "Truck stop");
+  const { error } = await supabase
+    .from("ghsmta_operations_truck_stops")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateOperations();
 }

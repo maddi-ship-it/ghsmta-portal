@@ -51,6 +51,7 @@ const routeRoleCoverage = new Map([
   ["/portal/admin/operations/calls/[callId]", ownerOnly],
   ["/portal/admin/operations/budgets", ownerOnly],
   ["/portal/admin/operations/budgets/[productionId]", ownerOnly],
+  ["/portal/admin/operations/trucking", ownerOnly],
   ["/portal/admin/reports", ownerOnly],
   ["/portal/admin/scoring", ownerOnly],
   ["/portal/admin/scoring/rubrics/[id]", ownerOnly],

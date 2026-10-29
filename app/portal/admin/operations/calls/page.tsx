@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
+import { OperationsExportMenu } from "@/components/operations-export-menu";
 import { createClient } from "@/lib/supabase/server";
 
 import { createCall, deleteCall, duplicateCall } from "../actions";
@@ -65,6 +66,19 @@ export default async function OperationsCallsPage({ searchParams }: { searchPara
   return (
     <div className="operations-stack">
       <section className="operations-section-heading"><div><span className="eyebrow">GHSMTA production labor</span><h2>Calls</h2><p>Build labor calls, assign crew, track working sessions and payroll estimates, and finalize call sheets.</p></div><span className="badge">{calls.length} calls shown</span></section>
+
+      <OperationsExportMenu
+        description="GHSMTA call sheets, sign-in sheets, payroll, and crew schedules."
+        options={[
+          { label: "Call Sheet PDF", module: "calls", format: "pdf", variant: "call-sheet", query: { production: filters.production } },
+          { label: "Payroll Cost PDF", module: "calls", format: "pdf", variant: "payroll", query: { production: filters.production } },
+          { label: "Daily Sign-In Sheet PDF", module: "calls", format: "pdf", variant: "daily-sign-in", query: { production: filters.production } },
+          { label: "Daily Payroll PDF", module: "calls", format: "pdf", variant: "daily-payroll", query: { production: filters.production } },
+          { label: "Weekly Payroll Projection PDF", module: "calls", format: "pdf", variant: "weekly-payroll", query: { production: filters.production } },
+          { label: "Crew Schedule PDF", module: "calls", format: "pdf", variant: "person-schedule", query: { production: filters.production } },
+          { label: "Department Schedule CSV", module: "calls", format: "csv", variant: "department-schedule", query: { production: filters.production } },
+        ]}
+      />
 
       <details className="panel operations-create-panel" open={calls.length === 0 && productions.length > 0}>
         <summary><span><strong>Create a labor call</strong><small>Start a GHSMTA call and connect it to an optional master schedule event.</small></span><span aria-hidden="true">＋</span></summary>

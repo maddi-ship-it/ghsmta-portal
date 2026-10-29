@@ -92,6 +92,7 @@ function buildNavigation(profile: Profile) {
   }
 
   const management: NavItem[] = [];
+  const production: NavItem[] = [];
 
   if (profile.role === "applicant") {
     primary.push({
@@ -153,6 +154,35 @@ function buildNavigation(profile: Profile) {
   }
 
   if (profile.role === "owner") {
+    production.push(
+      {
+        href: "/portal/admin/operations",
+        label: "Productions",
+        icon: "◈",
+      },
+      {
+        href: "/portal/admin/operations/schedule",
+        label: "Production schedule",
+        shortLabel: "Schedule",
+        icon: "◷",
+      },
+      {
+        href: "/portal/admin/operations/calls",
+        label: "Calls",
+        icon: "☷",
+      },
+      {
+        href: "/portal/admin/operations/budgets",
+        label: "Budgets",
+        icon: "$",
+      },
+      {
+        href: "/portal/admin/operations/trucking",
+        label: "Trucking",
+        icon: "▰",
+      },
+    );
+
     management.push(
       {
         href: "/portal/admin/billing",
@@ -165,12 +195,6 @@ function buildNavigation(profile: Profile) {
         label: "Program setup",
         shortLabel: "Setup",
         icon: "⚙",
-      },
-      {
-        href: "/portal/admin/operations",
-        label: "Production operations",
-        shortLabel: "Operations",
-        icon: "◈",
       },
       {
         href: "/portal/admin/users",
@@ -200,10 +224,12 @@ function buildNavigation(profile: Profile) {
   return {
     primary,
     resources,
+    production,
     management,
     mobile: [
       ...primary,
       ...resources,
+      ...production,
       ...management,
       {
         href: "/portal/account",
@@ -316,6 +342,8 @@ export async function PortalHeader({
               label={profile.role === "applicant" ? "School" : "Resources"}
               items={navigation.resources}
             />
+
+            <DesktopMenu label="Production" items={navigation.production} />
 
             <DesktopMenu label="Admin" items={navigation.management} />
           </nav>

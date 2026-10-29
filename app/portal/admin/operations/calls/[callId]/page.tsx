@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
+import { OperationsExportMenu } from "@/components/operations-export-menu";
 import { createClient } from "@/lib/supabase/server";
 
 import { addCallAssignment, deleteCallAssignment, deleteCall, updateCall, updateCallAssignment } from "../../actions";
@@ -51,6 +52,17 @@ export default async function CallDetailPage({ params }: { params: Promise<{ cal
   return (
     <div className="operations-stack">
       <section className="operations-section-heading"><div><Link className="operations-back-link" href="/portal/admin/operations/calls">← All calls</Link><span className="eyebrow">GHSMTA call sheet</span><h2>{call.description}</h2><p>Manage the call schedule, meal windows, crew assignments, payroll estimates, and actuals.</p></div><span className={`badge badge-${call.status}`}>{call.is_final ? "final" : label(call.status)}</span></section>
+
+      <OperationsExportMenu
+        description="GHSMTA individual call, sign-in, payroll, and crew reports."
+        options={[
+          { label: "Call Sheet PDF", module: "calls", format: "pdf", variant: "call-sheet", query: { callId: call.id } },
+          { label: "Payroll Cost PDF", module: "calls", format: "pdf", variant: "payroll", query: { callId: call.id } },
+          { label: "Sign-In Sheet PDF", module: "calls", format: "pdf", variant: "daily-sign-in", query: { callId: call.id } },
+          { label: "Crew Schedule PDF", module: "calls", format: "pdf", variant: "person-schedule", query: { callId: call.id } },
+          { label: "Department Schedule CSV", module: "calls", format: "csv", variant: "department-schedule", query: { callId: call.id } },
+        ]}
+      />
 
       <section className="operations-summary-grid operations-summary-grid-three"><article><span>Assigned crew</span><strong>{assignments.length}</strong><small>People and open positions</small></article><article><span>Estimated payroll</span><strong>{money(estimatedTotal)}</strong><small>From rates and estimates</small></article><article><span>Actual payroll</span><strong>{money(actualTotal)}</strong><small>Entered actual pay</small></article></section>
 

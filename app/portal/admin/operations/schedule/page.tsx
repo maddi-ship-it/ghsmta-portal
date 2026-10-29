@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
+import { OperationsExportMenu } from "@/components/operations-export-menu";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -92,6 +93,15 @@ export default async function OperationsSchedulePage({ searchParams }: { searchP
         <div><span className="eyebrow">GHSMTA master calendar</span><h2>Schedule</h2><p>Production events, meetings, deadlines, calls, and department milestones.</p></div>
         <span className="badge">{events.length} events shown</span>
       </section>
+
+      <OperationsExportMenu
+        description="GHSMTA daily, advance, and editable schedule reports."
+        options={[
+          { label: "Daily Schedule PDF", module: "schedule", format: "pdf", variant: "daily", query: { date: filters.from || dateInput() } },
+          { label: "Advance Schedule PDF", module: "schedule", format: "pdf", variant: "advance", query: { date: filters.from || dateInput() } },
+          { label: "Schedule CSV", module: "schedule", format: "csv", variant: "csv", query: { production: filters.production, from: filters.from, to: filters.to } },
+        ]}
+      />
 
       <details className="panel operations-create-panel">
         <summary><span><strong>Add schedule event</strong><small>Create a GHSMTA event, deadline, rehearsal, or performance.</small></span><span aria-hidden="true">＋</span></summary>

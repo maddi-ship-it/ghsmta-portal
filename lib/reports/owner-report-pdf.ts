@@ -1,10 +1,11 @@
 import {
   PDFDocument,
   StandardFonts,
-  rgb,
   type PDFFont,
   type PDFPage,
 } from "pdf-lib";
+
+import { GHSMTA_PRINT } from "@/lib/reports/print-brand";
 
 export type OwnerReportName =
   | "missing-comments"
@@ -29,15 +30,15 @@ const TABLE_HEADER_HEIGHT = 24;
 const FOOTER_HEIGHT = 28;
 
 const COLORS = {
-  midnight: rgb(7 / 255, 11 / 255, 23 / 255),
-  navy: rgb(0 / 255, 22 / 255, 153 / 255),
-  gold: rgb(212 / 255, 175 / 255, 55 / 255),
-  ivory: rgb(247 / 255, 242 / 255, 232 / 255),
-  text: rgb(36 / 255, 36 / 255, 36 / 255),
-  muted: rgb(96 / 255, 105 / 255, 121 / 255),
-  line: rgb(218 / 255, 223 / 255, 233 / 255),
-  soft: rgb(246 / 255, 248 / 255, 252 / 255),
-  white: rgb(1, 1, 1),
+  midnight: GHSMTA_PRINT.midnight,
+  navy: GHSMTA_PRINT.navy,
+  gold: GHSMTA_PRINT.gold,
+  ivory: GHSMTA_PRINT.ivory,
+  text: GHSMTA_PRINT.ink,
+  muted: GHSMTA_PRINT.muted,
+  line: GHSMTA_PRINT.line,
+  soft: GHSMTA_PRINT.row,
+  white: GHSMTA_PRINT.white,
 };
 
 function cleanText(value: unknown) {
@@ -237,7 +238,7 @@ function drawPageHeader(
     y: PAGE_HEIGHT - 69,
     size: 8.5,
     font: regular,
-    color: rgb(220 / 255, 229 / 255, 1),
+    color: COLORS.ivory,
   });
 
   const summary = `${rowCount} record${rowCount === 1 ? "" : "s"}`;
@@ -256,7 +257,7 @@ function drawPageHeader(
     y: PAGE_HEIGHT - 58,
     size: 7.5,
     font: regular,
-    color: rgb(220 / 255, 229 / 255, 1),
+    color: COLORS.ivory,
   });
 }
 

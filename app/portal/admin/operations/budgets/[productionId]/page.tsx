@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
+import { OperationsExportMenu } from "@/components/operations-export-menu";
 import { createClient } from "@/lib/supabase/server";
 
 import { createBudgetLine, createBudgetTransaction, deleteBudgetLine, deleteBudgetTransaction, updateBudgetLine, updateBudgetTransaction } from "../../actions";
@@ -43,6 +44,15 @@ export default async function ProductionBudgetPage({ params }: { params: Promise
   return (
     <div className="operations-stack">
       <section className="operations-section-heading"><div><Link className="operations-back-link" href="/portal/admin/operations/budgets">← All budgets</Link><span className="eyebrow">GHSMTA production budget</span><h2>{production.name}</h2><p>{production.code ? `${production.code} · ` : ""}Budget lines, commitments, actuals, and forecast details.</p></div><span className={`badge badge-${production.status}`}>{label(production.status)}</span></section>
+
+      <OperationsExportMenu
+        description="GHSMTA production budget and detailed transaction reports."
+        options={[
+          { label: "Budget PDF", module: "budgets", format: "pdf", variant: "budget", query: { production: production.id } },
+          { label: "Detail PDF", module: "budgets", format: "pdf", variant: "detail", query: { production: production.id } },
+          { label: "Detail CSV", module: "budgets", format: "csv", variant: "detail", query: { production: production.id } },
+        ]}
+      />
 
       <section className="operations-summary-grid operations-budget-summary"><article><span>Current budget</span><strong>{money(current)}</strong><small>Original + approved changes</small></article><article><span>Estimated</span><strong>{money(estimated)}</strong><small>Open expenses</small></article><article><span>Paid</span><strong>{money(paid)}</strong><small>Actuals</small></article><article><span>Forecast</span><strong>{money(forecast)}</strong><small>Estimated + paid</small></article><article><span>Remaining</span><strong className={remaining < 0 ? "operations-negative" : ""}>{money(remaining)}</strong><small>Current budget − forecast</small></article></section>
 

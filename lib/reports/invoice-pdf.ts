@@ -1,14 +1,15 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import { formatInvoiceAmount, type InvoiceContext } from "../billing/types";
+import { GHSMTA_PRINT } from "./print-brand";
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const MARGIN = 48;
-const MAGENTA = rgb(0.89, 0.2, 0.64);
-const NAVY = rgb(0.08, 0.16, 0.3);
-const MUTED = rgb(0.38, 0.42, 0.5);
-const LIGHT = rgb(0.82, 0.82, 0.82);
+const GOLD = GHSMTA_PRINT.gold;
+const NAVY = GHSMTA_PRINT.navy;
+const MUTED = GHSMTA_PRINT.muted;
+const LIGHT = GHSMTA_PRINT.goldSoft;
 
 type InvoiceBillToFields = Pick<
   InvoiceContext,
@@ -140,7 +141,7 @@ export async function createInvoicePdf(
     y: 650,
     size: documentTitle === "Scholarship Confirmation" ? 17 : 18,
     font: bold,
-    color: MAGENTA,
+    color: GOLD,
   });
   const titleLabelWidth = bold.widthOfTextAtSize(titleLabel, documentTitle === "Scholarship Confirmation" ? 17 : 18);
   page.drawText(invoice.invoice_number, {
@@ -148,15 +149,15 @@ export async function createInvoicePdf(
     y: 650,
     size: 18,
     font: regular,
-    color: MAGENTA,
+    color: GOLD,
   });
-  page.drawText("Date:", { x: MARGIN, y: 625, size: 17, font: bold, color: MAGENTA });
+  page.drawText("Date:", { x: MARGIN, y: 625, size: 17, font: bold, color: GOLD });
   page.drawText(issuedDate, {
     x: MARGIN + bold.widthOfTextAtSize("Date:", 17) + 7,
     y: 625,
     size: 17,
     font: regular,
-    color: MAGENTA,
+    color: GOLD,
   });
 
   if (invoice.status === "paid") {
@@ -230,7 +231,7 @@ export async function createInvoicePdf(
     y: tableTop,
     width: PAGE_WIDTH - MARGIN * 2,
     height: 27,
-    color: MAGENTA,
+    color: GOLD,
   });
   page.drawText("Description", {
     x: MARGIN + 10,
@@ -313,7 +314,7 @@ export async function createInvoicePdf(
     start: { x: MARGIN, y: 294 },
     end: { x: PAGE_WIDTH - MARGIN, y: 294 },
     thickness: 1.5,
-    color: MAGENTA,
+    color: GOLD,
   });
 
   if (
@@ -340,7 +341,7 @@ export async function createInvoicePdf(
     });
     let paymentY = 178;
     for (const line of wrapText(invoice.payment_url ?? "Payment link not provided", 235, regular, 8.2)) {
-      page.drawText(line, { x: 314, y: paymentY, size: 8.2, font: regular, color: rgb(0.03, 0.3, 0.7) });
+      page.drawText(line, { x: 314, y: paymentY, size: 8.2, font: regular, color: NAVY });
       paymentY -= 11;
     }
     if (invoice.payment_promo_code) {

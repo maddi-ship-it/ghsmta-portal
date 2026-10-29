@@ -11,6 +11,7 @@ import {
 } from "pdf-lib";
 
 import type { LoadedReport, ReportRow } from "@/lib/reports/report-data";
+import { GHSMTA_PRINT } from "@/lib/reports/print-brand";
 
 const PAGE_WIDTH = 792;
 const PAGE_HEIGHT = 612;
@@ -24,32 +25,28 @@ const CARD_COLUMNS = 3;
 const CARD_ROWS = 3;
 
 const COLORS = {
-  midnight: rgb(7 / 255, 11 / 255, 23 / 255),
-  navy: rgb(0 / 255, 22 / 255, 153 / 255),
-  gold: rgb(212 / 255, 175 / 255, 55 / 255),
-  ivory: rgb(247 / 255, 242 / 255, 232 / 255),
-  text: rgb(32 / 255, 40 / 255, 56 / 255),
-  muted: rgb(94 / 255, 104 / 255, 122 / 255),
-  line: rgb(218 / 255, 223 / 255, 233 / 255),
-  soft: rgb(247 / 255, 249 / 255, 252 / 255),
-  open: rgb(255 / 255, 248 / 255, 218 / 255),
-  white: rgb(1, 1, 1),
+  midnight: GHSMTA_PRINT.midnight,
+  navy: GHSMTA_PRINT.navy,
+  gold: GHSMTA_PRINT.gold,
+  ivory: GHSMTA_PRINT.ivory,
+  text: GHSMTA_PRINT.ink,
+  muted: GHSMTA_PRINT.muted,
+  line: GHSMTA_PRINT.line,
+  soft: GHSMTA_PRINT.row,
+  open: GHSMTA_PRINT.goldSoft,
+  white: GHSMTA_PRINT.white,
 };
 
 const MONTH_ACCENTS = [
-  rgb(45 / 255, 85 / 255, 160 / 255),
-  rgb(25 / 255, 123 / 255, 113 / 255),
-  rgb(98 / 255, 80 / 255, 147 / 255),
-  rgb(181 / 255, 76 / 255, 82 / 255),
-  rgb(180 / 255, 110 / 255, 28 / 255),
-  rgb(69 / 255, 112 / 255, 166 / 255),
-  rgb(125 / 255, 84 / 255, 151 / 255),
-  rgb(40 / 255, 130 / 255, 141 / 255),
-  rgb(177 / 255, 84 / 255, 130 / 255),
-  rgb(93 / 255, 118 / 255, 52 / 255),
-  rgb(167 / 255, 80 / 255, 42 / 255),
-  rgb(47 / 255, 92 / 255, 146 / 255),
+  COLORS.navy, COLORS.gold, COLORS.navy, COLORS.gold,
+  COLORS.navy, COLORS.gold, COLORS.navy, COLORS.gold,
+  COLORS.navy, COLORS.gold, COLORS.navy, COLORS.gold,
 ];
+
+function accentTextColor(accent: ReturnType<typeof rgb>) {
+  const luminance = 0.2126 * accent.red + 0.7152 * accent.green + 0.0722 * accent.blue;
+  return luminance > 0.55 ? COLORS.navy : COLORS.white;
+}
 
 type ScheduleItem = {
   row: ReportRow;
@@ -419,7 +416,7 @@ function drawScheduleCard({
     y: y + height - 10.8,
     size: 5.8,
     font: fonts.bold,
-    color: COLORS.white,
+    color: accentTextColor(accent),
   });
   const timeLabel = formatCardTime(startsAt, row.ends_at);
   const timeWidth = fonts.bold.widthOfTextAtSize(timeLabel, 5.6);
@@ -428,7 +425,7 @@ function drawScheduleCard({
     y: y + height - 10.8,
     size: 5.6,
     font: fonts.bold,
-    color: COLORS.white,
+    color: accentTextColor(accent),
   });
 
   page.drawText(truncate(fonts.bold, row.school, 6.4, width - 12), {

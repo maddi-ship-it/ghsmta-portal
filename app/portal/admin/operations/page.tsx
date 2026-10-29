@@ -1,4 +1,5 @@
 import { ConfirmedSubmitButton } from "@/components/confirmed-submit-button";
+import { OperationsExportMenu } from "@/components/operations-export-menu";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -64,6 +65,12 @@ export default async function ProductionOperationsPage() {
 
   return (
     <div className="operations-stack">
+      <OperationsExportMenu
+        options={[
+          { label: "Production Directory PDF", module: "productions", format: "pdf" },
+          { label: "Production Directory CSV", module: "productions", format: "csv" },
+        ]}
+      />
       <section className="operations-summary-grid" aria-label="Production operations overview">
         <article><span>Productions</span><strong>{productions.length}</strong><small>All GHSMTA internal projects</small></article>
         <article><span>Active</span><strong>{productions.filter((item) => item.status === "active").length}</strong><small>Currently in production</small></article>

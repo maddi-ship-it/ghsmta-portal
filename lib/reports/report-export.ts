@@ -1,7 +1,6 @@
 import {
   PDFDocument,
   StandardFonts,
-  rgb,
   type PDFFont,
   type PDFPage,
 } from "pdf-lib";
@@ -9,6 +8,7 @@ import {
 import type { LoadedReport, ReportRow } from "@/lib/reports/report-data";
 import type { ReportColumn } from "@/lib/reports/report-definitions";
 import { buildScheduleCalendarPdf } from "@/lib/reports/schedule-calendar-pdf";
+import { GHSMTA_PRINT } from "@/lib/reports/print-brand";
 
 const LANDSCAPE_WIDTH = 792;
 const LANDSCAPE_HEIGHT = 612;
@@ -18,15 +18,15 @@ const FOOTER_HEIGHT = 28;
 const TABLE_HEADER_HEIGHT = 24;
 
 const COLORS = {
-  navy: rgb(0 / 255, 22 / 255, 153 / 255),
-  midnight: rgb(7 / 255, 11 / 255, 23 / 255),
-  gold: rgb(212 / 255, 175 / 255, 55 / 255),
-  ivory: rgb(247 / 255, 242 / 255, 232 / 255),
-  text: rgb(32 / 255, 40 / 255, 56 / 255),
-  muted: rgb(94 / 255, 104 / 255, 122 / 255),
-  line: rgb(220 / 255, 226 / 255, 236 / 255),
-  soft: rgb(247 / 255, 249 / 255, 252 / 255),
-  white: rgb(1, 1, 1),
+  navy: GHSMTA_PRINT.navy,
+  midnight: GHSMTA_PRINT.midnight,
+  gold: GHSMTA_PRINT.gold,
+  ivory: GHSMTA_PRINT.ivory,
+  text: GHSMTA_PRINT.ink,
+  muted: GHSMTA_PRINT.muted,
+  line: GHSMTA_PRINT.line,
+  soft: GHSMTA_PRINT.row,
+  white: GHSMTA_PRINT.white,
 };
 
 function cleanText(value: unknown) {

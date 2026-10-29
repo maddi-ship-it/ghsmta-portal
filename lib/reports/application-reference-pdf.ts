@@ -10,15 +10,16 @@ import {
   formatApplicationReferenceValue,
   type ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
+import { GHSMTA_PRINT } from "@/lib/reports/print-brand";
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const MARGIN = 48;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-const NAVY = rgb(0.07, 0.12, 0.23);
-const GOLD = rgb(0.74, 0.52, 0.06);
-const SLATE = rgb(0.35, 0.4, 0.5);
-const RULE = rgb(0.82, 0.85, 0.9);
+const NAVY = GHSMTA_PRINT.navy;
+const GOLD = GHSMTA_PRINT.gold;
+const SLATE = GHSMTA_PRINT.muted;
+const RULE = GHSMTA_PRINT.line;
 
 const PDF_SYMBOL_REPLACEMENTS: Record<string, string> = {
   "⚑": "[APPEAL]",

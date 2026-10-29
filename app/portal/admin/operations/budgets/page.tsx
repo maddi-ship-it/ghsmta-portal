@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { OperationsExportMenu } from "@/components/operations-export-menu";
 import { createClient } from "@/lib/supabase/server";
 
 type Production = { id: string; name: string; code: string | null; status: string };
@@ -37,6 +38,15 @@ export default async function OperationsBudgetsPage() {
   return (
     <div className="operations-stack">
       <section className="operations-section-heading"><div><span className="eyebrow">GHSMTA production finance</span><h2>Budgets</h2><p>Track original budgets, approved changes, commitments, paid actuals, forecasts, remaining funds, and variance.</p></div><span className="badge">{productions.length} active budgets</span></section>
+
+      <OperationsExportMenu
+        description="GHSMTA production budget and forecast reports."
+        options={[
+          { label: "Budget Forecast PDF", module: "budgets", format: "pdf", variant: "budget" },
+          { label: "Budget Detail PDF", module: "budgets", format: "pdf", variant: "detail" },
+          { label: "Budget Detail CSV", module: "budgets", format: "csv", variant: "detail" },
+        ]}
+      />
 
       <section className="operations-summary-grid operations-budget-summary" aria-label="Budget totals">
         <article><span>Current budget</span><strong>{money(totals.current)}</strong><small>Original + approved changes</small></article>
