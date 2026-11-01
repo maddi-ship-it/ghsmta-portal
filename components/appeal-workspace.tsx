@@ -385,6 +385,7 @@ function EligibilityReviewForm({
   } | null>(null);
   const [pendingDecision, setPendingDecision] =
     useState<AppealAdvisoryDecision | null>(null);
+  const [editingVote, setEditingVote] = useState(false);
   const closed = appeal.status === "resolved" || appeal.status === "denied";
   const currentVote = votes.find(
     (vote) => vote.advisory_member_id === currentProfileId,
@@ -405,6 +406,7 @@ function EligibilityReviewForm({
         }
         const successMessage = result.message ?? "Your vote was recorded.";
         setFeedback({ kind: "success", message: successMessage });
+        setEditingVote(false);
         onSaved(successMessage);
       } catch (error) {
         setFeedback({
@@ -448,47 +450,96 @@ function EligibilityReviewForm({
       <section className="appeal-acm-vote-card" aria-labelledby={`vote-title-${appeal.id}`}>
         <div>
           <span className="eyebrow">Your committee decision</span>
-          <h3 id={`vote-title-${appeal.id}`}>Approve or deny this appeal</h3>
+          <h3 id={`vote-title-${appeal.id}`}>
+            {currentVote && !editingVote
+              ? "Decision recorded"
+              : "Approve or deny this appeal"}
+          </h3>
           <p>
             Your named decision is saved for the Owner&apos;s final review. You
             can change it until the appeal is closed.
           </p>
         </div>
-        <div className="appeal-vote-actions" role="group" aria-label="Appeal decision">
-          <button
-            aria-pressed={currentVote?.decision === "approved"}
-            className={`button appeal-vote-button vote-approved${
-              currentVote?.decision === "approved" ? " is-selected" : ""
-            }`}
-            disabled={saving}
-            onClick={() => recordVote("approved")}
-            type="button"
+        {currentVote && !editingVote ? (
+          <div
+            className={`appeal-vote-complete is-${currentVote.decision}`}
+            aria-live="polite"
           >
-            {saving && pendingDecision === "approved"
-              ? "Saving…"
-              : "Approve appeal"}
-          </button>
-          <button
-            aria-pressed={currentVote?.decision === "denied"}
-            className={`button button-danger appeal-vote-button${
-              currentVote?.decision === "denied" ? " is-selected" : ""
-            }`}
-            disabled={saving}
-            onClick={() => recordVote("denied")}
-            type="button"
-          >
-            {saving && pendingDecision === "denied"
-              ? "Saving…"
-              : "Deny appeal"}
-          </button>
-        </div>
-        <p className="appeal-current-vote" aria-live="polite">
-          {currentVote
-            ? `Current decision: ${
-                currentVote.decision === "approved" ? "Approved" : "Denied"
-              } · ${formatDate(currentVote.responded_at)}`
-            : "No decision recorded yet."}
-        </p>
+            <span aria-hidden="true" className="appeal-vote-complete-icon">
+              {currentVote.decision === "approved" ? "✓" : "×"}
+            </span>
+            <span>
+              <strong>
+                {currentVote.decision === "approved"
+                  ? "Appeal approved"
+                  : "Appeal denied"}
+              </strong>
+              <small>Recorded {formatDate(currentVote.responded_at)}</small>
+            </span>
+            <button
+              className="button button-secondary button-compact"
+              onClick={() => {
+                setFeedback(null);
+                setEditingVote(true);
+              }}
+              type="button"
+            >
+              Change decision
+            </button>
+          </div>
+        ) : (
+          <>
+            <div
+              className="appeal-vote-actions"
+              role="group"
+              aria-label="Appeal decision"
+            >
+              <button
+                aria-pressed={currentVote?.decision === "approved"}
+                className={`button appeal-vote-button vote-approved${
+                  currentVote?.decision === "approved" ? " is-selected" : ""
+                }`}
+                disabled={saving}
+                onClick={() => recordVote("approved")}
+                type="button"
+              >
+                {saving && pendingDecision === "approved"
+                  ? "Saving…"
+                  : "Approve appeal"}
+              </button>
+              <button
+                aria-pressed={currentVote?.decision === "denied"}
+                className={`button button-danger appeal-vote-button${
+                  currentVote?.decision === "denied" ? " is-selected" : ""
+                }`}
+                disabled={saving}
+                onClick={() => recordVote("denied")}
+                type="button"
+              >
+                {saving && pendingDecision === "denied"
+                  ? "Saving…"
+                  : "Deny appeal"}
+              </button>
+              {currentVote ? (
+                <button
+                  className="button button-secondary button-compact"
+                  disabled={saving}
+                  onClick={() => setEditingVote(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+            <p className="appeal-current-vote" aria-live="polite">
+              {currentVote
+                ? `Current decision: ${
+                    currentVote.decision === "approved" ? "Approved" : "Denied"
+                  }`
+                : "No decision recorded yet."}
+            </p>
+          </>
+        )}
         {feedback ? (
           <div
             className={

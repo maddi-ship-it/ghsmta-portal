@@ -5538,6 +5538,42 @@ body.modal-open {
 .appeal-vote-button.is-selected {
   box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
 }
+.appeal-vote-complete {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: min(520px, 45vw);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.appeal-vote-complete.is-approved {
+  border-color: color-mix(in srgb, var(--portal-success, var(--success)) 55%, var(--line));
+  background: color-mix(in srgb, var(--portal-success, var(--success)) 10%, var(--surface-soft));
+}
+.appeal-vote-complete.is-denied {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--line));
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface-soft));
+}
+.appeal-vote-complete-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  background: var(--muted);
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+.appeal-vote-complete.is-approved .appeal-vote-complete-icon {
+  background: var(--portal-success, var(--success));
+}
+.appeal-vote-complete.is-denied .appeal-vote-complete-icon { background: var(--danger); }
+.appeal-vote-complete strong,
+.appeal-vote-complete small { display: block; }
+.appeal-vote-complete small { margin-top: 3px; color: var(--muted); }
 .appeal-current-vote,
 .appeal-form-feedback { grid-column: 1 / -1; }
 .appeal-form-feedback { margin: 0; }
@@ -5601,6 +5637,11 @@ body.modal-open {
   .appeal-acm-vote-card { grid-template-columns: 1fr; }
   .appeal-vote-actions { justify-content: stretch; }
   .appeal-vote-button { flex: 1 1 140px; }
+  .appeal-vote-complete {
+    grid-template-columns: 38px minmax(0, 1fr);
+    min-width: 0;
+  }
+  .appeal-vote-complete .button { grid-column: 1 / -1; }
   .appeal-vote-summary-header { align-items: flex-start; flex-direction: column; }
   .appeal-vote-totals { justify-content: flex-start; }
 }
