@@ -1842,15 +1842,25 @@ function splitChannelGroups(groups: ChannelGroup[]) {
     .map((group) => ({
       ...group,
       channels: group.channels.sort((left, right) => {
+        const unreadDifference =
+          Number(right.unread_count > 0) - Number(left.unread_count > 0);
+
+        if (unreadDifference !== 0) return unreadDifference;
+
         if (left.channel_type === right.channel_type) return 0;
         return left.channel_type === "school_dm" ? -1 : 1;
       }),
     }))
-    .sort((left, right) =>
-      left.schoolName.localeCompare(right.schoolName, undefined, {
+    .sort((left, right) => {
+      const unreadDifference =
+        Number(right.unreadCount > 0) - Number(left.unreadCount > 0);
+
+      if (unreadDifference !== 0) return unreadDifference;
+
+      return left.schoolName.localeCompare(right.schoolName, undefined, {
         sensitivity: "base",
-      }),
-    );
+      });
+    });
 
   return { standardGroups, schoolGroups };
 }

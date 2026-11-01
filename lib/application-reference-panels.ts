@@ -88,7 +88,7 @@ function displayValue(value: unknown): string {
   }
 
   if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
+    return value ? "TRUE" : "FALSE";
   }
 
   if (typeof value === "number") {
@@ -145,6 +145,9 @@ export function formatApplicationReferenceValue(
     if (["1", "true", "yes"].includes(normalizedValue)) return "YES";
     if (["0", "false", "no"].includes(normalizedValue)) return "NO";
   }
+
+  if (normalizedValue === "true") return "TRUE";
+  if (normalizedValue === "false") return "FALSE";
 
   const numeric = Number(value.replace(/[$,%\s,]/g, ""));
 
@@ -264,7 +267,10 @@ function buildRows({
           .join(" "),
       ),
       label: cleanDisplayText(question.source_label || question.label),
-      value: displayValue(answerMap.get(question.id)),
+      value:
+        question.question_type === "yes_no"
+          ? formatBooleanAnswer(answerMap.get(question.id))
+          : displayValue(answerMap.get(question.id)),
       imported: question.imported,
       order:
         question.source_column_index ??
@@ -289,6 +295,19 @@ function buildRows({
   }
 
   return rows.sort((a, b) => a.order - b.order);
+}
+
+function formatBooleanAnswer(value: unknown) {
+  if (value === true || value === 1) return "TRUE";
+  if (value === false || value === 0) return "FALSE";
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes"].includes(normalized)) return "TRUE";
+    if (["0", "false", "no"].includes(normalized)) return "FALSE";
+  }
+
+  return displayValue(value);
 }
 
 function rowMatches(row: ReferenceRow, fragments: string[]) {

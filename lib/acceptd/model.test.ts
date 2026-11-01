@@ -62,6 +62,7 @@ describe("Acceptd application normalization", () => {
   });
 
   it("maps Acceptd field types onto portal-compatible read-only types", () => {
+    expect(portalQuestionType("boolean")).toBe("yes_no");
     expect(portalQuestionType("yesno")).toBe("yes_no");
     expect(portalQuestionType("upload")).toBe("short_text");
     expect(portalQuestionType("textarea")).toBe("long_text");

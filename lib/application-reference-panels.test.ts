@@ -73,6 +73,39 @@ const legacyApplication = {
 >;
 
 describe("buildApplicationReferencePanels", () => {
+  it("renders boolean application responses as TRUE or FALSE", () => {
+    const panels = buildApplicationReferencePanels({
+      application: legacyApplication,
+      questions: [
+        question("boolean-true", "Uses student performers", 1, {
+          question_type: "yes_no",
+        }),
+        question("boolean-false", "Uses guest performers", 2, {
+          question_type: "yes_no",
+        }),
+        question("source-boolean", "Imported boolean", 3),
+      ],
+      answers: [
+        answer("boolean-true", 1),
+        answer("boolean-false", false),
+        answer("source-boolean", true),
+      ],
+    });
+
+    const items = panels.find(
+      (panel) => panel.key === "full-application",
+    )?.groups[0]?.items;
+
+    expect(items?.map((item) => item.value)).toEqual([
+      "TRUE",
+      "FALSE",
+      "TRUE",
+    ]);
+    expect(formatApplicationReferenceValue("Imported", "false")).toBe(
+      "FALSE",
+    );
+  });
+
   it("removes stored HTML tags from popup labels and values", () => {
     const panels = buildApplicationReferencePanels({
       application: legacyApplication,

@@ -131,8 +131,13 @@ function chatChannelTitle(channel: ChatChannelRow) {
     : chatChannelLabel(channel);
 }
 
-function sortChatChannelsNewestFirst(channels: ChatChannelRow[]) {
+function sortChatChannelsUnreadFirst(channels: ChatChannelRow[]) {
   return channels.toSorted((left, right) => {
+    const unreadDifference =
+      Number(right.unread_count > 0) - Number(left.unread_count > 0);
+
+    if (unreadDifference !== 0) return unreadDifference;
+
     const rightTime = new Date(right.last_activity_at).getTime();
     const leftTime = new Date(left.last_activity_at).getTime();
     return rightTime - leftTime;
@@ -244,7 +249,7 @@ export function PortalUtilities({
 
     if (!channelError) {
       setChatChannels(
-        sortChatChannelsNewestFirst(
+        sortChatChannelsUnreadFirst(
           (channelRows ?? []) as ChatChannelRow[],
         ),
       );
@@ -279,10 +284,12 @@ export function PortalUtilities({
 
     if (!readResult.error) {
       setChatChannels((current) =>
-        current.map((channel) =>
-          channel.channel_id === channelId
-            ? { ...channel, unread_count: 0 }
-            : channel,
+        sortChatChannelsUnreadFirst(
+          current.map((channel) =>
+            channel.channel_id === channelId
+              ? { ...channel, unread_count: 0 }
+              : channel,
+          ),
         ),
       );
       await refreshUnreadCounts();

@@ -134,6 +134,7 @@ export function portalQuestionType(acceptdType: string): ApplicationQuestionType
     case "comment":
     case "address":
       return "long_text";
+    case "boolean":
     case "yesno":
       return "yes_no";
     case "modalsignature":
