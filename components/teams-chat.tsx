@@ -84,6 +84,14 @@ export type ChatMember = {
   user_role: AppRole;
 };
 
+export type PanelContact = {
+  userId: string;
+  name: string;
+  role: AppRole;
+  email: string | null;
+  phone: string | null;
+};
+
 export type AdjudicationVisitDetails = {
   scheduleTitle: string;
   dateLabel: string;
@@ -1148,6 +1156,90 @@ function AdjudicationVisitDetailsDialog({
   );
 }
 
+function PanelContactsDialog({
+  channel,
+  contacts,
+  onClose,
+}: {
+  channel: ChatChannel;
+  contacts: PanelContact[];
+  onClose: () => void;
+}) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
+
+  return (
+    <div
+      aria-labelledby="panel-contacts-title"
+      aria-modal="true"
+      className={styles.modalBackdrop}
+      ref={dialogRef}
+      role="dialog"
+      tabIndex={-1}
+    >
+      <section className={`${styles.broadcastModal} ${styles.visitDetailsModal}`}>
+        <div className={styles.broadcastModalHeader}>
+          <div>
+            <span className="eyebrow">Adjudication panel</span>
+            <h2 id="panel-contacts-title">Panel contacts</h2>
+            <p>
+              {channel.school_name ?? channel.channel_name}
+              {channel.production_title ? ` · ${channel.production_title}` : ""}
+            </p>
+          </div>
+          <button
+            aria-label="Close panel contacts"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        {contacts.length > 0 ? (
+          <div className={styles.visitDetailsGrid}>
+            {contacts.map((contact) => (
+              <section className={styles.visitDetailsCard} key={contact.userId}>
+                <h3>{contact.name}</h3>
+                <dl>
+                  <div>
+                    <dt>Role</dt>
+                    <dd>{roleName(contact.role)}</dd>
+                  </div>
+                  <div>
+                    <dt>Email</dt>
+                    <dd>
+                      {contact.email ? (
+                        <a href={`mailto:${contact.email}`}>{contact.email}</a>
+                      ) : (
+                        "Not provided"
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Phone</dt>
+                    <dd>
+                      {contact.phone ? (
+                        <a href={`tel:${contact.phone}`}>{contact.phone}</a>
+                      ) : (
+                        "Not provided"
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.visitDetailsEmpty}>
+            No active panel contacts are assigned to this school yet.
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function escapeRegularExpression(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2006,6 +2098,7 @@ export function TeamsChat({
   ownerChannelCandidates,
   adjudicationVisitDetails,
   eligibilityReferencePanel,
+  panelContacts,
   previewMode = false,
 }: {
   profile: Profile;
@@ -2016,6 +2109,7 @@ export function TeamsChat({
   ownerChannelCandidates: ChatMember[];
   adjudicationVisitDetails: AdjudicationVisitDetails | null;
   eligibilityReferencePanel: ApplicationReferencePanel | null;
+  panelContacts: PanelContact[];
   previewMode?: boolean;
 }) {
   const router = useRouter();
@@ -2044,6 +2138,7 @@ export function TeamsChat({
   const [showOwnerChannelMemberAdder, setShowOwnerChannelMemberAdder] = useState(false);
   const [showVisitDetails, setShowVisitDetails] = useState(false);
   const [showEligibility, setShowEligibility] = useState(false);
+  const [showPanelContacts, setShowPanelContacts] = useState(false);
   const [directMessageContacts, setDirectMessageContacts] = useState<ChatMember[]>([]);
   const [directMessageContactsLoaded, setDirectMessageContactsLoaded] = useState(false);
   const [directMessageSearch, setDirectMessageSearch] = useState("");
@@ -3140,6 +3235,13 @@ export function TeamsChat({
                 ) : null}
                 <button
                   className={styles.visitDetailsButton}
+                  onClick={() => setShowPanelContacts(true)}
+                  type="button"
+                >
+                  Panel contacts
+                </button>
+                <button
+                  className={styles.visitDetailsButton}
                   onClick={() => setShowVisitDetails(true)}
                   type="button"
                 >
@@ -3211,6 +3313,13 @@ export function TeamsChat({
                     Eligibility
                   </button>
                 ) : null}
+                <button
+                  className="button button-secondary button-compact"
+                  onClick={() => setShowPanelContacts(true)}
+                  type="button"
+                >
+                  Panel contacts
+                </button>
                 <button
                   className="button button-secondary button-compact"
                   onClick={() => setShowVisitDetails(true)}
@@ -4029,6 +4138,14 @@ export function TeamsChat({
         <ApplicationReferencePanelDialog
           onClose={() => setShowEligibility(false)}
           panel={eligibilityReferencePanel}
+        />
+      ) : null}
+
+      {showPanelContacts && activeChannel.channel_type === "school" ? (
+        <PanelContactsDialog
+          channel={activeChannel}
+          contacts={panelContacts}
+          onClose={() => setShowPanelContacts(false)}
         />
       ) : null}
 

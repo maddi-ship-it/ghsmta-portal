@@ -3,6 +3,7 @@ import type {
   ChatChannel,
   ChatMember,
   ChatThread,
+  PanelContact,
 } from "@/components/teams-chat";
 import { TeamsChat } from "@/components/teams-chat";
 import {
@@ -22,6 +23,7 @@ import type {
   Application,
   ApplicationAnswer,
   ApplicationQuestion,
+  AppRole,
 } from "@/lib/types";
 
 type RawChannel = Partial<ChatChannel> & {
@@ -53,6 +55,19 @@ type ScheduleSchoolDetailsReference = {
   wifi_password: string | null;
   day_of_contact_name: string | null;
   day_of_contact_phone: string | null;
+};
+
+type PanelAssignmentReference = {
+  adjudicator_user_id: string;
+  participant_role: AppRole | null;
+};
+
+type PanelProfileReference = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  phone_e164: string | null;
+  role: AppRole;
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -267,6 +282,7 @@ export default async function ChatPage({
   let members: ChatMember[] = [];
   let adjudicationVisitDetails: AdjudicationVisitDetails | null = null;
   let eligibilityReferencePanel: ApplicationReferencePanel | null = null;
+  let panelContacts: PanelContact[] = [];
 
   if (selectedChannel) {
     const shouldLoadVisitDetails =
@@ -300,6 +316,82 @@ export default async function ChatPage({
 
     threads = (threadResult.data ?? []) as ChatThread[];
     members = (memberResult.data ?? []) as ChatMember[];
+
+    if (shouldLoadVisitDetails && selectedChannel.application_id) {
+      const assignmentResult = await admin
+        .from("adjudicator_assignments")
+        .select("adjudicator_user_id,participant_role")
+        .eq("application_id", selectedChannel.application_id)
+        .is("removed_at", null);
+
+      if (assignmentResult.error) {
+        throw new Error(
+          `Panel contacts could not be loaded: ${assignmentResult.error.message}`,
+        );
+      }
+
+      const channelMemberIds = new Set(members.map((member) => member.user_id));
+      const panelAssignments = (
+        (assignmentResult.data ?? []) as PanelAssignmentReference[]
+      ).filter((assignment) =>
+        channelMemberIds.has(assignment.adjudicator_user_id),
+      );
+      const panelUserIds = [
+        ...new Set(
+          panelAssignments.map(
+            (assignment) => assignment.adjudicator_user_id,
+          ),
+        ),
+      ];
+
+      if (panelUserIds.length > 0) {
+        const profileResult = await admin
+          .from("profiles")
+          .select("id,email,full_name,phone_e164,role")
+          .in("id", panelUserIds);
+
+        if (profileResult.error) {
+          throw new Error(
+            `Panel contact details could not be loaded: ${profileResult.error.message}`,
+          );
+        }
+
+        const assignmentByUserId = new Map(
+          panelAssignments.map((assignment) => [
+            assignment.adjudicator_user_id,
+            assignment,
+          ]),
+        );
+        const roleOrder = new Map<AppRole, number>([
+          ["advisory_member", 0],
+          ["adjudicator", 1],
+          ["owner", 2],
+          ["applicant", 3],
+        ]);
+
+        panelContacts = (
+          (profileResult.data ?? []) as PanelProfileReference[]
+        )
+          .map((panelProfile) => ({
+            userId: panelProfile.id,
+            name:
+              panelProfile.full_name?.trim() ||
+              panelProfile.email ||
+              "Panel member",
+            role:
+              assignmentByUserId.get(panelProfile.id)?.participant_role ??
+              panelProfile.role,
+            email: panelProfile.email,
+            phone: panelProfile.phone_e164,
+          }))
+          .sort(
+            (left, right) =>
+              (roleOrder.get(left.role) ?? 99) -
+                (roleOrder.get(right.role) ?? 99) ||
+              left.name.localeCompare(right.name),
+          );
+      }
+    }
 
     const scheduleBooking = (
       (scheduleBookingsResult.data ?? []) as ScheduleBookingReference[]
@@ -471,6 +563,7 @@ export default async function ChatPage({
         initialMembers={members}
         initialThreads={threads}
         ownerChannelCandidates={ownerChannelCandidates}
+        panelContacts={panelContacts}
         profile={profile}
         selectedChannelId={selectedChannel?.channel_id ?? null}
       />
