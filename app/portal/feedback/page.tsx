@@ -17,7 +17,7 @@ export default async function FeedbackPage() {
       <header className="page-heading"><div><p className="eyebrow">Portal feedback</p><h1>My requests</h1><p>Track reported issues and requested improvements.</p></div></header>
       <div className="feedback-request-list">
         {(data ?? []).map((request) => (
-          <article className="feedback-request-card" key={request.id}>
+          <article className="feedback-request-card" id={`feedback-${request.id}`} key={request.id}>
             <div className="feedback-request-header"><div><span className="status-pill">{FEEDBACK_STATUS_LABELS[request.status as keyof typeof FEEDBACK_STATUS_LABELS] ?? request.status}</span><h2>{request.title}</h2><p className="feedback-reference">{request.reference_code} · {request.request_type === "bug_report" ? "Bug report" : "Feature request"} · {request.priority}</p></div><time>{new Date(request.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}</time></div>
             <p>{request.description}</p>
             {request.owner_notes && <div className="owner-response"><strong>GHSMTA response</strong><p>{request.owner_notes}</p></div>}
