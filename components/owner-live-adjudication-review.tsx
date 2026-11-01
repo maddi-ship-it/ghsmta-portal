@@ -686,6 +686,7 @@ export function OwnerLiveAdjudicationReview({
   advisoryNarrativeReview,
   advisoryScoreEntry,
   categories,
+  categoryEligibilityDefaults = {},
   categoryProposals,
   criteria,
   assignments,
@@ -705,6 +706,7 @@ export function OwnerLiveAdjudicationReview({
   advisoryNarrativeReview?: AdvisoryNarrativeReview;
   advisoryScoreEntry?: AdvisoryScoreEntry;
   categories: ScoringCategory[];
+  categoryEligibilityDefaults?: Record<string, boolean>;
   categoryProposals: FullScoreCategoryProposal[];
   criteria: ScoringCriterion[];
   assignments: AdjudicatorAssignment[];
@@ -1076,6 +1078,7 @@ export function OwnerLiveAdjudicationReview({
         applicationId={applicationId}
         assignments={panelAssignments}
         categories={categories}
+        categoryEligibilityDefaults={categoryEligibilityDefaults}
         categoryProposals={categoryProposals}
         criteria={criteria}
         onClose={closeFullScoreOverview}

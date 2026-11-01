@@ -309,6 +309,42 @@ function allItems(rows: ReferenceRow[]) {
   return rows.map((row) => ({ label: row.label, value: row.value }));
 }
 
+function eligibilityBoolean(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes"].includes(normalized)) return true;
+  if (["0", "false", "no"].includes(normalized)) return false;
+  return null;
+}
+
+function inferredCategoryEligibility(
+  categoryKey: string,
+  rows: ReferenceRow[],
+) {
+  if (categoryKey === "ensemble") {
+    const ensembleDescription = rows.find((row) =>
+      rowMatches(row, ["describe your ensemble by choosing one option"]),
+    );
+    if (!ensembleDescription?.value.trim()) return null;
+
+    return normalize(ensembleDescription.value).includes(
+      "exclusively_features_eligible_9th_12th_grade_performers",
+    );
+  }
+
+  if (categoryKey === "orchestra") {
+    const accompaniment = rows.find((row) =>
+      rowMatches(row, ["best describes your musical accompaniment"]),
+    );
+    if (!accompaniment?.value.trim()) return null;
+
+    const value = normalize(accompaniment.value);
+    if (value.includes("recorded_tracks")) return false;
+    return value.includes("live") || value.includes("student");
+  }
+
+  return null;
+}
+
 function categoryEligibilitySelections(
   rows: ReferenceRow[],
   categories: NonNullable<ReferenceInput["eligibilityCategories"]>,
@@ -342,10 +378,22 @@ function categoryEligibilitySelections(
     const matchingRow = rows.find((row) => {
       if (usedRows.has(row)) return false;
       const haystack = `${row.key}_${normalize(row.label)}`;
-      return [...aliases].some((alias) => haystack.includes(alias));
+      const isAwardEligibility =
+        haystack.includes("award_eligible") ||
+        haystack.includes("award_eligibility");
+      return (
+        isAwardEligibility &&
+        [...aliases].some((alias) => haystack.includes(alias))
+      );
     });
 
-    const applicationValue = matchingRow?.value ?? "0";
+    const explicitEligibility = matchingRow
+      ? eligibilityBoolean(matchingRow.value)
+      : null;
+    const inferredEligibility = inferredCategoryEligibility(categoryKey, rows);
+    const applicationValue = String(
+      explicitEligibility ?? inferredEligibility ?? false,
+    );
     const latestApprovedAppeal = category.id
       ? latestApprovedAppealByCategoryId.get(category.id)
       : undefined;
@@ -400,10 +448,13 @@ function categoryEligibilityItems(
     categories,
     appeals,
   );
+  const eligibilityRows = rows.filter((row) =>
+    `${row.key}_${normalize(row.label)}`.includes("eligib"),
+  );
 
   return [
     ...selections.map(({ label, value }) => ({ label, value })),
-    ...allItems(rows.filter((row) => !usedRows.has(row))),
+    ...allItems(eligibilityRows.filter((row) => !usedRows.has(row))),
   ];
 }
 
@@ -470,9 +521,7 @@ export function buildApplicationCategoryEligibilityDefaults(
   const categories = input.eligibilityCategories ?? [];
   if (categories.length === 0) return {};
 
-  const eligibilityRows = buildRows(input).filter((row) =>
-    `${row.key}_${normalize(row.label)}`.includes("eligib"),
-  );
+  const eligibilityRows = buildRows(input);
   const { selections } = categoryEligibilitySelections(
     eligibilityRows,
     categories,
@@ -563,7 +612,7 @@ export function buildApplicationReferencePanels(
   );
   const eligibilityItems = input.eligibilityCategories?.length
     ? categoryEligibilityItems(
-        eligibilityRows,
+        rows,
         input.eligibilityCategories,
         input.eligibilityAppeals,
       )

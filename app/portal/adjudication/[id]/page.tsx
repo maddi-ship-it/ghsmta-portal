@@ -9,6 +9,7 @@ import {
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
 import { extractAcceptdPickSix } from "@/lib/acceptd/pick-six";
 import {
+  buildApplicationCategoryEligibilityDefaults,
   buildApplicationReferencePanels,
   type ApplicationEligibilityAppeal,
   type ApplicationReferencePanel,
@@ -406,13 +407,28 @@ export default async function AdjudicationApplicationPage({
   ]);
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
+  const eligibilityAppeals = (appealsResult.data ?? []) as ApplicationEligibilityAppeal[];
   const applicationReferencePanels = buildApplicationReferencePanels({
     application,
     questions: applicationQuestions,
     answers: applicationAnswers,
     eligibilityCategories: categories,
-    eligibilityAppeals: (appealsResult.data ?? []) as ApplicationEligibilityAppeal[],
+    eligibilityAppeals,
   });
+  const applicationEligibilityDefaultsByKey =
+    buildApplicationCategoryEligibilityDefaults({
+      application,
+      questions: applicationQuestions,
+      answers: applicationAnswers,
+      eligibilityCategories: categories,
+      eligibilityAppeals,
+    });
+  const applicationEligibilityDefaults = Object.fromEntries(
+    categories.map((category) => [
+      category.id,
+      applicationEligibilityDefaultsByKey[category.category_key] ?? false,
+    ]),
+  );
   const scale = (scaleResult.data ?? []) as ScoringScaleLevel[];
   const scoreOptions = quarterScoreOptions(
     Number(rubric.score_min),
@@ -943,6 +959,7 @@ export default async function AdjudicationApplicationPage({
           : undefined
       }
       categories={scoreableCategories}
+      categoryEligibilityDefaults={applicationEligibilityDefaults}
       categoryProposals={(proposalResult.data ?? []) as Array<{
         category_id: string;
         is_eligible: boolean;
@@ -1092,6 +1109,7 @@ export default async function AdjudicationApplicationPage({
           comment: string | null;
         }>}
         categories={visibleDecisionCategories}
+        categoryEligibilityDefaults={applicationEligibilityDefaults}
         currentUserId={profile.id}
         narrativeAssignments={feedback.map((item) => ({
           category_id: item.category_id,

@@ -78,6 +78,7 @@ export function FullScoreOverviewModal({
   applicationId,
   assignments,
   categories,
+  categoryEligibilityDefaults = {},
   categoryProposals,
   criteria,
   onClose,
@@ -89,6 +90,7 @@ export function FullScoreOverviewModal({
   applicationId: string;
   assignments: AdjudicatorAssignment[];
   categories: ScoringCategory[];
+  categoryEligibilityDefaults?: Record<string, boolean>;
   categoryProposals: FullScoreCategoryProposal[];
   criteria: ScoringCriterion[];
   onClose: () => void;
@@ -98,8 +100,13 @@ export function FullScoreOverviewModal({
   scores: AdjudicationScore[];
 }) {
   const saveRangeAction = useMemo(
-    () => saveFullScoreCategoryRanges.bind(null, applicationId),
-    [applicationId],
+    () =>
+      saveFullScoreCategoryRanges.bind(
+        null,
+        applicationId,
+        categoryEligibilityDefaults,
+      ),
+    [applicationId, categoryEligibilityDefaults],
   );
   const [rangeSaveResult, saveRanges] = useActionState(
     saveRangeAction,

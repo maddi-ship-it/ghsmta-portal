@@ -253,6 +253,89 @@ describe("buildApplicationReferencePanels", () => {
     });
   });
 
+  it("derives Blessed Trinity eligibility from conditional Acceptd answers", () => {
+    const eligibleLabels = [
+      "Music Direction",
+      "Choreography",
+      "Technical Execution",
+      "Lighting",
+      "Scenic",
+      "Leading Actress",
+      "Leading Actor",
+      "Supporting Performer [A]",
+      "Supporting Performer [B]",
+      "Featured Performer",
+      "Direction",
+    ];
+    const questions = eligibleLabels.map((label, index) =>
+      question(`eligible-${index}`, `${label} - Award Eligible`, index + 1, {
+        question_type: "yes_no",
+      }),
+    );
+    questions.push(
+      question(
+        "accompaniment",
+        "Select the option that best describes your musical accompaniment:",
+        20,
+      ),
+      question(
+        "ensemble-description",
+        "Please describe your ensemble by choosing one option below.",
+        21,
+      ),
+    );
+
+    const defaults = buildApplicationCategoryEligibilityDefaults({
+      application,
+      questions,
+      answers: [
+        ...eligibleLabels.map((_, index) => answer(`eligible-${index}`, 1)),
+        answer("accompaniment", "Recorded tracks"),
+        answer(
+          "ensemble-description",
+          "Our ensemble exclusively features eligible 9th-12th grade performers.",
+        ),
+      ],
+      eligibilityCategories: [
+        { category_key: "music_direction", title: "MUSIC DIRECTION" },
+        { category_key: "orchestra", title: "ORCHESTRA" },
+        { category_key: "choreography", title: "CHOREOGRAPHY" },
+        { category_key: "ensemble", title: "ENSEMBLE" },
+        { category_key: "technical_execution", title: "TECHNICAL EXECUTION" },
+        { category_key: "lighting_design", title: "LIGHTING DESIGN" },
+        { category_key: "sound_design", title: "SOUND DESIGN" },
+        { category_key: "scenic_design", title: "SCENIC" },
+        { category_key: "costume_design", title: "COSTUMES" },
+        { category_key: "leading_actress", title: "LEADING ACTRESS" },
+        { category_key: "leading_actor", title: "LEADING ACTOR" },
+        { category_key: "supporting_performer_a", title: "SUPPORTING PERFORMER A" },
+        { category_key: "supporting_performer_b", title: "SUPPORTING PERFORMER B" },
+        { category_key: "featured_performer", title: "FEATURED PERFORMER" },
+        { category_key: "direction", title: "DIRECTION" },
+        { category_key: "overall_production", title: "OVERALL PRODUCTION" },
+      ],
+    });
+
+    expect(defaults).toEqual({
+      music_direction: true,
+      orchestra: false,
+      choreography: true,
+      ensemble: true,
+      technical_execution: true,
+      lighting_design: true,
+      sound_design: false,
+      scenic_design: true,
+      costume_design: false,
+      leading_actress: true,
+      leading_actor: true,
+      supporting_performer_a: true,
+      supporting_performer_b: true,
+      featured_performer: true,
+      direction: true,
+      overall_production: true,
+    });
+  });
+
   it("calculates overall production as false at five ineligible categories", () => {
     const panels = buildApplicationReferencePanels({
       application,

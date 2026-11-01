@@ -56,6 +56,7 @@ const ACTIVE_APPLICATION_ERROR = "The active application was not found.";
 
 export async function saveFullScoreCategoryRanges(
   applicationId: string,
+  categoryEligibilityDefaults: Record<string, boolean>,
   _previous: FullScoreRangeSaveResult,
   formData: FormData,
 ): Promise<FullScoreRangeSaveResult> {
@@ -159,7 +160,10 @@ export async function saveFullScoreCategoryRanges(
     return [
       {
         category_id: categoryId,
-        is_eligible: existing?.is_eligible ?? true,
+        is_eligible:
+          existing?.is_eligible ??
+          categoryEligibilityDefaults[categoryId] ??
+          true,
         range_min: rangeMinimum,
         range_max: rangeMaximum,
         advisory_note: existing?.advisory_note ?? null,

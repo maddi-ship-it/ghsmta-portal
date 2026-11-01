@@ -10,6 +10,7 @@ import {
 } from "@/lib/reports/report-definitions";
 import { calculateOverallProductionScore } from "@/lib/adjudication-overall-score";
 import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjects";
+import { buildApplicationCategoryEligibilityDefaults } from "@/lib/application-reference-panels";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import { selectAuditPanelAssignments } from "@/lib/reports/audit-panel-selection";
 import { cityFromVenueAddress, scheduleCityLabel } from "@/lib/schedule-location";
@@ -71,6 +72,7 @@ type ApplicationRow = {
   external_applicant_name: string | null;
   external_applicant_email: string | null;
   source_stage: string | null;
+  source_system: string | null;
   is_archived: boolean | null;
   form_version_id: string | null;
   form_data?: Record<string, unknown> | null;
@@ -404,7 +406,7 @@ async function loadBaseMaps(supabase: SupabaseLike, filters: ReportFilters, warn
   const appQuery = () => {
     let query = supabase
       .from("applications")
-      .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,updated_at,owner_notes,external_applicant_name,external_applicant_email,source_stage,is_archived,form_version_id,form_data,archived_payload")
+      .select("id,cycle_id,applicant_user_id,school_name,production_title,status,submitted_at,updated_at,owner_notes,external_applicant_name,external_applicant_email,source_stage,source_system,is_archived,form_version_id,form_data,archived_payload")
       .order("school_name");
 
     if (!filters.includeArchived) query = query.eq("is_archived", false);
@@ -1499,6 +1501,23 @@ async function loadAuditSchoolScoresReport(
       const categoryByKey = new Map(
         rubricCategories.map((category) => [category.category_key, category]),
       );
+      const applicationEligibilityDefaults =
+        buildApplicationCategoryEligibilityDefaults({
+          application: {
+            form_data: application.form_data ?? {},
+            archived_payload: application.archived_payload ?? {},
+            source_system: application.source_system,
+          },
+          questions: questions as unknown as ApplicationQuestion[],
+          answers: [...answerMap.entries()].map(([questionId, value]) => ({
+            id: `${application.id}:${questionId}`,
+            application_id: application.id,
+            question_id: questionId,
+            value,
+            updated_at: "",
+          })) as ApplicationAnswer[],
+          eligibilityCategories: rubricCategories,
+        });
       const unscoreableCategoryIds = new Set(
         rubricCategories
           .filter(
@@ -1550,7 +1569,12 @@ async function loadAuditSchoolScoresReport(
           completeCategoryAverage(category, criteria, scoreByCriterion),
         );
         row[`${categoryKey}_eligible`] =
-          (proposal?.is_eligible ?? comment?.is_eligible ?? true) ? 1 : 0;
+          (proposal?.is_eligible ??
+          comment?.is_eligible ??
+          applicationEligibilityDefaults[categoryKey] ??
+          true)
+            ? 1
+            : 0;
         row[`${categoryKey}_range`] = auditRangeText(
           proposal?.range_min ?? comment?.score_range_min,
           proposal?.range_max ?? comment?.score_range_max,
@@ -1564,7 +1588,8 @@ async function loadAuditSchoolScoresReport(
         unscoreableCategoryIds,
       });
       row.overall_production_score = roundedAuditScore(overall.score);
-      row.overall_production_eligible = 1;
+      row.overall_production_eligible =
+        (applicationEligibilityDefaults.overall_production ?? true) ? 1 : 0;
       row.overall_production_range = "Not Required";
       rows.push(row);
     }

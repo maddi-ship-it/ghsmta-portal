@@ -172,6 +172,7 @@ export function AdjudicationConsensusBar({
   actingCandidateReviewers,
   applicationId,
   categories,
+  categoryEligibilityDefaults = {},
   narrativeAssignments,
   narrativesReady,
   panelReviewers,
@@ -191,6 +192,7 @@ export function AdjudicationConsensusBar({
   role: AppRole;
   currentUserId: string;
   categories: ScoringCategory[];
+  categoryEligibilityDefaults?: Record<string, boolean>;
   proposals: Proposal[];
   scoreability: CategoryScoreability[];
   approvals: CategoryApproval[];
@@ -1076,13 +1078,25 @@ export function AdjudicationConsensusBar({
                           <div className="advisory-decision-grid">
                             <label className="advisory-decision-toggle advisory-decision-eligibility">
                               <input
-                                defaultChecked={proposal?.is_eligible ?? true}
+                                defaultChecked={
+                                  proposal?.is_eligible ??
+                                  categoryEligibilityDefaults[category.id] ??
+                                  true
+                                }
                                 name={`eligible_${category.id}`}
                                 type="checkbox"
                               />
                               <span>
                                 <strong>Eligible</strong>
-                                <small>Awards consideration</small>
+                                <small>
+                                  {proposal
+                                    ? "Awards consideration"
+                                    : `Application: ${
+                                        categoryEligibilityDefaults[category.id]
+                                          ? "eligible"
+                                          : "not eligible"
+                                      }`}
+                                </small>
                               </span>
                             </label>
                             <label className="advisory-decision-toggle advisory-decision-applicability">
