@@ -3,6 +3,7 @@ import type {
   ApplicationAnswer,
   ApplicationQuestion,
 } from "@/lib/types";
+import { richTextToPlainText } from "@/lib/rich-text";
 import { CURRENT_ACCEPTD_EXPORT_QUESTION_LABELS } from "./acceptd-current-export-question-labels";
 
 export type ApplicationReferenceItem = {
@@ -72,6 +73,10 @@ function humanize(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function cleanDisplayText(value: string | null | undefined) {
+  return richTextToPlainText(value);
+}
+
 function displayValue(value: unknown): string {
   if (value == null) return "";
 
@@ -123,14 +128,14 @@ function displayValue(value: unknown): string {
     return "";
   }
 
-  return String(value).trim();
+  return cleanDisplayText(String(value));
 }
 
 export function formatApplicationReferenceValue(
   label: string,
   rawValue: string,
 ) {
-  const value = rawValue.trim();
+  const value = cleanDisplayText(rawValue);
   if (!value) return "Not provided";
 
   const normalizedLabel = normalize(label);
@@ -203,7 +208,9 @@ function flattenObject(
 
   const record = value as Record<string, unknown>;
   const recordLabel =
-    typeof record.label === "string" ? record.label : null;
+    typeof record.label === "string"
+      ? cleanDisplayText(record.label)
+      : null;
 
   if (recordLabel && "value" in record) {
     rows.push({
@@ -256,7 +263,7 @@ function buildRows({
           .filter(Boolean)
           .join(" "),
       ),
-      label: question.source_label || question.label,
+      label: cleanDisplayText(question.source_label || question.label),
       value: displayValue(answerMap.get(question.id)),
       imported: question.imported,
       order:
@@ -585,7 +592,10 @@ function buildSupplementalArchiveItems(
       }
 
       const field = rawField as Record<string, unknown>;
-      const label = typeof field.label === "string" ? field.label.trim() : "";
+      const label =
+        typeof field.label === "string"
+          ? cleanDisplayText(field.label)
+          : "";
       if (!label) return [];
 
       return [{ label, value: displayValue(field.value) }];

@@ -73,6 +73,42 @@ const legacyApplication = {
 >;
 
 describe("buildApplicationReferencePanels", () => {
+  it("removes stored HTML tags from popup labels and values", () => {
+    const panels = buildApplicationReferencePanels({
+      application: legacyApplication,
+      questions: [
+        question(
+          "question-html",
+          "<p>Director's Vision</p>",
+          1,
+          { source_label: null },
+        ),
+      ],
+      answers: [
+        answer(
+          "question-html",
+          "<p>A clear, student-centered concept.</p><p>Strong storytelling.</p>",
+        ),
+      ],
+    });
+
+    const fullApplication = panels.find(
+      (panel) => panel.key === "full-application",
+    );
+    const item = fullApplication?.groups
+      .flatMap((group) => group.items)
+      .find((candidate) => candidate.label === "Director's Vision");
+
+    expect(item).toEqual({
+      label: "Director's Vision",
+      value: "A clear, student-centered concept.\nStrong storytelling.",
+    });
+    expect(formatApplicationReferenceValue(
+      "Narrative",
+      "<p>Visible copy</p>",
+    )).toBe("Visible copy");
+  });
+
   it("keeps required toolbar panels and removes portal-only questions from current Acceptd data", () => {
     const panels = buildApplicationReferencePanels({
       application,
