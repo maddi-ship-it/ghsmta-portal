@@ -5,6 +5,11 @@ import type {
   ChatThread,
 } from "@/components/teams-chat";
 import { TeamsChat } from "@/components/teams-chat";
+import {
+  buildApplicationReferencePanels,
+  type ApplicationEligibilityAppeal,
+  type ApplicationReferencePanel,
+} from "@/lib/application-reference-panels";
 import { requireProfile } from "@/lib/auth";
 import {
   ADJUDICATOR_CHANNELS_LABEL,
@@ -13,6 +18,11 @@ import {
 } from "@/lib/chat-terminology";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type {
+  Application,
+  ApplicationAnswer,
+  ApplicationQuestion,
+} from "@/lib/types";
 
 type RawChannel = Partial<ChatChannel> & {
   channel_id: string;
@@ -182,11 +192,11 @@ export default async function ChatPage({
 }) {
   const profile = await requireProfile();
   const supabase = await createClient();
+  const admin = createAdminClient();
   const params = await searchParams;
   let ownerChannelCandidates: ChatMember[] = [];
 
   if (profile.role === "owner") {
-    const admin = createAdminClient();
     const { data: candidateProfiles, error: candidateError } = await admin
       .from("profiles")
       .select("id,email,full_name,role")
@@ -256,6 +266,7 @@ export default async function ChatPage({
   let threads: ChatThread[] = [];
   let members: ChatMember[] = [];
   let adjudicationVisitDetails: AdjudicationVisitDetails | null = null;
+  let eligibilityReferencePanel: ApplicationReferencePanel | null = null;
 
   if (selectedChannel) {
     const shouldLoadVisitDetails =
@@ -346,6 +357,97 @@ export default async function ChatPage({
       }
     }
 
+    if (shouldLoadVisitDetails && selectedChannel.application_id) {
+      const applicationResult = await admin
+        .from("applications")
+        .select("form_data,archived_payload,source_system,form_version_id")
+        .eq("id", selectedChannel.application_id)
+        .maybeSingle();
+
+      if (applicationResult.error) {
+        throw new Error(
+          `Application eligibility could not be loaded: ${applicationResult.error.message}`,
+        );
+      }
+
+      const application = applicationResult.data as Pick<
+        Application,
+        "form_data" | "archived_payload" | "source_system" | "form_version_id"
+      > | null;
+
+      if (application) {
+        const [questionsResult, answersResult, formVersionResult, appealsResult] =
+          await Promise.all([
+            application.form_version_id
+              ? admin
+                  .from("application_questions")
+                  .select(
+                    "id,form_version_id,section_id,question_key,label,description,question_type,required,options,settings,visibility_rule,sort_order,active,source_column_index,source_label,imported,created_at,updated_at",
+                  )
+                  .eq("form_version_id", application.form_version_id)
+                  .order("sort_order")
+                  .order("created_at")
+              : Promise.resolve({ data: [], error: null }),
+            admin
+              .from("application_answers")
+              .select("id,application_id,question_id,value,updated_at")
+              .eq("application_id", selectedChannel.application_id),
+            application.form_version_id
+              ? admin
+                  .from("application_form_versions")
+                  .select("scoring_rubric_id")
+                  .eq("id", application.form_version_id)
+                  .maybeSingle()
+              : Promise.resolve({ data: null, error: null }),
+            admin
+              .from("appeals")
+              .select(
+                "category_id,current_eligibility,requested_eligibility,status,submitted_at",
+              )
+              .eq("application_id", selectedChannel.application_id)
+              .eq("appeal_type", "eligibility")
+              .order("submitted_at", { ascending: false }),
+          ]);
+
+        const eligibilityLoadError =
+          questionsResult.error ??
+          answersResult.error ??
+          formVersionResult.error ??
+          appealsResult.error;
+
+        if (eligibilityLoadError) {
+          throw new Error(
+            `Application eligibility could not be loaded: ${eligibilityLoadError.message}`,
+          );
+        }
+
+        const rubricId = formVersionResult.data?.scoring_rubric_id ?? null;
+        const categoriesResult = rubricId
+          ? await admin
+              .from("scoring_categories")
+              .select("id,category_key,title")
+              .eq("rubric_id", rubricId)
+              .eq("active", true)
+              .order("sort_order")
+          : { data: [], error: null };
+
+        if (categoriesResult.error) {
+          throw new Error(
+            `Eligibility categories could not be loaded: ${categoriesResult.error.message}`,
+          );
+        }
+
+        eligibilityReferencePanel =
+          buildApplicationReferencePanels({
+            application,
+            questions: (questionsResult.data ?? []) as ApplicationQuestion[],
+            answers: (answersResult.data ?? []) as ApplicationAnswer[],
+            eligibilityCategories: categoriesResult.data ?? [],
+            eligibilityAppeals: (appealsResult.data ?? []) as ApplicationEligibilityAppeal[],
+          }).find((panel) => panel.key === "eligibility") ?? null;
+      }
+    }
+
     const readResult = await supabase.rpc("mark_chat_channel_read", {
       p_channel_id: selectedChannel.channel_id,
     });
@@ -363,6 +465,7 @@ export default async function ChatPage({
     <div className="chat-fullscreen-page">
       <TeamsChat
         adjudicationVisitDetails={adjudicationVisitDetails}
+        eligibilityReferencePanel={eligibilityReferencePanel}
         key={selectedChannel?.channel_id ?? "no-channel"}
         initialChannels={channels}
         initialMembers={members}

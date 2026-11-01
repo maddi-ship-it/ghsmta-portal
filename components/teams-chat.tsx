@@ -27,6 +27,7 @@ import {
   ownerDeleteChatMessage,
   startChatDirectMessage,
 } from "@/app/portal/chat/actions";
+import { ApplicationReferencePanelDialog } from "@/components/application-reference-bar";
 import styles from "@/components/chat-workspace.module.css";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import {
@@ -42,6 +43,7 @@ import {
 } from "@/lib/chat-presentation";
 import { createClient } from "@/lib/supabase/client";
 import { isAllowedPortalFile, PORTAL_FILE_ACCEPT } from "@/lib/file-upload-policy";
+import type { ApplicationReferencePanel } from "@/lib/application-reference-panels";
 import type { AppRole, Profile } from "@/lib/types";
 
 export type ChannelType =
@@ -2003,6 +2005,7 @@ export function TeamsChat({
   initialMembers,
   ownerChannelCandidates,
   adjudicationVisitDetails,
+  eligibilityReferencePanel,
   previewMode = false,
 }: {
   profile: Profile;
@@ -2012,6 +2015,7 @@ export function TeamsChat({
   initialMembers: ChatMember[];
   ownerChannelCandidates: ChatMember[];
   adjudicationVisitDetails: AdjudicationVisitDetails | null;
+  eligibilityReferencePanel: ApplicationReferencePanel | null;
   previewMode?: boolean;
 }) {
   const router = useRouter();
@@ -2039,6 +2043,7 @@ export function TeamsChat({
   const [showOwnerChannelCreator, setShowOwnerChannelCreator] = useState(false);
   const [showOwnerChannelMemberAdder, setShowOwnerChannelMemberAdder] = useState(false);
   const [showVisitDetails, setShowVisitDetails] = useState(false);
+  const [showEligibility, setShowEligibility] = useState(false);
   const [directMessageContacts, setDirectMessageContacts] = useState<ChatMember[]>([]);
   const [directMessageContactsLoaded, setDirectMessageContactsLoaded] = useState(false);
   const [directMessageSearch, setDirectMessageSearch] = useState("");
@@ -3123,13 +3128,24 @@ export function TeamsChat({
               {activeChannel.visibility_label}
             </span>
             {activeChannel.channel_type === "school" && (
-              <button
-                className={styles.visitDetailsButton}
-                onClick={() => setShowVisitDetails(true)}
-                type="button"
-              >
-                Visit details
-              </button>
+              <>
+                {eligibilityReferencePanel ? (
+                  <button
+                    className={styles.visitDetailsButton}
+                    onClick={() => setShowEligibility(true)}
+                    type="button"
+                  >
+                    Eligibility
+                  </button>
+                ) : null}
+                <button
+                  className={styles.visitDetailsButton}
+                  onClick={() => setShowVisitDetails(true)}
+                  type="button"
+                >
+                  Visit details
+                </button>
+              </>
             )}
             <button
               aria-label="Mark this conversation unread"
@@ -3185,13 +3201,24 @@ export function TeamsChat({
               ))}
             </select>
             {activeChannel.channel_type === "school" && (
-              <button
-                className="button button-secondary button-compact"
-                onClick={() => setShowVisitDetails(true)}
-                type="button"
-              >
-                Visit details
-              </button>
+              <>
+                {eligibilityReferencePanel ? (
+                  <button
+                    className="button button-secondary button-compact"
+                    onClick={() => setShowEligibility(true)}
+                    type="button"
+                  >
+                    Eligibility
+                  </button>
+                ) : null}
+                <button
+                  className="button button-secondary button-compact"
+                  onClick={() => setShowVisitDetails(true)}
+                  type="button"
+                >
+                  Visit details
+                </button>
+              </>
             )}
             <button
               className="button button-secondary button-compact"
@@ -3997,6 +4024,13 @@ export function TeamsChat({
           onClose={() => setShowVisitDetails(false)}
         />
       )}
+
+      {showEligibility && eligibilityReferencePanel ? (
+        <ApplicationReferencePanelDialog
+          onClose={() => setShowEligibility(false)}
+          panel={eligibilityReferencePanel}
+        />
+      ) : null}
 
       {showBroadcastComposer && profile.role === "owner" && (
         <div

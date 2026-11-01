@@ -32,6 +32,152 @@ export function panelCommentVisibilityStorageKey(currentUserId: string) {
   return `ghsmta:adjudication:peer-comments:v1:${currentUserId}`;
 }
 
+export function ApplicationReferencePanelDialog({
+  panel,
+  onClose,
+}: {
+  panel: ApplicationReferencePanel;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="application-reference-modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target) onClose();
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="application-reference-modal-title"
+        aria-modal="true"
+        className="application-reference-modal"
+        role="dialog"
+      >
+        <header className="application-reference-modal-header">
+          <div>
+            <span className="eyebrow">Application data</span>
+            <h2 id="application-reference-modal-title">{panel.title}</h2>
+            <p>{panel.description}</p>
+          </div>
+
+          <button
+            aria-label="Close application data"
+            className="application-reference-close"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="application-reference-modal-body">
+          {panel.groups.length > 0 ? (
+            panel.groups.map((group) => (
+              <section
+                className={`application-reference-group${
+                  panel.key === "eligibility"
+                    ? " application-reference-eligibility-group"
+                    : ""
+                }${
+                  panel.key === "eligibility" &&
+                  group.title === "Eligibility appeals"
+                    ? " application-reference-appeal-group"
+                    : ""
+                }`}
+                key={`${panel.key}-${group.title}`}
+              >
+                <h3>{group.title}</h3>
+
+                {group.items.length > 0 ? (
+                  <dl className="application-reference-list">
+                    {group.items.map((item, index) => {
+                      const formattedValue = formatApplicationReferenceValue(
+                        item.label,
+                        item.value,
+                      );
+                      const isEligibility = panel.key === "eligibility";
+                      const isOverallEligibility =
+                        isEligibility &&
+                        item.label
+                          .toLowerCase()
+                          .includes("overall production");
+                      const isEligibilityAppeal =
+                        isEligibility &&
+                        item.label.includes("ELIGIBILITY APPEAL");
+
+                      return (
+                        <div
+                          className={`application-reference-row${
+                            isOverallEligibility
+                              ? " is-overall-eligibility"
+                              : ""
+                          }${isEligibilityAppeal ? " is-appeal" : ""}`}
+                          key={`${item.label}-${index}`}
+                        >
+                          <dt>{item.label}</dt>
+                          <dd
+                            className={
+                              isEligibility
+                                ? `application-reference-status ${
+                                    formattedValue === "YES"
+                                      ? "is-true"
+                                      : formattedValue === "NO"
+                                        ? "is-false"
+                                        : formattedValue.startsWith("APPROVED")
+                                          ? "is-true"
+                                          : formattedValue.startsWith("DENIED")
+                                            ? "is-false"
+                                            : isEligibilityAppeal
+                                              ? "is-pending"
+                                              : "is-neutral"
+                                  }`
+                                : undefined
+                            }
+                          >
+                            {formattedValue}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                ) : (
+                  <p className="application-reference-empty">
+                    No matching application responses were found.
+                  </p>
+                )}
+              </section>
+            ))
+          ) : (
+            <div className="empty-state">
+              <h3>No application data found</h3>
+              <p>
+                This application does not contain responses for this view yet.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>,
+    document.querySelector(".portal-shell") ?? document.body,
+  );
+}
+
 const PRIMARY_PANEL_ORDER = [
   "eligibility",
   "acting-candidates",
@@ -160,24 +306,6 @@ export function ApplicationReferenceBar({
       {panel.shortTitle}
     </button>
   );
-
-  useEffect(() => {
-    if (!activePanel) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActivePanel(null);
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [activePanel]);
 
   useEffect(() => {
     const bar = barRef.current;
@@ -355,140 +483,12 @@ export function ApplicationReferenceBar({
         </div>
       </div>
 
-      {activePanel && createPortal(
-        <div
-          className="application-reference-modal-backdrop"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) {
-              setActivePanel(null);
-            }
-          }}
-          role="presentation"
-        >
-          <section
-            aria-labelledby="application-reference-modal-title"
-            aria-modal="true"
-            className="application-reference-modal"
-            role="dialog"
-          >
-            <header className="application-reference-modal-header">
-              <div>
-                <span className="eyebrow">Application data</span>
-                <h2 id="application-reference-modal-title">
-                  {activePanel.title}
-                </h2>
-                <p>{activePanel.description}</p>
-              </div>
-
-              <button
-                aria-label="Close application data"
-                className="application-reference-close"
-                onClick={() => setActivePanel(null)}
-                type="button"
-              >
-                ×
-              </button>
-            </header>
-
-            <div className="application-reference-modal-body">
-              {activePanel.groups.length > 0 ? (
-                activePanel.groups.map((group) => (
-                  <section
-                    className={`application-reference-group${
-                      activePanel.key === "eligibility"
-                        ? " application-reference-eligibility-group"
-                        : ""
-                    }${
-                      activePanel.key === "eligibility" &&
-                      group.title === "Eligibility appeals"
-                        ? " application-reference-appeal-group"
-                        : ""
-                    }`}
-                    key={`${activePanel.key}-${group.title}`}
-                  >
-                    <h3>{group.title}</h3>
-
-                    {group.items.length > 0 ? (
-                      <dl className="application-reference-list">
-                        {group.items.map((item, index) => {
-                          const formattedValue =
-                            formatApplicationReferenceValue(
-                              item.label,
-                              item.value,
-                            );
-                          const isEligibility =
-                            activePanel.key === "eligibility";
-                          const isOverallEligibility =
-                            isEligibility &&
-                            item.label
-                              .toLowerCase()
-                              .includes("overall production");
-                          const isEligibilityAppeal =
-                            isEligibility &&
-                            item.label.includes("ELIGIBILITY APPEAL");
-
-                          return (
-                            <div
-                              className={`application-reference-row${
-                                isOverallEligibility
-                                  ? " is-overall-eligibility"
-                                  : ""
-                              }${
-                                isEligibilityAppeal ? " is-appeal" : ""
-                              }`}
-                              key={`${item.label}-${index}`}
-                            >
-                              <dt>{item.label}</dt>
-                              <dd
-                                className={
-                                  isEligibility
-                                    ? `application-reference-status ${
-                                        formattedValue === "YES"
-                                          ? "is-true"
-                                          : formattedValue === "NO"
-                                            ? "is-false"
-                                            : formattedValue.startsWith(
-                                                  "APPROVED",
-                                                )
-                                              ? "is-true"
-                                              : formattedValue.startsWith(
-                                                    "DENIED",
-                                                  )
-                                                ? "is-false"
-                                                : isEligibilityAppeal
-                                                  ? "is-pending"
-                                            : "is-neutral"
-                                      }`
-                                    : undefined
-                                }
-                              >
-                                {formattedValue}
-                              </dd>
-                            </div>
-                          );
-                        })}
-                      </dl>
-                    ) : (
-                      <p className="application-reference-empty">
-                        No matching application responses were found.
-                      </p>
-                    )}
-                  </section>
-                ))
-              ) : (
-                <div className="empty-state">
-                  <h3>No application data found</h3>
-                  <p>
-                    This application does not contain responses for this
-                    view yet.
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-        </div>,
-        document.querySelector(".portal-shell") ?? document.body,
-      )}
+      {activePanel ? (
+        <ApplicationReferencePanelDialog
+          onClose={() => setActivePanel(null)}
+          panel={activePanel}
+        />
+      ) : null}
     </>
   );
 }
