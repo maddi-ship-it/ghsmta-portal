@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 export default async function AppealsPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
+  const admin = createAdminClient();
+  const canReviewAppeals =
+    profile.role === "advisory_member" || profile.role === "owner";
 
   const [
     applicationsResult,
@@ -15,6 +18,8 @@ export default async function AppealsPage() {
     filesResult,
     scholarshipFilesResult,
     cyclesResult,
+    advisoryMembersResult,
+    appealVotesResult,
   ] = await Promise.all([
       profile.role === "applicant"
         ? supabase
@@ -54,6 +59,20 @@ export default async function AppealsPage() {
         .eq("is_active", true)
         .neq("status", "archived")
         .order("season_year", { ascending: false }),
+      canReviewAppeals
+        ? admin
+            .from("profiles")
+            .select("id,full_name")
+            .eq("role", "advisory_member")
+            .eq("active", true)
+            .order("full_name")
+        : Promise.resolve({ data: [], error: null }),
+      canReviewAppeals
+        ? admin
+            .from("appeal_advisory_votes")
+            .select("id,appeal_id,advisory_member_id,decision,responded_at")
+            .order("responded_at")
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
   for (const result of [
@@ -64,6 +83,8 @@ export default async function AppealsPage() {
     filesResult,
     scholarshipFilesResult,
     cyclesResult,
+    advisoryMembersResult,
+    appealVotesResult,
   ]) {
     if (result.error) throw new Error(result.error.message);
   }
@@ -97,7 +118,6 @@ export default async function AppealsPage() {
   );
   let categories: { id: string; title: string; rubric_id: string }[] = [];
   if (applicationRubricIds.length > 0) {
-    const admin = createAdminClient();
     const categoriesResult = await admin
       .from("scoring_categories")
       .select("id,title,rubric_id")
@@ -118,6 +138,9 @@ export default async function AppealsPage() {
     activeApplicationIds.has(appeal.application_id),
   );
   const activeAppealIds = new Set(appeals.map((appeal) => appeal.id));
+  const appealVotes = (appealVotesResult.data ?? []).filter((vote) =>
+    activeAppealIds.has(vote.appeal_id),
+  );
   const files = (filesResult.data ?? []).filter((file) =>
     activeAppealIds.has(file.context_id),
   );
@@ -144,6 +167,8 @@ export default async function AppealsPage() {
       </div>
 
       <AppealWorkspace
+        advisoryMembers={advisoryMembersResult.data ?? []}
+        appealVotes={appealVotes}
         appeals={appeals}
         applications={applications}
         categories={categories}

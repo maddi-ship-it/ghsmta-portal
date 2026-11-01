@@ -5513,6 +5513,97 @@ body.modal-open {
 .appeal-file-list > strong { width: 100%; }
 .appeal-review-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
 .appeal-resolution-view p { white-space: pre-line; }
+.appeal-review-closed { display: grid; gap: 16px; margin-top: 18px; }
+.appeal-acm-vote-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px 28px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+.appeal-acm-vote-card h3,
+.appeal-vote-summary h3 { margin: 4px 0; }
+.appeal-acm-vote-card p { margin: 4px 0 0; color: var(--muted); }
+.appeal-vote-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.appeal-vote-button { min-width: 150px; }
+.appeal-vote-button.vote-approved {
+  color: var(--portal-success, var(--success));
+  border-color: color-mix(in srgb, var(--portal-success, var(--success)) 55%, var(--line));
+  background: color-mix(in srgb, var(--portal-success, var(--success)) 12%, var(--surface-soft));
+}
+.appeal-vote-button.is-selected {
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
+}
+.appeal-current-vote,
+.appeal-form-feedback { grid-column: 1 / -1; }
+.appeal-form-feedback { margin: 0; }
+.appeal-vote-summary {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+.appeal-vote-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.appeal-vote-totals { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.appeal-vote-totals span {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 800;
+}
+.appeal-vote-totals .is-approved { color: var(--portal-success, var(--success)); }
+.appeal-vote-totals .is-denied { color: var(--danger); }
+.appeal-vote-member-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.appeal-vote-member {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.appeal-vote-member strong,
+.appeal-vote-member small { display: block; }
+.appeal-vote-member small { margin-top: 2px; color: var(--muted); }
+.appeal-vote-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.appeal-vote-member.is-approved .appeal-vote-dot { background: var(--portal-success, var(--success)); }
+.appeal-vote-member.is-denied .appeal-vote-dot { background: var(--danger); }
+.appeal-vote-member.is-approved small { color: var(--portal-success, var(--success)); }
+.appeal-vote-member.is-denied small { color: var(--danger); }
+.appeal-legacy-notes {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.appeal-legacy-notes summary { cursor: pointer; font-weight: 800; }
+.appeal-legacy-notes p { margin: 12px 0 0; color: var(--muted); white-space: pre-line; }
+
+@media (max-width: 760px) {
+  .appeal-acm-vote-card { grid-template-columns: 1fr; }
+  .appeal-vote-actions { justify-content: stretch; }
+  .appeal-vote-button { flex: 1 1 140px; }
+  .appeal-vote-summary-header { align-items: flex-start; flex-direction: column; }
+  .appeal-vote-totals { justify-content: flex-start; }
+}
 
 .notification-row {
   display: grid;
