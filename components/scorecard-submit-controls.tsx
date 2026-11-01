@@ -5,7 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { saveAdjudicatorScorecard } from "@/app/portal/adjudication/[id]/actions";
 import { offlineScorecardDraftKey } from "@/components/adjudicator-autosave";
 import { richTextHasContent } from "@/lib/rich-text";
-import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import {
+  OVERALL_PRODUCTION_CATEGORY_KEY,
+  scorecardCategoryLabel,
+} from "@/lib/adjudication-overall-score";
 import type { ScoringCategory, ScoringCriterion } from "@/lib/types";
 
 type CompletionState = {
@@ -31,6 +34,7 @@ function evaluateCompletion(
   for (const category of categories) {
     const isOverallProduction =
       category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
+    const categoryLabel = scorecardCategoryLabel(category);
 
     const rangeStartValue = formText(
       formData,
@@ -42,7 +46,7 @@ function evaluateCompletion(
     if (!isOverallProduction && !rangeStartValue) {
       missingCount += 1;
       reasons.push(
-        `${category.title}: the Committee has not set a two-point range.`,
+        `${categoryLabel}: the Committee has not set a two-point range.`,
       );
     }
 
@@ -50,7 +54,7 @@ function evaluateCompletion(
       missingCount += 1;
       if (rangeStartValue) {
         reasons.push(
-          `${category.title}: eligibility and two-point range approval is pending.`,
+          `${categoryLabel}: eligibility and two-point range approval is pending.`,
         );
       }
     }
@@ -60,7 +64,7 @@ function evaluateCompletion(
       !formText(formData, `subject_name_${category.id}`)
     ) {
       missingCount += 1;
-      reasons.push(`${category.title}: candidate or subject name is missing.`);
+      reasons.push(`${categoryLabel}: candidate or subject name is missing.`);
     }
 
     const categoryScores: number[] = [];
@@ -96,7 +100,7 @@ function evaluateCompletion(
 
     if (missingScores > 0) {
       reasons.push(
-        `${category.title}: ${missingScores} criterion score${
+        `${categoryLabel}: ${missingScores} criterion score${
           missingScores === 1 ? " is" : "s are"
         } missing.`,
       );
@@ -104,7 +108,7 @@ function evaluateCompletion(
 
     if (missingComments > 0) {
       reasons.push(
-        `${category.title}: ${missingComments} criterion comment${
+        `${categoryLabel}: ${missingComments} criterion comment${
           missingComments === 1 ? " is" : "s are"
         } missing.`,
       );
@@ -126,7 +130,7 @@ function evaluateCompletion(
       if (average < rangeStart - 0.0001 || average > rangeEnd + 0.0001) {
         missingCount += 1;
         reasons.push(
-          `${category.title}: the category average must be within ${rangeStart.toFixed(2)}–${rangeEnd.toFixed(2)}.`,
+          `${categoryLabel}: the category average must be within ${rangeStart.toFixed(2)}–${rangeEnd.toFixed(2)}.`,
         );
       }
     }

@@ -1,6 +1,13 @@
 import type { ScoringCategory, ScoringCriterion } from "./types";
 
 export const OVERALL_PRODUCTION_CATEGORY_KEY = "overall_production";
+export const BIG_PICTURE_CATEGORY_LABEL = "Big Picture";
+
+export function scorecardCategoryLabel(category: ScoringCategory) {
+  return category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY
+    ? BIG_PICTURE_CATEGORY_LABEL
+    : category.title;
+}
 
 export type OverallProductionScore = {
   score: number | null;

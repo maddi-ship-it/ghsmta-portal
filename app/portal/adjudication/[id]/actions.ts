@@ -16,6 +16,7 @@ import { queuePanelReviewForOwnersIfReady } from "@/lib/adjudication-owner-revie
 import {
   calculateOverallProductionScore,
   OVERALL_PRODUCTION_CATEGORY_KEY,
+  scorecardCategoryLabel,
 } from "@/lib/adjudication-overall-score";
 import {
   ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE,
@@ -345,6 +346,8 @@ async function persistAdjudicatorScorecard(
       continue;
     }
 
+    const categoryLabel = scorecardCategoryLabel(category);
+
     const officialProposal = officialProposalMap.get(category.id);
     const isEligible = Boolean(officialProposal?.is_eligible ?? true);
     const rangeMinimum =
@@ -378,7 +381,7 @@ async function persistAdjudicatorScorecard(
       !validRange
     ) {
       throw new Error(
-        `The ${category.title} range must span exactly two points within the scoring scale.`,
+        `The ${categoryLabel} range must span exactly two points within the scoring scale.`,
       );
     }
 
@@ -390,11 +393,11 @@ async function persistAdjudicatorScorecard(
           ownResponse: ownApprovalByProposalId.get(officialProposal.id),
         }))
     ) {
-      missing.push(`${category.title}: your eligibility and range approval`);
+      missing.push(`${categoryLabel}: your eligibility and range approval`);
     }
 
     if (submit && !validRange) {
-      missing.push(`${category.title}: Committee must set a 2-point scoring range`);
+      missing.push(`${categoryLabel}: Committee must set a 2-point scoring range`);
     }
 
     if (
@@ -402,7 +405,7 @@ async function persistAdjudicatorScorecard(
       category.subject_label &&
       !formText(formData, `subject_name_${category.id}`)
     ) {
-      missing.push(`${category.title}: ${category.subject_label}`);
+      missing.push(`${categoryLabel}: ${category.subject_label}`);
     }
 
     const commentRow: Record<string, unknown> = {
@@ -449,7 +452,7 @@ async function persistAdjudicatorScorecard(
       }
 
       if (submit && canScore && !validScore) {
-        missing.push(`${category.title}: ${criterion.title} score`);
+        missing.push(`${categoryLabel}: ${criterion.title} score`);
       }
 
       if (
@@ -457,7 +460,7 @@ async function persistAdjudicatorScorecard(
         canComment &&
         !richTextHasContent(observation)
       ) {
-        missing.push(`${category.title}: ${criterion.title} observation`);
+        missing.push(`${categoryLabel}: ${criterion.title} observation`);
       }
 
       const scoreRow: Record<string, unknown> = {
@@ -495,7 +498,7 @@ async function persistAdjudicatorScorecard(
         categoryAverage > rangeMaximum + 0.0001
       ) {
         missing.push(
-          `${category.title}: category average must be within ${rangeMinimum.toFixed(2)}–${rangeMaximum.toFixed(2)}`,
+          `${categoryLabel}: category average must be within ${rangeMinimum.toFixed(2)}–${rangeMaximum.toFixed(2)}`,
         );
       }
     }
@@ -552,7 +555,7 @@ async function persistAdjudicatorScorecard(
 
       if (submit && canComment && !richTextHasContent(observation)) {
         missing.push(
-          `${overallCategory.title}: ${criterion.title} observation`,
+          `${scorecardCategoryLabel(overallCategory)}: ${criterion.title} observation`,
         );
       }
 

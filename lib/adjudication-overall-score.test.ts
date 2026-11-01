@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateOverallProductionScore } from "./adjudication-overall-score";
+import {
+  calculateOverallProductionScore,
+  scorecardCategoryLabel,
+} from "./adjudication-overall-score";
 import type { ScoringCategory, ScoringCriterion } from "./types";
 
 function category(id: string, key = id): ScoringCategory {
@@ -108,5 +111,19 @@ describe("calculateOverallProductionScore", () => {
       completedCategoryCount: 1,
       scoreableCategoryCount: 2,
     });
+  });
+});
+
+describe("scorecardCategoryLabel", () => {
+  it("labels the overall-production comment as Big Picture in scorecard requirements", () => {
+    expect(
+      scorecardCategoryLabel(category("Overall Production", "overall_production")),
+    ).toBe("Big Picture");
+  });
+
+  it("keeps ordinary category titles unchanged", () => {
+    expect(scorecardCategoryLabel(category("Music Direction"))).toBe(
+      "Music Direction",
+    );
   });
 });
