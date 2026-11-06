@@ -3,6 +3,9 @@ import Link from "next/link";
 import { AdjudicationReferenceLinks } from "@/components/adjudication-reference-links";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
 import { requireProfile } from "@/lib/auth";
+import {
+  scheduleObserverModesByApplication,
+} from "@/lib/schedule-staff";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
@@ -63,19 +66,14 @@ export default async function AdjudicationDashboard({
   if (scheduleStaffResult.error) {
     throw new Error(scheduleStaffResult.error.message);
   }
-  const shadowSlotIds = new Set(
-    ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
-      .filter(
-        (staff) =>
-          staff.user_id === profile.id &&
-          staff.participation_mode === "shadow",
-      )
-      .map((staff) => staff.slot_id),
-  );
-  const scheduledShadowApplicationIds = new Set(
-    ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[])
-      .filter((booking) => shadowSlotIds.has(booking.slot_id))
-      .map((booking) => booking.application_id),
+  const scheduledObserverModeByApplicationId =
+    scheduleObserverModesByApplication({
+      bookings: (scheduleBookingsResult.data ?? []) as ScheduleBookingReference[],
+      staff: (scheduleStaffResult.data ?? []) as ScheduleStaffReference[],
+      userId: profile.id,
+    });
+  const scheduledObserverApplicationIds = new Set(
+    scheduledObserverModeByApplicationId.keys(),
   );
   const scheduledApplicationIds = new Set(
     ((scheduleBookingsResult.data ?? []) as ScheduleBookingReference[]).map(
@@ -101,7 +99,7 @@ export default async function AdjudicationDashboard({
         ...candidateAssignments.map(
           (assignment) => assignment.application_id,
         ),
-        ...scheduledShadowApplicationIds,
+        ...scheduledObserverApplicationIds,
       ]),
     ];
     if (applicationIds.length > 0 && adjudicationCycleIds.length > 0) {
@@ -172,7 +170,7 @@ export default async function AdjudicationDashboard({
     ),
   );
   const readOnlyObserverApplicationIds = new Set(
-    scheduledShadowApplicationIds,
+    scheduledObserverApplicationIds,
   );
   for (const assignment of assignments) {
     if (
@@ -229,11 +227,15 @@ export default async function AdjudicationDashboard({
         assignment: assignmentByApplicationId.get(application.id) ?? null,
         application,
         isReadOnlyObserver: readOnlyObserverApplicationIds.has(application.id),
+        observerMode:
+          scheduledObserverModeByApplicationId.get(application.id) ?? null,
       }))
     : applications.map((application) => ({
       application,
       assignments: assignmentsByApplicationId.get(application.id) ?? [],
       isReadOnlyObserver: readOnlyObserverApplicationIds.has(application.id),
+      observerMode:
+        scheduledObserverModeByApplicationId.get(application.id) ?? null,
     }));
 
   const actionableAssignments = assignments.filter(
@@ -408,8 +410,15 @@ export default async function AdjudicationDashboard({
               const status = row.isReadOnlyObserver
                 ? "shadow"
                 : card?.status ?? row.assignment?.status ?? "assigned";
+              const observerLabel = row.observerMode
+                ? `${row.observerMode === "understudy" ? "Understudy" : "Shadow"} · read only`
+                : "Observer · read only";
+              const applicationHref =
+                row.observerMode === "understudy"
+                  ? `/portal/applications/${row.application.id}`
+                  : `/portal/adjudication/${row.application.id}`;
               return (
-                <Link className="adjudication-card" href={`/portal/adjudication/${row.application.id}`} key={row.assignment?.id ?? `shadow-${row.application.id}`}>
+                <Link className="adjudication-card" href={applicationHref} key={row.assignment?.id ?? `observer-${row.application.id}`}>
                   <div>
                     <span className="eyebrow">{cycle ? `${cycle.season_year} · ${cycle.name}` : "Assigned production"}</span>
                     <h3>{row.application.school_name}</h3>
@@ -418,10 +427,10 @@ export default async function AdjudicationDashboard({
                   <div className="adjudication-card-meta">
                     <span className={`badge badge-scorecard-${status}`}>
                       {row.isReadOnlyObserver
-                        ? "Shadow · read only"
+                        ? observerLabel
                         : status.replaceAll("_", " ")}
                     </span>
-                    <small>{row.isReadOnlyObserver ? "View panel adjudication" : row.assignment?.due_at ? `Due ${new Date(row.assignment.due_at).toLocaleDateString()}` : "No due date"}</small>
+                    <small>{row.isReadOnlyObserver ? row.observerMode === "understudy" ? "View application" : "View panel adjudication" : row.assignment?.due_at ? `Due ${new Date(row.assignment.due_at).toLocaleDateString()}` : "No due date"}</small>
                   </div>
                 </Link>
               );
@@ -432,8 +441,15 @@ export default async function AdjudicationDashboard({
               const cycle = cycleMap.get(row.application.cycle_id);
               const cards = scorecards.filter((card) => card.application_id === row.application.id);
               const complete = cards.filter((card) => card.status === "submitted" || card.status === "locked").length;
+              const observerLabel = row.observerMode
+                ? `${row.observerMode === "understudy" ? "Understudy" : "Shadow"} · read only`
+                : "Observer · read only";
+              const applicationHref =
+                row.observerMode === "understudy"
+                  ? `/portal/applications/${row.application.id}`
+                  : `/portal/adjudication/${row.application.id}`;
               return (
-                <Link className="adjudication-card" href={`/portal/adjudication/${row.application.id}`} key={row.application.id}>
+                <Link className="adjudication-card" href={applicationHref} key={row.application.id}>
                   <div>
                     <span className="eyebrow">{cycle ? `${cycle.season_year} · ${cycle.name}` : "Production"}</span>
                     <h3>{row.application.school_name}</h3>
@@ -451,7 +467,7 @@ export default async function AdjudicationDashboard({
                         }`}
                       >
                         {row.isReadOnlyObserver
-                          ? "Shadow · read only"
+                          ? observerLabel
                           : "Review enabled"}
                       </span>
                     )}

@@ -5,11 +5,71 @@ type ScheduleParticipant = {
   participation_mode?: "panel" | "understudy" | "shadow";
 };
 
+export type ScheduleObserverMode = "understudy" | "shadow";
+
+type ScheduleObserverBooking = {
+  slot_id: string;
+  application_id: string;
+};
+
+type ScheduleObserverStaff = {
+  slot_id: string;
+  user_id: string;
+  participation_mode: "panel" | ScheduleObserverMode;
+};
+
 export const SCHEDULE_STAFF_LIMITS = {
   adjudicators: 3,
   understudies: 1,
   shadows: 3,
 } as const;
+
+export function scheduleObserverModesByApplication({
+  bookings,
+  staff,
+  userId,
+}: {
+  bookings: ScheduleObserverBooking[];
+  staff: ScheduleObserverStaff[];
+  userId: string;
+}) {
+  const observerModeBySlotId = new Map<string, ScheduleObserverMode>();
+
+  for (const participant of staff) {
+    if (
+      participant.user_id !== userId ||
+      participant.participation_mode === "panel"
+    ) {
+      continue;
+    }
+
+    observerModeBySlotId.set(
+      participant.slot_id,
+      participant.participation_mode,
+    );
+  }
+
+  const observerModeByApplicationId = new Map<
+    string,
+    ScheduleObserverMode
+  >();
+  for (const booking of bookings) {
+    const observerMode = observerModeBySlotId.get(booking.slot_id);
+    if (!observerMode) continue;
+
+    const existingMode = observerModeByApplicationId.get(
+      booking.application_id,
+    );
+    if (!existingMode || observerMode === "shadow") {
+      observerModeByApplicationId.set(
+        booking.application_id,
+        observerMode,
+      );
+    }
+  }
+
+  return observerModeByApplicationId;
+}
 
 export function scheduleStaffCapacity(
   participants: ScheduleParticipant[],

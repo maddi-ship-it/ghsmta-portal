@@ -342,6 +342,28 @@ function eligibilityBoolean(value: string) {
   return null;
 }
 
+function eligibilityRowMatchStrength(
+  row: ReferenceRow,
+  categoryKey: string,
+  aliases: Set<string>,
+) {
+  const normalizedLabel = normalize(row.label);
+  const haystack = `${row.key}_${normalizedLabel}`;
+  const isAwardEligibility =
+    haystack.includes("award_eligible") ||
+    haystack.includes("award_eligibility");
+  if (!isAwardEligibility) return null;
+
+  const labelCategory = normalizedLabel.replace(
+    /_(?:award_eligible|award_eligibility)$/,
+    "",
+  );
+  if (labelCategory === categoryKey) return 3;
+  if (aliases.has(labelCategory)) return 2;
+  if (haystack.includes(categoryKey)) return 1;
+  return [...aliases].some((alias) => haystack.includes(alias)) ? 0 : null;
+}
+
 function inferredCategoryEligibility(
   categoryKey: string,
   rows: ReferenceRow[],
@@ -401,17 +423,40 @@ function categoryEligibilitySelections(
       aliases.add(categoryKey.slice(0, -"_design".length));
     }
 
-    const matchingRow = rows.find((row) => {
-      if (usedRows.has(row)) return false;
-      const haystack = `${row.key}_${normalize(row.label)}`;
-      const isAwardEligibility =
-        haystack.includes("award_eligible") ||
-        haystack.includes("award_eligibility");
-      return (
-        isAwardEligibility &&
-        [...aliases].some((alias) => haystack.includes(alias))
+    const matchingRows = rows
+      .filter((row) => !usedRows.has(row))
+      .map((row) => ({
+        row,
+        matchStrength: eligibilityRowMatchStrength(
+          row,
+          categoryKey,
+          aliases,
+        ),
+      }))
+      .filter(
+        (
+          match,
+        ): match is { row: ReferenceRow; matchStrength: number } =>
+          match.matchStrength !== null,
       );
-    });
+    const exactMatchingRows = matchingRows.filter(
+      (match) => match.matchStrength >= 2,
+    );
+    const candidateRows =
+      exactMatchingRows.length > 0 ? exactMatchingRows : matchingRows;
+    const matchingRow = candidateRows
+      .map((match, index) => ({
+        ...match,
+        index,
+        hasEligibilityAnswer:
+          eligibilityBoolean(match.row.value) !== null ? 1 : 0,
+      }))
+      .sort(
+        (left, right) =>
+          right.hasEligibilityAnswer - left.hasEligibilityAnswer ||
+          right.matchStrength - left.matchStrength ||
+          left.index - right.index,
+      )[0]?.row;
 
     const explicitEligibility = matchingRow
       ? eligibilityBoolean(matchingRow.value)
@@ -430,7 +475,11 @@ function categoryEligibilitySelections(
       : applicationValue;
 
     if (matchingRow) {
-      usedRows.add(matchingRow);
+      for (const match of matchingRows) {
+        if (match.row === matchingRow || match.matchStrength >= 2) {
+          usedRows.add(match.row);
+        }
+      }
       return {
         categoryKey,
         label: matchingRow.label,

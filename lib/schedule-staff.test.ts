@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canScheduleParticipantUseMode,
   canSelfJoinScheduleSlot,
+  scheduleObserverModesByApplication,
   scheduleStaffCapacity,
   scheduleSlotHasAdvisoryMember,
   scheduleSlotHasPrimaryAdvisoryMember,
@@ -89,5 +90,69 @@ describe("schedule staff capacity", () => {
 
     expect(capacity.understudiesFull).toBe(true);
     expect(capacity.shadowsFull).toBe(true);
+  });
+});
+
+describe("schedule observer application access", () => {
+  it("maps both understudies and shadows to their booked applications", () => {
+    const observerModes = scheduleObserverModesByApplication({
+      bookings: [
+        { slot_id: "slot-understudy", application_id: "application-1" },
+        { slot_id: "slot-shadow", application_id: "application-2" },
+        { slot_id: "slot-panel", application_id: "application-3" },
+      ],
+      staff: [
+        {
+          slot_id: "slot-understudy",
+          user_id: "current-user",
+          participation_mode: "understudy",
+        },
+        {
+          slot_id: "slot-shadow",
+          user_id: "current-user",
+          participation_mode: "shadow",
+        },
+        {
+          slot_id: "slot-panel",
+          user_id: "current-user",
+          participation_mode: "panel",
+        },
+        {
+          slot_id: "slot-understudy",
+          user_id: "another-user",
+          participation_mode: "shadow",
+        },
+      ],
+      userId: "current-user",
+    });
+
+    expect(Object.fromEntries(observerModes)).toEqual({
+      "application-1": "understudy",
+      "application-2": "shadow",
+    });
+  });
+
+  it("keeps shadow access when duplicate bookings expose both observer modes", () => {
+    const observerModes = scheduleObserverModesByApplication({
+      bookings: [
+        { slot_id: "slot-shadow", application_id: "application-1" },
+        { slot_id: "slot-understudy", application_id: "application-1" },
+      ],
+      staff: [
+        {
+          slot_id: "slot-shadow",
+          user_id: "current-user",
+          participation_mode: "shadow",
+        },
+        {
+          slot_id: "slot-understudy",
+          user_id: "current-user",
+          participation_mode: "understudy",
+        },
+      ],
+      userId: "current-user",
+    });
+
+    expect(observerModes.get("application-1")).toBe("shadow");
   });
 });

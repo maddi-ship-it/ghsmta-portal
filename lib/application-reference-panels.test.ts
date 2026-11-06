@@ -322,6 +322,98 @@ describe("buildApplicationReferencePanels", () => {
     });
   });
 
+  it.each([
+    {
+      name: "the newer Scenic Design field is answered",
+      scenicValue: null,
+      scenicDesignValue: 1,
+      expectedLabel: "Scenic Design - Award Eligible",
+    },
+    {
+      name: "the legacy Scenic field is answered",
+      scenicValue: 1,
+      scenicDesignValue: null,
+      expectedLabel: "Scenic - Award Eligible",
+    },
+  ])(
+    "uses the populated duplicate eligibility field when $name",
+    ({ scenicValue, scenicDesignValue, expectedLabel }) => {
+      const input = {
+        application: legacyApplication,
+        questions: [
+          question("scenic", "Scenic - Award Eligible", 1, {
+            question_type: "yes_no" as const,
+          }),
+          question("scenic-design", "Scenic Design - Award Eligible", 2, {
+            question_type: "yes_no" as const,
+          }),
+        ],
+        answers: [
+          answer("scenic", scenicValue),
+          answer("scenic-design", scenicDesignValue),
+        ],
+        eligibilityCategories: [
+          { category_key: "scenic_design", title: "SCENIC" },
+        ],
+      };
+
+      expect(buildApplicationCategoryEligibilityDefaults(input)).toEqual({
+        scenic_design: true,
+      });
+      expect(
+        buildApplicationReferencePanels(input).find(
+          (panel) => panel.key === "eligibility",
+        )?.groups[0]?.items,
+      ).toEqual([{ label: expectedLabel, value: "true" }]);
+    },
+  );
+
+  it("prefers the exact rubric category when duplicate fields are both answered", () => {
+    const input = {
+      application: legacyApplication,
+      questions: [
+        question("scenic", "Scenic - Award Eligible", 1, {
+          question_type: "yes_no" as const,
+        }),
+        question("scenic-design", "Scenic Design - Award Eligible", 2, {
+          question_type: "yes_no" as const,
+        }),
+      ],
+      answers: [answer("scenic", 0), answer("scenic-design", 1)],
+      eligibilityCategories: [
+        { category_key: "scenic_design", title: "SCENIC" },
+      ],
+    };
+
+    expect(buildApplicationCategoryEligibilityDefaults(input)).toEqual({
+      scenic_design: true,
+    });
+  });
+
+  it("does not borrow an answered eligibility value from a longer category name", () => {
+    const defaults = buildApplicationCategoryEligibilityDefaults({
+      application: legacyApplication,
+      questions: [
+        question("music-direction", "Music Direction - Award Eligible", 1, {
+          question_type: "yes_no",
+        }),
+        question("direction", "Direction - Award Eligible", 2, {
+          question_type: "yes_no",
+        }),
+      ],
+      answers: [answer("music-direction", 1)],
+      eligibilityCategories: [
+        { category_key: "direction", title: "DIRECTION" },
+        { category_key: "music_direction", title: "MUSIC DIRECTION" },
+      ],
+    });
+
+    expect(defaults).toEqual({
+      direction: false,
+      music_direction: true,
+    });
+  });
+
   it("derives Blessed Trinity eligibility from conditional Acceptd answers", () => {
     const eligibleLabels = [
       "Music Direction",
