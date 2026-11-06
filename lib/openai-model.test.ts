@@ -15,6 +15,7 @@ describe("OpenAI model configuration", () => {
       adjudicationSort: "low",
       handwriting: "medium",
       panelComment: "high",
+      playbillSongList: "low",
       phonetic: "low",
     });
   });

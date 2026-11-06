@@ -38,6 +38,7 @@ import {
   OwnerLiveAdjudicationReview,
   type PanelNarrativeReviewer,
 } from "@/components/owner-live-adjudication-review";
+import { PlaybillSongListModal } from "@/components/playbill-song-list-modal";
 import { ScorecardSubmitControls } from "@/components/scorecard-submit-controls";
 import { SpecialtyAwardModal } from "@/components/specialty-award-modal";
 import { SpecialtyAwardWorkspace } from "@/components/specialty-award-workspace";
@@ -352,6 +353,7 @@ export default async function AdjudicationApplicationPage({
     appealsResult,
     candidateReviewResult,
     acceptdSnapshotResult,
+    latestPlaybillResult,
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
@@ -404,7 +406,29 @@ export default async function AdjudicationApplicationPage({
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    admin
+      .from("portal_files")
+      .select("display_name,generated_name,original_name")
+      .eq("application_id", id)
+      .eq("context_type", "application")
+      .eq("document_category", "playbill")
+      .eq("reviewer_visible", true)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  if (latestPlaybillResult.error) {
+    throw new Error(latestPlaybillResult.error.message);
+  }
+  const latestPlaybill = latestPlaybillResult.data;
+  const playbillSourceFileName = latestPlaybill
+    ? latestPlaybill.display_name?.trim() ||
+      latestPlaybill.generated_name?.trim() ||
+      latestPlaybill.original_name?.trim() ||
+      "Uploaded Playbill"
+    : null;
 
   const categories = (categoriesResult.data ?? []) as ScoringCategory[];
   const eligibilityAppeals = (appealsResult.data ?? []) as ApplicationEligibilityAppeal[];
@@ -996,6 +1020,12 @@ export default async function AdjudicationApplicationPage({
           {showEditableScorecard && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
           {isReadOnlyObserver ? (
             <span className="badge badge-draft">Shadow · read only</span>
+          ) : null}
+          {playbillSourceFileName ? (
+            <PlaybillSongListModal
+              applicationId={id}
+              sourceFileName={playbillSourceFileName}
+            />
           ) : null}
           <Link className="button button-secondary" href="/portal/adjudication">Back to adjudication</Link>
         </div>

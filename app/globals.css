@@ -4338,6 +4338,119 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
   background: #f7f8fb;
 }
 
+.playbill-song-list-modal {
+  width: min(760px, 100%);
+  height: auto;
+  max-height: min(86vh, 860px);
+  max-height: min(86dvh, 860px);
+}
+
+.playbill-song-list-modal-body {
+  min-height: 240px;
+}
+
+.playbill-song-list-status {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  text-align: left;
+}
+
+.playbill-song-list-status strong {
+  color: var(--navy-950);
+}
+
+.playbill-song-list-status p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.playbill-song-list-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.playbill-song-list-section {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.playbill-song-list-section h3 {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--navy-900);
+  background: #f2f4f8;
+  font-size: .88rem;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+
+.playbill-song-list-section ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: playbill-song;
+}
+
+.playbill-song-list-section li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e8ebf1;
+  counter-increment: playbill-song;
+}
+
+.playbill-song-list-section li:last-child {
+  border-bottom: 0;
+}
+
+.playbill-song-list-section li::before {
+  content: counter(playbill-song) ".";
+  color: var(--gold-700);
+  font-size: .8rem;
+  font-weight: 850;
+  line-height: 1.6;
+}
+
+.playbill-song-list-section li div {
+  display: grid;
+  gap: 2px;
+}
+
+.playbill-song-list-section li strong {
+  color: var(--navy-950);
+  line-height: 1.45;
+}
+
+.playbill-song-list-section li span {
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+.playbill-song-list-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.playbill-song-list-empty {
+  min-height: 190px;
+}
+
 .adjudication-pdf-modal {
   width: min(1200px, 100%);
   height: min(92vh, 980px);
