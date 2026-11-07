@@ -28,6 +28,7 @@ import {
   isAdjudicationCategoryComplete,
 } from "@/lib/adjudication-category-completion";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import { resolveFocusSafeRemoteUpdate } from "@/lib/focus-safe-remote-value";
 import { panelNarrativeSourceAssignmentIds } from "@/lib/panel-narrative";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { createClient } from "@/lib/supabase/client";
@@ -356,16 +357,77 @@ function LivePanelFeedbackEditor({
   const storedComment = feedback?.final_comment?.trim() ?? "";
   const storageKey = `ghsmta:offline-panel-feedback:${applicationId}:${category.id}`;
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncLocalDraftRef = useRef<() => Promise<void>>(async () => undefined);
   const syncingRef = useRef(false);
-  const [manualValue, setManualValue] = useState(storedComment);
+  const resyncRequestedRef = useRef(false);
+  const initialValue = storedComment || liveDraft;
+  const dirtyRef = useRef(false);
+  const focusedRef = useRef(false);
+  const followingLiveDraftRef = useRef(!storedComment);
+  const remoteValueRef = useRef(initialValue);
+  const valueRef = useRef(initialValue);
+  const [manualValue, setManualValue] = useState(initialValue);
   const [followingLiveDraft, setFollowingLiveDraft] = useState(!storedComment);
   const [online, setOnline] = useState(true);
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const [pendingRemoteValue, setPendingRemoteValue] =
+    useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
   const [generationMessage, setGenerationMessage] = useState("");
   const [refreshingLiveNotes, setRefreshingLiveNotes] = useState(false);
   const [isGenerating, startGeneration] = useTransition();
-  const value = followingLiveDraft ? liveDraft : manualValue;
+  const value = manualValue;
+
+  useEffect(() => {
+    followingLiveDraftRef.current = followingLiveDraft;
+  }, [followingLiveDraft]);
+
+  const receiveRemoteValue = useCallback((nextValue: string) => {
+    if (
+      nextValue === remoteValueRef.current &&
+      nextValue !== valueRef.current
+    ) {
+      return;
+    }
+
+    const decision = resolveFocusSafeRemoteUpdate({
+      currentValue: valueRef.current,
+      dirty: dirtyRef.current,
+      focused: focusedRef.current,
+      remoteValue: nextValue,
+    });
+
+    remoteValueRef.current = nextValue;
+
+    if (decision === "acknowledge") {
+      dirtyRef.current = false;
+      setPendingRemoteValue(null);
+      return;
+    }
+
+    if (decision === "queue") {
+      dirtyRef.current = true;
+      setPendingRemoteValue(nextValue);
+      return;
+    }
+
+    valueRef.current = nextValue;
+    dirtyRef.current = false;
+    setPendingRemoteValue(null);
+    setManualValue(nextValue);
+  }, []);
+
+  useEffect(() => {
+    if (followingLiveDraftRef.current) {
+      receiveRemoteValue(liveDraft);
+    }
+  }, [liveDraft, receiveRemoteValue]);
+
+  useEffect(() => {
+    if (!followingLiveDraftRef.current) {
+      receiveRemoteValue(storedComment);
+    }
+  }, [receiveRemoteValue, storedComment]);
 
   const readLocalDraft = useCallback(() => {
     try {
@@ -403,8 +465,16 @@ function LivePanelFeedbackEditor({
 
     try {
       await savePanelFeedback(applicationId, category.id, formData);
-      window.localStorage.removeItem(storageKey);
-      setHasLocalDraft(false);
+      remoteValueRef.current = finalComment;
+      dirtyRef.current = valueRef.current !== finalComment;
+      if (!dirtyRef.current) {
+        setPendingRemoteValue(null);
+        window.localStorage.removeItem(storageKey);
+        setHasLocalDraft(false);
+      } else {
+        resyncRequestedRef.current = true;
+        setHasLocalDraft(true);
+      }
       setSyncMessage("Panel narrative synced.");
       router.refresh();
     } catch (error) {
@@ -416,8 +486,19 @@ function LivePanelFeedbackEditor({
       );
     } finally {
       syncingRef.current = false;
+      if (resyncRequestedRef.current && navigator.onLine) {
+        resyncRequestedRef.current = false;
+        syncTimerRef.current = setTimeout(
+          () => void syncLocalDraftRef.current(),
+          0,
+        );
+      }
     }
   }, [applicationId, category.id, readLocalDraft, router, storageKey]);
+
+  useEffect(() => {
+    syncLocalDraftRef.current = syncLocalDraft;
+  }, [syncLocalDraft]);
 
   useEffect(() => {
     const updateOnlineState = () => {
@@ -471,6 +552,9 @@ function LivePanelFeedbackEditor({
       }
 
       deferStateUpdate(() => {
+        followingLiveDraftRef.current = false;
+        valueRef.current = draft.finalComment ?? "";
+        dirtyRef.current = valueRef.current !== remoteValueRef.current;
         setFollowingLiveDraft(false);
         setManualValue(draft.finalComment ?? "");
         setHasLocalDraft(true);
@@ -583,6 +667,10 @@ function LivePanelFeedbackEditor({
                         setGenerationMessage(result.error);
                         return;
                       }
+                      followingLiveDraftRef.current = false;
+                      valueRef.current = result.generatedComment;
+                      dirtyRef.current =
+                        result.generatedComment !== remoteValueRef.current;
                       setFollowingLiveDraft(false);
                       setManualValue(result.generatedComment);
                       setGenerationMessage("Owner draft generated from the latest saved comments.");
@@ -610,9 +698,14 @@ function LivePanelFeedbackEditor({
                     const refreshed = await onRefreshLiveNotes();
                     if (refreshed) {
                       window.localStorage.removeItem(storageKey);
+                      followingLiveDraftRef.current = true;
+                      valueRef.current = liveDraft;
+                      remoteValueRef.current = liveDraft;
+                      dirtyRef.current = false;
                       setHasLocalDraft(false);
                       setFollowingLiveDraft(true);
-                      setManualValue("");
+                      setManualValue(liveDraft);
+                      setPendingRemoteValue(null);
                       setGenerationMessage(
                         "Live notes refreshed from currently assigned commenters.",
                       );
@@ -640,11 +733,70 @@ function LivePanelFeedbackEditor({
             name="final_comment"
             value={value}
             onChange={(event) => {
+              const nextValue = event.target.value;
+              followingLiveDraftRef.current = false;
+              valueRef.current = nextValue;
+              dirtyRef.current = nextValue !== remoteValueRef.current;
               setFollowingLiveDraft(false);
-              setManualValue(event.target.value);
-              writeLocalDraft(event.target.value);
+              setManualValue(nextValue);
+              writeLocalDraft(nextValue);
+              if (!dirtyRef.current) {
+                setPendingRemoteValue(null);
+              }
+            }}
+            onBlur={() => {
+              focusedRef.current = false;
+            }}
+            onFocus={() => {
+              focusedRef.current = true;
             }}
           />
+          {pendingRemoteValue !== null ? (
+            <div
+              aria-live="polite"
+              className="remote-edit-conflict"
+              role="status"
+            >
+              <span>
+                Saved content changed while you were editing. Your draft was
+                kept.
+              </span>
+              <div className="remote-edit-conflict-actions">
+                <button
+                  className="button button-secondary"
+                  onClick={() => setPendingRemoteValue(null)}
+                  type="button"
+                >
+                  Keep my draft
+                </button>
+                <button
+                  className="button button-secondary"
+                  onClick={() => {
+                    const syncInProgress = syncingRef.current;
+                    if (syncTimerRef.current) {
+                      clearTimeout(syncTimerRef.current);
+                      syncTimerRef.current = null;
+                    }
+                    valueRef.current = pendingRemoteValue;
+                    remoteValueRef.current = pendingRemoteValue;
+                    dirtyRef.current = false;
+                    setManualValue(pendingRemoteValue);
+                    setPendingRemoteValue(null);
+                    if (syncInProgress) {
+                      resyncRequestedRef.current = true;
+                      writeLocalDraft(pendingRemoteValue);
+                    } else {
+                      window.localStorage.removeItem(storageKey);
+                      setHasLocalDraft(false);
+                    }
+                  }}
+                  type="button"
+                >
+                  Load saved version
+                </button>
+              </div>
+            </div>
+          ) : null}
           <small className="field-help">
             {!online
               ? "Offline — panel narrative saved on this device. Save is available when you are back online."
@@ -1494,7 +1646,7 @@ export function OwnerLiveAdjudicationReview({
             {isOwner ? (
               <div className="panel-body">
                 <LivePanelFeedbackEditor
-                  key={`${category.id}:${categoryFeedback?.updated_at ?? "live"}`}
+                  key={category.id}
                   applicationId={applicationId}
                   assignedReviewerName={assignedReviewerName}
                   category={category}

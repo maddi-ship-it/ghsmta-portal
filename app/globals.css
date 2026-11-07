@@ -2119,6 +2119,35 @@ html[data-theme="light"] .portal-shell .criterion-header-summary strong {
   margin: .2em 0;
 }
 
+.remote-edit-conflict {
+  align-items: center;
+  background: color-mix(in srgb, var(--gold, #d6ad36) 12%, white);
+  border: 1px solid color-mix(in srgb, var(--gold, #d6ad36) 55%, var(--line));
+  border-radius: 10px;
+  color: var(--text);
+  display: grid;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 10px 12px;
+}
+
+.remote-edit-conflict > span {
+  font-size: .82rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.remote-edit-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.remote-edit-conflict-actions .button {
+  min-height: 34px;
+  padding: 7px 11px;
+}
+
 .raw-comment-section {
   display: grid;
   gap: 5px;

@@ -15,6 +15,7 @@ import {
   APPLY_ADJUDICATION_BRAIN_DUMP_EVENT,
   type ApplyAdjudicationBrainDumpDetail,
 } from "@/lib/adjudication-brain-dump";
+import { resolveFocusSafeRemoteUpdate } from "@/lib/focus-safe-remote-value";
 
 type RichTextCommand =
   | "bold"
@@ -68,9 +69,19 @@ export function RichTextField({
 
   const initialValue =
     sanitizeRichTextHtml(defaultValue);
+  const dirtyRef = useRef(false);
+  const focusedRef = useRef(false);
+  const onValueChangeRef = useRef(onValueChange);
+  const remoteValueRef = useRef(initialValue);
 
   const [value, setValue] =
     useState(initialValue);
+  const [pendingRemoteValue, setPendingRemoteValue] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    onValueChangeRef.current = onValueChange;
+  }, [onValueChange]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -81,11 +92,34 @@ export function RichTextField({
 
     const nextValue =
       sanitizeRichTextHtml(defaultValue);
+    const currentValue =
+      sanitizeRichTextHtml(editor.innerHTML);
+    const decision = resolveFocusSafeRemoteUpdate({
+      currentValue,
+      dirty: dirtyRef.current,
+      focused: focusedRef.current,
+      remoteValue: nextValue,
+    });
 
-    if (editor.innerHTML !== nextValue) {
-      editor.innerHTML = nextValue;
+    remoteValueRef.current = nextValue;
+
+    if (decision === "acknowledge") {
+      dirtyRef.current = false;
+      setPendingRemoteValue(null);
       setValue(nextValue);
+      return;
     }
+
+    if (decision === "queue") {
+      dirtyRef.current = true;
+      setPendingRemoteValue(nextValue);
+      return;
+    }
+
+    editor.innerHTML = nextValue;
+    dirtyRef.current = false;
+    setPendingRemoteValue(null);
+    setValue(nextValue);
   }, [defaultValue]);
 
   useEffect(() => {
@@ -105,7 +139,9 @@ export function RichTextField({
 
       const nextValue = sanitizeRichTextHtml(restoredValue);
       editor.innerHTML = nextValue;
+      dirtyRef.current = nextValue !== remoteValueRef.current;
       setValue(nextValue);
+      onValueChangeRef.current?.(nextValue);
       window.setTimeout(() => {
         editor.dispatchEvent(new Event("input", { bubbles: true }));
       }, 0);
@@ -168,8 +204,9 @@ export function RichTextField({
         : addition;
 
       editor.innerHTML = nextValue;
+      dirtyRef.current = nextValue !== remoteValueRef.current;
       setValue(nextValue);
-      onValueChange?.(nextValue);
+      onValueChangeRef.current?.(nextValue);
       window.setTimeout(() => {
         editor.dispatchEvent(new Event("input", { bubbles: true }));
       }, 0);
@@ -186,7 +223,7 @@ export function RichTextField({
         applySortedNotes,
       );
     };
-  }, [disabled, name, onValueChange]);
+  }, [disabled, name]);
 
   const syncValue = () => {
     const editor = editorRef.current;
@@ -196,8 +233,27 @@ export function RichTextField({
     }
 
     const nextValue = sanitizeRichTextHtml(editor.innerHTML);
+    dirtyRef.current = nextValue !== remoteValueRef.current;
+    if (!dirtyRef.current) {
+      setPendingRemoteValue(null);
+    }
     setValue(nextValue);
-    onValueChange?.(nextValue);
+    onValueChangeRef.current?.(nextValue);
+  };
+
+  const loadSavedVersion = () => {
+    const editor = editorRef.current;
+
+    if (!editor || pendingRemoteValue === null) {
+      return;
+    }
+
+    editor.innerHTML = pendingRemoteValue;
+    remoteValueRef.current = pendingRemoteValue;
+    dirtyRef.current = false;
+    setValue(pendingRemoteValue);
+    setPendingRemoteValue(null);
+    onValueChangeRef.current?.(pendingRemoteValue);
   };
 
   const runCommand = (
@@ -286,6 +342,11 @@ export function RichTextField({
         </div>
 
         <div
+          aria-describedby={
+            pendingRemoteValue !== null
+              ? `${id}-remote-update`
+              : undefined
+          }
           aria-label={label}
           aria-multiline="true"
           className="rich-text-editor"
@@ -300,7 +361,13 @@ export function RichTextField({
             "Enter comments"
           }
           id={id}
-          onBlur={syncValue}
+          onBlur={() => {
+            focusedRef.current = false;
+            syncValue();
+          }}
+          onFocus={() => {
+            focusedRef.current = true;
+          }}
           onInput={syncValue}
           onPaste={(event) => {
             if (disabled) {
@@ -327,6 +394,35 @@ export function RichTextField({
           suppressContentEditableWarning
         />
       </div>
+
+      {pendingRemoteValue !== null ? (
+        <div
+          aria-live="polite"
+          className="remote-edit-conflict"
+          id={`${id}-remote-update`}
+          role="status"
+        >
+          <span>
+            Saved content changed while you were editing. Your draft was kept.
+          </span>
+          <div className="remote-edit-conflict-actions">
+            <button
+              className="button button-secondary"
+              onClick={() => setPendingRemoteValue(null)}
+              type="button"
+            >
+              Keep my draft
+            </button>
+            <button
+              className="button button-secondary"
+              onClick={loadSavedVersion}
+              type="button"
+            >
+              Load saved version
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <input
         name={name}

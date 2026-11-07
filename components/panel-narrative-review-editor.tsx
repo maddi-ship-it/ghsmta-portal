@@ -7,6 +7,7 @@ import {
   autosavePanelFeedbackDraft,
   savePanelFeedback,
 } from "@/app/portal/adjudication/[id]/actions";
+import { resolveFocusSafeRemoteUpdate } from "@/lib/focus-safe-remote-value";
 
 type AutosaveState =
   | "saved"
@@ -42,6 +43,8 @@ export function PanelNarrativeReviewEditor({
   const timerRef = useRef<number | null>(null);
   const inFlightRef = useRef<Promise<{ savedAt: string }> | null>(null);
   const mountedRef = useRef(false);
+  const focusedRef = useRef(false);
+  const initialMountValueRef = useRef(initialValue);
   const latestValueRef = useRef(initialValue);
   const savedValueRef = useRef(initialValue);
   const sourceGeneratedAtRef = useRef(generatedAt);
@@ -52,6 +55,10 @@ export function PanelNarrativeReviewEditor({
     "Changes to this final comment save automatically.",
   );
   const [approving, setApproving] = useState(false);
+  const [pendingRemoteValue, setPendingRemoteValue] = useState<{
+    generatedAt: string;
+    value: string;
+  } | null>(null);
 
   const writeLocalDraft = useCallback(
     (draftValue: string) => {
@@ -155,7 +162,7 @@ export function PanelNarrativeReviewEditor({
           draft.applicationId === applicationId &&
           draft.categoryId === categoryId &&
           draft.reviewerId === currentUserId &&
-          draft.value !== initialValue
+          draft.value !== initialMountValueRef.current
         ) {
           latestValueRef.current = draft.value;
           sourceGeneratedAtRef.current = draft.sourceGeneratedAt ?? "";
@@ -202,7 +209,6 @@ export function PanelNarrativeReviewEditor({
     applicationId,
     categoryId,
     currentUserId,
-    initialValue,
     queueSave,
     storageKey,
     writeLocalDraft,
@@ -234,10 +240,37 @@ export function PanelNarrativeReviewEditor({
   }, [queueSave, value, writeLocalDraft]);
 
   useEffect(() => {
-    if (latestValueRef.current !== savedValueRef.current) return;
+    if (
+      initialValue === savedValueRef.current &&
+      initialValue !== latestValueRef.current
+    ) {
+      return;
+    }
+
+    const decision = resolveFocusSafeRemoteUpdate({
+      currentValue: latestValueRef.current,
+      dirty: latestValueRef.current !== savedValueRef.current,
+      focused: focusedRef.current,
+      remoteValue: initialValue,
+    });
+
+    if (decision === "acknowledge") {
+      savedValueRef.current = initialValue;
+      sourceGeneratedAtRef.current = generatedAt;
+      setPendingRemoteValue(null);
+      return;
+    }
+
+    if (decision === "queue") {
+      savedValueRef.current = initialValue;
+      setPendingRemoteValue({ generatedAt, value: initialValue });
+      return;
+    }
+
     savedValueRef.current = initialValue;
     latestValueRef.current = initialValue;
     sourceGeneratedAtRef.current = generatedAt;
+    setPendingRemoteValue(null);
     window.setTimeout(() => {
       if (mountedRef.current) setValue(initialValue);
     }, 0);
@@ -284,11 +317,89 @@ export function PanelNarrativeReviewEditor({
           className="textarea narrative-textarea"
           disabled={approving}
           id={`panel_final_comment_${categoryId}`}
-          onChange={(event) => setValue(event.target.value)}
+          onBlur={() => {
+            focusedRef.current = false;
+          }}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            latestValueRef.current = nextValue;
+            setValue(nextValue);
+            if (nextValue === savedValueRef.current) {
+              setPendingRemoteValue(null);
+            }
+          }}
+          onFocus={() => {
+            focusedRef.current = true;
+          }}
           onInput={(event) => event.stopPropagation()}
           rows={8}
           value={value}
         />
+        {pendingRemoteValue ? (
+          <div
+            aria-live="polite"
+            className="remote-edit-conflict"
+            role="status"
+          >
+            <span>
+              Saved content changed while you were editing. Your draft was
+              kept.
+            </span>
+            <div className="remote-edit-conflict-actions">
+              <button
+                className="button button-secondary"
+                onClick={() => {
+                  setPendingRemoteValue(null);
+                  writeLocalDraft(value);
+                  setAutosaveState(navigator.onLine ? "pending" : "offline");
+                  setMessage(
+                    navigator.onLine
+                      ? "Your draft was kept — autosave pending."
+                      : "Offline — your draft is saved on this device.",
+                  );
+                  if (timerRef.current) {
+                    window.clearTimeout(timerRef.current);
+                  }
+                  if (navigator.onLine && value.trim()) {
+                    timerRef.current = window.setTimeout(
+                      () => void queueSave(value),
+                      150,
+                    );
+                  }
+                }}
+                type="button"
+              >
+                Keep my draft
+              </button>
+              <button
+                className="button button-secondary"
+                onClick={() => {
+                  const saveWasInFlight = Boolean(inFlightRef.current);
+                  const savedVersion = pendingRemoteValue;
+                  if (timerRef.current) {
+                    window.clearTimeout(timerRef.current);
+                    timerRef.current = null;
+                  }
+                  clearLocalDraft();
+                  latestValueRef.current = savedVersion.value;
+                  savedValueRef.current = savedVersion.value;
+                  sourceGeneratedAtRef.current =
+                    savedVersion.generatedAt;
+                  setValue(savedVersion.value);
+                  setPendingRemoteValue(null);
+                  setAutosaveState("saved");
+                  setMessage("Loaded the saved final comment.");
+                  if (saveWasInFlight) {
+                    void queueSave(savedVersion.value);
+                  }
+                }}
+                type="button"
+              >
+                Load saved version
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <div
         aria-live="polite"

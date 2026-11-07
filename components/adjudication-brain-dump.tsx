@@ -18,6 +18,7 @@ import {
   type AdjudicationBrainDumpReviewNote,
   type AdjudicationBrainDumpTarget,
 } from "@/lib/adjudication-brain-dump";
+import { resolveFocusSafeRemoteUpdate } from "@/lib/focus-safe-remote-value";
 import { createClient } from "@/lib/supabase/client";
 
 type SortResponse = {
@@ -414,11 +415,68 @@ export function AdjudicationBrainDump({
   const [expanded, setExpanded] = useState(!(defaultValue ?? "").trim());
   const [sorting, setSorting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [pendingRemoteValue, setPendingRemoteValue] =
+    useState<string | null>(null);
   const [review, setReview] = useState<BrainDumpReview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const sortButtonRef = useRef<HTMLButtonElement | null>(null);
   const valueRef = useRef(defaultValue ?? "");
-  const lastLocalChangeAtRef = useRef(0);
+  const dirtyRef = useRef(false);
+  const focusedRef = useRef(false);
+  const remoteValueRef = useRef(defaultValue ?? "");
+  const dismissedRemoteValueRef = useRef<string | null>(null);
+
+  const receiveRemoteValue = useCallback(
+    (nextValue: string, appliedMessage: string) => {
+      const decision = resolveFocusSafeRemoteUpdate({
+        currentValue: valueRef.current,
+        dirty: dirtyRef.current,
+        focused: focusedRef.current,
+        remoteValue: nextValue,
+      });
+
+      remoteValueRef.current = nextValue;
+
+      if (decision === "acknowledge") {
+        dirtyRef.current = false;
+        dismissedRemoteValueRef.current = null;
+        setPendingRemoteValue(null);
+        return;
+      }
+
+      if (decision === "queue") {
+        dirtyRef.current = true;
+
+        if (dismissedRemoteValueRef.current === nextValue) {
+          return;
+        }
+
+        dismissedRemoteValueRef.current = null;
+        setPendingRemoteValue(nextValue);
+        setExpanded(true);
+        setMessage(
+          "Saved brain-dump content changed while you were editing. Your draft was kept.",
+        );
+        return;
+      }
+
+      valueRef.current = nextValue;
+      dirtyRef.current = false;
+      dismissedRemoteValueRef.current = null;
+      setPendingRemoteValue(null);
+      setValue(nextValue);
+      setExpanded(true);
+      setMessage(appliedMessage);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    receiveRemoteValue(
+      defaultValue ?? "",
+      "Brain dump refreshed with the latest saved version.",
+    );
+  }, [defaultValue, receiveRemoteValue]);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia("(max-width: 720px)");
@@ -457,20 +515,10 @@ export function AdjudicationBrainDump({
         (payload) => {
           const remoteValue = payload.new[databaseField];
           const nextValue = typeof remoteValue === "string" ? remoteValue : "";
-
-          if (nextValue === valueRef.current) return;
-
-          if (Date.now() - lastLocalChangeAtRef.current < 2_000) {
-            setMessage(
-              "New brain-dump notes were saved from another device. Finish your current edit, then refresh to reconcile both versions.",
-            );
-            return;
-          }
-
-          valueRef.current = nextValue;
-          setValue(nextValue);
-          setExpanded(true);
-          setMessage("Brain dump updated live from another signed-in device.");
+          receiveRemoteValue(
+            nextValue,
+            "Brain dump updated live from another signed-in device.",
+          );
         },
       )
       .subscribe();
@@ -478,7 +526,7 @@ export function AdjudicationBrainDump({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [fieldName, practiceMode, scorecardId, supabase]);
+  }, [fieldName, practiceMode, receiveRemoteValue, scorecardId, supabase]);
 
   useEffect(() => {
     const restoreFrame = window.requestAnimationFrame(() => {
@@ -681,6 +729,28 @@ export function AdjudicationBrainDump({
       (note) => note.requiresManualPlacement && !note.applied,
     ).length ?? 0;
 
+  const keepBrainDumpDraft = () => {
+    if (pendingRemoteValue === null) return;
+
+    dismissedRemoteValueRef.current = pendingRemoteValue;
+    setPendingRemoteValue(null);
+    setMessage(
+      "Your brain-dump draft is still in the box and will continue to autosave.",
+    );
+  };
+
+  const loadSavedBrainDump = () => {
+    if (pendingRemoteValue === null) return;
+
+    valueRef.current = pendingRemoteValue;
+    remoteValueRef.current = pendingRemoteValue;
+    dirtyRef.current = false;
+    dismissedRemoteValueRef.current = null;
+    setValue(pendingRemoteValue);
+    setPendingRemoteValue(null);
+    setMessage("Loaded the saved brain-dump version.");
+  };
+
   return (
     <>
       <details
@@ -711,10 +781,24 @@ export function AdjudicationBrainDump({
                 maxLength={30000}
                 name={fieldName}
                 onChange={(event) => {
-                  valueRef.current = event.target.value;
-                  lastLocalChangeAtRef.current = Date.now();
-                  setValue(event.target.value);
-                  setMessage(null);
+                  const nextValue = event.target.value;
+                  valueRef.current = nextValue;
+                  dirtyRef.current = nextValue !== remoteValueRef.current;
+                  setValue(nextValue);
+
+                  if (!dirtyRef.current) {
+                    dismissedRemoteValueRef.current = null;
+                    setPendingRemoteValue(null);
+                    setMessage(null);
+                  } else if (pendingRemoteValue === null) {
+                    setMessage(null);
+                  }
+                }}
+                onBlur={() => {
+                  focusedRef.current = false;
+                }}
+                onFocus={() => {
+                  focusedRef.current = true;
                 }}
                 placeholder="Capture your unsorted observations here. Focus this box to use Dictate or Scan notes."
                 value={value}
@@ -725,6 +809,34 @@ export function AdjudicationBrainDump({
                   "No private notes were entered before commenting was disabled."}
               </div>
             )}
+            {pendingRemoteValue !== null ? (
+              <div
+                aria-live="polite"
+                className="remote-edit-conflict"
+                role="status"
+              >
+                <span>
+                  Saved content changed while you were editing. Your draft was
+                  kept.
+                </span>
+                <div className="remote-edit-conflict-actions">
+                  <button
+                    className="button button-secondary"
+                    onClick={keepBrainDumpDraft}
+                    type="button"
+                  >
+                    Keep my draft
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    onClick={loadSavedBrainDump}
+                    type="button"
+                  >
+                    Load saved version
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <small className="field-help">
               {practiceMode
                 ? "These practice notes remain on this page and are cleared when you leave or reset the sandbox. Auto-sort does not send practice text to a school record."
