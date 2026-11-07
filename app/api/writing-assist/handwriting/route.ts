@@ -7,6 +7,10 @@ import {
   DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
 } from "@/lib/openai-model";
+import {
+  parseOpenAIResponseUsage,
+  recordAiRequestUsage,
+} from "@/lib/openai-usage";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -121,6 +125,13 @@ export async function POST(request: Request) {
       { status: 502 },
     );
   }
+  await recordAiRequestUsage({
+    feature: "handwriting_transcription",
+    fallbackModel: DEFAULT_OPENAI_TEXT_MODEL,
+    requestedBy: user.id,
+    responseId: response.headers.get("x-request-id"),
+    usage: parseOpenAIResponseUsage(payload),
+  });
   const transcription = extractOpenAIText(payload).trim();
   if (!transcription) return NextResponse.json({ error: "No readable handwriting was found." }, { status: 422 });
   return NextResponse.json({ text: transcription }, { headers: { "Cache-Control": "no-store" } });

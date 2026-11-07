@@ -28,6 +28,7 @@ import {
   DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
 } from "@/lib/openai-model";
+import { parseAiSdkUsage, recordAiRequestUsage } from "@/lib/openai-usage";
 import { createClient } from "@/lib/supabase/server";
 import type {
   ApplicationAnswer,
@@ -323,7 +324,7 @@ export async function POST(request: Request) {
         batchIndex + MODEL_BATCH_CONCURRENCY,
       );
       const batchPlacements = await Promise.all(
-        concurrentBatches.map(async (sourceNoteBatch) => {
+        concurrentBatches.map(async (sourceNoteBatch, batchOffset) => {
           const batchNoteIds = new Set(
             sourceNoteBatch.map((note) => note.id),
           );
@@ -411,7 +412,7 @@ export async function POST(request: Request) {
             },
           );
           try {
-            const { output } = await generateText({
+            const result = await generateText({
               model: openai.responses(modelId),
               output: Output.object({
                 name: "adjudication_brain_dump_sort",
@@ -440,7 +441,22 @@ export async function POST(request: Request) {
               },
             });
 
-            return output.placements;
+            await recordAiRequestUsage({
+              feature: "adjudication_brain_sort",
+              fallbackModel: modelId,
+              requestedBy: user.id,
+              applicationId,
+              usage: parseAiSdkUsage(
+                result.usage,
+                result.finalStep.response,
+              ),
+              metadata: {
+                batchNumber: batchIndex + batchOffset + 1,
+                noteCount: sourceNoteBatch.length,
+              },
+            });
+
+            return result.output.placements;
           } catch (error) {
             if (!NoOutputGeneratedError.isInstance(error)) throw error;
 

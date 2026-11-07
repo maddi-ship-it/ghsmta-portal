@@ -45,6 +45,10 @@ import {
 import { resolvePanelCommentModel } from "@/lib/panel-comment-model";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { OPENAI_REASONING_EFFORT } from "@/lib/openai-model";
+import {
+  parseOpenAIResponseUsage,
+  recordAiRequestUsage,
+} from "@/lib/openai-usage";
 import { logEvent } from "@/lib/observability";
 import { richTextHasContent, sanitizeRichTextHtml } from "@/lib/rich-text";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -1110,6 +1114,19 @@ async function generatePanelCommentDraft(
     const apiMessage = payload?.error?.message ?? `OpenAI returned ${response.status}.`;
     throw new Error(apiMessage);
   }
+
+  await recordAiRequestUsage({
+    feature: "panel_category_comment",
+    fallbackModel: model,
+    requestedBy: generatedBy,
+    applicationId,
+    responseId: response.headers.get("x-request-id"),
+    usage: parseOpenAIResponseUsage(payload),
+    metadata: {
+      categoryId,
+      promptTemplateId: prompt.id,
+    },
+  });
 
   const generatedComment = extractOpenAIText(payload);
   if (!generatedComment) throw new Error("OpenAI returned an empty narrative.");

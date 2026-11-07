@@ -10,6 +10,10 @@ import {
   PLAYBILL_SONG_LIST_MODEL,
 } from "@/lib/openai-model";
 import {
+  parseOpenAIResponseUsage,
+  recordAiRequestUsage,
+} from "@/lib/openai-usage";
+import {
   parsePlaybillSongList,
   PLAYBILL_SONG_LIST_EXTRACTOR_VERSION,
   PLAYBILL_SONG_LIST_INSTRUCTIONS,
@@ -354,6 +358,16 @@ export async function POST(
         },
       );
     }
+
+    await recordAiRequestUsage({
+      feature: "playbill_song_list",
+      fallbackModel: PLAYBILL_SONG_LIST_MODEL,
+      requestedBy: user.id,
+      applicationId,
+      portalFileId: file.id,
+      usage: parseOpenAIResponseUsage(payload),
+      metadata: { sourceFileName: sourceFileName(file) },
+    });
 
     const outputText = extractOpenAIText(payload);
     let structuredOutput: unknown = null;

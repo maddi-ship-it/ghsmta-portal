@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { consumeApiQuota } from "@/lib/api-quota";
+import {
+  parseOpenAITranscriptionUsage,
+  recordAiRequestUsage,
+} from "@/lib/openai-usage";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -48,9 +52,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Choose a supported audio recording." }, { status: 415 });
   }
 
+  const model = process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "gpt-4o-mini-transcribe";
   const body = new FormData();
   body.set("file", audio, audio.name || "dictation.webm");
-  body.set("model", process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "gpt-4o-mini-transcribe");
+  body.set("model", model);
   body.set("response_format", "json");
   body.set("prompt", "Transcribe the speaker's notes accurately. Preserve sentences, names, punctuation, and paragraph breaks. Return only the transcript.");
 
@@ -64,6 +69,13 @@ export async function POST(request: Request) {
   if (!response.ok) {
     return NextResponse.json({ error: apiError(payload, "The recording could not be transcribed.") }, { status: 502 });
   }
+  await recordAiRequestUsage({
+    feature: "voice_dictation",
+    fallbackModel: model,
+    requestedBy: user.id,
+    responseId: response.headers.get("x-request-id"),
+    usage: parseOpenAITranscriptionUsage(payload),
+  });
   const transcript = String(payload?.text ?? "").trim();
   if (!transcript) return NextResponse.json({ error: "No speech was detected." }, { status: 422 });
   return NextResponse.json({ text: transcript }, { headers: { "Cache-Control": "no-store" } });

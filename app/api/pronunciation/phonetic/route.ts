@@ -7,6 +7,11 @@ import {
   DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
 } from "@/lib/openai-model";
+import {
+  parseOpenAIResponseUsage,
+  parseOpenAITranscriptionUsage,
+  recordAiRequestUsage,
+} from "@/lib/openai-usage";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -45,6 +50,7 @@ async function requestPhoneticSuggestion(
   apiKey: string,
   model: string,
   prompt: string,
+  requestedBy: string,
 ) {
   try {
     const response = await fetch(RESPONSES_ENDPOINT, {
@@ -68,6 +74,15 @@ async function requestPhoneticSuggestion(
     });
 
     const payload = await response.json().catch(() => null);
+    if (response.ok) {
+      await recordAiRequestUsage({
+        feature: "pronunciation_phonetic",
+        fallbackModel: model,
+        requestedBy,
+        responseId: response.headers.get("x-request-id"),
+        usage: parseOpenAIResponseUsage(payload),
+      });
+    }
     const phoneticSpelling = cleanSingleLine(
       extractOpenAIText(payload),
     ).slice(0, 160);
@@ -93,7 +108,7 @@ async function requestPhoneticSuggestion(
 }
 
 export async function POST(request: Request) {
-  await requireProfile(["applicant"]);
+  const profile = await requireProfile(["applicant"]);
 
   const supabase = await createClient();
   try {
@@ -151,13 +166,12 @@ export async function POST(request: Request) {
     );
   }
 
+  const transcriptionModel =
+    process.env.OPENAI_TRANSCRIBE_MODEL?.trim() ||
+    "gpt-4o-mini-transcribe";
   const transcriptionBody = new FormData();
   transcriptionBody.set("file", audio, audio.name || "pronunciation.webm");
-  transcriptionBody.set(
-    "model",
-    process.env.OPENAI_TRANSCRIBE_MODEL?.trim() ||
-      "gpt-4o-mini-transcribe",
-  );
+  transcriptionBody.set("model", transcriptionModel);
   transcriptionBody.set("response_format", "json");
   transcriptionBody.set(
     "prompt",
@@ -189,6 +203,14 @@ export async function POST(request: Request) {
     );
   }
 
+  await recordAiRequestUsage({
+    feature: "pronunciation_transcription",
+    fallbackModel: transcriptionModel,
+    requestedBy: profile.id,
+    responseId: transcriptionResponse.headers.get("x-request-id"),
+    usage: parseOpenAITranscriptionUsage(transcriptionPayload),
+  });
+
   const transcript = cleanSingleLine(transcriptionPayload?.text);
   if (!transcript && !personName) {
     return NextResponse.json(
@@ -216,6 +238,7 @@ export async function POST(request: Request) {
       apiKey,
       model,
       responsePrompt,
+      profile.id,
     );
     if (suggestion.phoneticSpelling) {
       return NextResponse.json(
