@@ -477,6 +477,9 @@ export function visibleColumnsForVariant(
     includeProtectedScores: boolean;
   },
 ) {
+  if (definition.id === "audit-school-scores") {
+    return definition.columns;
+  }
   return definition.columns.filter((column) => {
     if (options.variant === "external" && column.internalOnly) return false;
     if (column.internalOnly && !options.includeInternalNotes) return false;

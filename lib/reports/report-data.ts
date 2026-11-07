@@ -2164,6 +2164,10 @@ export async function loadReport(
 ): Promise<LoadedReport> {
   const definition = findReportDefinition(reportId);
   if (!definition) throw new Error("Unknown report.");
+  if (definition.id === "audit-school-scores") {
+    filters.includeAdjudicatorIdentities = true;
+    filters.includeProtectedScores = true;
+  }
   if (!definition.formats.includes(filters.format)) {
     filters.format = definition.formats[0] ?? "pdf";
   }
