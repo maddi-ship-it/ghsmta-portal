@@ -197,6 +197,7 @@ export function ApplicationReferenceBar({
   panelCommentControls,
   panels,
   reviewActions,
+  scoringTools,
   scorecardSubmitControl,
   showFullScoreView = false,
 }: {
@@ -217,6 +218,7 @@ export function ApplicationReferenceBar({
     showCategoryReview: boolean;
     showPanelReview: boolean;
   };
+  scoringTools?: ReactNode;
   scorecardSubmitControl?: ReactNode;
   showFullScoreView?: boolean;
 }) {
@@ -409,7 +411,7 @@ export function ApplicationReferenceBar({
               </div>
             ) : null}
 
-            {links.length > 0 ? (
+            {links.length > 0 || scoringTools ? (
               <div
                 aria-label="Scoring tools"
                 className="application-reference-action-group"
@@ -418,11 +420,14 @@ export function ApplicationReferenceBar({
                   SCORING TOOLS
                 </span>
                 <div className="application-reference-group-buttons">
-                  <AdjudicationReferenceDocumentModal
-                    buttonClassName="application-reference-button"
-                    buttonLabels={REFERENCE_DOCUMENT_BUTTON_LABELS}
-                    links={links}
-                  />
+                  {links.length > 0 ? (
+                    <AdjudicationReferenceDocumentModal
+                      buttonClassName="application-reference-button"
+                      buttonLabels={REFERENCE_DOCUMENT_BUTTON_LABELS}
+                      links={links}
+                    />
+                  ) : null}
+                  {scoringTools}
                 </div>
               </div>
             ) : null}

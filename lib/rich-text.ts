@@ -30,10 +30,17 @@ function plainTextToHtml(value: string) {
     .join("");
 }
 
+function normalizeNonBreakingSpaces(value: string) {
+  return value
+    .replace(/&(?:amp;)?nbsp;/gi, " ")
+    .replace(/&#160;|&#x0*a0;/gi, " ")
+    .replaceAll("\u00a0", " ");
+}
+
 export function sanitizeRichTextHtml(
   value: string | null | undefined,
 ) {
-  const source = String(value ?? "").trim();
+  const source = normalizeNonBreakingSpaces(String(value ?? "")).trim();
 
   if (!source) {
     return "";

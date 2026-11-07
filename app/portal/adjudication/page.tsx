@@ -413,10 +413,7 @@ export default async function AdjudicationDashboard({
               const observerLabel = row.observerMode
                 ? `${row.observerMode === "understudy" ? "Understudy" : "Shadow"} · read only`
                 : "Observer · read only";
-              const applicationHref =
-                row.observerMode === "understudy"
-                  ? `/portal/applications/${row.application.id}`
-                  : `/portal/adjudication/${row.application.id}`;
+              const applicationHref = `/portal/adjudication/${row.application.id}`;
               return (
                 <Link className="adjudication-card" href={applicationHref} key={row.assignment?.id ?? `observer-${row.application.id}`}>
                   <div>
@@ -430,7 +427,7 @@ export default async function AdjudicationDashboard({
                         ? observerLabel
                         : status.replaceAll("_", " ")}
                     </span>
-                    <small>{row.isReadOnlyObserver ? row.observerMode === "understudy" ? "View application" : "View panel adjudication" : row.assignment?.due_at ? `Due ${new Date(row.assignment.due_at).toLocaleDateString()}` : "No due date"}</small>
+                    <small>{row.isReadOnlyObserver ? "View application data and panel adjudication" : row.assignment?.due_at ? `Due ${new Date(row.assignment.due_at).toLocaleDateString()}` : "No due date"}</small>
                   </div>
                 </Link>
               );
@@ -444,10 +441,7 @@ export default async function AdjudicationDashboard({
               const observerLabel = row.observerMode
                 ? `${row.observerMode === "understudy" ? "Understudy" : "Shadow"} · read only`
                 : "Observer · read only";
-              const applicationHref =
-                row.observerMode === "understudy"
-                  ? `/portal/applications/${row.application.id}`
-                  : `/portal/adjudication/${row.application.id}`;
+              const applicationHref = `/portal/adjudication/${row.application.id}`;
               return (
                 <Link className="adjudication-card" href={applicationHref} key={row.application.id}>
                   <div>

@@ -172,7 +172,7 @@ export default async function AdjudicationApplicationPage({
     profile.role === "owner"
       ? Promise.resolve({
           allowed: false,
-          scheduledShadow: false,
+          scheduledObserverMode: null,
           readOnlyAssignment: false,
         })
       : resolveAdjudicationObserverAccess({
@@ -198,7 +198,8 @@ export default async function AdjudicationApplicationPage({
   const scheduledStaff =
     ((scheduleStaffResult.data ?? []) as ScheduleStaffReference[])
       .filter((staff) => staff.slot_id === scheduleBooking?.slot_id);
-  const isScheduledShadow = observerAccess.scheduledShadow;
+  const scheduledObserverMode = observerAccess.scheduledObserverMode;
+  const isScheduledObserver = Boolean(scheduledObserverMode);
   const applicationReadClient = observerAccess.allowed ? admin : supabase;
 
   const { data: applicationData, error: applicationError } = await applicationReadClient
@@ -289,7 +290,13 @@ export default async function AdjudicationApplicationPage({
   const hasReadOnlyAssignment = observerAccess.readOnlyAssignment;
   const isReadOnlyObserver =
     profile.role !== "owner" &&
-    (isScheduledShadow || hasReadOnlyAssignment);
+    (isScheduledObserver || hasReadOnlyAssignment);
+  const observerLabel =
+    scheduledObserverMode === "understudy"
+      ? "Understudy"
+      : scheduledObserverMode === "shadow"
+        ? "Shadow"
+        : "Observer";
   const workspaceReadClient = isReadOnlyObserver ? admin : supabase;
 
   const isScoringParticipant =
@@ -658,7 +665,7 @@ export default async function AdjudicationApplicationPage({
   if (
     profile.role === "adjudicator" &&
     !ownParticipantResult.data &&
-    !isScheduledShadow
+    !isScheduledObserver
   ) {
     notFound();
   }
@@ -1019,13 +1026,7 @@ export default async function AdjudicationApplicationPage({
         <div className="heading-actions">
           {showEditableScorecard && <span className={`badge badge-scorecard-${ownScorecard?.status ?? "draft"}`}>{scorecardStatusLabel(ownScorecard?.status ?? "not started")}</span>}
           {isReadOnlyObserver ? (
-            <span className="badge badge-draft">Shadow · read only</span>
-          ) : null}
-          {playbillSourceFileName ? (
-            <PlaybillSongListModal
-              applicationId={id}
-              sourceFileName={playbillSourceFileName}
-            />
+            <span className="badge badge-draft">{observerLabel} · read only</span>
           ) : null}
           <Link className="button button-secondary" href="/portal/adjudication">Back to adjudication</Link>
         </div>
@@ -1077,6 +1078,15 @@ export default async function AdjudicationApplicationPage({
             : undefined
         }
         panels={referencePanels}
+        scoringTools={
+          playbillSourceFileName ? (
+            <PlaybillSongListModal
+              applicationId={id}
+              buttonClassName="application-reference-button"
+              sourceFileName={playbillSourceFileName}
+            />
+          ) : undefined
+        }
         showFullScoreView={
           canPanelReview &&
           (profile.role === "owner" || profile.role === "advisory_member")
@@ -1285,11 +1295,11 @@ export default async function AdjudicationApplicationPage({
           <section className="panel shadow-adjudication-notice" role="status">
             <div className="panel-header">
               <div>
-                <span className="eyebrow">Shadow view</span>
+                <span className="eyebrow">{observerLabel} view</span>
                 <h2>Adjudication is available in read-only mode</h2>
                 <p>
                   You can follow the categories and the assigned panel&apos;s live
-                  observations. Shadows do not receive score, comment,
+                  observations. Read-only observers do not receive score, comment,
                   brain-dump, approval, or submission fields.
                 </p>
               </div>
@@ -1335,7 +1345,7 @@ export default async function AdjudicationApplicationPage({
             categorySubjectDefaults={categorySubjectDefaults}
             criteria={scoreableCriteria}
             currentUserId={profile.id}
-            currentUserName={profile.full_name ?? profile.email ?? "Shadow"}
+            currentUserName={profile.full_name ?? profile.email ?? observerLabel}
             initialPanelRows={(sharedObservationResult.data ?? []) as Array<{
               panel_order: number;
               adjudicator_user_id: string;
@@ -1357,7 +1367,7 @@ export default async function AdjudicationApplicationPage({
             scoreOptions={scoreChoices}
             canComment={false}
             canScore={false}
-            observerMode
+            observerMode={isReadOnlyObserver}
           />
         </>
       ) : workspaceMode === "access_notice" ? (

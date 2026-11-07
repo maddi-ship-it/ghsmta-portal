@@ -38,6 +38,10 @@ type PlaybillFileRow = {
   storage_path: string;
 };
 
+function isMissingSongListCache(error: { code?: string } | null) {
+  return error?.code === "42P01" || error?.code === "PGRST205";
+}
+
 function apiError(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== "object") return fallback;
   const candidate = payload as {
@@ -191,7 +195,8 @@ export async function POST(
       .eq("portal_file_id", file.id)
       .eq("extractor_version", PLAYBILL_SONG_LIST_EXTRACTOR_VERSION)
       .maybeSingle();
-    if (cacheError) throw new Error(cacheError.message);
+    const cacheAvailable = !isMissingSongListCache(cacheError);
+    if (cacheError && cacheAvailable) throw new Error(cacheError.message);
     if (cachedData) {
       const cachedSongs = parsePlaybillSongList({ songs: cachedData.songs });
       if (cachedSongs) {
@@ -376,21 +381,23 @@ export async function POST(
     }
 
     const extractedAt = new Date().toISOString();
-    const { error: saveError } = await admin
-      .from("playbill_song_lists")
-      .upsert(
-        {
-          application_id: applicationId,
-          portal_file_id: file.id,
-          songs,
-          extractor_version: PLAYBILL_SONG_LIST_EXTRACTOR_VERSION,
-          model: DEFAULT_OPENAI_TEXT_MODEL,
-          extracted_by: user.id,
-          extracted_at: extractedAt,
-        },
-        { onConflict: "portal_file_id" },
-      );
-    if (saveError) throw new Error(saveError.message);
+    if (cacheAvailable) {
+      const { error: saveError } = await admin
+        .from("playbill_song_lists")
+        .upsert(
+          {
+            application_id: applicationId,
+            portal_file_id: file.id,
+            songs,
+            extractor_version: PLAYBILL_SONG_LIST_EXTRACTOR_VERSION,
+            model: DEFAULT_OPENAI_TEXT_MODEL,
+            extracted_by: user.id,
+            extracted_at: extractedAt,
+          },
+          { onConflict: "portal_file_id" },
+        );
+      if (saveError) throw new Error(saveError.message);
+    }
 
     return extractionResponse({
       cached: false,

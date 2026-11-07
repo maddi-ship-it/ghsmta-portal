@@ -421,6 +421,23 @@ export function AdjudicationBrainDump({
   const lastLocalChangeAtRef = useRef(0);
 
   useEffect(() => {
+    const mobileViewport = window.matchMedia("(max-width: 720px)");
+    const revealFrame = window.requestAnimationFrame(() => {
+      if (mobileViewport.matches) setExpanded(true);
+    });
+
+    const revealOnMobile = (event: MediaQueryListEvent) => {
+      if (event.matches) setExpanded(true);
+    };
+    mobileViewport.addEventListener("change", revealOnMobile);
+
+    return () => {
+      window.cancelAnimationFrame(revealFrame);
+      mobileViewport.removeEventListener("change", revealOnMobile);
+    };
+  }, []);
+
+  useEffect(() => {
     if (practiceMode || !scorecardId) return;
 
     const databaseField =

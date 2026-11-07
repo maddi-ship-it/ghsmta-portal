@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { ScheduleObserverMode } from "@/lib/schedule-staff";
+
 export type AdjudicationObserverPanelRow = {
   panel_order: number;
   adjudicator_user_id: string;
@@ -34,8 +36,12 @@ export type AdjudicationObserverSnapshot = {
 
 type ObserverAccess = {
   allowed: boolean;
-  scheduledShadow: boolean;
+  scheduledObserverMode: ScheduleObserverMode | null;
   readOnlyAssignment: boolean;
+};
+
+type ObserverModeRow = {
+  participation_mode: string | null;
 };
 
 type ObserverAssignmentRow = {
@@ -127,6 +133,20 @@ export function buildAdjudicationObserverPanelRows({
   });
 }
 
+export function resolveScheduledObserverMode(
+  rows: ObserverModeRow[],
+): ScheduleObserverMode | null {
+  if (rows.some((row) => row.participation_mode === "shadow")) {
+    return "shadow";
+  }
+
+  if (rows.some((row) => row.participation_mode === "understudy")) {
+    return "understudy";
+  }
+
+  return null;
+}
+
 export async function resolveAdjudicationObserverAccess({
   admin,
   applicationId,
@@ -154,20 +174,20 @@ export async function resolveAdjudicationObserverAccess({
   if (assignmentResult.error) throw new Error(assignmentResult.error.message);
 
   const slotIds = (bookingResult.data ?? []).map((booking) => booking.slot_id);
-  const shadowResult = slotIds.length
+  const observerResult = slotIds.length
     ? await admin
         .from("schedule_slot_staff")
-        .select("id")
+        .select("participation_mode")
         .in("slot_id", slotIds)
         .eq("user_id", userId)
-        .eq("participation_mode", "shadow")
-        .limit(1)
-        .maybeSingle()
-    : { data: null, error: null };
+        .in("participation_mode", ["understudy", "shadow"])
+    : { data: [], error: null };
 
-  if (shadowResult.error) throw new Error(shadowResult.error.message);
+  if (observerResult.error) throw new Error(observerResult.error.message);
 
-  const scheduledShadow = Boolean(shadowResult.data);
+  const scheduledObserverMode = resolveScheduledObserverMode(
+    (observerResult.data ?? []) as ObserverModeRow[],
+  );
   const readOnlyAssignment = Boolean(
     assignmentResult.data &&
       !assignmentResult.data.can_score &&
@@ -175,8 +195,8 @@ export async function resolveAdjudicationObserverAccess({
   );
 
   return {
-    allowed: scheduledShadow || readOnlyAssignment,
-    scheduledShadow,
+    allowed: Boolean(scheduledObserverMode) || readOnlyAssignment,
+    scheduledObserverMode,
     readOnlyAssignment,
   };
 }

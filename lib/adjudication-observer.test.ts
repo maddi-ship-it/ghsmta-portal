@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAdjudicationObserverPanelRows } from "./adjudication-observer";
+import {
+  buildAdjudicationObserverPanelRows,
+  resolveScheduledObserverMode,
+} from "./adjudication-observer";
+
+describe("resolveScheduledObserverMode", () => {
+  it("recognizes both read-only schedule roles", () => {
+    expect(
+      resolveScheduledObserverMode([{ participation_mode: "understudy" }]),
+    ).toBe("understudy");
+    expect(
+      resolveScheduledObserverMode([{ participation_mode: "shadow" }]),
+    ).toBe("shadow");
+  });
+
+  it("prefers shadow access when a user has both modes", () => {
+    expect(
+      resolveScheduledObserverMode([
+        { participation_mode: "understudy" },
+        { participation_mode: "panel" },
+        { participation_mode: "shadow" },
+      ]),
+    ).toBe("shadow");
+  });
+});
 
 describe("buildAdjudicationObserverPanelRows", () => {
   it("keeps active panel order and includes members who have not written yet", () => {

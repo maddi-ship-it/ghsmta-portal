@@ -17,9 +17,11 @@ type SongListResponse = {
 
 export function PlaybillSongListModal({
   applicationId,
+  buttonClassName = "button button-secondary",
   sourceFileName,
 }: {
   applicationId: string;
+  buttonClassName?: string;
   sourceFileName: string;
 }) {
   const reactId = useId();
@@ -95,7 +97,7 @@ export function PlaybillSongListModal({
     <>
       <button
         aria-haspopup="dialog"
-        className="button button-secondary"
+        className={buttonClassName}
         onClick={openSongList}
         ref={triggerRef}
         type="button"
