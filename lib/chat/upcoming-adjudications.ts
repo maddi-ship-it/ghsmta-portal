@@ -37,6 +37,7 @@ type ApplicationRow = {
   id: string;
   school_name: string;
   production_title: string | null;
+  source_system?: string | null;
 };
 
 type ScheduleStaffRow = {
@@ -45,6 +46,22 @@ type ScheduleStaffRow = {
   joined_as: AppRole;
   participation_mode: "panel" | "understudy" | "shadow";
 };
+
+export function isTrainingOrDemoAdjudication(application: ApplicationRow) {
+  const title = application.production_title?.trim().toLowerCase() ?? "";
+  const school = application.school_name.trim().toLowerCase();
+  const source = application.source_system?.trim().toLowerCase() ?? "";
+
+  return (
+    title.includes("training copy") ||
+    title.includes("demo copy") ||
+    school.startsWith("group shadow school") ||
+    school.startsWith("demo school") ||
+    source.includes("group-shadow") ||
+    source.includes("training") ||
+    source.includes("demo")
+  );
+}
 
 export function buildUpcomingAdjudications({
   applications,
@@ -89,7 +106,7 @@ export function buildUpcomingAdjudications({
       if (!booking) return [];
 
       const application = applicationById.get(booking.application_id);
-      if (!application) return [];
+      if (!application || isTrainingOrDemoAdjudication(application)) return [];
 
       const participants = staffBySlotId.get(slot.id) ?? [];
       const acmCount = participants.filter(

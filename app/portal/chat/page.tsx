@@ -116,6 +116,7 @@ type UpcomingApplicationRow = {
   id: string;
   school_name: string;
   production_title: string | null;
+  source_system: string | null;
 };
 
 type UpcomingScheduleStaffRow = {
@@ -390,7 +391,7 @@ async function loadUpcomingAdjudications(
       .order("starts_at", { ascending: true }),
     admin
       .from("applications")
-      .select("id,school_name,production_title")
+      .select("id,school_name,production_title,source_system")
       .in("id", applicationIds),
     admin
       .from("schedule_slot_staff")

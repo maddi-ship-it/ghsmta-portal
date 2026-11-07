@@ -102,4 +102,23 @@ describe("buildUpcomingAdjudications", () => {
       }),
     ).toEqual([]);
   });
+
+  it("excludes training and group-shadow copies", () => {
+    expect(
+      buildUpcomingAdjudications({
+        applications: [
+          {
+            ...applications[0],
+            school_name: "Group Shadow School 03 — North High Copy",
+            production_title: "The Music Man (Training Copy)",
+            source_system: "ghsmta-group-shadow-2026-2027",
+          },
+        ],
+        bookings,
+        currentUserId: "current-user",
+        slots,
+        staff: [],
+      }),
+    ).toEqual([]);
+  });
 });

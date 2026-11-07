@@ -4536,6 +4536,21 @@ export function TeamsChat({
                                     ? "Join panel as ACM"
                                     : "Join panel as ADJU"}
                               </button>
+                            ) : profile.role === "owner" && needsStaff ? (
+                              <Link
+                                aria-label={`Manage staffing for ${adjudication.schoolName}`}
+                                className={styles.managePanelButton}
+                                href={{
+                                  pathname: "/portal/schedule",
+                                  query: {
+                                    section: "staffing",
+                                    filter: "understaffed",
+                                    q: adjudication.schoolName,
+                                  },
+                                }}
+                              >
+                                Manage staffing
+                              </Link>
                             ) : adjudication.currentUserJoined ? (
                               <span className={styles.panelJoinedBadge}>
                                 You joined this panel
