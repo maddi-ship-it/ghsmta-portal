@@ -11,6 +11,7 @@ import {
   isValidTwoPointRange,
   twoPointRangeFromStart,
 } from "@/lib/adjudication-ranges";
+import { PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT } from "@/lib/chat/portal-authored";
 import {
   categoryDecisionRangeIsReady,
   categoryDecisionNeedsSave,
@@ -724,7 +725,7 @@ async function savePanelNarrativeAssignments({
       const { error: announcementError } = await admin.from("chat_posts").insert({
         channel_id: panelChannel.id,
         author_id: actorId,
-        subject: "Final comment assignments",
+        subject: PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT,
         body: narrativeAssignmentAnnouncement({
           schoolName: application.school_name,
           productionTitle: application.production_title,
@@ -1439,7 +1440,7 @@ export async function sendPanelNarrativeAssignmentsToChannel(
     };
   }
 
-  const subject = "Final comment assignments";
+  const subject = PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT;
   const body = narrativeAssignmentAnnouncement({
     schoolName: application.school_name,
     productionTitle: application.production_title,

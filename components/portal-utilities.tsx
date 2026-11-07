@@ -14,6 +14,10 @@ import { createChatMessage } from "@/app/portal/chat/actions";
 import { FEEDBACK_DIALOG_EVENT } from "@/components/global-feedback-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { ChatThread } from "@/components/teams-chat";
+import {
+  presentPortalAuthoredChannel,
+  presentPortalAuthoredThread,
+} from "@/lib/chat/portal-authored";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 
@@ -250,7 +254,9 @@ export function PortalUtilities({
     if (!channelError) {
       setChatChannels(
         sortChatChannelsUnreadFirst(
-          (channelRows ?? []) as ChatChannelRow[],
+          ((channelRows ?? []) as ChatChannelRow[]).map(
+            presentPortalAuthoredChannel,
+          ),
         ),
       );
       setChatError(null);
@@ -275,7 +281,11 @@ export function PortalUtilities({
       return;
     }
 
-    setChatThreads((threadResult.data ?? []) as ChatThread[]);
+    setChatThreads(
+      ((threadResult.data ?? []) as ChatThread[]).map(
+        presentPortalAuthoredThread,
+      ),
+    );
     setChatMessagesLoading(false);
 
     const readResult = await supabase.rpc("mark_chat_channel_read", {

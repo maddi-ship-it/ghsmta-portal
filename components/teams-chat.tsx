@@ -37,6 +37,11 @@ import {
 } from "@/lib/chat-terminology";
 import { OWNER_CHAT_SECTIONS } from "@/lib/chat-owner-sections";
 import { DEFAULT_COMMUNITY_POST_SUBJECT } from "@/lib/chat/community-post";
+import {
+  isPortalChatAuthorId,
+  presentPortalAuthoredChannel,
+  presentPortalAuthoredThread,
+} from "@/lib/chat/portal-authored";
 import type { UpcomingAdjudication } from "@/lib/chat/upcoming-adjudications";
 import type { CommunityShow } from "@/lib/community-shows";
 import {
@@ -1489,7 +1494,7 @@ function normalizeChannel(row: Partial<ChatChannel> & Pick<ChatChannel, "channel
   const fallback = GROUP_FALLBACKS[row.channel_type];
   const archived = Boolean(row.application_archived);
 
-  return {
+  return presentPortalAuthoredChannel({
     channel_id: row.channel_id,
     channel_type: row.channel_type,
     channel_name: row.channel_name,
@@ -1512,7 +1517,7 @@ function normalizeChannel(row: Partial<ChatChannel> & Pick<ChatChannel, "channel
       ? 60
       : Number(row.channel_group_order ?? fallback.order),
     visibility_label: row.visibility_label ?? "Private channel",
-  };
+  });
 }
 
 function MentionedMessage({
@@ -2306,8 +2311,12 @@ export function TeamsChat({
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [channels, setChannels] = useState(initialChannels);
-  const [threads, setThreads] = useState(initialThreads);
+  const [channels, setChannels] = useState(() =>
+    initialChannels.map(presentPortalAuthoredChannel),
+  );
+  const [threads, setThreads] = useState(() =>
+    initialThreads.map(presentPortalAuthoredThread),
+  );
   const [members, setMembers] = useState(initialMembers);
   const [reactions, setReactions] = useState<ChatReaction[]>([]);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -2427,7 +2436,9 @@ export function TeamsChat({
         .toLowerCase();
       const peopleText = [
         thread.author_name,
-        roleName(thread.author_role),
+        isPortalChatAuthorId(thread.author_id)
+          ? "Portal notification"
+          : roleName(thread.author_role),
         ...thread.replies.flatMap((reply) => [
           reply.author_name,
           roleName(reply.author_role),
@@ -2812,7 +2823,11 @@ export function TeamsChat({
       return;
     }
 
-    setThreads((threadResult.data ?? []) as ChatThread[]);
+    setThreads(
+      ((threadResult.data ?? []) as ChatThread[]).map(
+        presentPortalAuthoredThread,
+      ),
+    );
     setMembers((memberResult.data ?? []) as ChatMember[]);
     await loadEnhancements();
 
@@ -3955,9 +3970,11 @@ export function TeamsChat({
                                 <div className={styles.messageMeta}>
                                   <strong>{thread.author_name}</strong>
                                   <span>
-                                    {thread.author_role === "applicant"
-                                      ? "School"
-                                      : roleName(thread.author_role)}
+                                    {isPortalChatAuthorId(thread.author_id)
+                                      ? "Portal notification"
+                                      : thread.author_role === "applicant"
+                                        ? "School"
+                                        : roleName(thread.author_role)}
                                   </span>
                                   <time dateTime={thread.created_at}>
                                     {formatFullTimestamp(thread.created_at)}
@@ -4696,7 +4713,11 @@ export function TeamsChat({
                           {!ownMessage && startsGroup && (
                             <div className={styles.messageMeta}>
                               <strong>{message.author_name}</strong>
-                              <span>{roleName(message.author_role)}</span>
+                              <span>
+                                {isPortalChatAuthorId(message.author_id)
+                                  ? "Portal notification"
+                                  : roleName(message.author_role)}
+                              </span>
                             </div>
                           )}
                           {editingMessage?.id === message.id && editingMessage.kind === message.message_kind ? (

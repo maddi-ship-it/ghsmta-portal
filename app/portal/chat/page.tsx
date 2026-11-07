@@ -18,6 +18,10 @@ import {
   chatChannelGroupLabel,
 } from "@/lib/chat-terminology";
 import {
+  presentPortalAuthoredChannel,
+  presentPortalAuthoredThread,
+} from "@/lib/chat/portal-authored";
+import {
   buildCommunityShows,
   type CommunityShow,
 } from "@/lib/community-shows";
@@ -226,7 +230,7 @@ function normalizeChannels(rows: RawChannel[]): ChatChannel[] {
     const archived = Boolean(row.application_archived);
     const group = fallbackChannelGroup(row.channel_type, archived);
 
-    return {
+    return presentPortalAuthoredChannel({
       channel_id: row.channel_id,
       channel_type: row.channel_type,
       channel_name: chatChannelDisplayName(
@@ -252,7 +256,7 @@ function normalizeChannels(rows: RawChannel[]): ChatChannel[] {
       channel_group_order: Number(row.channel_group_order ?? group.order),
       visibility_label:
         row.visibility_label ?? fallbackVisibilityLabel(row.channel_type),
-    };
+    });
   });
 }
 
@@ -535,7 +539,9 @@ export default async function ChatPage({
       );
     }
 
-    threads = (threadResult.data ?? []) as ChatThread[];
+    threads = ((threadResult.data ?? []) as ChatThread[]).map(
+      presentPortalAuthoredThread,
+    );
     members = (memberResult.data ?? []) as ChatMember[];
 
     if (shouldLoadVisitDetails && selectedChannel.application_id) {
