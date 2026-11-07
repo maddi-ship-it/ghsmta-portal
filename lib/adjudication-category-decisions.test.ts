@@ -4,9 +4,39 @@ import {
   categoryDecisionApprovedForUser,
   categoryDecisionHasChanges,
   categoryDecisionNeedsSave,
+  categoryDecisionRangeIsReady,
   type CategoryDecision,
   type ExistingCategoryProposal,
 } from "./adjudication-category-decisions";
+
+describe("categoryDecisionRangeIsReady", () => {
+  it("allows a blank range when the category is not applicable", () => {
+    expect(
+      categoryDecisionRangeIsReady({
+        isScoreable: false,
+        rangeMinimum: null,
+        rangeMaximum: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("still requires a valid two-point range for applicable categories", () => {
+    expect(
+      categoryDecisionRangeIsReady({
+        isScoreable: true,
+        rangeMinimum: null,
+        rangeMaximum: null,
+      }),
+    ).toBe(false);
+    expect(
+      categoryDecisionRangeIsReady({
+        isScoreable: true,
+        rangeMinimum: 5,
+        rangeMaximum: 7,
+      }),
+    ).toBe(true);
+  });
+});
 
 describe("categoryDecisionApprovedForUser", () => {
   it("unlocks an adjudicator after their own approval without waiting for the panel", () => {

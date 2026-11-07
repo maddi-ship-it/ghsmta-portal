@@ -41,6 +41,7 @@ export async function queuePanelReviewForOwnersIfReady(
     assignmentsResult,
     scorecardsResult,
     proposalsResult,
+    scoreabilityResult,
     feedbackResult,
     reviewResult,
   ] = await Promise.all([
@@ -63,6 +64,10 @@ export async function queuePanelReviewForOwnersIfReady(
       .select("category_id,status,range_min,range_max")
       .eq("application_id", applicationId),
     admin
+      .from("adjudication_category_scoreability")
+      .select("category_id,is_scoreable")
+      .eq("application_id", applicationId),
+    admin
       .from("adjudication_panel_feedback")
       .select("category_id,status,final_comment,assigned_to,approved_by")
       .eq("application_id", applicationId),
@@ -78,15 +83,22 @@ export async function queuePanelReviewForOwnersIfReady(
     assignmentsResult.error,
     scorecardsResult.error,
     proposalsResult.error,
+    scoreabilityResult.error,
     feedbackResult.error,
     reviewResult.error,
   ].find(Boolean);
   if (firstError) throw new Error(firstError.message);
 
   const categories = categoriesResult.data ?? [];
+  const unscoreableCategoryIds = new Set(
+    (scoreabilityResult.data ?? [])
+      .filter((decision) => !decision.is_scoreable)
+      .map((decision) => decision.category_id),
+  );
   const decisionCategories = categories.filter(
     (category) =>
-      category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
+      category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY &&
+      !unscoreableCategoryIds.has(category.id),
   );
   const assignments = assignmentsResult.data ?? [];
   const scoringAssignments = assignments.filter(

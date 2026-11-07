@@ -1,14 +1,30 @@
 import type { AppRole } from "@/lib/types";
+import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 
 export type CategoryDecision = {
   category_id: string;
   is_eligible: boolean;
+  is_scoreable?: boolean;
   range_min: number | null;
   range_max: number | null;
   advisory_note: string | null;
   owner_override: boolean;
   owner_override_note: string | null;
 };
+
+export function categoryDecisionRangeIsReady({
+  isScoreable,
+  rangeMaximum,
+  rangeMinimum,
+}: {
+  isScoreable: boolean;
+  rangeMaximum: number | string | null | undefined;
+  rangeMinimum: number | string | null | undefined;
+}) {
+  return (
+    !isScoreable || isValidTwoPointRange(rangeMinimum, rangeMaximum)
+  );
+}
 
 export type ExistingCategoryProposal = {
   id: string;

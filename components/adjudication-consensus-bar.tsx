@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type ChangeEvent,
   useActionState,
   useCallback,
   useEffect,
@@ -33,6 +34,7 @@ import {
   buildRangeApprovalRoster,
   type RangeApprovalReviewer,
 } from "@/lib/adjudication-range-approvals";
+import { categoryDecisionRangeIsReady } from "@/lib/adjudication-category-decisions";
 import { createClient } from "@/lib/supabase/client";
 import type {
   ActingCandidateReviewer,
@@ -142,6 +144,23 @@ function proposalHasValidRange(proposal: Proposal | undefined) {
   return isValidTwoPointRange(proposal?.range_min, proposal?.range_max);
 }
 
+function formHasAllApplicableWriters(form: HTMLFormElement) {
+  const formData = new FormData(form);
+  const categoryIds = [
+    ...new Set(formData.getAll("category_id").map(String).filter(Boolean)),
+  ];
+  const applicableCategoryIds = categoryIds.filter(
+    (categoryId) => formData.get(`scoreable_${categoryId}`) === "on",
+  );
+
+  return (
+    applicableCategoryIds.length > 0 &&
+    applicableCategoryIds.every((categoryId) =>
+      Boolean(String(formData.get(`assigned_to_${categoryId}`) ?? "").trim()),
+    )
+  );
+}
+
 function initialRangeSelections(categories: ScoringCategory[], proposals: Proposal[]) {
   const proposalByCategory = new Map(
     proposals.map((proposal) => [proposal.category_id, proposal]),
@@ -220,6 +239,8 @@ export function AdjudicationConsensusBar({
   );
   const touchedRangeSelections = useRef(new Set<string>());
   const autoSuggestedRanges = useRef(new Map<string, string>());
+  const autoSendAssignmentsButtonRef = useRef<HTMLButtonElement>(null);
+  const writerAssignmentsComplete = useRef(false);
   const [liveAverageStatus, setLiveAverageStatus] = useState<
     "loading" | "live" | "error"
   >("loading");
@@ -317,9 +338,17 @@ export function AdjudicationConsensusBar({
   );
   const unresolved = categories.filter((category) => {
     const proposal = proposalByCategory.get(category.id);
+    const isScoreable =
+      scoreabilityByCategory.get(category.id)?.is_scoreable ?? true;
+    if (!isScoreable) return false;
+
     return (
       !proposal ||
-      !proposalHasValidRange(proposal) ||
+      !categoryDecisionRangeIsReady({
+        isScoreable,
+        rangeMinimum: proposal?.range_min,
+        rangeMaximum: proposal?.range_max,
+      }) ||
       !["approved", "overridden"].includes(proposal.status)
     );
   }).length;
@@ -336,8 +365,48 @@ export function AdjudicationConsensusBar({
     setRangeSelections(initialRangeSelections(categories, proposals));
     setLiveApprovals(approvals);
     setLiveApprovalStatus(proposals.length > 0 ? "loading" : "live");
+    const applicableCategoryIds = categories
+      .filter(
+        (category) =>
+          scoreabilityByCategory.get(category.id)?.is_scoreable !== false,
+      )
+      .map((category) => category.id);
+    writerAssignmentsComplete.current =
+      applicableCategoryIds.length > 0 &&
+      applicableCategoryIds.every((categoryId) =>
+        Boolean(assignmentByCategory.get(categoryId)),
+      );
     setMatrixOpen(true);
-  }, [approvals, categories, proposals]);
+  }, [
+    approvals,
+    assignmentByCategory,
+    categories,
+    proposals,
+    scoreabilityByCategory,
+  ]);
+  const handleApplicabilityChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const form = event.currentTarget.form;
+      if (form) writerAssignmentsComplete.current = formHasAllApplicableWriters(form);
+    },
+    [],
+  );
+  const handleWriterSelectionChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const form = event.currentTarget.form;
+      if (!form) return;
+
+      const assignmentsAreComplete = formHasAllApplicableWriters(form);
+      const completedWithThisSelection =
+        assignmentsAreComplete && !writerAssignmentsComplete.current;
+      writerAssignmentsComplete.current = assignmentsAreComplete;
+
+      if (completedWithThisSelection && autoSendAssignmentsButtonRef.current) {
+        form.requestSubmit(autoSendAssignmentsButtonRef.current);
+      }
+    },
+    [],
+  );
   const openRangeReview = useCallback(() => {
     setAdjudicatorCategoryAverages(
       adjudicatorCategoryScores.map((source) =>
@@ -1105,6 +1174,7 @@ export function AdjudicationConsensusBar({
                                   scoreabilityDecision?.is_scoreable ?? true
                                 }
                                 name={`scoreable_${category.id}`}
+                                onChange={handleApplicabilityChange}
                                 type="checkbox"
                               />
                               <span>
@@ -1142,7 +1212,6 @@ export function AdjudicationConsensusBar({
                                   [category.id]: event.target.value,
                                 }));
                               }}
-                              required
                               value={rangeSelections[category.id] ?? ""}
                             >
                               <option value="">Select range</option>
@@ -1170,6 +1239,7 @@ export function AdjudicationConsensusBar({
                                 defaultValue={assigneeId ?? ""}
                                 id={assigneeFieldName}
                                 name={assigneeFieldName}
+                                onChange={handleWriterSelectionChange}
                               >
                                 <option value="">Choose panel member</option>
                                 {panelReviewers.map((reviewer) => (
@@ -1301,24 +1371,17 @@ export function AdjudicationConsensusBar({
                     })}
               </div>
 
-              {canSetDecisions && (
-                <div className="panel-assignment-announcement">
-                  <div>
-                    <strong>Panel comment assignments</strong>
-                    <p>
-                      Post the currently saved final-comment writers in this
-                      school&apos;s panel channel.
-                    </p>
-                  </div>
-                  <ScheduleSubmitButton
-                    className="button button-secondary"
-                    formAction={sendAssignments}
-                    pendingLabel="Sending assignments…"
-                  >
-                    Send assignments to panel
-                  </ScheduleSubmitButton>
-                </div>
-              )}
+              <button
+                aria-hidden="true"
+                formAction={sendAssignments}
+                formNoValidate
+                hidden
+                ref={autoSendAssignmentsButtonRef}
+                tabIndex={-1}
+                type="submit"
+              >
+                Save and send assigned writers
+              </button>
               {assignmentAnnouncementResult.message && (
                 <div
                   aria-live="polite"
@@ -1367,6 +1430,16 @@ export function AdjudicationConsensusBar({
                 >
                   Save and close
                 </ScheduleSubmitButton>
+                {canSetDecisions && (
+                  <ScheduleSubmitButton
+                    className="button button-secondary"
+                    formAction={sendAssignments}
+                    formNoValidate
+                    pendingLabel="Sending assigned writers…"
+                  >
+                    Send assigned writers
+                  </ScheduleSubmitButton>
+                )}
                 <ScheduleSubmitButton
                   className="button button-gold"
                   name="save_intent"

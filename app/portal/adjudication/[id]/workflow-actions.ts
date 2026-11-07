@@ -12,6 +12,7 @@ import {
   twoPointRangeFromStart,
 } from "@/lib/adjudication-ranges";
 import {
+  categoryDecisionRangeIsReady,
   categoryDecisionNeedsSave,
   type CategorySaveIntent,
   type CategoryDecision,
@@ -766,6 +767,17 @@ export async function saveAllCategoryProposals(
     return { ok: false, error: "No categories were submitted.", attemptId };
   }
 
+  const scoreabilityDecisions = categoryIds.map((categoryId) => ({
+    category_id: categoryId,
+    is_scoreable: formData.get(`scoreable_${categoryId}`) === "on",
+    reason: text(formData, `scoreability_reason_${categoryId}`) || null,
+  }));
+  const scoreabilityByCategory = new Map(
+    scoreabilityDecisions.map((decision) => [
+      decision.category_id,
+      decision.is_scoreable,
+    ]),
+  );
   const decisions: CategoryDecision[] = categoryIds.map((categoryId) => {
     const eligible = formData.get(`eligible_${categoryId}`) === "on";
     const rangeText = text(formData, `range_${categoryId}`);
@@ -774,6 +786,7 @@ export async function saveAllCategoryProposals(
     return {
       category_id: categoryId,
       is_eligible: eligible,
+      is_scoreable: scoreabilityByCategory.get(categoryId) ?? true,
       range_min: range?.rangeMinimum ?? Number.NaN,
       range_max: range?.rangeMaximum ?? Number.NaN,
       advisory_note: text(formData, `note_${categoryId}`) || null,
@@ -782,11 +795,6 @@ export async function saveAllCategoryProposals(
         text(formData, `override_note_${categoryId}`) || null,
     };
   });
-  const scoreabilityDecisions = categoryIds.map((categoryId) => ({
-    category_id: categoryId,
-    is_scoreable: formData.get(`scoreable_${categoryId}`) === "on",
-    reason: text(formData, `scoreability_reason_${categoryId}`) || null,
-  }));
 
   const supabase = await createClient();
   const { data: canReview, error: accessError } = await supabase.rpc(
@@ -862,13 +870,16 @@ export async function saveAllCategoryProposals(
       row,
     ]),
   );
-  const savableDecisions = decisions.map((decision) =>
-    intent === "draft" &&
-    (!Number.isFinite(decision.range_min) ||
-      !Number.isFinite(decision.range_max))
+  const savableDecisions = decisions.map((decision) => {
+    const hasMissingRange =
+      !Number.isFinite(decision.range_min) ||
+      !Number.isFinite(decision.range_max);
+
+    return hasMissingRange &&
+      (intent === "draft" || decision.is_scoreable === false)
       ? { ...decision, range_min: null, range_max: null }
-      : decision,
-  );
+      : decision;
+  });
   const changedDecisions = savableDecisions.filter((decision) =>
     categoryDecisionNeedsSave(
       decision,
@@ -889,14 +900,17 @@ export async function saveAllCategoryProposals(
     intent === "approval" &&
     decisions.some(
       (decision) =>
-        !Number.isFinite(decision.range_min) ||
-        !Number.isFinite(decision.range_max),
+        !categoryDecisionRangeIsReady({
+          isScoreable: decision.is_scoreable !== false,
+          rangeMinimum: decision.range_min,
+          rangeMaximum: decision.range_max,
+        }),
     )
   ) {
     return {
       ok: false,
       error:
-        "Every category needs a valid two-point range, even when it is not award eligible.",
+        "Every applicable category needs a valid two-point range.",
       attemptId,
       intent,
     };
@@ -1212,6 +1226,7 @@ export async function submitPanelForOwnerReview(applicationId: string) {
 export async function sendPanelNarrativeAssignmentsToChannel(
   applicationId: string,
   _previous: PanelAssignmentAnnouncementResult,
+  formData?: FormData,
 ): Promise<PanelAssignmentAnnouncementResult> {
   void _previous;
   const profile = await requireProfile(["advisory_member", "owner"]);
@@ -1236,6 +1251,45 @@ export async function sendPanelNarrativeAssignmentsToChannel(
       error: "You are no longer assigned to review this application.",
       attemptId,
     };
+  }
+
+  let submittedApplicableCategoryIds: Set<string> | null = null;
+  if (formData) {
+    const submittedCategoryIds = [
+      ...new Set(
+        formData
+          .getAll("category_id")
+          .map(String)
+          .filter(Boolean),
+      ),
+    ];
+    submittedApplicableCategoryIds = new Set(
+      submittedCategoryIds.filter(
+        (categoryId) => formData.get(`scoreable_${categoryId}`) === "on",
+      ),
+    );
+
+    if (submittedCategoryIds.length > 0) {
+      try {
+        await savePanelNarrativeAssignments({
+          applicationId,
+          actorId: profile.id,
+          categoryIds: submittedCategoryIds,
+          announcementCategoryIds: [...submittedApplicableCategoryIds],
+          announceChanges: false,
+          formData,
+        });
+      } catch (assignmentError) {
+        return {
+          ok: false,
+          error:
+            assignmentError instanceof Error
+              ? assignmentError.message
+              : "The final comment assignments could not be saved.",
+          attemptId,
+        };
+      }
+    }
   }
 
   const admin = createAdminClient();
@@ -1360,7 +1414,10 @@ export async function sendPanelNarrativeAssignmentsToChannel(
   );
   const announcementAssignments = (categoryResult.data ?? []).flatMap(
     (category) => {
-      if (scoreabilityByCategory.get(category.id) === false) return [];
+      const isApplicable = submittedApplicableCategoryIds
+        ? submittedApplicableCategoryIds.has(category.id)
+        : scoreabilityByCategory.get(category.id) !== false;
+      if (!isApplicable) return [];
       const reviewerId = assignmentByCategory.get(category.id);
       if (!reviewerId) return [];
       const reviewer = reviewerById.get(reviewerId);
