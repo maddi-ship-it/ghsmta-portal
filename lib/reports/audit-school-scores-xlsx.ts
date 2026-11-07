@@ -272,8 +272,8 @@ function detailWorksheetXml(report: LoadedReport) {
     <row r="1" ht="44" customHeight="1">${headerCells}</row>
     ${bodyRows}
   </sheetData>
-  ${mergeCells}
   <autoFilter ref="A1:${lastColumn}${Math.max(lastRow, 1)}"/>
+  ${mergeCells}
   <pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>
   <pageSetup paperSize="3" orientation="landscape" fitToWidth="1" fitToHeight="0"/>
 </worksheet>`;
@@ -457,8 +457,8 @@ function summaryWorksheetXml(
     ${bodyRows}
     ${emptyRow}
   </sheetData>
-  <mergeCells count="2"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/></mergeCells>
   <autoFilter ref="A4:H${Math.max(summaryRows.length + 4, 4)}"/>
+  <mergeCells count="2"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/></mergeCells>
   <pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>
   <pageSetup paperSize="3" orientation="landscape" fitToWidth="1" fitToHeight="0"/>
 </worksheet>`;

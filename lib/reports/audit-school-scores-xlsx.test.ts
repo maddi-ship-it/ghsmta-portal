@@ -115,8 +115,14 @@ describe("buildAuditSchoolScoresXlsx", () => {
     expect(sheet).toContain('<c r="A3" s="2" t="inlineStr"><is><t></t></is></c>');
     expect(sheet).toContain('<mergeCell ref="A2:A4"/>');
     expect(sheet).toContain('<mergeCell ref="A5:A7"/>');
+    expect(sheet.indexOf("<autoFilter")).toBeLessThan(
+      sheet.indexOf("<mergeCells"),
+    );
     expect(sheet).toContain('<c r="E5" s="7" t="n"><v>7</v></c>');
     expect(directionSummary).toContain("Top 10 Direction Scores");
+    expect(directionSummary.indexOf("<autoFilter")).toBeLessThan(
+      directionSummary.indexOf("<mergeCells"),
+    );
     expect(directionSummary).toContain(
       '<c r="E5" s="11" t="n"><v>8.5</v></c>',
     );
