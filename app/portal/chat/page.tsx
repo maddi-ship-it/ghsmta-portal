@@ -21,6 +21,10 @@ import {
   buildCommunityShows,
   type CommunityShow,
 } from "@/lib/community-shows";
+import {
+  buildUpcomingAdjudications,
+  type UpcomingAdjudication,
+} from "@/lib/chat/upcoming-adjudications";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
@@ -92,6 +96,33 @@ type CommunityShowAnswerRow = {
   application_id: string;
   question_id: string;
   value: unknown;
+};
+
+type UpcomingScheduleSlotRow = {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  location: string | null;
+  status: string;
+};
+
+type UpcomingScheduleBookingRow = {
+  slot_id: string;
+  application_id: string;
+  approval_status: string;
+};
+
+type UpcomingApplicationRow = {
+  id: string;
+  school_name: string;
+  production_title: string | null;
+};
+
+type UpcomingScheduleStaffRow = {
+  slot_id: string;
+  user_id: string;
+  joined_as: AppRole;
+  participation_mode: "panel" | "understudy" | "shadow";
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -326,6 +357,63 @@ async function loadCommunityShows(
   });
 }
 
+async function loadUpcomingAdjudications(
+  admin: ReturnType<typeof createAdminClient>,
+  currentUserId: string,
+): Promise<UpcomingAdjudication[]> {
+  const bookingsResult = await admin
+    .from("schedule_school_bookings")
+    .select("slot_id,application_id,approval_status")
+    .eq("approval_status", "confirmed");
+
+  if (bookingsResult.error) {
+    throw new Error(
+      `Upcoming adjudications could not be loaded: ${bookingsResult.error.message}`,
+    );
+  }
+
+  const bookings =
+    (bookingsResult.data ?? []) as UpcomingScheduleBookingRow[];
+  if (bookings.length === 0) return [];
+
+  const slotIds = [...new Set(bookings.map((booking) => booking.slot_id))];
+  const applicationIds = [
+    ...new Set(bookings.map((booking) => booking.application_id)),
+  ];
+  const [slotsResult, applicationsResult, staffResult] = await Promise.all([
+    admin
+      .from("schedule_slots")
+      .select("id,starts_at,ends_at,location,status")
+      .in("id", slotIds)
+      .gte("ends_at", new Date().toISOString())
+      .neq("status", "cancelled")
+      .order("starts_at", { ascending: true }),
+    admin
+      .from("applications")
+      .select("id,school_name,production_title")
+      .in("id", applicationIds),
+    admin
+      .from("schedule_slot_staff")
+      .select("slot_id,user_id,joined_as,participation_mode")
+      .in("slot_id", slotIds),
+  ]);
+
+  const loadError =
+    slotsResult.error ?? applicationsResult.error ?? staffResult.error;
+  if (loadError) {
+    throw new Error(`Upcoming adjudications could not be loaded: ${loadError.message}`);
+  }
+
+  return buildUpcomingAdjudications({
+    applications:
+      (applicationsResult.data ?? []) as UpcomingApplicationRow[],
+    bookings,
+    currentUserId,
+    slots: (slotsResult.data ?? []) as UpcomingScheduleSlotRow[],
+    staff: (staffResult.data ?? []) as UpcomingScheduleStaffRow[],
+  });
+}
+
 export default async function ChatPage({
   searchParams,
 }: {
@@ -404,6 +492,11 @@ export default async function ChatPage({
     (channel) => channel.channel_id === params.channel,
   );
   const selectedChannel = visibleRequestedChannel ?? channels[0] ?? null;
+  const upcomingAdjudicationsPromise =
+    selectedChannel &&
+    ["general", "scheduling"].includes(selectedChannel.channel_type)
+      ? loadUpcomingAdjudications(admin, profile.id)
+      : Promise.resolve([]);
 
   let threads: ChatThread[] = [];
   let members: ChatMember[] = [];
@@ -694,6 +787,7 @@ export default async function ChatPage({
         panelContacts={panelContacts}
         profile={profile}
         selectedChannelId={selectedChannel?.channel_id ?? null}
+        upcomingAdjudications={await upcomingAdjudicationsPromise}
       />
     </div>
   );

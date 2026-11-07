@@ -4660,6 +4660,7 @@
 
 .visitDetailsButton {
   letter-spacing: 0;
+  text-decoration: none;
   text-transform: none;
 }
 
@@ -5226,13 +5227,15 @@
   font-size: 0.95rem;
 }
 
-.upcomingShowsHeading button {
+.upcomingShowsHeading button,
+.upcomingShowsHeading a {
   border: 0;
   color: var(--portal-gold-bright);
   background: transparent;
   font: inherit;
   font-size: 0.68rem;
   font-weight: 850;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -5292,6 +5295,101 @@
   padding: 18px 15px;
 }
 
+.adjudicationList article {
+  position: relative;
+  display: grid;
+  gap: 3px;
+}
+
+.adjudicationList article.adjudicationNeedsStaff {
+  border-left: 3px solid #ef6464;
+  background: color-mix(in srgb, #ef6464 5%, transparent);
+}
+
+.adjudicationStaffing {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.adjudicationStaffing > span {
+  display: grid;
+  gap: 1px;
+  padding: 7px 8px;
+  border: 1px solid var(--portal-line);
+  border-radius: 9px;
+  background: var(--portal-surface-2);
+}
+
+.adjudicationStaffing > span strong {
+  color: var(--portal-ivory);
+  font-size: 0.82rem;
+}
+
+.adjudicationStaffing > span small {
+  color: var(--portal-muted);
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.adjudicationStaffing > span.staffingShortage {
+  border-color: color-mix(in srgb, #ef6464 74%, var(--portal-line));
+  background: color-mix(in srgb, #ef6464 12%, var(--portal-surface-2));
+}
+
+.adjudicationStaffing > span.staffingShortage strong,
+.adjudicationStaffing > span.staffingShortage small {
+  color: #ff9d9d;
+}
+
+.joinPanelButton {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 7px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, #ef6464 70%, #fff);
+  border-radius: 9px;
+  color: #fff;
+  background: #b8323f;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.joinPanelButton:hover,
+.joinPanelButton:focus-visible {
+  background: #ce3c49;
+}
+
+.joinPanelButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.panelJoinedBadge,
+.panelSignupClosed {
+  display: block;
+  margin-top: 7px;
+  font-size: 0.63rem;
+  font-weight: 800;
+}
+
+.panelJoinedBadge {
+  padding: 0;
+  border-radius: 0;
+  color: var(--portal-gold-bright);
+  background: transparent;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.panelSignupClosed {
+  color: #ff9d9d;
+}
+
 .mobileCreatePostButton {
   display: none;
 }
@@ -5304,6 +5402,27 @@
 
   .upcomingShowsRail {
     display: none;
+  }
+
+  .adjudicationRail {
+    position: static;
+    display: block;
+    order: -1;
+  }
+
+  .adjudicationList {
+    display: grid;
+    grid-auto-columns: minmax(230px, 1fr);
+    grid-auto-flow: column;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .adjudicationList article {
+    min-width: 0;
+    border-right: 1px solid var(--portal-line);
+    border-bottom: 0;
+    scroll-snap-align: start;
   }
 }
 

@@ -10,7 +10,6 @@ import {
   type UrgentSmsResult,
 } from "@/lib/chat/urgent-sms";
 import { canUseUrgentTag, containsUrgentMention } from "@/lib/chat/urgent";
-import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
 import { isOwnerChatSection } from "@/lib/chat-owner-sections";
 import { communityPostSubject } from "@/lib/chat/community-post";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -40,6 +39,18 @@ type ChannelMode = {
     | "advisory_committee"
     | "portal_updates";
 };
+
+const THREADED_CHANNEL_TYPES = new Set<ChannelMode["channel_type"]>([
+  "applicant_community",
+  "general",
+  "scheduling",
+]);
+
+function threadedPostFallback(channelType: ChannelMode["channel_type"]) {
+  if (channelType === "general") return "Announcement";
+  if (channelType === "scheduling") return "Scheduling post";
+  return "Community post";
+}
 
 function formText(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
@@ -338,7 +349,7 @@ export async function createChatPost(
 ): Promise<ChatActionResult> {
   const profile = await requireProfile();
   const channelId = formText(formData, "channel_id");
-  const subject = communityPostSubject(formText(formData, "subject"));
+  const requestedSubject = formText(formData, "subject");
   const body = formText(formData, "body");
 
   if (!channelId || !body) {
@@ -348,7 +359,7 @@ export async function createChatPost(
     };
   }
 
-  if (subject.length > 180 || body.length > 5000) {
+  if (requestedSubject.length > 180 || body.length > 5000) {
     return {
       ok: false,
       error: "The subject or message is longer than the allowed limit.",
@@ -356,7 +367,7 @@ export async function createChatPost(
   }
 
   const urgentPermissionError = urgentTagPermissionError(
-    `${subject}\n${body}`,
+    `${requestedSubject}\n${body}`,
     profile.role,
   );
   if (urgentPermissionError) {
@@ -370,12 +381,17 @@ export async function createChatPost(
     return { ok: false, error: channelError ?? "Chat channel not found." };
   }
 
-  if (channel.channel_type !== "applicant_community") {
+  if (!THREADED_CHANNEL_TYPES.has(channel.channel_type)) {
     return {
       ok: false,
-      error: `Only ${SCHOOL_COMMUNITY_CHAT_LABEL} uses threaded conversations.`,
+      error: "This conversation does not use threaded posts.",
     };
   }
+
+  const subject = communityPostSubject(
+    requestedSubject,
+    threadedPostFallback(channel.channel_type),
+  );
 
   const { data: post, error } = await supabase
     .from("chat_posts")
@@ -410,6 +426,29 @@ export async function createChatPost(
     messageKind: "post",
     ...notificationResult,
   };
+}
+
+export async function joinChatAdjudicationPanel(
+  formData: FormData,
+): Promise<ChatActionResult> {
+  await requireProfile(["adjudicator", "advisory_member"]);
+
+  const slotId = formText(formData, "slot_id");
+  if (!isUuid(slotId)) {
+    return { ok: false, error: "The adjudication could not be found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("join_schedule_slot", {
+    p_slot_id: slotId,
+    p_participation_mode: "panel",
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/schedule");
+  return { ok: true };
 }
 
 export async function createChatReply(
@@ -582,10 +621,10 @@ export async function createChatMessage(
     return { ok: false, error: channelError ?? "Chat channel not found." };
   }
 
-  if (channel.channel_type === "applicant_community") {
+  if (THREADED_CHANNEL_TYPES.has(channel.channel_type)) {
     return {
       ok: false,
-      error: `Start a threaded conversation in ${SCHOOL_COMMUNITY_CHAT_LABEL} instead.`,
+      error: "Start a threaded post in this conversation instead.",
     };
   }
 
@@ -749,10 +788,13 @@ export async function moderateChatPost(
     ? post.chat_channels[0]
     : post.chat_channels;
 
-  if (relatedChannel?.channel_type !== "applicant_community") {
+  if (
+    !relatedChannel?.channel_type ||
+    !THREADED_CHANNEL_TYPES.has(relatedChannel.channel_type)
+  ) {
     return {
       ok: false,
-      error: `Thread moderation is only available in ${SCHOOL_COMMUNITY_CHAT_LABEL}.`,
+      error: "Thread moderation is not available in this conversation.",
     };
   }
 

@@ -15,5 +15,11 @@ describe("communityPostSubject", () => {
   it("supplies the database fallback when a post has no title", () => {
     expect(communityPostSubject("   ")).toBe(DEFAULT_COMMUNITY_POST_SUBJECT);
   });
+
+  it("supports a channel-specific fallback", () => {
+    expect(communityPostSubject("", "Scheduling post")).toBe(
+      "Scheduling post",
+    );
+  });
 });
 

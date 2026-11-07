@@ -22,6 +22,7 @@ import {
   createChatPost,
   createChatReply,
   editChatMessage,
+  joinChatAdjudicationPanel,
   markChatChannelUnread,
   moderateChatPost,
   ownerDeleteChatMessage,
@@ -33,10 +34,10 @@ import styles from "@/components/chat-workspace.module.css";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import {
   ADJUDICATOR_CHANNELS_LABEL,
-  SCHOOL_COMMUNITY_CHAT_LABEL,
 } from "@/lib/chat-terminology";
 import { OWNER_CHAT_SECTIONS } from "@/lib/chat-owner-sections";
 import { DEFAULT_COMMUNITY_POST_SUBJECT } from "@/lib/chat/community-post";
+import type { UpcomingAdjudication } from "@/lib/chat/upcoming-adjudications";
 import type { CommunityShow } from "@/lib/community-shows";
 import {
   isFeedNearBottom,
@@ -253,6 +254,12 @@ type ChatAttachment = {
 const QUICK_REACTIONS = ["👍", "❤️", "🎉", "✅", "👀", "👏"];
 const MORE_REACTIONS = ["😂", "😮", "😢", "🙏", "💡", "⭐", "🚀", "🙌", "💯", "🤔", "🔥", "🎭"];
 const MAX_CHAT_FILE_BYTES = 25 * 1024 * 1024;
+const GENERIC_THREAD_SUBJECTS = new Set([
+  DEFAULT_COMMUNITY_POST_SUBJECT,
+  "Announcement",
+  "Scheduling post",
+  "Message",
+]);
 
 function safeFileName(value: string) {
   return value
@@ -1280,6 +1287,22 @@ function formatShowDateRange(show: CommunityShow) {
   return `${opening} – ${closing}`;
 }
 
+function formatAdjudicationDate(start: string, end: string) {
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(start));
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return `${date} · ${time.format(new Date(start))}–${time.format(new Date(end))} ET`;
+}
+
 function ShulerSchoolShowDatesDialog({
   shows,
   onClose,
@@ -2265,6 +2288,7 @@ export function TeamsChat({
   eligibilityReferencePanel,
   panelContacts,
   communityShows,
+  upcomingAdjudications,
   previewMode = false,
 }: {
   profile: Profile;
@@ -2277,6 +2301,7 @@ export function TeamsChat({
   eligibilityReferencePanel: ApplicationReferencePanel | null;
   panelContacts: PanelContact[];
   communityShows: CommunityShow[];
+  upcomingAdjudications: UpcomingAdjudication[];
   previewMode?: boolean;
 }) {
   const router = useRouter();
@@ -2353,7 +2378,12 @@ export function TeamsChat({
   const activeChannel = channels.find(
     (channel) => channel.channel_id === selectedChannelId,
   );
-  const isThreaded = activeChannel?.channel_type === "applicant_community";
+  const isCommunityFeed =
+    activeChannel?.channel_type === "applicant_community";
+  const isStaffFeed =
+    activeChannel?.channel_type === "general" ||
+    activeChannel?.channel_type === "scheduling";
+  const isThreaded = isCommunityFeed || isStaffFeed;
   const isPortalUpdates = activeChannel?.channel_type === "portal_updates";
   const canPostToActiveChannel = !isPortalUpdates || profile.role === "owner";
   const canSeeActiveChannelMembers = !isPortalUpdates || profile.role === "owner";
@@ -2380,6 +2410,7 @@ export function TeamsChat({
     const filtered = threads.filter((thread) => {
       if (
         communityFilter === "schools" &&
+        isCommunityFeed &&
         thread.author_role !== "applicant"
       ) {
         return false;
@@ -2417,7 +2448,7 @@ export function TeamsChat({
         new Date(right.created_at).getTime() -
         new Date(left.created_at).getTime(),
     );
-  }, [communityFilter, communitySearch, threads]);
+  }, [communityFilter, communitySearch, isCommunityFeed, threads]);
 
   const upcomingCommunityShows = useMemo(() => {
     const today = easternTodayDateString();
@@ -2455,6 +2486,25 @@ export function TeamsChat({
       setStatus("The post link could not be copied on this device.");
     }
   }, []);
+
+  function joinUpcomingAdjudication(slotId: string) {
+    if (blockPreviewMutation()) return;
+
+    const formData = new FormData();
+    formData.set("slot_id", slotId);
+    setStatus(null);
+
+    startTransition(async () => {
+      const result = await joinChatAdjudicationPanel(formData);
+      if (!result.ok) {
+        setStatus(result.error ?? "The panel could not be joined.");
+        return;
+      }
+
+      setStatus("You joined the adjudication panel.");
+      router.refresh();
+    });
+  }
 
   const toggleThreadOpen = useCallback((postId: string) => {
     setOpenThreadState((current) => {
@@ -3479,27 +3529,40 @@ export function TeamsChat({
             {isThreaded ? (
               <>
                 <label className="sr-only" htmlFor="community-header-search">
-                  Search community posts
+                  Search {activeChannelTitle} posts
                 </label>
                 <input
                   className={`input ${styles.communityHeaderSearch}`}
                   id="community-header-search"
                   onChange={(event) => setCommunitySearch(event.target.value)}
-                  placeholder="Search community"
+                  placeholder={
+                    isStaffFeed
+                      ? `Search ${activeChannelTitle}`
+                      : "Search community"
+                  }
                   type="search"
                   value={communitySearch}
                 />
-                <button
-                  className={styles.visitDetailsButton}
-                  onClick={() => setShowSchoolShowDates(true)}
-                  type="button"
-                >
-                  Shuler School Show Dates
-                </button>
+                {isStaffFeed ? (
+                  <Link
+                    className={styles.visitDetailsButton}
+                    href="/portal/schedule?view=monthly"
+                  >
+                    Upcoming Adjudications
+                  </Link>
+                ) : (
+                  <button
+                    className={styles.visitDetailsButton}
+                    onClick={() => setShowSchoolShowDates(true)}
+                    type="button"
+                  >
+                    Shuler School Show Dates
+                  </button>
+                )}
                 <AutoClosingDetails
                   className={styles.communityHeaderMenu}
                   summary={<span aria-hidden="true">•••</span>}
-                  summaryAriaLabel="Open community options"
+                  summaryAriaLabel="Open conversation options"
                 >
                   <div className={styles.communityMenuPopover}>
                     <span>{activeChannel.visibility_label}</span>
@@ -3508,7 +3571,7 @@ export function TeamsChat({
                       onClick={markActiveChannelUnread}
                       type="button"
                     >
-                      Mark community unread
+                      Mark conversation unread
                     </button>
                     {canSeeActiveChannelMembers ? (
                       <button
@@ -3624,25 +3687,38 @@ export function TeamsChat({
             {isThreaded ? (
               <>
                 <label className="sr-only" htmlFor="community-mobile-search">
-                  Search community posts
+                  Search {activeChannelTitle} posts
                 </label>
                 <input
                   className="input"
                   id="community-mobile-search"
                   onChange={(event) => setCommunitySearch(event.target.value)}
-                  placeholder="Search posts, schools, or people"
+                  placeholder={
+                    isStaffFeed
+                      ? "Search posts or people"
+                      : "Search posts, schools, or people"
+                  }
                   type="search"
                   value={communitySearch}
                 />
               </>
             ) : null}
-            <button
-              className="button button-secondary button-compact"
-              onClick={() => setShowSchoolShowDates(true)}
-              type="button"
-            >
-              Shuler School Show Dates
-            </button>
+            {isStaffFeed ? (
+              <Link
+                className="button button-secondary button-compact"
+                href="/portal/schedule?view=monthly"
+              >
+                Upcoming Adjudications
+              </Link>
+            ) : (
+              <button
+                className="button button-secondary button-compact"
+                onClick={() => setShowSchoolShowDates(true)}
+                type="button"
+              >
+                Shuler School Show Dates
+              </button>
+            )}
             {activeChannel.channel_type === "school" && (
               <>
                 {eligibilityReferencePanel ? (
@@ -3718,7 +3794,13 @@ export function TeamsChat({
                       </span>
                       <div>
                         <strong>Create a post</strong>
-                        <p>Share news, ask a question, or celebrate a show.</p>
+                        <p>
+                          {isStaffFeed
+                            ? activeChannel.channel_type === "scheduling"
+                              ? "Share a scheduling update, question, or panel need."
+                              : "Share an announcement, update, or question."
+                            : "Share news, ask a question, or celebrate a show."}
+                        </p>
                       </div>
                       <button
                         aria-label="Close post composer"
@@ -3748,7 +3830,7 @@ export function TeamsChat({
                         id="chat-body"
                         members={members}
                         name="body"
-                        placeholder={`Share something with ${SCHOOL_COMMUNITY_CHAT_LABEL}`}
+                        placeholder={`Share something in ${activeChannelTitle}`}
                         rows={4}
                       />
                     </div>
@@ -3758,7 +3840,7 @@ export function TeamsChat({
                         <ChatFilePicker
                           key={`thread-files-${attachmentPickerVersion}`}
                         />
-                        <span>Visible to community members.</span>
+                        <span>{activeChannel.visibility_label}</span>
                       </div>
                       <button
                         className="button button-dark"
@@ -3785,17 +3867,25 @@ export function TeamsChat({
                 <section className={styles.communityToolbar}>
                   <div className={styles.communityFilterButtons}>
                     {(
-                      [
-                        ["posts", "Posts"],
-                        ["schools", "Schools"],
-                        ["people", "People"],
-                        ["recent", "Most recent"],
-                      ] as Array<[CommunityFeedFilter, string]>
+                      isCommunityFeed
+                        ? [
+                            ["posts", "Posts"],
+                            ["schools", "Schools"],
+                            ["people", "People"],
+                            ["recent", "Most recent"],
+                          ]
+                        : [
+                            ["posts", "All posts"],
+                            ["people", "People"],
+                            ["recent", "Most recent"],
+                          ]
                     ).map(([value, label]) => (
                       <button
                         aria-pressed={communityFilter === value}
                         key={value}
-                        onClick={() => setCommunityFilter(value)}
+                        onClick={() =>
+                          setCommunityFilter(value as CommunityFeedFilter)
+                        }
                         type="button"
                       >
                         {label}
@@ -3818,7 +3908,7 @@ export function TeamsChat({
                       </h2>
                       <p>
                         {threads.length === 0
-                          ? `Start the first ${SCHOOL_COMMUNITY_CHAT_LABEL} post.`
+                          ? `Start the first post in ${activeChannelTitle}.`
                           : "Try another search or feed filter."}
                       </p>
                     </div>
@@ -3944,7 +4034,7 @@ export function TeamsChat({
                                 </AutoClosingDetails>
                               </div>
 
-                              {thread.subject !== DEFAULT_COMMUNITY_POST_SUBJECT ? (
+                              {!GENERIC_THREAD_SUBJECTS.has(thread.subject) ? (
                                 <h2 className={styles.communityPostTitle}>
                                   {thread.subject}
                                 </h2>
@@ -4358,38 +4448,147 @@ export function TeamsChat({
                 </div>
               </main>
 
-              <aside className={styles.upcomingShowsRail}>
-                <div className={styles.upcomingShowsHeading}>
-                  <div>
-                    <span className="eyebrow">On stage</span>
-                    <h2>Upcoming shows</h2>
+              {isStaffFeed ? (
+                <aside
+                  className={`${styles.upcomingShowsRail} ${styles.adjudicationRail}`}
+                >
+                  <div className={styles.upcomingShowsHeading}>
+                    <div>
+                      <span className="eyebrow">Staffing</span>
+                      <h2>Upcoming adjudications</h2>
+                    </div>
+                    <Link href="/portal/schedule?view=monthly">View all</Link>
                   </div>
-                  <button
-                    onClick={() => setShowSchoolShowDates(true)}
-                    type="button"
-                  >
-                    View all
-                  </button>
-                </div>
-                {upcomingCommunityShows.length > 0 ? (
-                  <div className={styles.upcomingShowList}>
-                    {upcomingCommunityShows.map((show) => (
-                      <article key={show.applicationId}>
-                        {show.nowPlaying ? <span>Now playing</span> : null}
-                        <strong>{show.productionTitle}</strong>
-                        <p>{show.schoolName}</p>
-                        <time dateTime={show.openingDate ?? undefined}>
-                          {formatShowDateRange(show)}
-                        </time>
-                      </article>
-                    ))}
+                  {upcomingAdjudications.length > 0 ? (
+                    <div
+                      className={`${styles.upcomingShowList} ${styles.adjudicationList}`}
+                    >
+                      {upcomingAdjudications.map((adjudication) => {
+                        const canJoinAsAcm =
+                          profile.role === "advisory_member" &&
+                          adjudication.needsAcm;
+                        const canJoinAsAdjudicator =
+                          profile.role === "adjudicator" &&
+                          adjudication.needsAdjudicators;
+                        const canJoin =
+                          adjudication.status === "open" &&
+                          !adjudication.currentUserJoined &&
+                          (canJoinAsAcm || canJoinAsAdjudicator);
+                        const needsStaff =
+                          adjudication.needsAcm ||
+                          adjudication.needsAdjudicators;
+
+                        return (
+                          <article
+                            className={
+                              needsStaff ? styles.adjudicationNeedsStaff : ""
+                            }
+                            key={adjudication.slotId}
+                          >
+                            <strong>{adjudication.productionTitle}</strong>
+                            <p>{adjudication.schoolName}</p>
+                            <time dateTime={adjudication.startsAt}>
+                              {formatAdjudicationDate(
+                                adjudication.startsAt,
+                                adjudication.endsAt,
+                              )}
+                            </time>
+                            <div
+                              aria-label="Panel staffing"
+                              className={styles.adjudicationStaffing}
+                            >
+                              <span
+                                className={
+                                  adjudication.needsAcm
+                                    ? styles.staffingShortage
+                                    : ""
+                                }
+                              >
+                                <strong>{adjudication.acmCount}/1</strong>
+                                <small>ACM</small>
+                              </span>
+                              <span
+                                className={
+                                  adjudication.needsAdjudicators
+                                    ? styles.staffingShortage
+                                    : ""
+                                }
+                              >
+                                <strong>
+                                  {adjudication.adjudicatorCount}/3
+                                </strong>
+                                <small>ADJUs</small>
+                              </span>
+                            </div>
+                            {canJoin ? (
+                              <button
+                                aria-label={`Join ${adjudication.schoolName} as ${canJoinAsAcm ? "ACM" : "adjudicator"}`}
+                                className={styles.joinPanelButton}
+                                disabled={isPending}
+                                onClick={() =>
+                                  joinUpcomingAdjudication(adjudication.slotId)
+                                }
+                                type="button"
+                              >
+                                {isPending
+                                  ? "Joining…"
+                                  : canJoinAsAcm
+                                    ? "Join panel as ACM"
+                                    : "Join panel as ADJU"}
+                              </button>
+                            ) : adjudication.currentUserJoined ? (
+                              <span className={styles.panelJoinedBadge}>
+                                You joined this panel
+                              </span>
+                            ) : needsStaff && adjudication.status !== "open" ? (
+                              <small className={styles.panelSignupClosed}>
+                                Panel signups are closed
+                              </small>
+                            ) : null}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className={styles.upcomingShowsEmpty}>
+                      No upcoming confirmed adjudications are scheduled.
+                    </p>
+                  )}
+                </aside>
+              ) : (
+                <aside className={styles.upcomingShowsRail}>
+                  <div className={styles.upcomingShowsHeading}>
+                    <div>
+                      <span className="eyebrow">On stage</span>
+                      <h2>Upcoming shows</h2>
+                    </div>
+                    <button
+                      onClick={() => setShowSchoolShowDates(true)}
+                      type="button"
+                    >
+                      View all
+                    </button>
                   </div>
-                ) : (
-                  <p className={styles.upcomingShowsEmpty}>
-                    No additional opening nights are currently listed.
-                  </p>
-                )}
-              </aside>
+                  {upcomingCommunityShows.length > 0 ? (
+                    <div className={styles.upcomingShowList}>
+                      {upcomingCommunityShows.map((show) => (
+                        <article key={show.applicationId}>
+                          {show.nowPlaying ? <span>Now playing</span> : null}
+                          <strong>{show.productionTitle}</strong>
+                          <p>{show.schoolName}</p>
+                          <time dateTime={show.openingDate ?? undefined}>
+                            {formatShowDateRange(show)}
+                          </time>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={styles.upcomingShowsEmpty}>
+                      No additional opening nights are currently listed.
+                    </p>
+                  )}
+                </aside>
+              )}
             </div>
 
             {!communityComposerOpen ? (
