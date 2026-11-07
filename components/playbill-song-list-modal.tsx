@@ -171,9 +171,17 @@ export function PlaybillSongListModal({
                     <div className="empty-state playbill-song-list-empty">
                       <h3>No musical-number list found</h3>
                       <p>
-                        The uploaded Playbill did not contain a clearly labeled song list.
-                        Review the original file if you expected one.
+                        The reader could not identify a musical-number list in
+                        this Playbill. You can try once more or review the
+                        original file.
                       </p>
+                      <button
+                        className="button button-secondary"
+                        onClick={() => void loadSongList()}
+                        type="button"
+                      >
+                        Read Playbill again
+                      </button>
                     </div>
                   ) : null}
 

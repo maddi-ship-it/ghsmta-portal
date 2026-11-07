@@ -3,10 +3,25 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlaybillSongListSections,
   parsePlaybillSongList,
+  PLAYBILL_SONG_LIST_EXTRACTOR_VERSION,
+  PLAYBILL_SONG_LIST_INSTRUCTIONS,
+  PLAYBILL_SONG_LIST_REQUEST,
   resolvePlaybillInputKind,
 } from "./playbill-song-list";
 
 describe("Playbill song-list extraction", () => {
+  it("recognizes act-only lists that use dotted leaders", () => {
+    expect(PLAYBILL_SONG_LIST_EXTRACTOR_VERSION).toBe(2);
+    expect(PLAYBILL_SONG_LIST_INSTRUCTIONS).toContain(
+      "Act I, Act II",
+    );
+    expect(PLAYBILL_SONG_LIST_INSTRUCTIONS).toContain("dotted leaders");
+    expect(PLAYBILL_SONG_LIST_INSTRUCTIONS).toContain(
+      "Do not require an overall song-list heading",
+    );
+    expect(PLAYBILL_SONG_LIST_REQUEST).toContain("Search every page");
+  });
+
   it("sanitizes structured output and drops entries without a title", () => {
     expect(
       parsePlaybillSongList({
