@@ -6,8 +6,8 @@ import { extractOpenAIText } from "@/lib/adjudication";
 import { resolveAdjudicationObserverAccess } from "@/lib/adjudication-observer";
 import { consumeApiQuota } from "@/lib/api-quota";
 import {
-  DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
+  PLAYBILL_SONG_LIST_MODEL,
 } from "@/lib/openai-model";
 import {
   parsePlaybillSongList,
@@ -279,7 +279,7 @@ export async function POST(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: DEFAULT_OPENAI_TEXT_MODEL,
+        model: PLAYBILL_SONG_LIST_MODEL,
         store: false,
         safety_identifier: createHash("sha256")
           .update(user.id)
@@ -384,7 +384,7 @@ export async function POST(
             portal_file_id: file.id,
             songs,
             extractor_version: PLAYBILL_SONG_LIST_EXTRACTOR_VERSION,
-            model: DEFAULT_OPENAI_TEXT_MODEL,
+            model: PLAYBILL_SONG_LIST_MODEL,
             extracted_by: user.id,
             extracted_at: extractedAt,
           },
