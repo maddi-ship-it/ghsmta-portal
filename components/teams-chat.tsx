@@ -28,6 +28,7 @@ import {
   startChatDirectMessage,
 } from "@/app/portal/chat/actions";
 import { ApplicationReferencePanelDialog } from "@/components/application-reference-bar";
+import { AutoClosingDetails } from "@/components/auto-closing-details";
 import styles from "@/components/chat-workspace.module.css";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import {
@@ -35,6 +36,7 @@ import {
   SCHOOL_COMMUNITY_CHAT_LABEL,
 } from "@/lib/chat-terminology";
 import { OWNER_CHAT_SECTIONS } from "@/lib/chat-owner-sections";
+import { DEFAULT_COMMUNITY_POST_SUBJECT } from "@/lib/chat/community-post";
 import type { CommunityShow } from "@/lib/community-shows";
 import {
   isFeedNearBottom,
@@ -132,6 +134,8 @@ type MentionSuggestion =
       insertion: string;
       member: ChatMember;
     };
+
+type CommunityFeedFilter = "posts" | "schools" | "people" | "recent";
 
 const EMPTY_THREAD_IDS = new Set<string>();
 
@@ -1255,6 +1259,27 @@ function formatShowDate(value: string | null) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
+function easternTodayDateString() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+
+  return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
+}
+
+function formatShowDateRange(show: CommunityShow) {
+  const opening = formatShowDate(show.openingDate);
+  const closing = formatShowDate(show.closingDate);
+
+  if (!show.openingDate) return closing;
+  if (!show.closingDate || show.closingDate === show.openingDate) return opening;
+  return `${opening} – ${closing}`;
+}
+
 function ShulerSchoolShowDatesDialog({
   shows,
   onClose,
@@ -1557,6 +1582,7 @@ function MentionTextarea({
   className,
   submitOnEnter = false,
   autoResize = false,
+  autoFocus = false,
 }: {
   id: string;
   name: string;
@@ -1566,6 +1592,7 @@ function MentionTextarea({
   className?: string;
   submitOnEnter?: boolean;
   autoResize?: boolean;
+  autoFocus?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState("");
@@ -1736,6 +1763,7 @@ function MentionTextarea({
   return (
     <div className={styles.mentionComposer}>
       <textarea
+        autoFocus={autoFocus}
         className={`${className ?? "textarea"} ${styles.textarea}`}
         id={id}
         maxLength={5000}
@@ -1798,7 +1826,10 @@ function MentionTextarea({
       )}
 
       <small className={styles.mentionHelp}>
-        Type @ to tag someone, @channel, or @URGENT for a text alert. Press Enter to send; Shift+Enter adds a line.
+        Type @ to tag someone, @channel, or @URGENT for a text alert.
+        {submitOnEnter
+          ? " Press Enter to send; Shift+Enter adds a line."
+          : " Use the Post button when you are ready."}
       </small>
     </div>
   );
@@ -2257,6 +2288,9 @@ export function TeamsChat({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [channelSearch, setChannelSearch] = useState("");
   const [communitySearch, setCommunitySearch] = useState("");
+  const [communityFilter, setCommunityFilter] =
+    useState<CommunityFeedFilter>("posts");
+  const [communityComposerOpen, setCommunityComposerOpen] = useState(false);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [openThreadState, setOpenThreadState] = useState<{
     channelId: string | null;
@@ -2309,6 +2343,7 @@ export function TeamsChat({
   } | null>(null);
   const [isPending, startTransition] = useTransition();
   const feedRef = useRef<HTMLDivElement>(null);
+  const communityComposerRef = useRef<HTMLFormElement>(null);
   const hasInitialScrollRef = useRef(false);
   const broadcastDialogRef = useDialogFocus<HTMLDivElement>(
     () => setShowBroadcastComposer(false),
@@ -2342,16 +2377,27 @@ export function TeamsChat({
       : EMPTY_THREAD_IDS;
   const filteredCommunityThreads = useMemo(() => {
     const query = communitySearch.trim().toLowerCase();
-    if (!query) return threads;
+    const filtered = threads.filter((thread) => {
+      if (
+        communityFilter === "schools" &&
+        thread.author_role !== "applicant"
+      ) {
+        return false;
+      }
 
-    return threads.filter((thread) => {
-      const searchableText = [
+      if (!query) return true;
+
+      const postText = [
         thread.subject,
         thread.body,
+        ...thread.replies.map((reply) => reply.body),
+      ]
+        .join(" ")
+        .toLowerCase();
+      const peopleText = [
         thread.author_name,
         roleName(thread.author_role),
         ...thread.replies.flatMap((reply) => [
-          reply.body,
           reply.author_name,
           roleName(reply.author_role),
         ]),
@@ -2359,9 +2405,56 @@ export function TeamsChat({
         .join(" ")
         .toLowerCase();
 
-      return searchableText.includes(query);
+      return communityFilter === "people"
+        ? peopleText.includes(query)
+        : `${postText} ${peopleText}`.includes(query);
     });
-  }, [communitySearch, threads]);
+
+    if (communityFilter !== "recent") return filtered;
+
+    return [...filtered].sort(
+      (left, right) =>
+        new Date(right.created_at).getTime() -
+        new Date(left.created_at).getTime(),
+    );
+  }, [communityFilter, communitySearch, threads]);
+
+  const upcomingCommunityShows = useMemo(() => {
+    const today = easternTodayDateString();
+    return communityShows
+      .filter((show) => {
+        if (!show.openingDate) return false;
+        return (show.closingDate ?? show.openingDate) >= today;
+      })
+      .slice(0, 5)
+      .map((show) => ({
+        ...show,
+        nowPlaying:
+          Boolean(show.openingDate && show.openingDate <= today) &&
+          Boolean((show.closingDate ?? show.openingDate ?? "") >= today),
+      }));
+  }, [communityShows]);
+
+  const openCommunityComposer = useCallback(() => {
+    setCommunityComposerOpen(true);
+    window.requestAnimationFrame(() => {
+      communityComposerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, []);
+
+  const copyCommunityPostLink = useCallback(async (postId: string) => {
+    const url = `${window.location.href.split("#")[0]}#community-post-${postId}`;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus("Post link copied.");
+    } catch {
+      setStatus("The post link could not be copied on this device.");
+    }
+  }, []);
 
   const toggleThreadOpen = useCallback((postId: string) => {
     setOpenThreadState((current) => {
@@ -2969,7 +3062,12 @@ export function TeamsChat({
 
   const submitPost = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    runFormAction(event.currentTarget, createChatPost, "Conversation posted.");
+    runFormAction(
+      event.currentTarget,
+      createChatPost,
+      "Post shared.",
+      () => setCommunityComposerOpen(false),
+    );
   };
 
   const submitReply = (event: FormEvent<HTMLFormElement>) => {
@@ -3343,7 +3441,9 @@ export function TeamsChat({
       </aside>
 
       <section className={styles.conversation}>
-        <header className={styles.channelHeader}>
+        <header
+          className={`${styles.channelHeader} ${isThreaded ? styles.communityChannelHeader : ""}`}
+        >
           <div className={styles.channelIdentity}>
             <span
               className={`${styles.headerIcon} ${styles[`channelIcon_${activeChannel.channel_type}`]}`}
@@ -3376,73 +3476,125 @@ export function TeamsChat({
           </div>
 
           <div className={styles.headerMeta}>
-            <span
-              className={styles.visibilityPill}
-              title={activeChannel.visibility_label}
-            >
-              {activeChannel.visibility_label}
-            </span>
-            <button
-              className={styles.visitDetailsButton}
-              onClick={() => setShowSchoolShowDates(true)}
-              type="button"
-            >
-              Shuler School Show Dates
-            </button>
-            {activeChannel.channel_type === "school" && (
+            {isThreaded ? (
               <>
-                {eligibilityReferencePanel ? (
+                <label className="sr-only" htmlFor="community-header-search">
+                  Search community posts
+                </label>
+                <input
+                  className={`input ${styles.communityHeaderSearch}`}
+                  id="community-header-search"
+                  onChange={(event) => setCommunitySearch(event.target.value)}
+                  placeholder="Search community"
+                  type="search"
+                  value={communitySearch}
+                />
+                <button
+                  className={styles.visitDetailsButton}
+                  onClick={() => setShowSchoolShowDates(true)}
+                  type="button"
+                >
+                  Shuler School Show Dates
+                </button>
+                <AutoClosingDetails
+                  className={styles.communityHeaderMenu}
+                  summary={<span aria-hidden="true">•••</span>}
+                  summaryAriaLabel="Open community options"
+                >
+                  <div className={styles.communityMenuPopover}>
+                    <span>{activeChannel.visibility_label}</span>
+                    <button
+                      disabled={isPending}
+                      onClick={markActiveChannelUnread}
+                      type="button"
+                    >
+                      Mark community unread
+                    </button>
+                    {canSeeActiveChannelMembers ? (
+                      <button
+                        aria-haspopup="dialog"
+                        onClick={openMemberDirectory}
+                        type="button"
+                      >
+                        View {members.length}{" "}
+                        {members.length === 1 ? "member" : "members"}
+                      </button>
+                    ) : null}
+                  </div>
+                </AutoClosingDetails>
+              </>
+            ) : (
+              <>
+                <span
+                  className={styles.visibilityPill}
+                  title={activeChannel.visibility_label}
+                >
+                  {activeChannel.visibility_label}
+                </span>
+                <button
+                  className={styles.visitDetailsButton}
+                  onClick={() => setShowSchoolShowDates(true)}
+                  type="button"
+                >
+                  Shuler School Show Dates
+                </button>
+                {activeChannel.channel_type === "school" && (
+                  <>
+                    {eligibilityReferencePanel ? (
+                      <button
+                        className={styles.visitDetailsButton}
+                        onClick={() => setShowEligibility(true)}
+                        type="button"
+                      >
+                        Eligibility
+                      </button>
+                    ) : null}
+                    <button
+                      className={styles.visitDetailsButton}
+                      onClick={() => setShowPanelContacts(true)}
+                      type="button"
+                    >
+                      Panel contacts
+                    </button>
+                    <button
+                      className={styles.visitDetailsButton}
+                      onClick={() => setShowVisitDetails(true)}
+                      type="button"
+                    >
+                      Visit details
+                    </button>
+                  </>
+                )}
+                <button
+                  aria-label="Mark this conversation unread"
+                  className={`button button-secondary button-compact ${styles.headerActionButton}`}
+                  disabled={isPending}
+                  onClick={markActiveChannelUnread}
+                  type="button"
+                >
+                  Mark unread
+                </button>
+                {canSeeActiveChannelMembers && (
                   <button
-                    className={styles.visitDetailsButton}
-                    onClick={() => setShowEligibility(true)}
+                    aria-haspopup="dialog"
+                    className={styles.memberSummary}
+                    onClick={openMemberDirectory}
                     type="button"
                   >
-                    Eligibility
-                  </button>
-                ) : null}
-                <button
-                  className={styles.visitDetailsButton}
-                  onClick={() => setShowPanelContacts(true)}
-                  type="button"
-                >
-                  Panel contacts
-                </button>
-                <button
-                  className={styles.visitDetailsButton}
-                  onClick={() => setShowVisitDetails(true)}
-                  type="button"
-                >
-                  Visit details
-                </button>
-              </>
-            )}
-            <button
-              aria-label="Mark this conversation unread"
-              className={`button button-secondary button-compact ${styles.headerActionButton}`}
-              disabled={isPending}
-              onClick={markActiveChannelUnread}
-              type="button"
-            >
-              Mark unread
-            </button>
-            {canSeeActiveChannelMembers && (
-              <button
-                aria-haspopup="dialog"
-                className={styles.memberSummary}
-                onClick={openMemberDirectory}
-                type="button"
-              >
-                <div className={styles.memberAvatars} aria-hidden="true">
-                  {members.slice(0, 4).map((member) => (
-                    <span className={styles.memberAvatar} key={member.user_id}>
-                      {initials(member.display_name)}
+                    <div className={styles.memberAvatars} aria-hidden="true">
+                      {members.slice(0, 4).map((member) => (
+                        <span className={styles.memberAvatar} key={member.user_id}>
+                          {initials(member.display_name)}
+                        </span>
+                      ))}
+                    </div>
+                    <span>
+                      {members.length}{" "}
+                      {members.length === 1 ? "member" : "members"}
                     </span>
-                  ))}
-                </div>
-                <span>
-                  {members.length} {members.length === 1 ? "member" : "members"}
-                </span>
-              </button>
+                  </button>
+                )}
+              </>
             )}
           </div>
 
@@ -3469,6 +3621,21 @@ export function TeamsChat({
                 </optgroup>
               ))}
             </select>
+            {isThreaded ? (
+              <>
+                <label className="sr-only" htmlFor="community-mobile-search">
+                  Search community posts
+                </label>
+                <input
+                  className="input"
+                  id="community-mobile-search"
+                  onChange={(event) => setCommunitySearch(event.target.value)}
+                  placeholder="Search posts, schools, or people"
+                  type="search"
+                  value={communitySearch}
+                />
+              </>
+            ) : null}
             <button
               className="button button-secondary button-compact"
               onClick={() => setShowSchoolShowDates(true)}
@@ -3532,408 +3699,709 @@ export function TeamsChat({
 
         {isThreaded ? (
           <div className={styles.threadWorkspace}>
-            <form className={styles.newThread} onSubmit={submitPost}>
-              <input
-                name="channel_id"
-                type="hidden"
-                value={activeChannel.channel_id}
-              />
-              <div className={styles.newThreadHeading}>
-                <span className={styles.avatar}>
-                  {initials(profile.full_name ?? profile.email ?? "User")}
-                </span>
-                <div>
-                  <strong>Create a post</strong>
-                  <p>Share news, ask a question, or celebrate a show.</p>
-                </div>
-              </div>
+            <div className={styles.communityLayout}>
+              <main className={styles.communityMain}>
+                {communityComposerOpen ? (
+                  <form
+                    className={styles.newThread}
+                    onSubmit={submitPost}
+                    ref={communityComposerRef}
+                  >
+                    <input
+                      name="channel_id"
+                      type="hidden"
+                      value={activeChannel.channel_id}
+                    />
+                    <div className={styles.newThreadHeading}>
+                      <span className={styles.avatar}>
+                        {initials(profile.full_name ?? profile.email ?? "User")}
+                      </span>
+                      <div>
+                        <strong>Create a post</strong>
+                        <p>Share news, ask a question, or celebrate a show.</p>
+                      </div>
+                      <button
+                        aria-label="Close post composer"
+                        className={styles.composerClose}
+                        onClick={() => setCommunityComposerOpen(false)}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </div>
 
-              <div className="field">
-                <label htmlFor="chat-subject">Post title</label>
-                <input
-                  className="input"
-                  id="chat-subject"
-                  maxLength={180}
-                  name="subject"
-                  placeholder="Give your post a short title"
-                  required
-                />
-              </div>
+                    <div className="field">
+                      <label htmlFor="chat-subject">Title (optional)</label>
+                      <input
+                        className="input"
+                        id="chat-subject"
+                        maxLength={180}
+                        name="subject"
+                        placeholder="Add a title if it helps"
+                      />
+                    </div>
 
-              <div className="field">
-                <label htmlFor="chat-body">What&apos;s on your mind?</label>
-                <MentionTextarea
-                  id="chat-body"
-                  members={members}
-                  name="body"
-                  placeholder={`Share something with ${SCHOOL_COMMUNITY_CHAT_LABEL}`}
-                  rows={4}
-                />
-              </div>
+                    <div className="field">
+                      <label htmlFor="chat-body">What&apos;s on your mind?</label>
+                      <MentionTextarea
+                        autoFocus
+                        id="chat-body"
+                        members={members}
+                        name="body"
+                        placeholder={`Share something with ${SCHOOL_COMMUNITY_CHAT_LABEL}`}
+                        rows={4}
+                      />
+                    </div>
 
-              <div className={styles.composerFooter}>
-                <div><ChatFilePicker key={`thread-files-${attachmentPickerVersion}`} /><span>Visible to school applicants and GHSMTA Owners.</span></div>
-                <button
-                  className="button button-dark"
-                  disabled={isPending}
-                  type="submit"
-                >
-                  {isPending ? "Posting…" : "Post"}
-                </button>
-              </div>
-            </form>
+                    <div className={styles.composerFooter}>
+                      <div>
+                        <ChatFilePicker
+                          key={`thread-files-${attachmentPickerVersion}`}
+                        />
+                        <span>Visible to community members.</span>
+                      </div>
+                      <button
+                        className="button button-dark"
+                        disabled={isPending}
+                        type="submit"
+                      >
+                        {isPending ? "Posting…" : "Post"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    className={styles.compactPostComposer}
+                    onClick={openCommunityComposer}
+                    type="button"
+                  >
+                    <span className={styles.avatar} aria-hidden="true">
+                      {initials(profile.full_name ?? profile.email ?? "User")}
+                    </span>
+                    <span>What&apos;s on your mind?</span>
+                  </button>
+                )}
 
-            <section className={styles.communityToolbar}>
-              <div>
-                <strong>Community feed</strong>
-                <span>Updates from Shuler schools</span>
-              </div>
-              <label className="sr-only" htmlFor="community-post-search">
-                Search posts and comments
-              </label>
-              <input
-                className={`input ${styles.communitySearch}`}
-                id="community-post-search"
-                onChange={(event) => setCommunitySearch(event.target.value)}
-                placeholder="Search posts, people, or comments"
-                type="search"
-                value={communitySearch}
-              />
-              <span className={styles.communitySearchCount} aria-live="polite">
-                {filteredCommunityThreads.length}{" "}
-                {filteredCommunityThreads.length === 1 ? "post" : "posts"}
-              </span>
-            </section>
+                <section className={styles.communityToolbar}>
+                  <div className={styles.communityFilterButtons}>
+                    {(
+                      [
+                        ["posts", "Posts"],
+                        ["schools", "Schools"],
+                        ["people", "People"],
+                        ["recent", "Most recent"],
+                      ] as Array<[CommunityFeedFilter, string]>
+                    ).map(([value, label]) => (
+                      <button
+                        aria-pressed={communityFilter === value}
+                        key={value}
+                        onClick={() => setCommunityFilter(value)}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className={styles.communitySearchCount} aria-live="polite">
+                    {filteredCommunityThreads.length}{" "}
+                    {filteredCommunityThreads.length === 1 ? "post" : "posts"}
+                  </span>
+                </section>
 
-            <div className={styles.threadFeed} aria-live="polite">
-              {filteredCommunityThreads.length === 0 ? (
-                <div className={`empty-state ${styles.threadEmpty}`}>
-                  <h2>
-                    {threads.length === 0
-                      ? "No posts yet."
-                      : "No matching posts."}
-                  </h2>
-                  <p>
-                    {threads.length === 0
-                      ? `Start the first ${SCHOOL_COMMUNITY_CHAT_LABEL} post.`
-                      : "Try a different word, school, or person."}
-                  </p>
-                </div>
-              ) : (
-                filteredCommunityThreads.map((thread) => {
-                  const isThreadOpen = openThreadIds.has(thread.post_id);
-                  const latestReply = thread.replies[thread.replies.length - 1];
-                  const replyTotal = thread.reply_count ?? thread.replies.length;
-                  const replyLabel =
-                    replyTotal === 1 ? "1 reply" : `${replyTotal} replies`;
-                  const threadClassName = [
-                    styles.threadCard,
-                    isThreadOpen ? styles.threadCardOpen : "",
-                    thread.post_deleted_at ? styles.deletedMessage : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
+                <div className={styles.threadFeed} aria-live="polite">
+                  {filteredCommunityThreads.length === 0 ? (
+                    <div className={`empty-state ${styles.threadEmpty}`}>
+                      <h2>
+                        {threads.length === 0
+                          ? "No posts yet."
+                          : "No matching posts."}
+                      </h2>
+                      <p>
+                        {threads.length === 0
+                          ? `Start the first ${SCHOOL_COMMUNITY_CHAT_LABEL} post.`
+                          : "Try another search or feed filter."}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredCommunityThreads.map((thread) => {
+                      const isThreadOpen = openThreadIds.has(thread.post_id);
+                      const replyTotal =
+                        thread.reply_count ?? thread.replies.length;
+                      const commentLabel =
+                        replyTotal === 1
+                          ? "1 comment"
+                          : `${replyTotal} comments`;
+                      const previewReplies = thread.replies.slice(-2);
+                      const postReactions = reactions.filter(
+                        (reaction) =>
+                          reaction.message_kind === "post" &&
+                          reaction.message_id === thread.post_id,
+                      );
+                      const likedByCurrentUser = postReactions.some(
+                        (reaction) =>
+                          reaction.emoji === "👍" &&
+                          reaction.user_id === profile.id,
+                      );
+                      const threadClassName = [
+                        styles.threadCard,
+                        isThreadOpen ? styles.threadCardOpen : "",
+                        thread.post_deleted_at ? styles.deletedMessage : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
 
-                  return (
-                    <article className={threadClassName} key={thread.post_id}>
-                      <div className={styles.threadRoot}>
-                        <span className={styles.avatar}>
-                          {initials(thread.author_name)}
-                        </span>
-                        <div className={styles.threadContent}>
-                          <div className={styles.messageMeta}>
-                            <strong>{thread.author_name}</strong>
-                            <span>{roleName(thread.author_role)}</span>
-                            <time dateTime={thread.created_at}>
-                              {formatFullTimestamp(thread.created_at)}
-                            </time>
-                          </div>
-
-                          <div className={styles.threadTitleRow}>
-                            <div>
-                              <h2>{thread.subject}</h2>
-                              <small className={styles.threadSummary}>
-                                {replyTotal > 0
-                                  ? `${replyLabel}${
-                                      latestReply
-                                        ? ` · latest from ${latestReply.author_name}`
-                                        : ""
-                                    }`
-                                  : "No replies yet"}
-                              </small>
-                            </div>
-                            <div className={styles.threadTitleActions}>
-                              {(thread.pinned || thread.locked) && (
-                                <div className={styles.threadBadges}>
-                                  {thread.pinned && <span>Pinned</span>}
-                                  {thread.locked && <span>Locked</span>}
+                      return (
+                        <article
+                          className={threadClassName}
+                          id={`community-post-${thread.post_id}`}
+                          key={thread.post_id}
+                        >
+                          <div className={styles.threadRoot}>
+                            <span className={styles.avatar}>
+                              {initials(thread.author_name)}
+                            </span>
+                            <div className={styles.threadContent}>
+                              <div className={styles.communityPostHeader}>
+                                <div className={styles.messageMeta}>
+                                  <strong>{thread.author_name}</strong>
+                                  <span>
+                                    {thread.author_role === "applicant"
+                                      ? "School"
+                                      : roleName(thread.author_role)}
+                                  </span>
+                                  <time dateTime={thread.created_at}>
+                                    {formatFullTimestamp(thread.created_at)}
+                                  </time>
+                                  {thread.pinned ? <span>📌 Pinned</span> : null}
+                                  {thread.locked ? <span>Comments closed</span> : null}
                                 </div>
+                                <AutoClosingDetails
+                                  className={styles.postMenu}
+                                  summary={<span aria-hidden="true">•••</span>}
+                                  summaryAriaLabel={`Open options for ${thread.author_name}'s post`}
+                                >
+                                  <div className={styles.postMenuPopover}>
+                                    <button
+                                      onClick={() =>
+                                        void copyCommunityPostLink(thread.post_id)
+                                      }
+                                      type="button"
+                                    >
+                                      Copy post link
+                                    </button>
+                                    {!thread.post_deleted_at &&
+                                    thread.author_id === profile.id ? (
+                                      <button
+                                        disabled={isPending}
+                                        onClick={() =>
+                                          setEditingMessage({
+                                            id: thread.post_id,
+                                            kind: "post",
+                                            body: thread.body,
+                                          })
+                                        }
+                                        type="button"
+                                      >
+                                        Edit post
+                                      </button>
+                                    ) : null}
+                                    {profile.role === "owner" &&
+                                    !thread.post_deleted_at ? (
+                                      <>
+                                        <button
+                                          disabled={isPending}
+                                          onClick={() =>
+                                            moderate(thread.post_id, "pin")
+                                          }
+                                          type="button"
+                                        >
+                                          {thread.pinned ? "Unpin post" : "Pin post"}
+                                        </button>
+                                        <button
+                                          disabled={isPending}
+                                          onClick={() =>
+                                            moderate(thread.post_id, "lock")
+                                          }
+                                          type="button"
+                                        >
+                                          {thread.locked
+                                            ? "Open comments"
+                                            : "Close comments"}
+                                        </button>
+                                        <button
+                                          className="danger-text"
+                                          disabled={isPending}
+                                          onClick={() =>
+                                            deleteMessage(thread.post_id, "post")
+                                          }
+                                          type="button"
+                                        >
+                                          Delete post
+                                        </button>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                </AutoClosingDetails>
+                              </div>
+
+                              {thread.subject !== DEFAULT_COMMUNITY_POST_SUBJECT ? (
+                                <h2 className={styles.communityPostTitle}>
+                                  {thread.subject}
+                                </h2>
+                              ) : null}
+
+                              {editingMessage?.id === thread.post_id &&
+                              editingMessage.kind === "post" ? (
+                                <form
+                                  className={styles.inlineEditForm}
+                                  onSubmit={submitMessageEdit}
+                                >
+                                  <input
+                                    name="message_id"
+                                    type="hidden"
+                                    value={thread.post_id}
+                                  />
+                                  <input
+                                    name="message_kind"
+                                    type="hidden"
+                                    value="post"
+                                  />
+                                  <textarea
+                                    autoFocus
+                                    className="textarea"
+                                    defaultValue={thread.body}
+                                    maxLength={5000}
+                                    name="body"
+                                    required
+                                    rows={4}
+                                  />
+                                  <div>
+                                    <button
+                                      className="button button-dark button-compact"
+                                      disabled={isPending}
+                                      type="submit"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      className="button button-secondary button-compact"
+                                      onClick={() => setEditingMessage(null)}
+                                      type="button"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </form>
+                              ) : (
+                                <p className={styles.messageBody}>
+                                  <MentionedMessage
+                                    body={thread.body}
+                                    currentUserId={profile.id}
+                                    members={members}
+                                  />
+                                </p>
                               )}
+                              <AttachmentList
+                                attachments={attachments.filter(
+                                  (attachment) =>
+                                    attachment.message_kind === "post" &&
+                                    attachment.message_id === thread.post_id,
+                                )}
+                              />
+                              {thread.post_deleted_at &&
+                              thread.post_deletion_reason ? (
+                                <small className={styles.deletionReason}>
+                                  Reason: {thread.post_deletion_reason}
+                                </small>
+                              ) : null}
                             </div>
                           </div>
 
-                          {editingMessage?.id === thread.post_id && editingMessage.kind === "post" ? (
-                            <form className={styles.inlineEditForm} onSubmit={submitMessageEdit}>
-                              <input name="message_id" type="hidden" value={thread.post_id} />
-                              <input name="message_kind" type="hidden" value="post" />
-                              <textarea autoFocus className="textarea" defaultValue={thread.body} maxLength={5000} name="body" required rows={4} />
-                              <div>
-                                <button className="button button-dark button-compact" disabled={isPending} type="submit">Save</button>
-                                <button className="button button-secondary button-compact" onClick={() => setEditingMessage(null)} type="button">Cancel</button>
-                              </div>
-                            </form>
-                          ) : (
-                            <p className={styles.messageBody}>
-                              <MentionedMessage body={thread.body} currentUserId={profile.id} members={members} />
-                            </p>
-                          )}
-                          <AttachmentList
-                            attachments={attachments.filter(
-                              (attachment) =>
-                                attachment.message_kind === "post" &&
-                                attachment.message_id === thread.post_id,
-                            )}
-                          />
-                          {!thread.post_deleted_at && (
-                            <ReactionBar
-                              currentUserId={profile.id}
-                              onToggle={(emoji) =>
-                                void toggleReaction(thread.post_id, "post", emoji)
-                              }
-                              reactions={reactions.filter(
-                                (reaction) =>
-                                  reaction.message_kind === "post" &&
-                                  reaction.message_id === thread.post_id,
+                          {!thread.post_deleted_at ? (
+                            <div className={styles.threadEngagementSummary}>
+                              {postReactions.length > 0 ? (
+                                <ReactionBar
+                                  currentUserId={profile.id}
+                                  onToggle={(emoji) =>
+                                    void toggleReaction(
+                                      thread.post_id,
+                                      "post",
+                                      emoji,
+                                    )
+                                  }
+                                  reactions={postReactions}
+                                />
+                              ) : (
+                                <span aria-hidden="true" />
                               )}
-                            />
-                          )}
+                              {replyTotal > 0 ? (
+                                <button
+                                  onClick={() => toggleThreadOpen(thread.post_id)}
+                                  type="button"
+                                >
+                                  {commentLabel}
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
 
-                          {!thread.post_deleted_at && thread.author_id === profile.id && (
-                            <div className={styles.messageFooter}>
+                          <div className={styles.threadSocialActions}>
+                            {!thread.post_deleted_at ? (
                               <button
-                                className={styles.messageActionButton}
+                                aria-pressed={likedByCurrentUser}
+                                className={
+                                  likedByCurrentUser
+                                    ? styles.threadSocialActionActive
+                                    : undefined
+                                }
                                 disabled={isPending}
-                                onClick={() => setEditingMessage({ id: thread.post_id, kind: "post", body: thread.body })}
+                                onClick={() =>
+                                  void toggleReaction(
+                                    thread.post_id,
+                                    "post",
+                                    "👍",
+                                  )
+                                }
                                 type="button"
                               >
-                                Edit
+                                <span aria-hidden="true">👍</span>
+                                {likedByCurrentUser ? "Liked" : "Like"}
                               </button>
-                            </div>
-                          )}
-
-                          {profile.role === "owner" && (
-                            <div className={styles.ownerControls}>
-                              {!thread.post_deleted_at && (
-                                <>
-                                  <button
-                                    className="button button-secondary button-compact"
-                                    disabled={isPending}
-                                    onClick={() => moderate(thread.post_id, "pin")}
-                                    type="button"
-                                  >
-                                    {thread.pinned ? "Unpin" : "Pin"}
-                                  </button>
-                                  <button
-                                    className="button button-secondary button-compact"
-                                    disabled={isPending}
-                                    onClick={() => moderate(thread.post_id, "lock")}
-                                    type="button"
-                                  >
-                                    {thread.locked ? "Unlock replies" : "Lock replies"}
-                                  </button>
-                                  <button
-                                    className="button button-secondary button-compact danger-text"
-                                    disabled={isPending}
-                                    onClick={() => deleteMessage(thread.post_id, "post")}
-                                    type="button"
-                                  >
-                                    Delete message
-                                  </button>
-                                </>
-                              )}
-                              {thread.post_deleted_at &&
-                                thread.post_deletion_reason && (
-                                  <small>
-                                    Reason: {thread.post_deletion_reason}
-                                  </small>
-                                )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={styles.threadSocialActions}>
-                        {!thread.post_deleted_at ? (
-                          <button
-                            disabled={isPending}
-                            onClick={() =>
-                              void toggleReaction(thread.post_id, "post", "👍")
-                            }
-                            type="button"
-                          >
-                            <span aria-hidden="true">👍</span>
-                            Like
-                          </button>
-                        ) : null}
-                        <button
-                          aria-controls={`thread-replies-${thread.post_id}`}
-                          aria-expanded={isThreadOpen}
-                          onClick={() => toggleThreadOpen(thread.post_id)}
-                          type="button"
-                        >
-                          <span aria-hidden="true">💬</span>
-                          {isThreadOpen
-                            ? "Hide comments"
-                            : replyTotal > 0
-                              ? `View ${replyLabel}`
-                              : "Comment"}
-                        </button>
-                      </div>
-
-                      {isThreadOpen ? (
-                        <div
-                          className={styles.replyThread}
-                          id={`thread-replies-${thread.post_id}`}
-                        >
-                          {thread.replies.map((reply) => (
-                            <div
-                              className={
-                                reply.deleted_at
-                                  ? `${styles.reply} ${styles.deletedMessage}`
-                                  : styles.reply
-                              }
-                              key={reply.id}
+                            ) : null}
+                            <button
+                              aria-controls={`thread-replies-${thread.post_id}`}
+                              aria-expanded={isThreadOpen}
+                              onClick={() => toggleThreadOpen(thread.post_id)}
+                              type="button"
                             >
-                              <span
-                                className={`${styles.avatar} ${styles.avatarSmall}`}
-                              >
-                                {initials(reply.author_name)}
-                              </span>
-                              <div>
-                                <div className={styles.messageMeta}>
-                                  <strong>{reply.author_name}</strong>
-                                  <span>{roleName(reply.author_role)}</span>
-                                  <time dateTime={reply.created_at}>
-                                    {formatFullTimestamp(reply.created_at)}
-                                  </time>
+                              <span aria-hidden="true">💬</span>
+                              {isThreadOpen ? "Hide comments" : "Comment"}
+                            </button>
+                          </div>
+
+                          {!isThreadOpen && previewReplies.length > 0 ? (
+                            <div
+                              className={styles.commentPreviewSection}
+                              id={`thread-replies-${thread.post_id}`}
+                            >
+                              {replyTotal > previewReplies.length ? (
+                                <button
+                                  className={styles.viewAllComments}
+                                  onClick={() => toggleThreadOpen(thread.post_id)}
+                                  type="button"
+                                >
+                                  View all {commentLabel}
+                                </button>
+                              ) : null}
+                              {previewReplies.map((reply) => (
+                                <div
+                                  className={`${styles.commentPreview} ${reply.deleted_at ? styles.deletedMessage : ""}`}
+                                  key={reply.id}
+                                >
+                                  <span
+                                    className={`${styles.avatar} ${styles.avatarSmall}`}
+                                  >
+                                    {initials(reply.author_name)}
+                                  </span>
+                                  <div>
+                                    <strong>{reply.author_name}</strong>
+                                    <p>
+                                      <MentionedMessage
+                                        body={reply.body}
+                                        currentUserId={profile.id}
+                                        members={members}
+                                      />
+                                    </p>
+                                    <time dateTime={reply.created_at}>
+                                      {formatFullTimestamp(reply.created_at)}
+                                    </time>
+                                  </div>
                                 </div>
-                                {editingMessage?.id === reply.id && editingMessage.kind === "reply" ? (
-                                  <form className={styles.inlineEditForm} onSubmit={submitMessageEdit}>
-                                    <input name="message_id" type="hidden" value={reply.id} />
-                                    <input name="message_kind" type="hidden" value="reply" />
-                                    <textarea autoFocus className="textarea" defaultValue={reply.body} maxLength={5000} name="body" required rows={3} />
-                                    <div>
-                                      <button className="button button-dark button-compact" disabled={isPending} type="submit">Save</button>
-                                      <button className="button button-secondary button-compact" onClick={() => setEditingMessage(null)} type="button">Cancel</button>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {isThreadOpen ? (
+                            <div
+                              className={styles.replyThread}
+                              id={`thread-replies-${thread.post_id}`}
+                            >
+                              {thread.replies.map((reply) => (
+                                <div
+                                  className={
+                                    reply.deleted_at
+                                      ? `${styles.reply} ${styles.deletedMessage}`
+                                      : styles.reply
+                                  }
+                                  key={reply.id}
+                                >
+                                  <span
+                                    className={`${styles.avatar} ${styles.avatarSmall}`}
+                                  >
+                                    {initials(reply.author_name)}
+                                  </span>
+                                  <div>
+                                    <div className={styles.commentHeader}>
+                                      <div className={styles.messageMeta}>
+                                        <strong>{reply.author_name}</strong>
+                                        <span>{roleName(reply.author_role)}</span>
+                                        <time dateTime={reply.created_at}>
+                                          {formatFullTimestamp(reply.created_at)}
+                                        </time>
+                                      </div>
+                                      {!reply.deleted_at &&
+                                      (reply.author_id === profile.id ||
+                                        profile.role === "owner") ? (
+                                        <AutoClosingDetails
+                                          className={`${styles.postMenu} ${styles.commentMenu}`}
+                                          summary={
+                                            <span aria-hidden="true">•••</span>
+                                          }
+                                          summaryAriaLabel={`Open options for ${reply.author_name}'s comment`}
+                                        >
+                                          <div className={styles.postMenuPopover}>
+                                            {reply.author_id === profile.id ? (
+                                              <button
+                                                disabled={isPending}
+                                                onClick={() =>
+                                                  setEditingMessage({
+                                                    id: reply.id,
+                                                    kind: "reply",
+                                                    body: reply.body,
+                                                  })
+                                                }
+                                                type="button"
+                                              >
+                                                Edit comment
+                                              </button>
+                                            ) : null}
+                                            {profile.role === "owner" ? (
+                                              <button
+                                                className="danger-text"
+                                                disabled={isPending}
+                                                onClick={() =>
+                                                  deleteMessage(reply.id, "reply")
+                                                }
+                                                type="button"
+                                              >
+                                                Delete comment
+                                              </button>
+                                            ) : null}
+                                          </div>
+                                        </AutoClosingDetails>
+                                      ) : null}
                                     </div>
-                                  </form>
-                                ) : (
-                                  <p className={styles.messageBody}>
-                                    <MentionedMessage body={reply.body} currentUserId={profile.id} members={members} />
-                                  </p>
-                                )}
-                                <AttachmentList
-                                  attachments={attachments.filter(
-                                    (attachment) =>
-                                      attachment.message_kind === "reply" &&
-                                      attachment.message_id === reply.id,
-                                  )}
-                                />
-                                {!reply.deleted_at && (
-                                  <ReactionBar
-                                    currentUserId={profile.id}
-                                    onToggle={(emoji) =>
-                                      void toggleReaction(reply.id, "reply", emoji)
-                                    }
-                                    reactions={reactions.filter(
+                                    {editingMessage?.id === reply.id &&
+                                    editingMessage.kind === "reply" ? (
+                                      <form
+                                        className={styles.inlineEditForm}
+                                        onSubmit={submitMessageEdit}
+                                      >
+                                        <input
+                                          name="message_id"
+                                          type="hidden"
+                                          value={reply.id}
+                                        />
+                                        <input
+                                          name="message_kind"
+                                          type="hidden"
+                                          value="reply"
+                                        />
+                                        <textarea
+                                          autoFocus
+                                          className="textarea"
+                                          defaultValue={reply.body}
+                                          maxLength={5000}
+                                          name="body"
+                                          required
+                                          rows={3}
+                                        />
+                                        <div>
+                                          <button
+                                            className="button button-dark button-compact"
+                                            disabled={isPending}
+                                            type="submit"
+                                          >
+                                            Save
+                                          </button>
+                                          <button
+                                            className="button button-secondary button-compact"
+                                            onClick={() => setEditingMessage(null)}
+                                            type="button"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      </form>
+                                    ) : (
+                                      <p className={styles.messageBody}>
+                                        <MentionedMessage
+                                          body={reply.body}
+                                          currentUserId={profile.id}
+                                          members={members}
+                                        />
+                                      </p>
+                                    )}
+                                    <AttachmentList
+                                      attachments={attachments.filter(
+                                        (attachment) =>
+                                          attachment.message_kind === "reply" &&
+                                          attachment.message_id === reply.id,
+                                      )}
+                                    />
+                                    {!reply.deleted_at &&
+                                    reactions.some(
                                       (reaction) =>
                                         reaction.message_kind === "reply" &&
                                         reaction.message_id === reply.id,
-                                    )}
-                                  />
-                                )}
-                                {!reply.deleted_at && reply.author_id === profile.id && (
-                                  <div className={styles.messageFooter}>
-                                    <button
-                                      className={styles.messageActionButton}
-                                      disabled={isPending}
-                                      onClick={() => setEditingMessage({ id: reply.id, kind: "reply", body: reply.body })}
-                                      type="button"
-                                    >
-                                      Edit
-                                    </button>
+                                    ) ? (
+                                      <ReactionBar
+                                        currentUserId={profile.id}
+                                        onToggle={(emoji) =>
+                                          void toggleReaction(
+                                            reply.id,
+                                            "reply",
+                                            emoji,
+                                          )
+                                        }
+                                        reactions={reactions.filter(
+                                          (reaction) =>
+                                            reaction.message_kind === "reply" &&
+                                            reaction.message_id === reply.id,
+                                        )}
+                                      />
+                                    ) : null}
+                                    {!reply.deleted_at ? (
+                                      <button
+                                        aria-pressed={reactions.some(
+                                          (reaction) =>
+                                            reaction.message_kind === "reply" &&
+                                            reaction.message_id === reply.id &&
+                                            reaction.emoji === "👍" &&
+                                            reaction.user_id === profile.id,
+                                        )}
+                                        className={styles.commentLikeButton}
+                                        disabled={isPending}
+                                        onClick={() =>
+                                          void toggleReaction(
+                                            reply.id,
+                                            "reply",
+                                            "👍",
+                                          )
+                                        }
+                                        type="button"
+                                      >
+                                        Like
+                                      </button>
+                                    ) : null}
+                                    {profile.role === "owner" &&
+                                    reply.deletion_reason ? (
+                                      <small className={styles.deletionReason}>
+                                        Reason: {reply.deletion_reason}
+                                      </small>
+                                    ) : null}
                                   </div>
-                                )}
-                                {profile.role === "owner" && !reply.deleted_at && (
-                                  <button
-                                    className={`${styles.messageDeleteButton} danger-text`}
-                                    disabled={isPending}
-                                    onClick={() => deleteMessage(reply.id, "reply")}
-                                    type="button"
-                                  >
-                                    Delete
-                                  </button>
-                                )}
-                                {profile.role === "owner" &&
-                                  reply.deletion_reason && (
-                                    <small className={styles.deletionReason}>
-                                      Reason: {reply.deletion_reason}
-                                    </small>
-                                  )}
-                              </div>
-                            </div>
-                          ))}
+                                </div>
+                              ))}
 
-                          {!thread.locked ? (
-                            <form
-                              className={styles.replyForm}
-                              onSubmit={submitReply}
-                            >
-                              <input
-                                name="channel_id"
-                                type="hidden"
-                                value={activeChannel.channel_id}
-                              />
-                              <input
-                                name="post_id"
-                                type="hidden"
-                                value={thread.post_id}
-                              />
-                              <label
-                                className="sr-only"
-                                htmlFor={`reply-${thread.post_id}`}
-                              >
-                                Reply to {thread.subject}
-                              </label>
-                              <MentionTextarea
-                                id={`reply-${thread.post_id}`}
-                                members={members}
-                                name="body"
-                                placeholder="Reply to this conversation"
-                                rows={2}
-                                submitOnEnter
-                              />
-                              <ChatFilePicker key={`reply-files-${thread.post_id}-${attachmentPickerVersion}`} />
-                              <button
-                                className="button button-secondary button-compact"
-                                disabled={isPending}
-                                type="submit"
-                              >
-                                Reply
-                              </button>
-                            </form>
-                          ) : (
-                            <p className={styles.lockedNote}>
-                              Replies are closed for this conversation.
-                            </p>
-                          )}
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })
-              )}
+                              {!thread.locked ? (
+                                <form
+                                  className={styles.replyForm}
+                                  onSubmit={submitReply}
+                                >
+                                  <input
+                                    name="channel_id"
+                                    type="hidden"
+                                    value={activeChannel.channel_id}
+                                  />
+                                  <input
+                                    name="post_id"
+                                    type="hidden"
+                                    value={thread.post_id}
+                                  />
+                                  <label
+                                    className="sr-only"
+                                    htmlFor={`reply-${thread.post_id}`}
+                                  >
+                                    Comment on this post
+                                  </label>
+                                  <MentionTextarea
+                                    id={`reply-${thread.post_id}`}
+                                    members={members}
+                                    name="body"
+                                    placeholder="Write a comment…"
+                                    rows={2}
+                                    submitOnEnter
+                                  />
+                                  <ChatFilePicker
+                                    key={`reply-files-${thread.post_id}-${attachmentPickerVersion}`}
+                                  />
+                                  <button
+                                    className="button button-secondary button-compact"
+                                    disabled={isPending}
+                                    type="submit"
+                                  >
+                                    Post
+                                  </button>
+                                </form>
+                              ) : (
+                                <p className={styles.lockedNote}>
+                                  Comments are closed for this post.
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              </main>
+
+              <aside className={styles.upcomingShowsRail}>
+                <div className={styles.upcomingShowsHeading}>
+                  <div>
+                    <span className="eyebrow">On stage</span>
+                    <h2>Upcoming shows</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowSchoolShowDates(true)}
+                    type="button"
+                  >
+                    View all
+                  </button>
+                </div>
+                {upcomingCommunityShows.length > 0 ? (
+                  <div className={styles.upcomingShowList}>
+                    {upcomingCommunityShows.map((show) => (
+                      <article key={show.applicationId}>
+                        {show.nowPlaying ? <span>Now playing</span> : null}
+                        <strong>{show.productionTitle}</strong>
+                        <p>{show.schoolName}</p>
+                        <time dateTime={show.openingDate ?? undefined}>
+                          {formatShowDateRange(show)}
+                        </time>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.upcomingShowsEmpty}>
+                    No additional opening nights are currently listed.
+                  </p>
+                )}
+              </aside>
             </div>
+
+            {!communityComposerOpen ? (
+              <button
+                className={styles.mobileCreatePostButton}
+                onClick={openCommunityComposer}
+                type="button"
+              >
+                <span aria-hidden="true">＋</span>
+                Create post
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className={styles.messageWorkspace}>

@@ -4766,3 +4766,621 @@
     padding: 8px 14px 16px;
   }
 }
+
+/* Community group experience. */
+.communityChannelHeader .headerMeta {
+  flex: 1 1 auto;
+}
+
+.communityHeaderSearch {
+  width: clamp(170px, 22vw, 300px);
+  min-height: 36px;
+  border-radius: 999px;
+  background: var(--portal-surface-2);
+}
+
+.communityHeaderMenu,
+.postMenu {
+  position: relative;
+}
+
+.communityHeaderMenu > summary,
+.postMenu > summary {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--portal-line);
+  border-radius: 999px;
+  color: var(--portal-text);
+  background: var(--portal-surface-2);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  list-style: none;
+  cursor: pointer;
+}
+
+.communityHeaderMenu > summary::-webkit-details-marker,
+.postMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.communityHeaderMenu > summary:hover,
+.communityHeaderMenu > summary:focus-visible,
+.postMenu > summary:hover,
+.postMenu > summary:focus-visible {
+  border-color: var(--portal-line-strong);
+  background: var(--portal-surface-3);
+}
+
+.communityMenuPopover,
+.postMenuPopover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: 230px;
+  overflow: hidden;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--portal-gold, #d5b14f) 36%, var(--portal-line));
+  border-radius: 13px;
+  background: var(--portal-surface-3, #192743);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.48);
+}
+
+.communityMenuPopover > span {
+  padding: 8px 10px;
+  color: var(--portal-muted);
+  font-size: 0.67rem;
+  line-height: 1.35;
+}
+
+.communityMenuPopover button,
+.postMenuPopover button {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--portal-text);
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 780;
+  text-align: left;
+  cursor: pointer;
+}
+
+.communityMenuPopover button:hover,
+.communityMenuPopover button:focus-visible,
+.postMenuPopover button:hover,
+.postMenuPopover button:focus-visible {
+  background: var(--portal-surface-3);
+}
+
+.communityMenuPopover button:disabled,
+.postMenuPopover button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.communityLayout {
+  display: grid;
+  width: min(100%, 1080px);
+  grid-template-columns: minmax(0, 760px) minmax(240px, 280px);
+  align-items: start;
+  gap: 20px;
+  margin-inline: auto;
+}
+
+.communityMain {
+  min-width: 0;
+}
+
+.communityMain .newThread,
+.communityMain .threadFeed,
+.compactPostComposer,
+.communityMain .communityToolbar {
+  width: 100%;
+}
+
+.compactPostComposer {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--portal-line);
+  border-radius: 15px;
+  color: var(--portal-muted);
+  background: var(--portal-surface);
+  box-shadow: 0 7px 20px rgba(0, 0, 0, 0.14);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compactPostComposer:hover,
+.compactPostComposer:focus-visible {
+  border-color: var(--portal-line-strong);
+  color: var(--portal-text);
+}
+
+.compactPostComposer > span:last-child {
+  padding: 10px 15px;
+  border-radius: 999px;
+  background: var(--portal-surface-2);
+  font-size: 0.85rem;
+}
+
+.communityMain .newThread {
+  position: relative;
+  margin-bottom: 12px;
+  border-color: var(--portal-line-strong);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.composerClose {
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 999px;
+  color: var(--portal-muted);
+  background: var(--portal-surface-3);
+  font: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.communityMain .communityToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  box-shadow: none;
+}
+
+.communityFilterButtons {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.communityToolbar > .communityFilterButtons {
+  display: flex;
+}
+
+.communityFilterButtons::-webkit-scrollbar {
+  display: none;
+}
+
+.communityFilterButtons button {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--portal-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.communityFilterButtons button:hover,
+.communityFilterButtons button:focus-visible {
+  color: var(--portal-text);
+  background: var(--portal-surface-3);
+}
+
+.communityFilterButtons button[aria-pressed="true"] {
+  color: #071328 !important;
+  background: var(--portal-gold, #d5b14f) !important;
+}
+
+.communityMain .threadFeed {
+  gap: 12px;
+}
+
+.threadWorkspace .threadCard {
+  overflow: visible;
+  border-color: var(--portal-line);
+  border-radius: 15px;
+  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.14);
+  scroll-margin-top: 90px;
+}
+
+.threadWorkspace .threadCardOpen {
+  border-color: var(--portal-line-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.communityPostHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.communityPostHeader .messageMeta {
+  min-width: 0;
+}
+
+.postMenu {
+  flex: 0 0 auto;
+}
+
+.postMenu > summary {
+  width: 30px;
+  height: 30px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.communityPostTitle {
+  margin: 11px 0 0;
+  color: var(--portal-ivory);
+  font-size: 1.02rem;
+  line-height: 1.35;
+}
+
+.threadEngagementSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  margin: 0 20px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.threadEngagementSummary .reactionBar {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.threadEngagementSummary > button {
+  border: 0;
+  color: var(--portal-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.threadEngagementSummary > button:hover {
+  color: var(--portal-text);
+  text-decoration: underline;
+}
+
+.threadSocialActions button[aria-pressed="true"],
+.threadSocialActionActive {
+  color: var(--portal-gold-bright) !important;
+  background: color-mix(in srgb, var(--portal-gold) 10%, transparent) !important;
+}
+
+.commentPreviewSection {
+  display: grid;
+  gap: 9px;
+  padding: 4px 20px 16px 74px;
+}
+
+.viewAllComments {
+  justify-self: start;
+  padding: 3px 0;
+  border: 0;
+  color: var(--portal-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.viewAllComments:hover,
+.viewAllComments:focus-visible {
+  color: var(--portal-text);
+  text-decoration: underline;
+}
+
+.commentPreview {
+  display: grid;
+  grid-template-columns: 31px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.commentPreview > div {
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 11px;
+  border-radius: 4px 13px 13px;
+  background: var(--portal-surface-2);
+}
+
+.commentPreview strong {
+  display: block;
+  color: var(--portal-ivory);
+  font-size: 0.72rem;
+}
+
+.commentPreview p {
+  margin: 3px 0 0;
+  color: var(--portal-text);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.commentPreview time {
+  display: block;
+  margin-top: 4px;
+  color: var(--portal-muted);
+  font-size: 0.6rem;
+}
+
+.threadWorkspace .replyThread .reply {
+  align-items: start;
+  padding: 7px 0;
+  border: 0;
+}
+
+.threadWorkspace .replyThread .reply > div {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 4px 13px 13px;
+  background: var(--portal-surface-2);
+}
+
+.commentHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.commentMenu {
+  flex: 0 0 auto;
+}
+
+.commentMenu > summary {
+  width: 24px;
+  height: 24px;
+}
+
+.commentMenu .postMenuPopover {
+  top: calc(100% + 4px);
+}
+
+.threadWorkspace .replyThread .messageBody {
+  margin-top: 5px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.threadWorkspace .replyThread .reactionBar {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+}
+
+.commentLikeButton {
+  margin-top: 5px;
+  padding: 2px 0;
+  border: 0;
+  color: var(--portal-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.65rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.commentLikeButton:hover,
+.commentLikeButton:focus-visible,
+.commentLikeButton[aria-pressed="true"] {
+  color: var(--portal-gold-bright);
+}
+
+.threadWorkspace .replyForm {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--portal-line);
+  border-radius: 13px;
+  background: var(--portal-surface);
+}
+
+.upcomingShowsRail {
+  position: sticky;
+  top: 82px;
+  overflow: hidden;
+  border: 1px solid var(--portal-line);
+  border-radius: 15px;
+  background: var(--portal-surface);
+}
+
+.upcomingShowsHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 15px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.upcomingShowsHeading h2 {
+  margin: 2px 0 0;
+  color: var(--portal-ivory);
+  font-size: 0.95rem;
+}
+
+.upcomingShowsHeading button {
+  border: 0;
+  color: var(--portal-gold-bright);
+  background: transparent;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.upcomingShowList {
+  display: grid;
+}
+
+.upcomingShowList article {
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.upcomingShowList article:last-child {
+  border-bottom: 0;
+}
+
+.upcomingShowList article > span {
+  display: inline-flex;
+  margin-bottom: 6px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: #071328;
+  background: var(--portal-gold);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.upcomingShowList strong,
+.upcomingShowList p,
+.upcomingShowList time {
+  display: block;
+}
+
+.upcomingShowList strong {
+  color: var(--portal-ivory);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.upcomingShowList p {
+  margin: 3px 0;
+  color: var(--portal-text);
+  font-size: 0.7rem;
+}
+
+.upcomingShowList time,
+.upcomingShowsEmpty {
+  color: var(--portal-muted);
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
+.upcomingShowsEmpty {
+  margin: 0;
+  padding: 18px 15px;
+}
+
+.mobileCreatePostButton {
+  display: none;
+}
+
+@media (max-width: 1250px) {
+  .communityLayout {
+    width: min(100%, 760px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .upcomingShowsRail {
+    display: none;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1080px) {
+  .communityChannelHeader .headerMeta {
+    display: flex;
+  }
+
+  .communityChannelHeader .channelIdentity p,
+  .communityChannelHeader .realtimeIndicator {
+    display: none;
+  }
+
+  .communityHeaderSearch {
+    width: 170px;
+  }
+
+  .communityChannelHeader .visitDetailsButton {
+    max-width: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .communityChannelHeader .headerMeta {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .communityMain .compactPostComposer {
+    display: none;
+  }
+
+  .communityMain .communityToolbar {
+    margin-top: 0;
+    padding-inline: 8px;
+  }
+
+  .communitySearchCount {
+    display: none;
+  }
+
+  .communityMain .newThread {
+    padding: 14px;
+  }
+
+  .threadWorkspace .threadCard {
+    border-radius: 13px;
+  }
+
+  .threadEngagementSummary,
+  .threadSocialActions {
+    margin-inline: 14px;
+  }
+
+  .commentPreviewSection {
+    padding: 4px 14px 14px;
+  }
+
+  .mobileCreatePostButton {
+    position: fixed;
+    z-index: 12;
+    right: 18px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 16px;
+    border: 1px solid color-mix(in srgb, var(--portal-gold) 72%, #fff);
+    border-radius: 999px;
+    color: #071328;
+    background: var(--portal-gold);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+}

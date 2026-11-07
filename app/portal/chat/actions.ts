@@ -12,6 +12,7 @@ import {
 import { canUseUrgentTag, containsUrgentMention } from "@/lib/chat/urgent";
 import { SCHOOL_COMMUNITY_CHAT_LABEL } from "@/lib/chat-terminology";
 import { isOwnerChatSection } from "@/lib/chat-owner-sections";
+import { communityPostSubject } from "@/lib/chat/community-post";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -337,13 +338,13 @@ export async function createChatPost(
 ): Promise<ChatActionResult> {
   const profile = await requireProfile();
   const channelId = formText(formData, "channel_id");
-  const subject = formText(formData, "subject");
+  const subject = communityPostSubject(formText(formData, "subject"));
   const body = formText(formData, "body");
 
-  if (!channelId || !subject || !body) {
+  if (!channelId || !body) {
     return {
       ok: false,
-      error: "Add both a subject and a message before posting.",
+      error: "Add a message before posting.",
     };
   }
 
