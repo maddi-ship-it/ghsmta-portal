@@ -17,6 +17,10 @@ import {
   chatChannelDisplayName,
   chatChannelGroupLabel,
 } from "@/lib/chat-terminology";
+import {
+  buildCommunityShows,
+  type CommunityShow,
+} from "@/lib/community-shows";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
@@ -68,6 +72,26 @@ type PanelProfileReference = {
   full_name: string | null;
   phone_e164: string | null;
   role: AppRole;
+};
+
+type CommunityShowApplicationRow = {
+  id: string;
+  form_version_id: string | null;
+  school_name: string;
+  production_title: string | null;
+};
+
+type CommunityShowQuestionRow = {
+  id: string;
+  question_key: string;
+  label: string;
+  source_label: string | null;
+};
+
+type CommunityShowAnswerRow = {
+  application_id: string;
+  question_id: string;
+  value: unknown;
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
@@ -200,6 +224,108 @@ function normalizeChannels(rows: RawChannel[]): ChatChannel[] {
   });
 }
 
+async function loadCommunityShows(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<CommunityShow[]> {
+  const cycleResult = await admin
+    .from("award_cycles")
+    .select("id")
+    .eq("program_type", "directors")
+    .neq("status", "archived")
+    .order("is_active", { ascending: false })
+    .order("season_year", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (cycleResult.error) {
+    throw new Error(`Show dates could not be loaded: ${cycleResult.error.message}`);
+  }
+
+  if (!cycleResult.data) return [];
+
+  const applicationsResult = await admin
+    .from("applications")
+    .select("id,form_version_id,school_name,production_title")
+    .eq("cycle_id", cycleResult.data.id)
+    .eq("is_archived", false)
+    .is("cloned_from_application_id", null)
+    .neq("status", "withdrawn")
+    .order("school_name");
+
+  if (applicationsResult.error) {
+    throw new Error(
+      `School productions could not be loaded: ${applicationsResult.error.message}`,
+    );
+  }
+
+  const applications =
+    (applicationsResult.data ?? []) as CommunityShowApplicationRow[];
+  if (applications.length === 0) return [];
+
+  const formVersionIds = [
+    ...new Set(
+      applications
+        .map((application) => application.form_version_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (formVersionIds.length === 0) {
+    return buildCommunityShows({ applications, questions: [], answers: [] });
+  }
+
+  const questionsResult = await admin
+    .from("application_questions")
+    .select("id,question_key,label,source_label")
+    .in("form_version_id", formVersionIds);
+
+  if (questionsResult.error) {
+    throw new Error(
+      `Show date questions could not be loaded: ${questionsResult.error.message}`,
+    );
+  }
+
+  const questions =
+    (questionsResult.data ?? []) as CommunityShowQuestionRow[];
+  const relevantQuestionIds = questions
+    .filter((question) => {
+      const text = `${question.question_key} ${question.label} ${question.source_label ?? ""}`
+        .toLowerCase();
+      return (
+        text.includes("opening night") ||
+        text.includes("opening_night") ||
+        text.includes("closing night") ||
+        text.includes("closing_night")
+      );
+    })
+    .map((question) => question.id);
+
+  if (relevantQuestionIds.length === 0) {
+    return buildCommunityShows({ applications, questions, answers: [] });
+  }
+
+  const answersResult = await admin
+    .from("application_answers")
+    .select("application_id,question_id,value")
+    .in(
+      "application_id",
+      applications.map((application) => application.id),
+    )
+    .in("question_id", relevantQuestionIds);
+
+  if (answersResult.error) {
+    throw new Error(
+      `Show dates could not be loaded: ${answersResult.error.message}`,
+    );
+  }
+
+  return buildCommunityShows({
+    applications,
+    questions,
+    answers: (answersResult.data ?? []) as CommunityShowAnswerRow[],
+  });
+}
+
 export default async function ChatPage({
   searchParams,
 }: {
@@ -209,6 +335,7 @@ export default async function ChatPage({
   const supabase = await createClient();
   const admin = createAdminClient();
   const params = await searchParams;
+  const communityShowsPromise = loadCommunityShows(admin);
   let ownerChannelCandidates: ChatMember[] = [];
 
   if (profile.role === "owner") {
@@ -557,6 +684,7 @@ export default async function ChatPage({
     <div className="chat-fullscreen-page">
       <TeamsChat
         adjudicationVisitDetails={adjudicationVisitDetails}
+        communityShows={await communityShowsPromise}
         eligibilityReferencePanel={eligibilityReferencePanel}
         key={selectedChannel?.channel_id ?? "no-channel"}
         initialChannels={channels}

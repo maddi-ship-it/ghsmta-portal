@@ -1104,6 +1104,279 @@
   }
 }
 
+/* School Community uses a familiar social-feed layout. */
+.communityToolbar {
+  display: grid;
+  width: min(100%, 760px);
+  grid-template-columns: minmax(150px, auto) minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  background: var(--portal-surface);
+  box-shadow: var(--portal-shadow);
+}
+
+.communityToolbar > div {
+  display: grid;
+  gap: 2px;
+}
+
+.communityToolbar strong {
+  color: var(--portal-ivory);
+  font-size: 0.9rem;
+}
+
+.communityToolbar > div span,
+.communitySearchCount {
+  color: var(--portal-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.communitySearch {
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--portal-surface-2);
+}
+
+.communitySearchCount {
+  min-width: 50px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.threadCard {
+  border-radius: 16px;
+}
+
+.threadCardOpen {
+  border-color: var(--portal-line-strong);
+}
+
+.threadRoot {
+  grid-template-columns: 42px minmax(0, 1fr);
+  padding: 18px 20px 12px;
+}
+
+.threadRoot > .avatar {
+  width: 42px;
+  height: 42px;
+}
+
+.threadTitleRow {
+  margin-top: 10px;
+}
+
+.threadTitleRow h2 {
+  color: var(--portal-ivory);
+  font-size: 1.06rem;
+  line-height: 1.3;
+}
+
+.threadSummary {
+  margin-top: 6px;
+}
+
+.threadContent > .messageBody {
+  margin-top: 13px;
+  font-size: 0.94rem;
+  line-height: 1.62;
+}
+
+.threadSocialActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 20px;
+  padding: 7px 0;
+  border-top: 1px solid var(--portal-line);
+}
+
+.threadSocialActions button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--portal-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.threadSocialActions button:hover,
+.threadSocialActions button:focus-visible {
+  color: var(--portal-ivory);
+  background: var(--portal-surface-3);
+}
+
+.threadSocialActions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.replyThread {
+  padding: 8px 20px 18px 74px;
+  background: color-mix(in srgb, var(--portal-surface-2) 84%, transparent);
+}
+
+.reply {
+  border-bottom-color: var(--portal-line);
+}
+
+.showDatesModal {
+  width: min(1060px, 96vw);
+  max-height: min(88vh, 820px);
+}
+
+.showDatesSearch {
+  min-height: 44px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+}
+
+.showDatesResultCount {
+  margin-bottom: 10px;
+  color: var(--portal-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.showDatesTableWrap {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+}
+
+.showDatesTable {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--portal-text);
+  font-size: 0.8rem;
+}
+
+.showDatesTable th,
+.showDatesTable td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--portal-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.showDatesTable th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  color: var(--portal-gold-bright);
+  background: var(--portal-surface-2);
+  font-size: 0.67rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.showDatesTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.showDatesTable tbody tr:hover {
+  background: color-mix(in srgb, var(--portal-gold) 5%, transparent);
+}
+
+.showDatesTable strong {
+  color: var(--portal-ivory);
+}
+
+.showDatesTable time {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .communityToolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .communityToolbar > div {
+    grid-column: 1 / -1;
+  }
+
+  .communitySearch {
+    min-width: 0;
+  }
+
+  .threadRoot {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 10px;
+    padding: 15px 14px 10px;
+  }
+
+  .threadRoot > .avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .threadSocialActions {
+    margin-inline: 14px;
+  }
+
+  .replyThread {
+    padding: 8px 14px 16px;
+  }
+
+  .showDatesModal {
+    width: 100%;
+  }
+
+  .showDatesTableWrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  .showDatesTable,
+  .showDatesTable tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .showDatesTable thead {
+    display: none;
+  }
+
+  .showDatesTable tr {
+    display: grid;
+    gap: 8px;
+    padding: 13px;
+    border: 1px solid var(--portal-line);
+    border-radius: 12px;
+    background: var(--portal-surface-2);
+  }
+
+  .showDatesTable td {
+    display: grid;
+    grid-template-columns: 105px minmax(0, 1fr);
+    gap: 10px;
+    padding: 0;
+    border: 0;
+  }
+
+  .showDatesTable td::before {
+    color: var(--portal-muted);
+    content: attr(data-label);
+    font-size: 0.65rem;
+    font-weight: 850;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+
 @media (max-width: 560px) {
   .channelIdentity {
     align-items: flex-start;
@@ -4454,5 +4727,42 @@
 
   .messageFeedInner {
     padding: 14px 10px 12px;
+  }
+}
+
+/* Keep the final community-feed treatment above legacy workspace overrides. */
+.threadWorkspace .threadCard {
+  border-radius: 16px;
+}
+
+.threadWorkspace .threadRoot {
+  grid-template-columns: 42px minmax(0, 1fr);
+  padding: 18px 20px 12px;
+}
+
+.threadWorkspace .threadRoot > .avatar {
+  width: 42px;
+  height: 42px;
+}
+
+.threadWorkspace .replyThread {
+  padding: 8px 20px 18px 74px;
+  background: color-mix(in srgb, var(--portal-surface-2) 84%, transparent);
+}
+
+@media (max-width: 720px) {
+  .threadWorkspace .threadRoot {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 10px;
+    padding: 15px 14px 10px;
+  }
+
+  .threadWorkspace .threadRoot > .avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .threadWorkspace .replyThread {
+    padding: 8px 14px 16px;
   }
 }

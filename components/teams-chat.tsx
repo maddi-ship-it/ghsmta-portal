@@ -35,6 +35,7 @@ import {
   SCHOOL_COMMUNITY_CHAT_LABEL,
 } from "@/lib/chat-terminology";
 import { OWNER_CHAT_SECTIONS } from "@/lib/chat-owner-sections";
+import type { CommunityShow } from "@/lib/community-shows";
 import {
   isFeedNearBottom,
   messagesBelongTogether,
@@ -1240,6 +1241,139 @@ function PanelContactsDialog({
   );
 }
 
+function formatShowDate(value: string | null) {
+  if (!value) return "Not provided";
+
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return "Not provided";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function ShulerSchoolShowDatesDialog({
+  shows,
+  onClose,
+}: {
+  shows: CommunityShow[];
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
+  const filteredShows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return shows;
+
+    return shows.filter((show) =>
+      `${show.schoolName} ${show.productionTitle}`.toLowerCase().includes(query),
+    );
+  }, [search, shows]);
+
+  return (
+    <div
+      aria-labelledby="shuler-school-show-dates-title"
+      aria-modal="true"
+      className={styles.modalBackdrop}
+      ref={dialogRef}
+      role="dialog"
+      tabIndex={-1}
+    >
+      <section className={`${styles.broadcastModal} ${styles.showDatesModal}`}>
+        <div className={styles.broadcastModalHeader}>
+          <div>
+            <span className="eyebrow">Current Shuler season</span>
+            <h2 id="shuler-school-show-dates-title">
+              Shuler School Show Dates
+            </h2>
+            <p>
+              {shows.length} {shows.length === 1 ? "production" : "productions"},
+              sorted by opening night.
+            </p>
+          </div>
+          <button
+            aria-label="Close Shuler School Show Dates"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <label className="sr-only" htmlFor="show-dates-search">
+          Search schools or shows
+        </label>
+        <input
+          autoFocus
+          className={`input ${styles.showDatesSearch}`}
+          id="show-dates-search"
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search school or show name"
+          type="search"
+          value={search}
+        />
+
+        <div className={styles.showDatesResultCount} aria-live="polite">
+          {filteredShows.length} {filteredShows.length === 1 ? "show" : "shows"}
+        </div>
+
+        {filteredShows.length > 0 ? (
+          <div className={styles.showDatesTableWrap}>
+            <table className={styles.showDatesTable}>
+              <thead>
+                <tr>
+                  <th>School</th>
+                  <th>Show</th>
+                  <th>Opening night</th>
+                  <th>Closing night</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredShows.map((show) => (
+                  <tr key={show.applicationId}>
+                    <td data-label="School">
+                      <strong>{show.schoolName}</strong>
+                    </td>
+                    <td data-label="Show">{show.productionTitle}</td>
+                    <td data-label="Opening night">
+                      {show.openingDate ? (
+                        <time dateTime={show.openingDate}>
+                          {formatShowDate(show.openingDate)}
+                        </time>
+                      ) : (
+                        "Not provided"
+                      )}
+                    </td>
+                    <td data-label="Closing night">
+                      {show.closingDate ? (
+                        <time dateTime={show.closingDate}>
+                          {formatShowDate(show.closingDate)}
+                        </time>
+                      ) : (
+                        "Not provided"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className={styles.visitDetailsEmpty}>
+            {shows.length === 0
+              ? "No current-season school shows were found."
+              : "No schools or shows match that search."}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function escapeRegularExpression(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2099,6 +2233,7 @@ export function TeamsChat({
   adjudicationVisitDetails,
   eligibilityReferencePanel,
   panelContacts,
+  communityShows,
   previewMode = false,
 }: {
   profile: Profile;
@@ -2110,6 +2245,7 @@ export function TeamsChat({
   adjudicationVisitDetails: AdjudicationVisitDetails | null;
   eligibilityReferencePanel: ApplicationReferencePanel | null;
   panelContacts: PanelContact[];
+  communityShows: CommunityShow[];
   previewMode?: boolean;
 }) {
   const router = useRouter();
@@ -2120,6 +2256,7 @@ export function TeamsChat({
   const [reactions, setReactions] = useState<ChatReaction[]>([]);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [channelSearch, setChannelSearch] = useState("");
+  const [communitySearch, setCommunitySearch] = useState("");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [openThreadState, setOpenThreadState] = useState<{
     channelId: string | null;
@@ -2139,6 +2276,7 @@ export function TeamsChat({
   const [showVisitDetails, setShowVisitDetails] = useState(false);
   const [showEligibility, setShowEligibility] = useState(false);
   const [showPanelContacts, setShowPanelContacts] = useState(false);
+  const [showSchoolShowDates, setShowSchoolShowDates] = useState(false);
   const [directMessageContacts, setDirectMessageContacts] = useState<ChatMember[]>([]);
   const [directMessageContactsLoaded, setDirectMessageContactsLoaded] = useState(false);
   const [directMessageSearch, setDirectMessageSearch] = useState("");
@@ -2202,6 +2340,28 @@ export function TeamsChat({
     openThreadState.channelId === selectedChannelId
       ? openThreadState.ids
       : EMPTY_THREAD_IDS;
+  const filteredCommunityThreads = useMemo(() => {
+    const query = communitySearch.trim().toLowerCase();
+    if (!query) return threads;
+
+    return threads.filter((thread) => {
+      const searchableText = [
+        thread.subject,
+        thread.body,
+        thread.author_name,
+        roleName(thread.author_role),
+        ...thread.replies.flatMap((reply) => [
+          reply.body,
+          reply.author_name,
+          roleName(reply.author_role),
+        ]),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [communitySearch, threads]);
 
   const toggleThreadOpen = useCallback((postId: string) => {
     setOpenThreadState((current) => {
@@ -3222,6 +3382,13 @@ export function TeamsChat({
             >
               {activeChannel.visibility_label}
             </span>
+            <button
+              className={styles.visitDetailsButton}
+              onClick={() => setShowSchoolShowDates(true)}
+              type="button"
+            >
+              Shuler School Show Dates
+            </button>
             {activeChannel.channel_type === "school" && (
               <>
                 {eligibilityReferencePanel ? (
@@ -3302,6 +3469,13 @@ export function TeamsChat({
                 </optgroup>
               ))}
             </select>
+            <button
+              className="button button-secondary button-compact"
+              onClick={() => setShowSchoolShowDates(true)}
+              type="button"
+            >
+              Shuler School Show Dates
+            </button>
             {activeChannel.channel_type === "school" && (
               <>
                 {eligibilityReferencePanel ? (
@@ -3369,30 +3543,30 @@ export function TeamsChat({
                   {initials(profile.full_name ?? profile.email ?? "User")}
                 </span>
                 <div>
-                  <strong>Share an update</strong>
-                  <p>Post to this group and continue the conversation in comments.</p>
+                  <strong>Create a post</strong>
+                  <p>Share news, ask a question, or celebrate a show.</p>
                 </div>
               </div>
 
               <div className="field">
-                <label htmlFor="chat-subject">Subject</label>
+                <label htmlFor="chat-subject">Post title</label>
                 <input
                   className="input"
                   id="chat-subject"
                   maxLength={180}
                   name="subject"
-                  placeholder="What is this conversation about?"
+                  placeholder="Give your post a short title"
                   required
                 />
               </div>
 
               <div className="field">
-                <label htmlFor="chat-body">Message</label>
+                <label htmlFor="chat-body">What&apos;s on your mind?</label>
                 <MentionTextarea
                   id="chat-body"
                   members={members}
                   name="body"
-                  placeholder={`Write a message to ${SCHOOL_COMMUNITY_CHAT_LABEL}`}
+                  placeholder={`Share something with ${SCHOOL_COMMUNITY_CHAT_LABEL}`}
                   rows={4}
                 />
               </div>
@@ -3404,19 +3578,49 @@ export function TeamsChat({
                   disabled={isPending}
                   type="submit"
                 >
-                  {isPending ? "Posting…" : "Post conversation"}
+                  {isPending ? "Posting…" : "Post"}
                 </button>
               </div>
             </form>
 
+            <section className={styles.communityToolbar}>
+              <div>
+                <strong>Community feed</strong>
+                <span>Updates from Shuler schools</span>
+              </div>
+              <label className="sr-only" htmlFor="community-post-search">
+                Search posts and comments
+              </label>
+              <input
+                className={`input ${styles.communitySearch}`}
+                id="community-post-search"
+                onChange={(event) => setCommunitySearch(event.target.value)}
+                placeholder="Search posts, people, or comments"
+                type="search"
+                value={communitySearch}
+              />
+              <span className={styles.communitySearchCount} aria-live="polite">
+                {filteredCommunityThreads.length}{" "}
+                {filteredCommunityThreads.length === 1 ? "post" : "posts"}
+              </span>
+            </section>
+
             <div className={styles.threadFeed} aria-live="polite">
-              {threads.length === 0 ? (
+              {filteredCommunityThreads.length === 0 ? (
                 <div className={`empty-state ${styles.threadEmpty}`}>
-                  <h2>No conversations yet.</h2>
-                  <p>Start the first {SCHOOL_COMMUNITY_CHAT_LABEL} topic.</p>
+                  <h2>
+                    {threads.length === 0
+                      ? "No posts yet."
+                      : "No matching posts."}
+                  </h2>
+                  <p>
+                    {threads.length === 0
+                      ? `Start the first ${SCHOOL_COMMUNITY_CHAT_LABEL} post.`
+                      : "Try a different word, school, or person."}
+                  </p>
                 </div>
               ) : (
-                threads.map((thread) => {
+                filteredCommunityThreads.map((thread) => {
                   const isThreadOpen = openThreadIds.has(thread.post_id);
                   const latestReply = thread.replies[thread.replies.length - 1];
                   const replyTotal = thread.reply_count ?? thread.replies.length;
@@ -3429,67 +3633,6 @@ export function TeamsChat({
                   ]
                     .filter(Boolean)
                     .join(" ");
-
-                  if (!isThreadOpen) {
-                    return (
-                      <article
-                        className={`${threadClassName} ${styles.threadCardCompact}`}
-                        key={thread.post_id}
-                      >
-                        <button
-                          aria-controls={`thread-replies-${thread.post_id}`}
-                          aria-expanded={false}
-                          className={styles.threadCardButton}
-                          onClick={() => toggleThreadOpen(thread.post_id)}
-                          type="button"
-                        >
-                          <span
-                            className={`${styles.avatar} ${styles.avatarSmall}`}
-                          >
-                            {initials(thread.author_name)}
-                          </span>
-                          <span className={styles.threadCardMain}>
-                            <span className={styles.threadCardKicker}>
-                              <strong>{thread.author_name}</strong>
-                              <span>{roleName(thread.author_role)}</span>
-                              <time dateTime={thread.created_at}>
-                                {formatChannelActivity(thread.created_at)}
-                              </time>
-                            </span>
-                            <span className={styles.threadCardTitle}>
-                              <span>{thread.subject}</span>
-                              {(thread.pinned || thread.locked) && (
-                                <span className={styles.threadBadges}>
-                                  {thread.pinned && <span>Pinned</span>}
-                                  {thread.locked && <span>Locked</span>}
-                                </span>
-                              )}
-                            </span>
-                            <span className={styles.threadCardPreview}>
-                              <MentionedMessage
-                                body={thread.body}
-                                currentUserId={profile.id}
-                                members={members}
-                              />
-                            </span>
-                          </span>
-                          <span className={styles.threadCardMeta}>
-                            <span className={styles.threadCardReplyCount}>
-                              {replyLabel}
-                            </span>
-                            <span>
-                              {latestReply
-                                ? `Latest: ${latestReply.author_name}`
-                                : "Open to reply"}
-                            </span>
-                            <span className={styles.threadCardOpenCue}>
-                              Open
-                            </span>
-                          </span>
-                        </button>
-                      </article>
-                    );
-                  }
 
                   return (
                     <article className={threadClassName} key={thread.post_id}>
@@ -3526,18 +3669,6 @@ export function TeamsChat({
                                   {thread.locked && <span>Locked</span>}
                                 </div>
                               )}
-                              <button
-                                aria-controls={`thread-replies-${thread.post_id}`}
-                                aria-expanded={isThreadOpen}
-                                className={styles.threadToggleButton}
-                                onClick={() => toggleThreadOpen(thread.post_id)}
-                                type="button"
-                              >
-                                <span aria-hidden="true">
-                                  {isThreadOpen ? "−" : "+"}
-                                </span>
-                                {isThreadOpen ? "Collapse" : "Open thread"}
-                              </button>
                             </div>
                           </div>
 
@@ -3631,10 +3762,39 @@ export function TeamsChat({
                         </div>
                       </div>
 
-                      <div
-                        className={styles.replyThread}
-                        id={`thread-replies-${thread.post_id}`}
-                      >
+                      <div className={styles.threadSocialActions}>
+                        {!thread.post_deleted_at ? (
+                          <button
+                            disabled={isPending}
+                            onClick={() =>
+                              void toggleReaction(thread.post_id, "post", "👍")
+                            }
+                            type="button"
+                          >
+                            <span aria-hidden="true">👍</span>
+                            Like
+                          </button>
+                        ) : null}
+                        <button
+                          aria-controls={`thread-replies-${thread.post_id}`}
+                          aria-expanded={isThreadOpen}
+                          onClick={() => toggleThreadOpen(thread.post_id)}
+                          type="button"
+                        >
+                          <span aria-hidden="true">💬</span>
+                          {isThreadOpen
+                            ? "Hide comments"
+                            : replyTotal > 0
+                              ? `View ${replyLabel}`
+                              : "Comment"}
+                        </button>
+                      </div>
+
+                      {isThreadOpen ? (
+                        <div
+                          className={styles.replyThread}
+                          id={`thread-replies-${thread.post_id}`}
+                        >
                           {thread.replies.map((reply) => (
                             <div
                               className={
@@ -3767,7 +3927,8 @@ export function TeamsChat({
                               Replies are closed for this conversation.
                             </p>
                           )}
-                      </div>
+                        </div>
+                      ) : null}
                     </article>
                   );
                 })
@@ -4146,6 +4307,13 @@ export function TeamsChat({
           channel={activeChannel}
           contacts={panelContacts}
           onClose={() => setShowPanelContacts(false)}
+        />
+      ) : null}
+
+      {showSchoolShowDates ? (
+        <ShulerSchoolShowDatesDialog
+          onClose={() => setShowSchoolShowDates(false)}
+          shows={communityShows}
         />
       ) : null}
 
