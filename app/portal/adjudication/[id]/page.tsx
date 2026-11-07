@@ -66,6 +66,7 @@ import type {
   ApplicationAnswer,
   ApplicationFormVersion,
   ApplicationQuestion,
+  AppRole,
   AwardCycle,
   Profile,
   ScoringCategory,
@@ -277,7 +278,7 @@ export default async function AdjudicationApplicationPage({
       ? { data: null, error: null }
       : await supabase
           .from("adjudicator_assignments")
-          .select("id,can_score,can_comment,removed_at")
+          .select("id,participant_role,can_score,can_comment,removed_at")
           .eq("application_id", id)
           .eq("adjudicator_user_id", profile.id)
           .is("removed_at", null)
@@ -286,6 +287,12 @@ export default async function AdjudicationApplicationPage({
   if (ownParticipantResult.error) {
     throw new Error(ownParticipantResult.error.message);
   }
+
+  const effectiveParticipantRole = (
+    profile.role === "owner"
+      ? "owner"
+      : ownParticipantResult.data?.participant_role ?? profile.role
+  ) as AppRole;
 
   const hasReadOnlyAssignment = observerAccess.readOnlyAssignment;
   const isReadOnlyObserver =
@@ -307,7 +314,7 @@ export default async function AdjudicationApplicationPage({
     );
 
   const advisoryReviewAccessResult =
-    profile.role === "advisory_member"
+    effectiveParticipantRole === "advisory_member"
       ? await supabase.rpc("can_advisory_review_application", {
           p_application_id: id,
           p_user_id: profile.id,
@@ -320,18 +327,18 @@ export default async function AdjudicationApplicationPage({
 
   const canPanelReview =
     profile.role === "owner" ||
-    (profile.role === "advisory_member" &&
+    (effectiveParticipantRole === "advisory_member" &&
       Boolean(advisoryReviewAccessResult.data) &&
       !isReadOnlyObserver);
   const workspaceMode = resolveAdjudicationWorkspaceMode({
-    role: profile.role,
+    role: effectiveParticipantRole,
     isScoringParticipant,
     canPanelReview,
     isReadOnlyObserver,
   });
   const showPersonalScorecard = workspaceMode === "personal_scorecard";
   const canEditAdvisoryScorecard =
-    profile.role === "advisory_member" &&
+    effectiveParticipantRole === "advisory_member" &&
     canPanelReview &&
     Boolean(
       ownParticipantResult.data?.can_score ||
@@ -364,7 +371,7 @@ export default async function AdjudicationApplicationPage({
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
-    profile.role === "adjudicator"
+    effectiveParticipantRole === "adjudicator"
       ? supabase
           .from("adjudicator_assignments")
           .select("*")
@@ -377,11 +384,11 @@ export default async function AdjudicationApplicationPage({
           .eq("application_id", id)
           .or("removed_at.is.null,status.eq.complete")
           .order("assigned_at"),
-    profile.role === "adjudicator"
+    effectiveParticipantRole === "adjudicator"
       ? supabase.from("adjudication_scorecards").select("*").eq("application_id", id).eq("adjudicator_user_id", profile.id)
       : supabase.from("adjudication_scorecards").select("*").eq("application_id", id).order("created_at"),
     admin.from("adjudication_panel_feedback").select("*").eq("application_id", id),
-    profile.role === "adjudicator"
+    effectiveParticipantRole === "adjudicator"
       ? Promise.resolve({ data: null, error: null })
       : supabase.from("adjudication_releases").select("*").eq("application_id", id).maybeSingle(),
     isScoringParticipant || canPanelReview || isReadOnlyObserver
@@ -559,7 +566,8 @@ export default async function AdjudicationApplicationPage({
   const panelVisibleFeedback = feedback.filter(
     (item) =>
       item.status === "approved" &&
-      (profile.role !== "adjudicator" || item.assigned_to === profile.id),
+      (effectiveParticipantRole !== "adjudicator" ||
+        item.assigned_to === profile.id),
   );
 
   let scheduleSlot: ScheduleSlotReference | null = null;
@@ -663,7 +671,7 @@ export default async function AdjudicationApplicationPage({
   };
 
   if (
-    profile.role === "adjudicator" &&
+    effectiveParticipantRole === "adjudicator" &&
     !ownParticipantResult.data &&
     !isScheduledObserver
   ) {
@@ -695,7 +703,7 @@ export default async function AdjudicationApplicationPage({
     .from("adjudication_category_proposals")
     .select("*")
     .eq("application_id", id);
-  if (profile.role === "adjudicator") {
+  if (effectiveParticipantRole === "adjudicator") {
     proposalQuery = proposalQuery.neq("status", "draft");
   }
 
@@ -735,7 +743,8 @@ export default async function AdjudicationApplicationPage({
 
   const specialtyResult =
     canPanelReview &&
-    (profile.role === "advisory_member" || profile.role === "owner")
+    (effectiveParticipantRole === "advisory_member" ||
+      profile.role === "owner")
       ? await supabase
           .from("advisory_specialty_award_recommendations")
           .select(
@@ -784,7 +793,7 @@ export default async function AdjudicationApplicationPage({
   }
 
   let adjudicatorProfiles: Profile[] = [];
-  if (profile.role !== "adjudicator") {
+  if (effectiveParticipantRole !== "adjudicator") {
     const profileIds = [...new Set(assignments.map((assignment) => assignment.adjudicator_user_id))];
     if (profileIds.length > 0) {
       const { data } = await supabase.from("profiles").select("id,email,full_name,role,active").in("id", profileIds);
@@ -853,7 +862,7 @@ export default async function AdjudicationApplicationPage({
     : null;
   const readOnly = ownScorecard?.status === "submitted" || ownScorecard?.status === "locked";
   const outstandingAssignedCommentCount =
-    profile.role === "adjudicator"
+    effectiveParticipantRole === "adjudicator"
       ? outstandingAssignedFinalComments(feedback, profile.id).length
       : 0;
   const canComment = Boolean(ownParticipantResult.data?.can_comment);
@@ -891,7 +900,7 @@ export default async function AdjudicationApplicationPage({
       category.category_key !== OVERALL_PRODUCTION_CATEGORY_KEY,
   );
   const visibleDecisionCategories =
-    profile.role === "adjudicator"
+    effectiveParticipantRole === "adjudicator"
       ? decisionCategories.filter(
           (category) => !unscoreableCategoryIds.has(category.id),
         )
@@ -925,7 +934,8 @@ export default async function AdjudicationApplicationPage({
   const showConsensusControls = showEditableScorecard || canPanelReview;
   const compactConsensusControls =
     showConsensusControls &&
-    (profile.role === "adjudicator" || profile.role === "advisory_member");
+    (effectiveParticipantRole === "adjudicator" ||
+      effectiveParticipantRole === "advisory_member");
   const scorecardFormId = `adjudication-scorecard-${id}`;
   const proposalByCategoryId = new Map(
     (proposalResult.data ?? []).map((proposal) => [
@@ -957,7 +967,7 @@ export default async function AdjudicationApplicationPage({
       });
     });
   const candidateReviewComplete =
-    profile.role === "adjudicator"
+    effectiveParticipantRole === "adjudicator"
       ? actingCandidateReviewIsComplete(actingCandidateReview, profile.id)
       : actingCandidateReview.status === "approved";
   const categoryReviewComplete =
@@ -968,7 +978,7 @@ export default async function AdjudicationApplicationPage({
       acceptdPickSix={acceptdPickSix}
       isOwner={profile.role === "owner"}
       advisoryNarrativeReview={
-        profile.role === "advisory_member"
+        effectiveParticipantRole === "advisory_member"
           ? {
               canComment,
               currentUserId: profile.id,
@@ -1053,7 +1063,7 @@ export default async function AdjudicationApplicationPage({
 
       <ApplicationReferenceBar
         categoryWorkflowControl={
-          profile.role === "advisory_member" && canPanelReview ? (
+          effectiveParticipantRole === "advisory_member" && canPanelReview ? (
             <SpecialtyAwardModal
               applicationId={id}
               currentUserId={profile.id}
@@ -1068,7 +1078,7 @@ export default async function AdjudicationApplicationPage({
         }}
         links={referenceLinks}
         panelCommentControls={
-          profile.role === "adjudicator" && showEditableScorecard
+          effectiveParticipantRole === "adjudicator" && showEditableScorecard
             ? {
                 currentUserId: profile.id,
                 peerCount: panelReviewerIds.filter(
@@ -1089,7 +1099,8 @@ export default async function AdjudicationApplicationPage({
         }
         showFullScoreView={
           canPanelReview &&
-          (profile.role === "owner" || profile.role === "advisory_member")
+          (profile.role === "owner" ||
+            effectiveParticipantRole === "advisory_member")
         }
         reviewActions={compactConsensusControls
           ? {
@@ -1098,7 +1109,8 @@ export default async function AdjudicationApplicationPage({
                 : "needs-action",
               showCategoryReview: true,
               showPanelReview:
-                profile.role === "advisory_member" && canPanelReview,
+                effectiveParticipantRole === "advisory_member" &&
+                  canPanelReview,
             }
           : undefined}
         scorecardSubmitControl={
@@ -1111,7 +1123,7 @@ export default async function AdjudicationApplicationPage({
               formId={scorecardFormId}
               requireComments={canComment}
             />
-          ) : profile.role === "adjudicator" && readOnly ? (
+          ) : effectiveParticipantRole === "adjudicator" && readOnly ? (
             <CompleteAdjudicationControl
               applicationId={id}
               outstandingCommentCount={outstandingAssignedCommentCount}
@@ -1125,7 +1137,7 @@ export default async function AdjudicationApplicationPage({
         actingCandidateReview={actingCandidateReview}
         actingCandidateReviewers={candidatePanelReviewers}
         adjudicatorCategoryScores={
-          profile.role === "adjudicator"
+          effectiveParticipantRole === "adjudicator"
             ? visibleDecisionCategories.map((category) => ({
                 category_id: category.id,
                 criteria: criteria
@@ -1177,7 +1189,7 @@ export default async function AdjudicationApplicationPage({
         review={reviewResult.data as { status: string; owner_note: string | null } | null}
         panelReviewers={panelNarrativeReviewers}
         rangeReviewers={rangeApprovalReviewers}
-        role={profile.role}
+        role={effectiveParticipantRole}
         compact={compactConsensusControls}
       />
       )}

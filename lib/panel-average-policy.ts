@@ -14,7 +14,8 @@ export type PanelAveragePolicy = {
 
 export function resolvePanelAveragePolicy(
   assignments: Array<
-    Pick<AdjudicatorAssignment, "adjudicator_user_id" | "can_score">
+    Pick<AdjudicatorAssignment, "adjudicator_user_id" | "can_score"> &
+      Partial<Pick<AdjudicatorAssignment, "participant_role">>
   >,
   profiles: Array<Pick<Profile, "id" | "role">>,
 ): PanelAveragePolicy {
@@ -27,9 +28,15 @@ export function resolvePanelAveragePolicy(
       .map((assignment) => assignment.adjudicator_user_id),
   );
   const adjudicatorUserIds = new Set(
-    [...scoringUserIds].filter(
-      (userId) => roleByUserId.get(userId) === "adjudicator",
-    ),
+    assignments
+      .filter(
+        (assignment) =>
+          scoringUserIds.has(assignment.adjudicator_user_id) &&
+          (assignment.participant_role ??
+            roleByUserId.get(assignment.adjudicator_user_id)) ===
+            "adjudicator",
+      )
+      .map((assignment) => assignment.adjudicator_user_id),
   );
   const adjudicatorOnly =
     adjudicatorUserIds.size >= STANDARD_ADJUDICATOR_PANEL_SIZE;

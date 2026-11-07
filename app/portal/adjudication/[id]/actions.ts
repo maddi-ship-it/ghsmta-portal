@@ -685,12 +685,12 @@ export async function completeAdjudication(
   formData: FormData,
 ) {
   void formData;
-  const adjudicator = await requireProfile(["adjudicator"]);
+  const adjudicator = await requireProfile(["adjudicator", "advisory_member"]);
   const admin = createAdminClient();
 
   const { data: assignment, error: assignmentError } = await admin
     .from("adjudicator_assignments")
-    .select("id,status,removed_at")
+    .select("id,status,participant_role,removed_at")
     .eq("application_id", applicationId)
     .eq("adjudicator_user_id", adjudicator.id)
     .is("removed_at", null)
@@ -699,6 +699,11 @@ export async function completeAdjudication(
   if (assignmentError) throw new Error(assignmentError.message);
   if (!assignment) {
     throw new Error("This adjudication assignment is no longer active.");
+  }
+  if (
+    (assignment.participant_role ?? adjudicator.role) !== "adjudicator"
+  ) {
+    throw new Error("An adjudicator assignment is required to complete this scorecard.");
   }
 
   const [scorecardResult, feedbackResult] = await Promise.all([
@@ -869,7 +874,9 @@ async function generatePanelCommentDraft(
       .in("status", ["draft", "reopened", "submitted", "locked"]),
     admin
       .from("adjudicator_assignments")
-      .select("id,adjudicator_user_id,can_score,can_comment")
+      .select(
+        "id,adjudicator_user_id,participant_role,can_score,can_comment",
+      )
       .eq("application_id", applicationId)
       .is("removed_at", null),
     admin.from("award_cycles").select("*").eq("id", application.cycle_id).single(),
@@ -922,7 +929,11 @@ async function generatePanelCommentDraft(
   );
   const panelAssignments = (assignmentsResult.data ?? []) as Pick<
     AdjudicatorAssignment,
-    "id" | "adjudicator_user_id" | "can_score" | "can_comment"
+    | "id"
+    | "adjudicator_user_id"
+    | "participant_role"
+    | "can_score"
+    | "can_comment"
   >[];
   const panelUserIds = [
     ...new Set(

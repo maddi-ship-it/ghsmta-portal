@@ -4,10 +4,15 @@ import type { AdjudicatorAssignment, Profile } from "@/lib/types";
 
 import { resolvePanelAveragePolicy } from "./panel-average-policy";
 
-function assignment(userId: string, canScore = true) {
+function assignment(
+  userId: string,
+  canScore = true,
+  participantRole?: AdjudicatorAssignment["participant_role"],
+) {
   return {
     adjudicator_user_id: userId,
     can_score: canScore,
+    participant_role: participantRole,
   } as AdjudicatorAssignment;
 }
 
@@ -71,5 +76,30 @@ describe("panel average policy", () => {
 
     expect([...policy.contributorUserIds]).toEqual(["adj-1"]);
     expect(policy.referenceUserIds.size).toBe(0);
+  });
+
+  it("uses the production assignment role before the account-wide role", () => {
+    const policy = resolvePanelAveragePolicy(
+      [
+        assignment("adj-1"),
+        assignment("adj-2"),
+        assignment("mixed-role", true, "adjudicator"),
+        assignment("acm-1"),
+      ],
+      [
+        profile("adj-1", "adjudicator"),
+        profile("adj-2", "adjudicator"),
+        profile("mixed-role", "advisory_member"),
+        profile("acm-1", "advisory_member"),
+      ],
+    );
+
+    expect([...policy.contributorUserIds]).toEqual([
+      "adj-1",
+      "adj-2",
+      "mixed-role",
+    ]);
+    expect([...policy.referenceUserIds]).toEqual(["acm-1"]);
+    expect(policy.adjudicatorOnly).toBe(true);
   });
 });
