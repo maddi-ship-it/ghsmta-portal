@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { OwnerDashboardActionCenter } from "@/components/owner-dashboard-action-center";
 import { requireProfile } from "@/lib/auth";
+import { buildOwnerDashboardActions } from "@/lib/owner-dashboard-actions";
+import { loadOwnerPostAdjudicationVisits } from "@/lib/owner-dashboard-data";
 import { createClient } from "@/lib/supabase/server";
 import { roleLabel, statusLabel } from "@/lib/format";
 import type { Application } from "@/lib/types";
@@ -43,12 +46,18 @@ export default async function PortalDashboard() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("applications")
-    .select("id,cycle_id,school_name,production_title,status,updated_at,award_cycles!inner(is_active,status)")
+    .select("id,cycle_id,form_version_id,current_stage_id,school_name,production_title,status,form_data,updated_at,award_cycles!inner(is_active,status)")
     .eq("is_archived", false)
     .eq("award_cycles.is_active", true)
     .neq("award_cycles.status", "archived")
     .order("updated_at", { ascending: false });
   const applications = (data ?? []) as unknown as Application[];
+  const ownerDashboardActions =
+    profile.role === "owner"
+      ? buildOwnerDashboardActions(
+          await loadOwnerPostAdjudicationVisits(applications),
+        )
+      : [];
 
   let adjudicationVisits: Array<{
     slot: DashboardScheduleSlot;
@@ -141,6 +150,10 @@ export default async function PortalDashboard() {
         <article className="metric-card"><span className="metric-label">Submitted</span><strong className="metric-value">{counts.submitted}</strong></article>
         <article className="metric-card"><span className="metric-label">In review</span><strong className="metric-value">{counts.review}</strong></article>
       </section>
+
+      {profile.role === "owner" ? (
+        <OwnerDashboardActionCenter actions={ownerDashboardActions} />
+      ) : null}
 
       {["adjudicator", "advisory_member"].includes(profile.role) && (
         <section className="panel dashboard-adjudication-dates">

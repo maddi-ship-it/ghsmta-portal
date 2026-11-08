@@ -8894,6 +8894,209 @@ h1, h2, .page-heading h1 { font-family: Georgia, "Times New Roman", serif; }
 }
 
 /* Dashboard and metrics */
+.owner-dashboard-action-center {
+  overflow: hidden;
+}
+
+.owner-dashboard-action-header {
+  align-items: flex-start;
+}
+
+.owner-dashboard-action-counts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.owner-dashboard-action-counts > span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border: 1px solid var(--portal-line);
+  border-radius: 999px;
+  color: var(--portal-muted);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.owner-dashboard-action-counts > span.is-overdue {
+  color: #ffd6d6;
+  border-color: rgba(255, 126, 139, 0.3);
+  background: rgba(133, 39, 52, 0.2);
+}
+
+.owner-dashboard-school-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.owner-dashboard-school-card {
+  min-width: 0;
+  border: 1px solid var(--portal-line);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(21, 33, 58, 0.96), rgba(9, 16, 29, 0.98));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+}
+
+.owner-dashboard-school-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 17px 18px 15px;
+  border-bottom: 1px solid var(--portal-line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.owner-dashboard-school-header h3,
+.owner-dashboard-school-header p {
+  margin: 0;
+}
+
+.owner-dashboard-school-header h3 {
+  color: var(--portal-ivory);
+  font-size: 1rem;
+}
+
+.owner-dashboard-school-header p {
+  margin-top: 4px;
+  color: var(--portal-muted);
+  font-size: 0.86rem;
+}
+
+.owner-dashboard-school-deadline {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.owner-dashboard-school-deadline span,
+.owner-dashboard-school-deadline time {
+  display: block;
+}
+
+.owner-dashboard-school-deadline span {
+  color: var(--portal-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.owner-dashboard-school-deadline time {
+  margin-top: 3px;
+  color: var(--portal-gold-bright);
+  font-weight: 800;
+}
+
+.owner-dashboard-school-actions {
+  display: grid;
+}
+
+.owner-dashboard-action-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px;
+  padding: 15px 18px 16px 21px;
+  border-top: 1px solid var(--portal-line);
+}
+
+.owner-dashboard-action-row:first-child {
+  border-top: 0;
+}
+
+.owner-dashboard-action-row::before {
+  position: absolute;
+  inset: 15px auto 15px 0;
+  width: 3px;
+  content: "";
+  border-radius: 0 3px 3px 0;
+  background: rgba(213, 177, 79, 0.72);
+}
+
+.owner-dashboard-action-row.is-overdue::before {
+  background: #ff7e8b;
+}
+
+.owner-dashboard-action-row-heading,
+.owner-dashboard-action-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.owner-dashboard-action-row-heading {
+  margin-bottom: 7px;
+}
+
+.owner-dashboard-action-copy strong,
+.owner-dashboard-action-copy p {
+  display: block;
+}
+
+.owner-dashboard-action-copy strong {
+  color: var(--portal-ivory);
+  font-size: 0.93rem;
+}
+
+.owner-dashboard-action-copy p {
+  margin: 5px 0 0;
+  color: var(--portal-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.owner-dashboard-action-buttons {
+  justify-content: flex-end;
+}
+
+.owner-dashboard-action-buttons .button {
+  white-space: nowrap;
+}
+
+@media (max-width: 820px) {
+  .owner-dashboard-school-grid {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .owner-dashboard-action-counts {
+    justify-content: flex-start;
+  }
+
+  .owner-dashboard-action-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .owner-dashboard-action-buttons {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .owner-dashboard-school-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .owner-dashboard-school-deadline {
+    text-align: left;
+  }
+
+  .owner-dashboard-action-row-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .metric-grid,
 .application-metrics,
 .adjudication-review-metrics,

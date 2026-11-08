@@ -48,6 +48,7 @@ export default async function ApplicationDetailPage({
     stage_submitted?: string;
     error?: string;
     missing?: string;
+    owner_tools?: string;
   }>;
 }) {
   const profile = await requireProfile();
@@ -263,7 +264,11 @@ export default async function ApplicationDetailPage({
       )}
 
       {canEditMetadata && (
-        <details className="owner-application-tools owner-application-disclosure">
+        <details
+          className="owner-application-tools owner-application-disclosure"
+          id="owner-application-tools"
+          open={query.owner_tools === "1"}
+        >
           <summary className="owner-application-summary">
             <span>
               <strong>Owner tools</strong>

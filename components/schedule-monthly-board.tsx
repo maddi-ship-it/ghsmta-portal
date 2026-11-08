@@ -117,6 +117,10 @@ function WorkflowChecklist({ item }: { item: MonthlyScheduleItem }) {
         <span>Moved to Section C</span>
       </label>
       <label>
+        <input defaultChecked={item.checklist.section_c_reminder_sent} name="section_c_reminder_sent" type="checkbox" />
+        <span>Section C reminder sent</span>
+      </label>
+      <label>
         <input defaultChecked={item.checklist.section_c_complete} name="section_c_complete" type="checkbox" />
         <span>Section C Complete</span>
       </label>

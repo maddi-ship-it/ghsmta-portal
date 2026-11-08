@@ -5,6 +5,11 @@ export const RESTORE_ADJUDICATION_BRAIN_DUMP_EVENT =
   "ghsmta:offline-draft-restore";
 
 const BULLET_OR_NUMBERED_LINE = /^\s*(?:[-*•]|\d+[.)])\s+/;
+const LEDGER_HEADER_LINE = /^ledger\s*:?\s*$/i;
+const ACT_NOTES_HEADER_LINE =
+  /^act\s+(?:\d+|[ivxlcdm]+)\s*(?:notes?)?\s*:?\s*$/i;
+const ADJUDICATION_NOTE_PREFIX =
+  /^(?:md|o|c|e|te|ld|sd|s|lactress|lactor|spa|spb|fp|d)(?:\s*(?:\/|&|\+)\s*(?:md|o|c|e|te|ld|sd|s|lactress|lactor|spa|spb|fp|d))*$/i;
 const SENTENCE_SEGMENTER = new Intl.Segmenter("en", {
   granularity: "sentence",
 });
@@ -57,30 +62,90 @@ function sentenceParts(value: string) {
     .filter(Boolean);
 }
 
+function songTitleFromHeading(value: string) {
+  const quotedHeading = value.match(
+    /^[“"]\s*(.+?)\s*[”"]\s*(?:[-–—]\s*.*)?$/u,
+  );
+  if (quotedHeading?.[1]) return quotedHeading[1].trim();
+
+  const unquotedHeading = value.match(/^(.+?)\s*[-–—]\s*(.+)$/u);
+  if (!unquotedHeading) return null;
+
+  const title = unquotedHeading[1]?.trim() ?? "";
+  const performers = unquotedHeading[2]?.trim() ?? "";
+  if (
+    !title ||
+    !performers ||
+    title.length > 120 ||
+    performers.length > 160 ||
+    ADJUDICATION_NOTE_PREFIX.test(title) ||
+    /[.!?]/.test(performers)
+  ) {
+    return null;
+  }
+
+  const looksLikePerformerList =
+    /,|\band\b|\bensemble\b|\bpirates?\b/i.test(performers) ||
+    /^[\p{Lu}][\p{L}'’.-]*(?:\s+[\p{Lu}][\p{L}'’.-]*){0,3}$/u.test(
+      performers,
+    );
+  return looksLikePerformerList ? title : null;
+}
+
+function withSongContext(text: string, songTitle: string | null) {
+  return songTitle ? `Song: “${songTitle}” — ${text}` : text;
+}
+
 export function segmentAdjudicationBrainDump(
   value: string,
 ): AdjudicationBrainDumpSourceNote[] {
   const sourceNotes: string[] = [];
-  const blocks = value
+  const lines = value
     .replaceAll("\r\n", "\n")
     .replaceAll("\r", "\n")
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
+    .split("\n")
+    .map((line) => line.trim())
     .filter(Boolean);
+  const hasLedger = lines.some((line) => LEDGER_HEADER_LINE.test(line));
+  let acceptingObservations = !hasLedger;
+  let insideLedger = false;
+  let currentSongTitle: string | null = null;
 
-  for (const block of blocks) {
-    const lines = block
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+  for (const line of lines) {
+    if (LEDGER_HEADER_LINE.test(line)) {
+      insideLedger = true;
+      acceptingObservations = false;
+      currentSongTitle = null;
+      continue;
+    }
 
-    for (const line of lines) {
-      if (BULLET_OR_NUMBERED_LINE.test(line)) {
-        sourceNotes.push(line.replace(BULLET_OR_NUMBERED_LINE, "").trim());
-        continue;
-      }
+    if (ACT_NOTES_HEADER_LINE.test(line)) {
+      insideLedger = false;
+      acceptingObservations = true;
+      currentSongTitle = null;
+      continue;
+    }
 
-      sourceNotes.push(...sentenceParts(line));
+    if (insideLedger || !acceptingObservations) continue;
+
+    const songTitle = songTitleFromHeading(line);
+    if (songTitle) {
+      currentSongTitle = songTitle;
+      continue;
+    }
+
+    if (BULLET_OR_NUMBERED_LINE.test(line)) {
+      sourceNotes.push(
+        withSongContext(
+          line.replace(BULLET_OR_NUMBERED_LINE, "").trim(),
+          currentSongTitle,
+        ),
+      );
+      continue;
+    }
+
+    for (const sentence of sentenceParts(line)) {
+      sourceNotes.push(withSongContext(sentence, currentSongTitle));
     }
   }
 

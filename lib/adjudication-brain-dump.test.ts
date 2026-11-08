@@ -55,6 +55,53 @@ describe("adjudication brain-dump review", () => {
     ]);
   });
 
+  it("carries each song heading into the observations below it", () => {
+    const notes = segmentAdjudicationBrainDump(`Use the song names above each note.
+
+Ledger:
+MD- Music Direction
+LD- Lighting Design
+SD- Sound Design
+
+ACT 1 Notes:
+
+Prologue and London 1903- Barrie and Mary
+LD- Yellow of spots not the right shade
+SD- Barrie is too quiet compared to other members of the ensemble
+Dog is adorable!
+
+“Welcome to London” - Barrie, Frohman, Ensemble
+SD- Late on getting Frohman
+MD- Harmony parts aren’t equally represented.
+
+All That Matters - Sylvia
+LActress- Wonderful forward vocal placement.
+
+“Stronger”
+D- Make sure the actor’s movements don’t cause vocal-support problems.`);
+
+    expect(notes.map((note) => note.text)).toEqual([
+      "Song: “Prologue and London 1903” — LD- Yellow of spots not the right shade",
+      "Song: “Prologue and London 1903” — SD- Barrie is too quiet compared to other members of the ensemble",
+      "Song: “Prologue and London 1903” — Dog is adorable!",
+      "Song: “Welcome to London” — SD- Late on getting Frohman",
+      "Song: “Welcome to London” — MD- Harmony parts aren’t equally represented.",
+      "Song: “All That Matters” — LActress- Wonderful forward vocal placement.",
+      "Song: “Stronger” — D- Make sure the actor’s movements don’t cause vocal-support problems.",
+    ]);
+  });
+
+  it("does not mistake adjudication labels for unquoted song headings", () => {
+    const notes = segmentAdjudicationBrainDump(
+      "SD/O- Music is too loud compared with the voice.\nS & D - Curtains move with the performers.",
+    );
+
+    expect(notes.map((note) => note.text)).toEqual([
+      "SD/O- Music is too loud compared with the voice.",
+      "S & D - Curtains move with the performers.",
+    ]);
+  });
+
   it("builds one traceable assignment per selected source note", () => {
     expect(
       groupAdjudicationBrainDumpAssignments([

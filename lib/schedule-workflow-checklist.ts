@@ -3,6 +3,7 @@ export const SCHEDULE_WORKFLOW_CHECKLIST_KEY = "schedule_workflow_checklist";
 export const SCHEDULE_WORKFLOW_CHECKLIST_FIELDS = [
   "pick_six_sent",
   "moved_to_section_c",
+  "section_c_reminder_sent",
   "section_c_complete",
   "final_results_released",
 ] as const;
@@ -24,6 +25,7 @@ export type ScheduleWorkflowMilestones = {
 export const EMPTY_SCHEDULE_WORKFLOW_CHECKLIST: ScheduleWorkflowChecklist = {
   pick_six_sent: false,
   moved_to_section_c: false,
+  section_c_reminder_sent: false,
   section_c_complete: false,
   final_results_released: false,
 };
@@ -42,6 +44,7 @@ export function readScheduleWorkflowChecklist(
   return {
     pick_six_sent: stored.pick_six_sent === true,
     moved_to_section_c: stored.moved_to_section_c === true,
+    section_c_reminder_sent: stored.section_c_reminder_sent === true,
     section_c_complete: stored.section_c_complete === true,
     final_results_released: stored.final_results_released === true,
   };
@@ -62,6 +65,7 @@ export function resolveScheduleWorkflowChecklist(
       stored.pick_six_sent ||
       Number(milestones.releasedFeedbackCount ?? 0) >= 6,
     moved_to_section_c: stored.moved_to_section_c || sectionCStarted,
+    section_c_reminder_sent: stored.section_c_reminder_sent,
     section_c_complete:
       stored.section_c_complete || sectionCStatus === "complete",
     final_results_released:

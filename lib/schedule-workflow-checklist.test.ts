@@ -11,6 +11,7 @@ describe("schedule workflow checklist", () => {
     expect(readScheduleWorkflowChecklist({})).toEqual({
       pick_six_sent: false,
       moved_to_section_c: false,
+      section_c_reminder_sent: false,
       section_c_complete: false,
       final_results_released: false,
     });
@@ -22,6 +23,7 @@ describe("schedule workflow checklist", () => {
       {
         pick_six_sent: true,
         moved_to_section_c: true,
+        section_c_reminder_sent: true,
         section_c_complete: false,
         final_results_released: false,
       },
@@ -32,6 +34,7 @@ describe("schedule workflow checklist", () => {
     expect(readScheduleWorkflowChecklist(formData)).toEqual({
       pick_six_sent: true,
       moved_to_section_c: true,
+      section_c_reminder_sent: true,
       section_c_complete: false,
       final_results_released: false,
     });
@@ -50,6 +53,7 @@ describe("schedule workflow checklist", () => {
     ).toEqual({
       pick_six_sent: true,
       moved_to_section_c: true,
+      section_c_reminder_sent: false,
       section_c_complete: true,
       final_results_released: true,
     });
@@ -62,6 +66,7 @@ describe("schedule workflow checklist", () => {
           schedule_workflow_checklist: {
             pick_six_sent: true,
             moved_to_section_c: true,
+            section_c_reminder_sent: true,
           },
         },
         {
@@ -73,6 +78,7 @@ describe("schedule workflow checklist", () => {
     ).toEqual({
       pick_six_sent: true,
       moved_to_section_c: true,
+      section_c_reminder_sent: true,
       section_c_complete: false,
       final_results_released: false,
     });

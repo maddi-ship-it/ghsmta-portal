@@ -1314,7 +1314,7 @@ export function OwnerLiveAdjudicationReview({
       </section>
 
       {isOwner ? (
-        <section className="panel owner-comment-review-launcher">
+        <section className="panel owner-comment-review-launcher" id="owner-comment-review">
           <div className="panel-header">
             <div>
               <span className="eyebrow">Owner workflow</span>
