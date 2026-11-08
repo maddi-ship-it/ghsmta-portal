@@ -180,8 +180,9 @@ OPENAI_API_KEY=sk-YOUR_OPENAI_API_KEY
 Never prefix the OpenAI key with `NEXT_PUBLIC_`.
 
 Text and image generation uses the OpenAI Responses API. The default model is
-`gpt-6-astra`, with low reasoning for phonetic respelling and brain-dump sorting,
-medium reasoning for handwriting extraction, and high reasoning for final panel
-comments. Audio transcription remains on `gpt-4o-mini-transcribe`. These are
-independent, stateless requests, so they do not change reasoning effort inside a
-continued response chain.
+`gpt-6-astra`, with low reasoning for phonetic respelling. Brain-dump sorting
+uses `gpt-6-luna` for the same structured-output workflow at lower cost.
+Handwriting extraction uses medium reasoning, and final panel comments use high
+reasoning. Audio transcription remains on `gpt-4o-mini-transcribe`. These are
+independent, stateless requests, so they do not change reasoning effort inside
+a continued response chain.

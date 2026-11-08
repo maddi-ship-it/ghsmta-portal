@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADJUDICATION_SORT_MODEL,
   DEFAULT_OPENAI_TEXT_MODEL,
   OPENAI_REASONING_EFFORT,
   PLAYBILL_SONG_LIST_MODEL,
@@ -13,6 +14,10 @@ describe("OpenAI model configuration", () => {
 
   it("uses GPT-6 Luna for Playbill song-list extraction", () => {
     expect(PLAYBILL_SONG_LIST_MODEL).toBe("gpt-6-luna");
+  });
+
+  it("uses GPT-6 Luna for adjudication brain-dump sorting", () => {
+    expect(ADJUDICATION_SORT_MODEL).toBe("gpt-6-luna");
   });
 
   it("preserves the effective reasoning effort for each workload", () => {
