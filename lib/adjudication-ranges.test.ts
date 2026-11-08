@@ -4,10 +4,17 @@ import {
   deriveNaturalTwoPointRange,
   formatTwoPointRangeStart,
   isValidTwoPointRange,
+  TWO_POINT_RANGE_START_OPTIONS,
   twoPointRangeFromStart,
 } from "./adjudication-ranges";
 
 describe("adjudication two-point ranges", () => {
+  it("offers every valid quarter-point range start", () => {
+    expect(TWO_POINT_RANGE_START_OPTIONS[0]).toBe(1);
+    expect(TWO_POINT_RANGE_START_OPTIONS.at(-1)).toBe(8);
+    expect(TWO_POINT_RANGE_START_OPTIONS).toHaveLength(29);
+  });
+
   it("normalizes stored numeric values to the dropdown option format", () => {
     expect(formatTwoPointRangeStart(5)).toBe("5.00");
     expect(formatTwoPointRangeStart("6.25")).toBe("6.25");

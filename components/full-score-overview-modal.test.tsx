@@ -185,6 +185,10 @@ describe("FullScoreOverviewModal", () => {
     expect(html).toContain("3 adjudicators; committee shown as reference");
     expect(html).toContain("8.00000");
     expect(html).not.toContain("6.50000");
+    expect(html).toContain('<option value="" selected="">Not set</option>');
+    expect(html).not.toContain(
+      '<option value="7.00" selected="">7.00–9.00</option>',
+    );
   });
 
   it("flags a category red when panel averages cannot fit a two-point range", () => {

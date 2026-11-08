@@ -29,7 +29,13 @@ import {
   deriveNaturalTwoPointRange,
   formatTwoPointRangeStart,
   isValidTwoPointRange,
+  TWO_POINT_RANGE_START_OPTIONS,
 } from "@/lib/adjudication-ranges";
+import {
+  ADJUDICATION_RANGE_SELECTION_EVENT,
+  announceAdjudicationRangeSelection,
+  type AdjudicationRangeSelectionDetail,
+} from "@/lib/adjudication-range-sync";
 import {
   buildRangeApprovalRoster,
   type RangeApprovalReviewer,
@@ -176,11 +182,6 @@ function initialRangeSelections(categories: ScoringCategory[], proposals: Propos
   );
 }
 
-const rangeOptions = Array.from(
-  { length: 29 },
-  (_, index) => 1 + index * 0.25,
-).filter((value) => value <= 8);
-
 const initialCategorySaveResult: CategoryProposalSaveResult = { ok: false };
 const initialAssignmentAnnouncementResult: PanelAssignmentAnnouncementResult = {
   ok: false,
@@ -237,8 +238,6 @@ export function AdjudicationConsensusBar({
   const [rangeSelections, setRangeSelections] = useState<Record<string, string>>(
     () => initialRangeSelections(categories, proposals),
   );
-  const touchedRangeSelections = useRef(new Set<string>());
-  const autoSuggestedRanges = useRef(new Map<string, string>());
   const autoSendAssignmentsButtonRef = useRef<HTMLButtonElement>(null);
   const writerAssignmentsComplete = useRef(false);
   const [liveAverageStatus, setLiveAverageStatus] = useState<
@@ -360,9 +359,6 @@ export function AdjudicationConsensusBar({
   const canSetDecisions = role === "advisory_member" || role === "owner";
   const canReviewRanges = role === "adjudicator";
   const openDecisionMatrix = useCallback(() => {
-    touchedRangeSelections.current.clear();
-    autoSuggestedRanges.current.clear();
-    setRangeSelections(initialRangeSelections(categories, proposals));
     setLiveApprovals(approvals);
     setLiveApprovalStatus(proposals.length > 0 ? "loading" : "live");
     const applicableCategoryIds = categories
@@ -384,6 +380,31 @@ export function AdjudicationConsensusBar({
     proposals,
     scoreabilityByCategory,
   ]);
+
+  useEffect(() => {
+    const syncRangeSelection = (event: Event) => {
+      const detail = (
+        event as CustomEvent<AdjudicationRangeSelectionDetail>
+      ).detail;
+      if (!detail || detail.applicationId !== applicationId) return;
+
+      setRangeSelections((current) => ({
+        ...current,
+        [detail.categoryId]: detail.rangeStart,
+      }));
+    };
+
+    window.addEventListener(
+      ADJUDICATION_RANGE_SELECTION_EVENT,
+      syncRangeSelection,
+    );
+    return () => {
+      window.removeEventListener(
+        ADJUDICATION_RANGE_SELECTION_EVENT,
+        syncRangeSelection,
+      );
+    };
+  }, [applicationId]);
   const handleApplicabilityChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const form = event.currentTarget.form;
@@ -472,56 +493,6 @@ export function AdjudicationConsensusBar({
 
       const scoreSpreads = (data ?? []) as LivePanelScoreSpread[];
       setLivePanelAverages(scoreSpreads);
-      setRangeSelections((current) => {
-        const next = { ...current };
-
-        for (const spread of scoreSpreads) {
-          const savedRangeStart = formatTwoPointRangeStart(
-            proposalByCategory.get(spread.category_id)?.range_min,
-          );
-          if (
-            touchedRangeSelections.current.has(spread.category_id) ||
-            savedRangeStart
-          ) {
-            continue;
-          }
-
-          const minimum =
-            spread.minimum_member_average == null
-              ? null
-              : Number(spread.minimum_member_average);
-          const maximum =
-            spread.maximum_member_average == null
-              ? null
-              : Number(spread.maximum_member_average);
-          const suggestedRange =
-            Number(spread.scoring_member_count) >= 2
-              ? deriveNaturalTwoPointRange([minimum, maximum])
-              : null;
-          const previousSuggestion = autoSuggestedRanges.current.get(
-            spread.category_id,
-          );
-          const currentIsAutomatic =
-            previousSuggestion != null &&
-            next[spread.category_id] === previousSuggestion;
-
-          if (suggestedRange) {
-            const suggestedStart = suggestedRange.rangeMinimum.toFixed(2);
-            if (!next[spread.category_id] || currentIsAutomatic) {
-              next[spread.category_id] = suggestedStart;
-            }
-            autoSuggestedRanges.current.set(
-              spread.category_id,
-              suggestedStart,
-            );
-          } else {
-            if (currentIsAutomatic) next[spread.category_id] = "";
-            autoSuggestedRanges.current.delete(spread.category_id);
-          }
-        }
-
-        return next;
-      });
       setLiveAverageUpdatedAt(new Date());
       setLiveAverageStatus("live");
     };
@@ -1206,27 +1177,29 @@ export function AdjudicationConsensusBar({
                               id={`range_${category.id}`}
                               name={`range_${category.id}`}
                               onChange={(event) => {
-                                touchedRangeSelections.current.add(category.id);
+                                const rangeStart = event.target.value;
                                 setRangeSelections((current) => ({
                                   ...current,
-                                  [category.id]: event.target.value,
+                                  [category.id]: rangeStart,
                                 }));
+                                announceAdjudicationRangeSelection({
+                                  applicationId,
+                                  categoryId: category.id,
+                                  rangeStart,
+                                });
                               }}
                               value={rangeSelections[category.id] ?? ""}
                             >
                               <option value="">Select range</option>
-                              {rangeOptions.map((value) => (
+                              {TWO_POINT_RANGE_START_OPTIONS.map((value) => (
                                 <option key={value} value={value.toFixed(2)}>
                                   {value.toFixed(2)}–{(value + 2).toFixed(2)}
                                 </option>
                               ))}
                             </select>
                               <small>
-                                {naturalRange &&
-                                rangeSelections[category.id] ===
-                                  naturalRange.rangeMinimum.toFixed(2)
-                                  ? "Auto-set from the live panel scores."
-                                  : "Choose the approved low and high range."}
+                                Enter the ACM-approved range. Live scores are
+                                reference only and never fill this field.
                               </small>
                             </div>
                             <div className="advisory-decision-field advisory-decision-writer">

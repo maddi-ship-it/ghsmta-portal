@@ -16857,6 +16857,72 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   border-top: 1px solid var(--portal-line);
 }
 
+.advisory-inline-range-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, auto);
+  align-items: center;
+  gap: 1rem 1.5rem;
+  border-top: 1px solid var(--portal-line);
+  background: color-mix(
+    in srgb,
+    var(--portal-gold) 7%,
+    var(--portal-surface-2)
+  );
+}
+
+.advisory-inline-range-copy {
+  min-width: 0;
+}
+
+.advisory-inline-range-copy h3,
+.advisory-inline-range-copy p {
+  margin: 0;
+}
+
+.advisory-inline-range-copy h3 {
+  margin-top: 0.2rem;
+}
+
+.advisory-inline-range-copy p {
+  margin-top: 0.35rem;
+  color: var(--portal-muted);
+  line-height: 1.45;
+}
+
+.advisory-inline-range-actions {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.advisory-inline-range-actions .select {
+  min-width: 170px;
+}
+
+.advisory-inline-range-message,
+.advisory-inline-range-control > .form-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.advisory-inline-range-message {
+  color: var(--portal-success);
+  font-weight: 750;
+}
+
+@media (max-width: 760px) {
+  .advisory-inline-range-control,
+  .advisory-inline-range-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .advisory-inline-range-actions .button,
+  .advisory-inline-range-actions .select {
+    width: 100%;
+  }
+}
+
 .panel-narrative-card-inline {
   margin: 0;
 }

@@ -10,6 +10,7 @@ import {
 } from "@/app/portal/adjudication/[id]/actions";
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
 import { AdjudicationBigPictureComment } from "@/components/adjudication-overall-production";
+import { AdvisoryCategoryRangeControl } from "@/components/advisory-category-range-control";
 import { OPEN_FULL_SCORE_VIEW_EVENT } from "@/components/application-reference-bar";
 import {
   FullScoreOverviewModal,
@@ -983,6 +984,16 @@ export function OwnerLiveAdjudicationReview({
       new Set(advisoryNarrativeReview?.panelApprovedCategoryIds ?? []),
     [advisoryNarrativeReview?.panelApprovedCategoryIds],
   );
+  const categoryProposalById = useMemo(
+    () =>
+      new Map(
+        categoryProposals.map((proposal) => [
+          proposal.category_id,
+          proposal,
+        ]),
+      ),
+    [categoryProposals],
+  );
   const ownerPanelApprovedCategoryIds = useMemo(
     () =>
       feedback
@@ -1375,6 +1386,7 @@ export function OwnerLiveAdjudicationReview({
         const categoryFeedback = feedback.find(
           (item) => item.category_id === category.id,
         );
+        const categoryProposal = categoryProposalById.get(category.id);
         const assignedReviewer = categoryFeedback?.assigned_to
           ? profileMap.get(categoryFeedback.assigned_to)
           : undefined;
@@ -1642,6 +1654,22 @@ export function OwnerLiveAdjudicationReview({
                 </tbody>
               </table>
             </div>
+
+            {advisoryNarrativeReview &&
+            !isOverallProductionCategory &&
+            !practiceMode ? (
+              <AdvisoryCategoryRangeControl
+                applicationId={applicationId}
+                categoryId={category.id}
+                categoryTitle={category.title}
+                initialRangeStart={categoryProposal?.range_min}
+                isEligible={
+                  categoryProposal?.is_eligible ??
+                  categoryEligibilityDefaults[category.id] ??
+                  true
+                }
+              />
+            ) : null}
 
             {isOwner ? (
               <div className="panel-body">

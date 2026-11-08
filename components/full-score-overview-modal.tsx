@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 import {
   saveFullScoreCategoryRanges,
@@ -18,7 +18,13 @@ import {
 import {
   deriveNaturalTwoPointRange,
   formatTwoPointRangeStart,
+  TWO_POINT_RANGE_START_OPTIONS,
 } from "@/lib/adjudication-ranges";
+import {
+  ADJUDICATION_RANGE_SELECTION_EVENT,
+  announceAdjudicationRangeSelection,
+  type AdjudicationRangeSelectionDetail,
+} from "@/lib/adjudication-range-sync";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import type {
   AdjudicationScore,
@@ -49,11 +55,6 @@ export type FullScoreCategoryProposal = {
   advisory_note: string | null;
   owner_override_note: string | null;
 };
-
-const rangeOptions = Array.from(
-  { length: 29 },
-  (_, index) => 1 + index * 0.25,
-).filter((value) => value <= 8);
 
 const initialRangeSaveResult: FullScoreRangeSaveResult = { ok: false };
 
@@ -112,6 +113,41 @@ export function FullScoreOverviewModal({
     saveRangeAction,
     initialRangeSaveResult,
   );
+  const [rangeSelections, setRangeSelections] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        categoryProposals.map((proposal) => [
+          proposal.category_id,
+          formatTwoPointRangeStart(proposal.range_min),
+        ]),
+      ),
+  );
+
+  useEffect(() => {
+    const syncRangeSelection = (event: Event) => {
+      const detail = (
+        event as CustomEvent<AdjudicationRangeSelectionDetail>
+      ).detail;
+      if (!detail || detail.applicationId !== applicationId) return;
+
+      setRangeSelections((current) => ({
+        ...current,
+        [detail.categoryId]: detail.rangeStart,
+      }));
+    };
+
+    window.addEventListener(
+      ADJUDICATION_RANGE_SELECTION_EVENT,
+      syncRangeSelection,
+    );
+    return () => {
+      window.removeEventListener(
+        ADJUDICATION_RANGE_SELECTION_EVENT,
+        syncRangeSelection,
+      );
+    };
+  }, [applicationId]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -368,9 +404,9 @@ export function FullScoreOverviewModal({
                       proposalByCategory.get(category.id)?.range_min,
                     );
                     const selectedRangeStart =
-                      savedRangeStart ||
-                      naturalRange?.rangeMinimum.toFixed(2) ||
-                      "";
+                      rangeSelections[category.id] ?? savedRangeStart;
+                    const rangeSelectionChanged =
+                      selectedRangeStart !== savedRangeStart;
 
                     return (
                       <tr
@@ -462,25 +498,37 @@ export function FullScoreOverviewModal({
                               </label>
                               <select
                                 className="select full-score-range-select"
-                                defaultValue={selectedRangeStart}
                                 id={`full-score-range-${category.id}`}
                                 name={`full_score_range_${category.id}`}
+                                onChange={(event) => {
+                                  const rangeStart = event.target.value;
+                                  setRangeSelections((current) => ({
+                                    ...current,
+                                    [category.id]: rangeStart,
+                                  }));
+                                  announceAdjudicationRangeSelection({
+                                    applicationId,
+                                    categoryId: category.id,
+                                    rangeStart,
+                                  });
+                                }}
+                                value={selectedRangeStart}
                               >
                                 <option value="">Not set</option>
-                                {rangeOptions.map((value) => (
+                                {TWO_POINT_RANGE_START_OPTIONS.map((value) => (
                                   <option key={value} value={value.toFixed(2)}>
                                     {value.toFixed(2)}–{(value + 2).toFixed(2)}
                                   </option>
                                 ))}
                               </select>
                               <small>
-                                {proposalByCategory.get(category.id)?.status === "draft"
+                                {rangeSelectionChanged
+                                  ? "Selection shared; save to store it"
+                                  : proposalByCategory.get(category.id)?.status === "draft"
                                   ? "Saved draft"
                                   : proposalByCategory.has(category.id)
                                     ? "Current approved workflow value"
-                                    : naturalRange
-                                      ? "Suggested from live scores"
-                                      : "Not selected"}
+                                    : "Not selected"}
                               </small>
                             </>
                           )}

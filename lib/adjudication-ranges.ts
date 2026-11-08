@@ -2,6 +2,11 @@ const TWO_POINT_RANGE_WIDTH = 2;
 const SCORE_INCREMENT = 0.25;
 const FLOAT_TOLERANCE = 0.0001;
 
+export const TWO_POINT_RANGE_START_OPTIONS = Array.from(
+  { length: 29 },
+  (_, index) => 1 + index * SCORE_INCREMENT,
+).filter((value) => value <= 8);
+
 export type NaturalTwoPointRange = {
   rangeMinimum: number;
   rangeMaximum: number;
