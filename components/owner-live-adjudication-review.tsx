@@ -1459,6 +1459,22 @@ export function OwnerLiveAdjudicationReview({
               </div>
             </div>
 
+            {advisoryNarrativeReview &&
+            !isOverallProductionCategory &&
+            !practiceMode ? (
+              <AdvisoryCategoryRangeControl
+                applicationId={applicationId}
+                categoryId={category.id}
+                categoryTitle={category.title}
+                initialRangeStart={categoryProposal?.range_min}
+                isEligible={
+                  categoryProposal?.is_eligible ??
+                  categoryEligibilityDefaults[category.id] ??
+                  true
+                }
+              />
+            ) : null}
+
             <div className="table-wrap criterion-score-table">
               <table className="data-table">
                 <thead>
@@ -1654,22 +1670,6 @@ export function OwnerLiveAdjudicationReview({
                 </tbody>
               </table>
             </div>
-
-            {advisoryNarrativeReview &&
-            !isOverallProductionCategory &&
-            !practiceMode ? (
-              <AdvisoryCategoryRangeControl
-                applicationId={applicationId}
-                categoryId={category.id}
-                categoryTitle={category.title}
-                initialRangeStart={categoryProposal?.range_min}
-                isEligible={
-                  categoryProposal?.is_eligible ??
-                  categoryEligibilityDefaults[category.id] ??
-                  true
-                }
-              />
-            ) : null}
 
             {isOwner ? (
               <div className="panel-body">
