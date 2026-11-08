@@ -78,6 +78,9 @@ function formText(formData: FormData, name: string) {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const AUTOMATIC_PANEL_COMMENT_GENERATION_ENABLED =
+  process.env.AUTOMATIC_PANEL_COMMENT_GENERATION_ENABLED === "true";
+
 type PersistScorecardResult = {
   missing: string[];
   submitted: boolean;
@@ -642,13 +645,15 @@ export async function autosaveAdjudicatorScorecard(
 ) {
   try {
     const result = await persistAdjudicatorScorecard(applicationId, false, formData);
-    after(async () => {
-      try {
-        await refreshLivePanelNarratives(applicationId, result.savedBy);
-      } catch (error) {
-        console.error("Unable to refresh the live panel narratives.", error);
-      }
-    });
+    if (AUTOMATIC_PANEL_COMMENT_GENERATION_ENABLED) {
+      after(async () => {
+        try {
+          await refreshLivePanelNarratives(applicationId, result.savedBy);
+        } catch (error) {
+          console.error("Unable to refresh the live panel narratives.", error);
+        }
+      });
+    }
     return { ok: true as const, savedAt: result.savedAt };
   } catch (error) {
     console.error("[adjudication:autosave] Unable to save scorecard draft.", {
@@ -666,13 +671,15 @@ export async function saveAdjudicatorScorecard(
 ) {
   const result = await persistAdjudicatorScorecard(applicationId, submit, formData);
 
-  after(async () => {
-    try {
-      await refreshLivePanelNarratives(applicationId, result.savedBy);
-    } catch (error) {
-      console.error("Unable to refresh the live panel narratives.", error);
-    }
-  });
+  if (AUTOMATIC_PANEL_COMMENT_GENERATION_ENABLED) {
+    after(async () => {
+      try {
+        await refreshLivePanelNarratives(applicationId, result.savedBy);
+      } catch (error) {
+        console.error("Unable to refresh the live panel narratives.", error);
+      }
+    });
+  }
 
   if (result.missing.length > 0) {
     revalidatePath(`/portal/adjudication/${applicationId}`);
@@ -1191,6 +1198,8 @@ async function refreshLivePanelNarratives(
   applicationId: string,
   generatedBy: string,
 ) {
+  if (!AUTOMATIC_PANEL_COMMENT_GENERATION_ENABLED) return;
+
   const admin = createAdminClient();
   const [scorecardResult, assignmentResult] = await Promise.all([
     admin
