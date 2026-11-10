@@ -53,6 +53,11 @@ import {
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { loadAdjudicationReferenceLinks } from "@/lib/adjudication-reference-documents";
+import {
+  parsePlaybillSongList,
+  PLAYBILL_SONG_LIST_EXTRACTOR_VERSION,
+  type PlaybillSong,
+} from "@/lib/playbill-song-list";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -422,7 +427,7 @@ export default async function AdjudicationApplicationPage({
       : Promise.resolve({ data: null, error: null }),
     admin
       .from("portal_files")
-      .select("display_name,generated_name,original_name")
+      .select("id,display_name,generated_name,original_name")
       .eq("application_id", id)
       .eq("context_type", "application")
       .eq("document_category", "playbill")
@@ -437,6 +442,23 @@ export default async function AdjudicationApplicationPage({
     throw new Error(latestPlaybillResult.error.message);
   }
   const latestPlaybill = latestPlaybillResult.data;
+  let playbillSongs: PlaybillSong[] = [];
+  if (latestPlaybill?.id) {
+    const { data: songListCache, error: songListCacheError } = await admin
+      .from("playbill_song_lists")
+      .select("songs")
+      .eq("portal_file_id", latestPlaybill.id)
+      .eq("extractor_version", PLAYBILL_SONG_LIST_EXTRACTOR_VERSION)
+      .maybeSingle();
+    if (
+      songListCacheError &&
+      songListCacheError.code !== "42P01" &&
+      songListCacheError.code !== "PGRST205"
+    ) {
+      throw new Error(songListCacheError.message);
+    }
+    playbillSongs = parsePlaybillSongList(songListCache ?? {}) ?? [];
+  }
   const playbillSourceFileName = latestPlaybill
     ? latestPlaybill.display_name?.trim() ||
       latestPlaybill.generated_name?.trim() ||
@@ -1208,6 +1230,7 @@ export default async function AdjudicationApplicationPage({
             canComment={canComment}
             defaultValue={ownScorecard?.internal_notes}
             fieldName="scorecard_internal_notes"
+            playbillSongs={playbillSongs}
             readOnly={readOnly}
             scorecardId={ownScorecard?.id}
             title="INITIAL BRAIN DUMP (INTERMISSION)"
@@ -1217,6 +1240,7 @@ export default async function AdjudicationApplicationPage({
             canComment={canComment}
             defaultValue={ownScorecard?.post_show_notes}
             fieldName="scorecard_post_show_notes"
+            playbillSongs={playbillSongs}
             readOnly={readOnly}
             scorecardId={ownScorecard?.id}
             title="INITIAL BRAIN DUMP (POST SHOW)"
@@ -1417,6 +1441,7 @@ export default async function AdjudicationApplicationPage({
                     canComment
                     defaultValue={ownScorecard?.internal_notes}
                     fieldName="scorecard_internal_notes"
+                    playbillSongs={playbillSongs}
                     readOnly={readOnly}
                     scorecardId={ownScorecard?.id}
                     title="INITIAL BRAIN DUMP (INTERMISSION)"
@@ -1426,6 +1451,7 @@ export default async function AdjudicationApplicationPage({
                     canComment
                     defaultValue={ownScorecard?.post_show_notes}
                     fieldName="scorecard_post_show_notes"
+                    playbillSongs={playbillSongs}
                     readOnly={readOnly}
                     scorecardId={ownScorecard?.id}
                     title="INITIAL BRAIN DUMP (POST SHOW)"

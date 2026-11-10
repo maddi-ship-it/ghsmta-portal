@@ -23,15 +23,19 @@ export function resolveGeneratedNarrativeFinal({
 export function panelNarrativeSourceAssignmentIds(
   assignments: ReadonlyArray<{
     id: string;
+    adjudicator_user_id: string;
     can_comment?: boolean;
     removed_at?: string | null;
   }>,
+  contributorUserIds: ReadonlySet<string>,
 ) {
   return new Set(
     assignments
       .filter(
         (assignment) =>
-          assignment.removed_at == null && assignment.can_comment === true,
+          assignment.removed_at == null &&
+          assignment.can_comment === true &&
+          contributorUserIds.has(assignment.adjudicator_user_id),
       )
       .map((assignment) => assignment.id),
   );

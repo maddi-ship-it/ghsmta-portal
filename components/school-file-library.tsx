@@ -138,7 +138,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
     setError(null); setMessage(null);
     startTransition(async () => {
       try {
-        await uploadPortalFiles({
+        const uploadedFiles = await uploadPortalFiles({
           files,
           contextType: "application",
           contextId: application.application_id,
@@ -161,9 +161,40 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
             productionName: application.production_title,
           },
         });
+        let playbillTriggerFailed = false;
+        if (fileType === "playbill") {
+          const triggerResults = await Promise.all(
+            uploadedFiles.map((uploadedFile) =>
+              fetch(
+                `/api/adjudication/${application.application_id}/playbill-song-list`,
+                {
+                  method: "POST",
+                  cache: "no-store",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    background: true,
+                    portalFileId: uploadedFile.id,
+                  }),
+                },
+              ),
+            ),
+          );
+          playbillTriggerFailed = triggerResults.some(
+            (response) => !response.ok,
+          );
+        }
         form?.reset();
         if (form) setUploadOpen(false);
-        setMessage(`${files.length} file${files.length === 1 ? "" : "s"} uploaded.`);
+        setMessage(
+          fileType === "playbill" && !playbillTriggerFailed
+            ? `${files.length} Playbill${files.length === 1 ? "" : "s"} uploaded. The song list is being generated in the background.`
+            : `${files.length} file${files.length === 1 ? "" : "s"} uploaded.`,
+        );
+        if (playbillTriggerFailed) {
+          setError(
+            "The Playbill uploaded, but automatic song-list generation could not start. A reviewer can retry it from the adjudication page.",
+          );
+        }
         router.refresh();
       } catch (caught) { setError(caught instanceof Error ? caught.message : "Upload failed."); }
     });

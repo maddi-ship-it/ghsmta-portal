@@ -5,7 +5,9 @@ import { createPortal } from "react-dom";
 
 import {
   buildPlaybillSongListSections,
+  PLAYBILL_SONG_LIST_READY_EVENT,
   type PlaybillSong,
+  type PlaybillSongListReadyDetail,
 } from "@/lib/playbill-song-list";
 
 type SongListResponse = {
@@ -53,6 +55,12 @@ export function PlaybillSongListModal({
 
       setResult(payload);
       setStatus("loaded");
+      window.dispatchEvent(
+        new CustomEvent<PlaybillSongListReadyDetail>(
+          PLAYBILL_SONG_LIST_READY_EVENT,
+          { detail: { songs: payload.songs } },
+        ),
+      );
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -186,6 +194,21 @@ export function PlaybillSongListModal({
                   ) : null}
 
                   {status === "loaded" && sections.length > 0 ? (
+                    <>
+                    <div className="playbill-song-list-export-actions">
+                      <a
+                        className="button button-secondary"
+                        href={`/api/adjudication/${applicationId}/playbill-song-list/export?format=docx`}
+                      >
+                        Download Word
+                      </a>
+                      <a
+                        className="button button-secondary"
+                        href={`/api/adjudication/${applicationId}/playbill-song-list/export?format=pdf`}
+                      >
+                        Download PDF
+                      </a>
+                    </div>
                     <div className="playbill-song-list-sections">
                       {sections.map((section, sectionIndex) => (
                         <section
@@ -206,6 +229,7 @@ export function PlaybillSongListModal({
                         </section>
                       ))}
                     </div>
+                    </>
                   ) : null}
 
                   {status === "loaded" ? (

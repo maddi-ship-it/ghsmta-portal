@@ -1,5 +1,7 @@
 export const PLAYBILL_SONG_LIST_EXTRACTOR_VERSION = 2;
 export const MAX_PLAYBILL_SONGS = 250;
+export const PLAYBILL_SONG_LIST_READY_EVENT =
+  "ghsmta:playbill-song-list-ready";
 
 export const PLAYBILL_SONG_LIST_INSTRUCTIONS = [
   "Extract the musical-number or song list from this Playbill.",
@@ -28,6 +30,14 @@ export type PlaybillSongListSection = {
   heading: string;
   songs: PlaybillSong[];
 };
+
+export type PlaybillSongListReadyDetail = {
+  songs: PlaybillSong[];
+};
+
+export type PlaybillBrainDumpField =
+  | "scorecard_internal_notes"
+  | "scorecard_post_show_notes";
 
 export type PlaybillInputKind =
   | { kind: "pdf"; mimeType: "application/pdf" }
@@ -102,6 +112,36 @@ export function buildPlaybillSongListSections(
   }
 
   return sections;
+}
+
+export function playbillSongsForBrainDump(
+  songs: PlaybillSong[],
+  fieldName: PlaybillBrainDumpField,
+) {
+  const sections = buildPlaybillSongListSections(songs);
+  if (sections.length <= 1) return sections.flatMap((section) => section.songs);
+
+  return fieldName === "scorecard_internal_notes"
+    ? sections[0].songs
+    : sections.slice(1).flatMap((section) => section.songs);
+}
+
+export function buildPlaybillBrainDumpOutline(
+  songs: PlaybillSong[],
+  fieldName: PlaybillBrainDumpField,
+) {
+  const selectedSongs = playbillSongsForBrainDump(songs, fieldName);
+  if (selectedSongs.length === 0) return "";
+
+  const actHeading =
+    fieldName === "scorecard_internal_notes" ? "ACT I NOTES:" : "ACT II NOTES:";
+  const lines = [actHeading, ""];
+  for (const song of selectedSongs) {
+    const songHeading = `“${song.title}”${song.performers ? ` — ${song.performers}` : ""}`;
+    if ([...lines, songHeading, ""].join("\n").length > 24_000) break;
+    lines.push(songHeading, "");
+  }
+  return lines.join("\n");
 }
 
 export function resolvePlaybillInputKind({

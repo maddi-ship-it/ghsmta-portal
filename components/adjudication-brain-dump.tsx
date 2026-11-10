@@ -19,6 +19,12 @@ import {
   type AdjudicationBrainDumpTarget,
 } from "@/lib/adjudication-brain-dump";
 import { resolveFocusSafeRemoteUpdate } from "@/lib/focus-safe-remote-value";
+import {
+  buildPlaybillBrainDumpOutline,
+  PLAYBILL_SONG_LIST_READY_EVENT,
+  type PlaybillSong,
+  type PlaybillSongListReadyDetail,
+} from "@/lib/playbill-song-list";
 import { createClient } from "@/lib/supabase/client";
 
 type SortResponse = {
@@ -42,6 +48,8 @@ type BrainDumpReview = {
   targets: AdjudicationBrainDumpTarget[];
   undoValues: Record<string, string> | null;
 };
+
+const EMPTY_PLAYBILL_SONGS: PlaybillSong[] = [];
 
 function isStoredReview(value: unknown): value is BrainDumpReview {
   if (!value || typeof value !== "object") return false;
@@ -395,6 +403,7 @@ export function AdjudicationBrainDump({
   defaultValue,
   canComment,
   fieldName = "scorecard_internal_notes",
+  playbillSongs = EMPTY_PLAYBILL_SONGS,
   practiceMode = false,
   readOnly,
   scorecardId,
@@ -404,6 +413,7 @@ export function AdjudicationBrainDump({
   defaultValue: string | null | undefined;
   canComment: boolean;
   fieldName?: "scorecard_internal_notes" | "scorecard_post_show_notes";
+  playbillSongs?: PlaybillSong[];
   practiceMode?: boolean;
   readOnly: boolean;
   scorecardId?: string;
@@ -411,8 +421,17 @@ export function AdjudicationBrainDump({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}:${fieldName}`;
-  const [value, setValue] = useState(defaultValue ?? "");
-  const [expanded, setExpanded] = useState(!(defaultValue ?? "").trim());
+  const savedValue = defaultValue ?? "";
+  const initialPlaybillOutline =
+    canComment && !readOnly && !savedValue.trim()
+      ? buildPlaybillBrainDumpOutline(playbillSongs, fieldName)
+      : "";
+  const initialValue = savedValue || initialPlaybillOutline;
+  const [value, setValue] = useState(initialValue);
+  const [expanded, setExpanded] = useState(!savedValue.trim());
+  const [playbillOutlineReady, setPlaybillOutlineReady] = useState(
+    Boolean(initialPlaybillOutline),
+  );
   const [sorting, setSorting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingRemoteValue, setPendingRemoteValue] =
@@ -420,10 +439,11 @@ export function AdjudicationBrainDump({
   const [review, setReview] = useState<BrainDumpReview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const sortButtonRef = useRef<HTMLButtonElement | null>(null);
-  const valueRef = useRef(defaultValue ?? "");
+  const valueRef = useRef(initialValue);
   const dirtyRef = useRef(false);
   const focusedRef = useRef(false);
-  const remoteValueRef = useRef(defaultValue ?? "");
+  const remoteValueRef = useRef(savedValue);
+  const previousDefaultValueRef = useRef(savedValue);
   const dismissedRemoteValueRef = useRef<string | null>(null);
 
   const receiveRemoteValue = useCallback(
@@ -472,11 +492,45 @@ export function AdjudicationBrainDump({
   );
 
   useEffect(() => {
+    const nextDefaultValue = defaultValue ?? "";
+    if (nextDefaultValue === previousDefaultValueRef.current) return;
+    previousDefaultValueRef.current = nextDefaultValue;
+    setPlaybillOutlineReady(false);
     receiveRemoteValue(
-      defaultValue ?? "",
+      nextDefaultValue,
       "Brain dump refreshed with the latest saved version.",
     );
   }, [defaultValue, receiveRemoteValue]);
+
+  useEffect(() => {
+    const applyPlaybillOutline = (songs: PlaybillSong[]) => {
+      if (!canComment || readOnly || valueRef.current.trim()) return;
+      const outline = buildPlaybillBrainDumpOutline(songs, fieldName);
+      if (!outline) return;
+
+      valueRef.current = outline;
+      setValue(outline);
+      setExpanded(true);
+      setPlaybillOutlineReady(true);
+      setMessage(
+        "The Playbill song titles and printed characters were added as an editable note outline.",
+      );
+    };
+
+    applyPlaybillOutline(playbillSongs);
+    const receiveSongList = (event: Event) => {
+      applyPlaybillOutline(
+        (event as CustomEvent<PlaybillSongListReadyDetail>).detail?.songs ?? [],
+      );
+    };
+    window.addEventListener(PLAYBILL_SONG_LIST_READY_EVENT, receiveSongList);
+    return () => {
+      window.removeEventListener(
+        PLAYBILL_SONG_LIST_READY_EVENT,
+        receiveSongList,
+      );
+    };
+  }, [canComment, fieldName, playbillSongs, readOnly]);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia("(max-width: 720px)");
@@ -838,7 +892,9 @@ export function AdjudicationBrainDump({
               </div>
             ) : null}
             <small className="field-help">
-              {practiceMode
+              {playbillOutlineReady
+                ? "Song titles and printed characters came from the Playbill. Type each observation on a new line beneath the matching song; you can edit or remove any part of the outline."
+                : practiceMode
                 ? "These practice notes remain on this page and are cleared when you leave or reset the sandbox. Auto-sort does not send practice text to a school record."
                 : "These private notes autosave with your scorecard. Auto-sort adds matched observations to their criterion comments and opens a placement window only for observations it cannot categorize. It never assigns scores or removes the original brain dump."}
             </small>

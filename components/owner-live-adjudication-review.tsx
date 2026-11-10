@@ -945,8 +945,12 @@ export function OwnerLiveAdjudicationReview({
     [panelAveragePolicy, visibleScorecards],
   );
   const narrativeSourceAssignmentIds = useMemo(
-    () => panelNarrativeSourceAssignmentIds(panelAssignments),
-    [panelAssignments],
+    () =>
+      panelNarrativeSourceAssignmentIds(
+        panelAssignments,
+        panelAveragePolicy.contributorUserIds,
+      ),
+    [panelAssignments, panelAveragePolicy],
   );
   const narrativeSourceScorecards = useMemo(
     () =>

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
-import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
+import { after, NextResponse } from "next/server";
 
 import { extractOpenAIText } from "@/lib/adjudication";
 import { resolveAdjudicationObserverAccess } from "@/lib/adjudication-observer";
@@ -21,6 +22,10 @@ import {
   resolvePlaybillInputKind,
   type PlaybillSong,
 } from "@/lib/playbill-song-list";
+import {
+  PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX,
+  PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX,
+} from "@/lib/chat/portal-authored";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -42,7 +47,86 @@ type PlaybillFileRow = {
   mime_type: string | null;
   original_name: string;
   storage_path: string;
+  uploaded_by: string;
 };
+
+async function postMissingSongListNotice({
+  admin,
+  applicationId,
+  authorId,
+  file,
+}: {
+  admin: ReturnType<typeof createAdminClient>;
+  applicationId: string;
+  authorId: string;
+  file: PlaybillFileRow;
+}) {
+  const fileName = sourceFileName(file);
+  const subject = `${PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX} ${fileName}`.slice(
+    0,
+    180,
+  );
+  const [channelResult, applicationResult] = await Promise.all([
+    admin
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", applicationId)
+      .eq("channel_type", "school")
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("applications")
+      .select("school_name,production_title")
+      .eq("id", applicationId)
+      .maybeSingle(),
+  ]);
+  if (channelResult.error || !channelResult.data) {
+    console.error("Missing Playbill song-list notice channel was not found", {
+      applicationId,
+      message: channelResult.error?.message,
+    });
+    return;
+  }
+
+  const { data: existingPost, error: existingPostError } = await admin
+    .from("chat_posts")
+    .select("id")
+    .eq("channel_id", channelResult.data.id)
+    .eq("subject", subject)
+    .limit(1)
+    .maybeSingle();
+  if (existingPostError || existingPost) return;
+
+  const showLabel = [
+    applicationResult.data?.school_name,
+    applicationResult.data?.production_title,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+  const { error: postError } = await admin.from("chat_posts").insert({
+    channel_id: channelResult.data.id,
+    author_id: authorId,
+    subject,
+    body: [
+      `${PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX}${fileName}.`,
+      showLabel ? `Show: ${showLabel}` : "",
+      "Please verify that the uploaded Playbill contains a printed musical-number or song-list page. Upload a corrected Playbill if needed.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+  if (postError) {
+    console.error("Missing Playbill song-list notice could not be posted", {
+      applicationId,
+      message: postError.message,
+    });
+    return;
+  }
+
+  revalidatePath("/portal/chat");
+  revalidatePath("/portal/notifications");
+}
 
 function isMissingSongListCache(error: { code?: string } | null) {
   return error?.code === "42P01" || error?.code === "PGRST205";
@@ -95,7 +179,7 @@ function extractionResponse({
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ applicationId: string }> },
 ) {
   const { applicationId } = await context.params;
@@ -114,6 +198,21 @@ export async function POST(
     );
   }
 
+  const requestBody = (await request.json().catch(() => null)) as
+    | { background?: unknown; portalFileId?: unknown }
+    | null;
+  const background = requestBody?.background === true;
+  const portalFileId =
+    typeof requestBody?.portalFileId === "string"
+      ? requestBody.portalFileId
+      : "";
+  if (background && !UUID_PATTERN.test(portalFileId)) {
+    return NextResponse.json(
+      { error: "A valid uploaded Playbill is required." },
+      { status: 400 },
+    );
+  }
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role,active")
@@ -125,7 +224,10 @@ export async function POST(
       { status: 500 },
     );
   }
-  if (!profile?.active || !ADJUDICATION_ROLES.has(profile.role)) {
+  if (
+    !profile?.active ||
+    (!background && !ADJUDICATION_ROLES.has(profile.role))
+  ) {
     return NextResponse.json(
       { error: "You do not have access to this adjudication session." },
       { status: 403 },
@@ -143,7 +245,8 @@ export async function POST(
         .maybeSingle();
     if (visibleApplicationError) throw new Error(visibleApplicationError.message);
 
-    let hasAccess = profile.role === "owner" || Boolean(visibleApplication);
+    let hasAccess =
+      background || profile.role === "owner" || Boolean(visibleApplication);
     if (!hasAccess && profile.role !== "owner") {
       const observerAccess = await resolveAdjudicationObserverAccess({
         admin,
@@ -173,17 +276,20 @@ export async function POST(
       );
     }
 
-    const { data: fileData, error: fileError } = await admin
+    let fileQuery = admin
       .from("portal_files")
       .select(
-        "id,display_name,file_size,generated_name,mime_type,original_name,storage_path",
+        "id,display_name,file_size,generated_name,mime_type,original_name,storage_path,uploaded_by",
       )
       .eq("application_id", applicationId)
       .eq("context_type", "application")
       .eq("document_category", "playbill")
       .eq("reviewer_visible", true)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
+      .is("archived_at", null);
+    fileQuery = background
+      ? fileQuery.eq("id", portalFileId)
+      : fileQuery.order("created_at", { ascending: false });
+    const { data: fileData, error: fileError } = await fileQuery
       .limit(1)
       .maybeSingle();
     if (fileError) throw new Error(fileError.message);
@@ -194,6 +300,18 @@ export async function POST(
       );
     }
     const file = fileData as PlaybillFileRow;
+    if (
+      background &&
+      profile.role !== "owner" &&
+      file.uploaded_by !== user.id
+    ) {
+      return NextResponse.json(
+        { error: "You can only process a Playbill you uploaded." },
+        { status: 403 },
+      );
+    }
+
+    const executeExtraction = async () => {
 
     const { data: cachedData, error: cacheError } = await admin
       .from("playbill_song_lists")
@@ -206,6 +324,14 @@ export async function POST(
     if (cachedData) {
       const cachedSongs = parsePlaybillSongList({ songs: cachedData.songs });
       if (cachedSongs) {
+        if (background && cachedSongs.length === 0) {
+          await postMissingSongListNotice({
+            admin,
+            applicationId,
+            authorId: user.id,
+            file,
+          });
+        }
         return extractionResponse({
           cached: true,
           extractedAt: cachedData.extracted_at,
@@ -407,12 +533,42 @@ export async function POST(
       if (saveError) throw new Error(saveError.message);
     }
 
+    if (background && songs.length === 0) {
+      await postMissingSongListNotice({
+        admin,
+        applicationId,
+        authorId: user.id,
+        file,
+      });
+    }
+
     return extractionResponse({
       cached: false,
       extractedAt,
       file,
       songs,
     });
+    };
+
+    if (background) {
+      after(async () => {
+        try {
+          await executeExtraction();
+        } catch (error) {
+          console.error("Background Playbill song-list extraction failed", {
+            applicationId,
+            fileId: file.id,
+            message: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      });
+      return NextResponse.json(
+        { processing: true, portalFileId: file.id },
+        { status: 202 },
+      );
+    }
+
+    return executeExtraction();
   } catch (error) {
     console.error("Playbill song-list request failed", {
       applicationId,

@@ -2627,6 +2627,7 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
 .panel-comment-sync-status small { color: var(--muted); }
 .panel-comment-sync-status-error { border-color: #fecdca; background: #fff6f5; }
 .panel-comment-sync-status-error .status-dot { background: #d92d20; box-shadow: 0 0 0 7px rgba(217,45,32,.1); }
+.score-visibility-toggle { margin-left: auto; flex: 0 0 auto; }
 
 .collaborative-criterion-table {
   overflow-x: auto;
@@ -2642,6 +2643,12 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
   gap: 14px;
   align-items: stretch;
 }
+.collaborative-criterion-table-scores-hidden
+  :is(.collaborative-criterion-table-header, .collaborative-criterion-row) {
+  grid-template-columns: minmax(220px, .85fr) minmax(720px, 3fr);
+  min-width: 970px;
+}
+.personal-score-column[hidden] { display: none !important; }
 .collaborative-criterion-table-header {
   position: sticky;
   top: 0;
@@ -4404,6 +4411,28 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
 .playbill-song-list-sections {
   display: grid;
   gap: 16px;
+}
+
+.playbill-song-list-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (min-width: 901px) {
+  .portal-shell .portal-main
+    .collaborative-criterion-table-scores-hidden
+    :is(.collaborative-criterion-table-header, .collaborative-criterion-row) {
+    grid-template-columns: minmax(250px, .92fr) minmax(0, 3fr);
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .panel-comment-sync-status { flex-wrap: wrap; }
+  .score-visibility-toggle { width: 100%; margin-left: 0; }
+  .playbill-song-list-export-actions .button { flex: 1 1 150px; }
 }
 
 .playbill-song-list-section {

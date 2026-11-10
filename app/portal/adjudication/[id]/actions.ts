@@ -968,6 +968,7 @@ async function generatePanelCommentDraft(
   );
   const narrativeAssignmentIds = panelNarrativeSourceAssignmentIds(
     panelAssignments,
+    panelAveragePolicy.contributorUserIds,
   );
   const narrativeScorecardIds = new Set(
     scorecards
@@ -1208,15 +1209,48 @@ async function refreshLivePanelNarratives(
       .eq("application_id", applicationId),
     admin
       .from("adjudicator_assignments")
-      .select("id,can_comment,removed_at")
+      .select(
+        "id,adjudicator_user_id,participant_role,can_score,can_comment,removed_at",
+      )
       .eq("application_id", applicationId)
       .is("removed_at", null),
   ]);
   const { data: allScorecards, error: scorecardError } = scorecardResult;
   if (scorecardError) throw new Error(scorecardError.message);
   if (assignmentResult.error) throw new Error(assignmentResult.error.message);
+  const refreshAssignments = (assignmentResult.data ?? []) as Pick<
+    AdjudicatorAssignment,
+    | "id"
+    | "adjudicator_user_id"
+    | "participant_role"
+    | "can_score"
+    | "can_comment"
+    | "removed_at"
+  >[];
+  const refreshPanelUserIds = [
+    ...new Set(
+      refreshAssignments.map(
+        (assignment) => assignment.adjudicator_user_id,
+      ),
+    ),
+  ];
+  const { data: refreshPanelProfiles, error: refreshPanelProfilesError } =
+    refreshPanelUserIds.length
+      ? await admin
+          .from("profiles")
+          .select("id,role")
+          .in("id", refreshPanelUserIds)
+      : { data: [], error: null };
+  if (refreshPanelProfilesError) {
+    throw new Error(refreshPanelProfilesError.message);
+  }
+  const refreshPanelPolicy = resolvePanelAveragePolicy(
+    refreshAssignments,
+    (refreshPanelProfiles ?? []) as Pick<Profile, "id" | "role">[],
+  );
   const narrativeAssignmentIds = panelNarrativeSourceAssignmentIds(
-    assignmentResult.data ?? [],
+    refreshAssignments,
+    refreshPanelPolicy.contributorUserIds,
   );
   const scorecards = (allScorecards ?? []).filter((scorecard) =>
     narrativeAssignmentIds.has(scorecard.assignment_id),

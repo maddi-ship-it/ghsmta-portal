@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { segmentAdjudicationBrainDump } from "./adjudication-brain-dump";
 import {
+  buildPlaybillBrainDumpOutline,
   buildPlaybillSongListSections,
   parsePlaybillSongList,
   PLAYBILL_SONG_LIST_EXTRACTOR_VERSION,
@@ -73,5 +75,42 @@ describe("Playbill song-list extraction", () => {
       mimeType: "image/jpeg",
     });
     expect(resolvePlaybillInputKind({ fileName: "show.docx", mimeType: null })).toBeNull();
+  });
+
+  it("builds editable act-aware brain-dump outlines with characters", () => {
+    const songs = [
+      { section: "Act I", title: "Opening", performers: "Company" },
+      { section: "Act I", title: "Solo", performers: "Alice" },
+      { section: "Act II", title: "Finale", performers: "Alice and Company" },
+    ];
+
+    expect(
+      buildPlaybillBrainDumpOutline(songs, "scorecard_internal_notes"),
+    ).toContain("ACT I NOTES:\n\n“Opening” — Company\n\n“Solo” — Alice");
+    expect(
+      buildPlaybillBrainDumpOutline(songs, "scorecard_internal_notes"),
+    ).not.toContain("Finale");
+    expect(
+      buildPlaybillBrainDumpOutline(songs, "scorecard_post_show_notes"),
+    ).toContain("ACT II NOTES:\n\n“Finale” — Alice and Company");
+  });
+
+  it("keeps notes typed beneath an auto-placed song tied to that song", () => {
+    const outline = buildPlaybillBrainDumpOutline(
+      [{ section: "Act I", title: "Believe", performers: "Sylvia" }],
+      "scorecard_internal_notes",
+    );
+    const withObservation = outline.replace(
+      "“Believe” — Sylvia\n",
+      "“Believe” — Sylvia\nStrong character work throughout the number.\n",
+    );
+
+    expect(segmentAdjudicationBrainDump(withObservation)).toEqual([
+      {
+        id: "note-1",
+        number: 1,
+        text: "Song: “Believe” — Strong character work throughout the number.",
+      },
+    ]);
   });
 });

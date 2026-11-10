@@ -345,6 +345,7 @@ function CategoryScoreSection({
   scoreOptions,
   canComment,
   canScore,
+  showScores,
   observerMode,
   readOnly,
   currentUserId,
@@ -372,6 +373,7 @@ function CategoryScoreSection({
   scoreOptions: ScoreOption[];
   canComment: boolean;
   canScore: boolean;
+  showScores: boolean;
   observerMode: boolean;
   readOnly: boolean;
   currentUserId: string;
@@ -464,6 +466,12 @@ function CategoryScoreSection({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      if (!showScores) {
+        setReviewOpen(false);
+        previousMismatchRef.current = false;
+        return;
+      }
+
       if (rangeMismatch && !previousMismatchRef.current && !readOnly) {
         setReviewOpen(true);
       }
@@ -476,7 +484,7 @@ function CategoryScoreSection({
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [rangeMismatch, readOnly]);
+  }, [rangeMismatch, readOnly, showScores]);
 
   const updateScore = (criterionId: string, nextValue: string) => {
     setScoreValues((current) => ({
@@ -612,7 +620,7 @@ function CategoryScoreSection({
         </button>
 
         <div className="scoring-category-header-actions">
-          {!canScore ? null : isOverallProduction ? (
+          {!canScore || !showScores ? null : isOverallProduction ? (
             <div className="category-average-summary category-overall-summary">
               <span>Your derived overall score</span>
               <strong>{formatAverage(overallProductionScore.score)}</strong>
@@ -634,7 +642,7 @@ function CategoryScoreSection({
             />
           )}
 
-          {canScore && !isOverallProduction && (
+          {canScore && showScores && !isOverallProduction && (
             <section
               aria-labelledby={`category-decision-${category.id}`}
               className={[
@@ -779,6 +787,9 @@ function CategoryScoreSection({
           className={[
             "collaborative-criterion-table",
             observerMode ? "collaborative-criterion-table-observer" : "",
+            canScore && !showScores
+              ? "collaborative-criterion-table-scores-hidden"
+              : "",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -799,7 +810,7 @@ function CategoryScoreSection({
               ))}
             </div>
 
-            {canScore ? (
+            {canScore && showScores ? (
               <span className="personal-score-heading">Your score</span>
             ) : null}
           </div>
@@ -873,7 +884,10 @@ function CategoryScoreSection({
                 </div>
 
                 {canScore ? (
-                <div className="personal-score-column">
+                <div
+                  className="personal-score-column"
+                  hidden={!showScores}
+                >
                   <label htmlFor={`score_${criterion.id}`}>Your score</label>
                   {isOverallProduction ? (
                     <output
@@ -1011,7 +1025,7 @@ function CategoryScoreSection({
 
       </div>
 
-      {canScore && reviewOpen && !readOnly && !isOverallProduction && (
+      {canScore && showScores && reviewOpen && !readOnly && !isOverallProduction && (
         <div
           className="score-range-modal-backdrop"
           onMouseDown={(event) => {
@@ -1185,6 +1199,7 @@ export function CollaborativeAdjudicatorScorecard({
   const [refreshError, setRefreshError] = useState(false);
   const [liveConnection, setLiveConnection] = useState(false);
   const [showPeerComments, setShowPeerComments] = useState(true);
+  const [showScores, setShowScores] = useState(false);
   const [liveOwnScoreValues, setLiveOwnScoreValues] = useState<
     Record<string, number | null>
   >(() =>
@@ -1521,6 +1536,16 @@ export function CollaborativeAdjudicatorScorecard({
               : "Waiting for the next panel update…"}
           </small>
         </div>
+        {canScore ? (
+          <button
+            aria-pressed={showScores}
+            className="button button-secondary button-compact score-visibility-toggle"
+            onClick={() => setShowScores((current) => !current)}
+            type="button"
+          >
+            {showScores ? "Hide scores" : "Show scores"}
+          </button>
+        ) : null}
       </div>
 
       {categories.map((category) => (
@@ -1552,6 +1577,7 @@ export function CollaborativeAdjudicatorScorecard({
             panelMembers={visiblePanelMembers}
             canComment={canComment}
             canScore={canScore}
+            showScores={showScores}
             observerMode={observerMode}
             readOnly={readOnly}
             scoreOptions={scoreOptions}
