@@ -4,6 +4,7 @@ import {
   isPortalChatAuthorId,
   PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT,
   PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT,
+  PORTAL_FINAL_COMMENTS_READY_SUBJECT,
   PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT,
   PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX,
   PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX,
@@ -41,6 +42,25 @@ describe("portal-authored chat notifications", () => {
         latest_author_name: "Staff Member",
         latest_message_preview:
           "Final comment writers have been assigned for Demo School — Newsies.",
+      }).latest_author_name,
+    ).toBe("The Portal");
+  });
+
+  it("presents Owner final-comment release notices as coming from The Portal", () => {
+    const presented = presentPortalAuthoredThread({
+      author_id: "owner-user",
+      author_name: "Owner Name",
+      post_id: "post-ready",
+      subject: PORTAL_FINAL_COMMENTS_READY_SUBJECT,
+    });
+
+    expect(presented.author_name).toBe("The Portal");
+    expect(isPortalChatAuthorId(presented.author_id)).toBe(true);
+    expect(
+      presentPortalAuthoredChannel({
+        latest_author_name: "Owner Name",
+        latest_message_preview:
+          "The Owner sent final comments to the panel for Demo School — Newsies.",
       }).latest_author_name,
     ).toBe("The Portal");
   });

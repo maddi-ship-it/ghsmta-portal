@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activePanelMemberUserIds,
+  finalCommentsReadyAnnouncement,
   isAssignedPanelNarrativeReviewer,
   isPanelNarrativeApprovalComplete,
   panelNarrativeSourceAssignmentIds,
@@ -184,6 +186,65 @@ describe("Owner panel narrative generation", () => {
         reviewerId: "panelist-1",
       }),
     ).toBe(false);
+  });
+
+  it("shares released final comments with every active scoring or commenting panel member", () => {
+    expect(
+      activePanelMemberUserIds([
+        {
+          adjudicator_user_id: "scorer-only",
+          can_score: true,
+          can_comment: false,
+          removed_at: null,
+        },
+        {
+          adjudicator_user_id: "commenter-only",
+          can_score: false,
+          can_comment: true,
+          removed_at: null,
+        },
+        {
+          adjudicator_user_id: "both",
+          can_score: true,
+          can_comment: true,
+          removed_at: null,
+        },
+        {
+          adjudicator_user_id: "observer",
+          can_score: false,
+          can_comment: false,
+          removed_at: null,
+        },
+        {
+          adjudicator_user_id: "removed",
+          can_score: true,
+          can_comment: true,
+          removed_at: "2026-11-10T12:00:00.000Z",
+        },
+        {
+          adjudicator_user_id: "both",
+          can_score: true,
+          can_comment: true,
+          removed_at: null,
+        },
+      ]),
+    ).toEqual(["scorer-only", "commenter-only", "both"]);
+  });
+
+  it("announces Owner-sent comments and explains panel access", () => {
+    expect(
+      finalCommentsReadyAnnouncement({
+        schoolName: "Demo School",
+        productionTitle: "Newsies",
+        categoryTitles: ["Direction", "Technical Execution"],
+      }),
+    ).toBe(
+      "The Owner sent final comments to the panel for Demo School — Newsies.\n\n" +
+        "2 final comments are ready for panel review.\n" +
+        "• Direction\n" +
+        "• Technical Execution\n\n" +
+        "All active panel members can read the comments. Only each assigned writer can edit and approve their comment.",
+    );
   });
 
   it("requires approval from the assigned active panel reviewer", () => {

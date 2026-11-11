@@ -5,12 +5,16 @@ export const PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT =
   "Acting candidate changes approved";
 export const PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT =
   "Final comment assignments";
+export const PORTAL_FINAL_COMMENTS_READY_SUBJECT =
+  "Final comments sent to panel";
 export const PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX =
   "Playbill song list not found:";
 
 const PORTAL_AUTHOR_ID_PREFIX = "portal:";
 const NARRATIVE_ASSIGNMENT_PREVIEW_PREFIX =
   "Final comment writers have been assigned for ";
+const FINAL_COMMENTS_READY_PREVIEW_PREFIX =
+  "The Owner sent final comments to the panel for ";
 const ACTING_CANDIDATE_PREVIEW_PHRASE =
   "Congratulations on a successful run of your production!";
 export const PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX =
@@ -19,6 +23,7 @@ export const PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX =
 function isPortalAuthoredSubject(subject: string) {
   return (
     subject === PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT ||
+    subject === PORTAL_FINAL_COMMENTS_READY_SUBJECT ||
     subject === PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT ||
     subject === PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT ||
     subject.startsWith(PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX)
@@ -57,6 +62,9 @@ export function presentPortalAuthoredChannel<
   if (
     !channel.latest_message_preview?.startsWith(
       NARRATIVE_ASSIGNMENT_PREVIEW_PREFIX,
+    ) &&
+    !channel.latest_message_preview?.startsWith(
+      FINAL_COMMENTS_READY_PREVIEW_PREFIX,
     ) &&
     !channel.latest_message_preview?.includes(
       ACTING_CANDIDATE_PREVIEW_PHRASE,

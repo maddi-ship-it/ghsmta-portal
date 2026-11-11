@@ -289,6 +289,14 @@ function InlinePanelNarrativeReview({
         </div>
       )}
 
+      {ownerSentComment && !panelApproved ? (
+        <div className="notice page-message" role="status">
+          <strong>The Owner sent this final comment to the panel.</strong>{" "}
+          Everyone on the panel can read it. Only the assigned writer can edit
+          and approve it.
+        </div>
+      ) : null}
+
       {!ownerSentComment ? (
         <div className="comment-readonly-surface">
           The Owner draft will appear here after an Owner sends it to the
@@ -1245,7 +1253,7 @@ export function CollaborativeAdjudicatorScorecard({
         )
         .eq("application_id", applicationId)
         .neq("status", "draft"),
-      canComment
+      canScore || canComment
         ? supabase
             .from("adjudication_panel_feedback")
             .select("*")
@@ -1278,14 +1286,14 @@ export function CollaborativeAdjudicatorScorecard({
     setLiveCategoryApprovals(
       (approvalResult.data ?? []) as CategoryApproval[],
     );
-    if (canComment && feedbackResult.data) {
+    if ((canScore || canComment) && feedbackResult.data) {
       setLivePanelFeedback(
         feedbackResult.data as AdjudicationPanelFeedback[],
       );
     }
     setLastRefreshed(new Date());
     setRefreshError(false);
-  }, [applicationId, canComment, observerMode, practiceMode, supabase]);
+  }, [applicationId, canComment, canScore, observerMode, practiceMode, supabase]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) window.clearTimeout(refreshTimer.current);

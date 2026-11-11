@@ -46,6 +46,15 @@ export type PanelAssignmentAnnouncementResult = {
   attemptId?: string;
 };
 
+export type PanelAssignmentSaveResult = {
+  ok: boolean;
+  categoryId: string;
+  assignedTo: string | null;
+  error?: string;
+  changedCount?: number;
+  attemptId?: string;
+};
+
 export type FullScoreRangeSaveResult = {
   ok: boolean;
   error?: string;
@@ -744,6 +753,81 @@ async function savePanelNarrativeAssignments({
   }
 
   return changedAssignments.length;
+}
+
+export async function savePanelNarrativeAssignment(
+  applicationId: string,
+  categoryId: string,
+  assignedTo: string | null,
+): Promise<PanelAssignmentSaveResult> {
+  const profile = await requireProfile(["advisory_member", "owner"]);
+  const attemptId = new Date().toISOString();
+  const supabase = await createClient();
+  const { data: canReview, error: accessError } = await supabase.rpc(
+    "can_advisory_review_application",
+    {
+      p_application_id: applicationId,
+      p_user_id: profile.id,
+    },
+  );
+
+  if (accessError || !canReview) {
+    logEvent("warn", "adjudication.narrative_assignment_autosave_denied", {
+      applicationId,
+      actorId: profile.id,
+      categoryId,
+      message: accessError?.message ?? "Review access is no longer active.",
+    });
+    return {
+      ok: false,
+      categoryId,
+      assignedTo,
+      error: accessError
+        ? "We couldn't confirm access to this review. Please try again."
+        : "You are no longer assigned to review this application.",
+      attemptId,
+    };
+  }
+
+  const formData = new FormData();
+  formData.set(`assigned_to_${categoryId}`, assignedTo ?? "");
+
+  try {
+    const changedCount = await savePanelNarrativeAssignments({
+      applicationId,
+      actorId: profile.id,
+      categoryIds: [categoryId],
+      announcementCategoryIds: [],
+      announceChanges: false,
+      formData,
+    });
+    revalidatePath(`/portal/adjudication/${applicationId}`);
+    return {
+      ok: true,
+      categoryId,
+      assignedTo,
+      changedCount,
+      attemptId,
+    };
+  } catch (assignmentError) {
+    const message =
+      assignmentError instanceof Error
+        ? assignmentError.message
+        : "The final comment assignment could not be saved.";
+    logEvent("error", "adjudication.narrative_assignment_autosave_failed", {
+      applicationId,
+      actorId: profile.id,
+      categoryId,
+      message,
+    });
+    return {
+      ok: false,
+      categoryId,
+      assignedTo,
+      error: message,
+      attemptId,
+    };
+  }
 }
 
 export async function saveAllCategoryProposals(

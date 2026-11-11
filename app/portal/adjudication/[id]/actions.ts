@@ -31,7 +31,10 @@ import { categoryDecisionApprovedForUser } from "@/lib/adjudication-category-dec
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
+import { PORTAL_FINAL_COMMENTS_READY_SUBJECT } from "@/lib/chat/portal-authored";
 import {
+  activePanelMemberUserIds,
+  finalCommentsReadyAnnouncement,
   isAssignedPanelNarrativeReviewer,
   panelNarrativeSourceAssignmentIds,
   resolveGeneratedNarrativeFinal,
@@ -1721,7 +1724,7 @@ export async function sendAllPanelNarrativesToPanel(
       await Promise.all([
         admin
           .from("scoring_categories")
-          .select("id,category_key,rubric_id")
+          .select("id,title,category_key,rubric_id")
           .in("id", categoryIds)
           .eq("active", true),
         admin
@@ -1731,9 +1734,8 @@ export async function sendAllPanelNarrativesToPanel(
           .in("category_id", categoryIds),
         admin
           .from("adjudicator_assignments")
-          .select("adjudicator_user_id")
+          .select("adjudicator_user_id,can_score,can_comment,removed_at")
           .eq("application_id", applicationId)
-          .eq("can_comment", true)
           .is("removed_at", null),
         admin
           .from("adjudication_category_scoreability")
@@ -1793,15 +1795,11 @@ export async function sendAllPanelNarrativesToPanel(
       }
     }
 
-    const panelUserIds = [
-      ...new Set(
-        (panelAssignmentsResult.data ?? []).map(
-          (assignment) => assignment.adjudicator_user_id,
-        ),
-      ),
-    ];
+    const panelUserIds = activePanelMemberUserIds(
+      panelAssignmentsResult.data ?? [],
+    );
     if (panelUserIds.length === 0) {
-      throw new Error("No commenting panel members are assigned to this application.");
+      throw new Error("No active panel members are assigned to this application.");
     }
 
     const approvedAt = new Date().toISOString();
@@ -1845,6 +1843,47 @@ export async function sendAllPanelNarrativesToPanel(
         applicationId,
         notificationError,
       });
+    }
+
+    const { data: panelChannel, error: panelChannelError } = await admin
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", applicationId)
+      .eq("channel_type", ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+    if (panelChannelError) {
+      console.error("Unable to locate the panel channel for final comments.", {
+        applicationId,
+        panelChannelError,
+      });
+    } else if (panelChannel) {
+      const categoryTitleById = new Map(
+        (categoriesResult.data ?? []).map((category) => [
+          category.id,
+          category.title,
+        ]),
+      );
+      const { error: panelPostError } = await admin.from("chat_posts").insert({
+        channel_id: panelChannel.id,
+        author_id: owner.id,
+        subject: PORTAL_FINAL_COMMENTS_READY_SUBJECT,
+        body: finalCommentsReadyAnnouncement({
+          schoolName: application.school_name,
+          productionTitle: application.production_title,
+          categoryTitles: comments.map(
+            (comment) =>
+              categoryTitleById.get(comment.categoryId) ?? "Final comment",
+          ),
+        }),
+      });
+      if (panelPostError) {
+        console.error("Unable to post the final-comment panel announcement.", {
+          applicationId,
+          panelPostError,
+        });
+      }
     }
 
     revalidatePath(`/portal/adjudication/${applicationId}`);
@@ -2016,19 +2055,12 @@ export async function savePanelFeedback(
   if (sentToPanel) {
     const { data: panelAssignments, error: panelAssignmentError } = await admin
       .from("adjudicator_assignments")
-      .select("adjudicator_user_id")
+      .select("adjudicator_user_id,can_score,can_comment,removed_at")
       .eq("application_id", applicationId)
-      .eq("can_comment", true)
       .is("removed_at", null);
     if (panelAssignmentError) throw new Error(panelAssignmentError.message);
 
-    const panelUserIds = [
-      ...new Set(
-        (panelAssignments ?? []).map(
-          (assignment) => assignment.adjudicator_user_id,
-        ),
-      ),
-    ];
+    const panelUserIds = activePanelMemberUserIds(panelAssignments ?? []);
     if (panelUserIds.length > 0) {
       const { error: notificationError } = await admin
         .from("user_notifications")
@@ -2042,7 +2074,49 @@ export async function savePanelFeedback(
             related_application_id: applicationId,
           })),
         );
-      if (notificationError) throw new Error(notificationError.message);
+      if (notificationError) {
+        console.error("Unable to notify the full panel about the final comment.", {
+          applicationId,
+          categoryId,
+          notificationError,
+        });
+      }
+    }
+
+    const { data: panelChannel, error: panelChannelError } = await admin
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", applicationId)
+      .eq("channel_type", ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+    if (panelChannelError) {
+      console.error("Unable to locate the panel channel for the final comment.", {
+        applicationId,
+        categoryId,
+        panelChannelError,
+      });
+    } else if (panelChannel) {
+      const { error: panelPostError } = await admin.from("chat_posts").insert({
+        channel_id: panelChannel.id,
+        author_id: editor.id,
+        subject: PORTAL_FINAL_COMMENTS_READY_SUBJECT,
+        body: finalCommentsReadyAnnouncement({
+          schoolName: application.school_name,
+          productionTitle: application.production_title,
+          categoryTitles: [category.title],
+        }),
+      });
+      if (panelPostError) {
+        console.error("Unable to post the final-comment panel announcement.", {
+          applicationId,
+          categoryId,
+          panelPostError,
+        });
+      } else {
+        revalidatePath("/portal/chat");
+      }
     }
   }
 

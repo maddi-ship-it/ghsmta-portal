@@ -14,6 +14,7 @@ import {
   ownerUpdateAdjudicationReview,
   respondCategoryProposal,
   saveAllCategoryProposals,
+  savePanelNarrativeAssignment,
   sendPanelNarrativeAssignmentsToChannel,
   submitPanelForOwnerReview,
   type CategoryProposalSaveResult,
@@ -72,6 +73,11 @@ type PanelReviewer = {
 type NarrativeAssignment = {
   category_id: string;
   assigned_to: string | null;
+};
+
+type WriterAssignmentSaveState = {
+  status: "idle" | "saving" | "saved" | "error";
+  error?: string;
 };
 
 type CategoryScoreability = {
@@ -238,6 +244,25 @@ export function AdjudicationConsensusBar({
   const [rangeSelections, setRangeSelections] = useState<Record<string, string>>(
     () => initialRangeSelections(categories, proposals),
   );
+  const [writerAssignments, setWriterAssignments] = useState<
+    Record<string, string | null>
+  >(() =>
+    Object.fromEntries(
+      categories.map((category) => [
+        category.id,
+        narrativeAssignments.find(
+          (assignment) => assignment.category_id === category.id,
+        )?.assigned_to ?? null,
+      ]),
+    ),
+  );
+  const [writerAssignmentSaveState, setWriterAssignmentSaveState] = useState<
+    Record<string, WriterAssignmentSaveState>
+  >({});
+  const pendingWriterAssignments = useRef(new Set<string>());
+  const persistedWriterAssignments = useRef({ ...writerAssignments });
+  const writerAssignmentRequestVersions = useRef(new Map<string, number>());
+  const writerAssignmentQueues = useRef(new Map<string, Promise<void>>());
   const autoSendAssignmentsButtonRef = useRef<HTMLButtonElement>(null);
   const writerAssignmentsComplete = useRef(false);
   const [liveAverageStatus, setLiveAverageStatus] = useState<
@@ -293,14 +318,8 @@ export function AdjudicationConsensusBar({
     [scoreability],
   );
   const assignmentByCategory = useMemo(
-    () =>
-      new Map(
-        narrativeAssignments.map((assignment) => [
-          assignment.category_id,
-          assignment.assigned_to,
-        ]),
-      ),
-    [narrativeAssignments],
+    () => new Map(Object.entries(writerAssignments)),
+    [writerAssignments],
   );
   const reviewerById = useMemo(
     () => new Map(panelReviewers.map((reviewer) => [reviewer.id, reviewer])),
@@ -412,21 +431,103 @@ export function AdjudicationConsensusBar({
     },
     [],
   );
+
+  useEffect(() => {
+    const incomingAssignments = new Map(
+      narrativeAssignments.map((assignment) => [
+        assignment.category_id,
+        assignment.assigned_to,
+      ]),
+    );
+    setWriterAssignments((current) => {
+      const next = { ...current };
+      for (const category of categories) {
+        if (pendingWriterAssignments.current.has(category.id)) continue;
+        const incomingAssignment = incomingAssignments.get(category.id) ?? null;
+        next[category.id] = incomingAssignment;
+        persistedWriterAssignments.current[category.id] = incomingAssignment;
+      }
+      return next;
+    });
+  }, [categories, narrativeAssignments]);
+
   const handleWriterSelectionChange = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) => {
+    async (categoryId: string, event: ChangeEvent<HTMLSelectElement>) => {
       const form = event.currentTarget.form;
       if (!form) return;
+
+      const nextAssignee = event.currentTarget.value || null;
+      const requestVersion =
+        (writerAssignmentRequestVersions.current.get(categoryId) ?? 0) + 1;
+      writerAssignmentRequestVersions.current.set(categoryId, requestVersion);
+      setWriterAssignments((current) => ({
+        ...current,
+        [categoryId]: nextAssignee,
+      }));
+      setWriterAssignmentSaveState((current) => ({
+        ...current,
+        [categoryId]: { status: "saving" },
+      }));
+      pendingWriterAssignments.current.add(categoryId);
 
       const assignmentsAreComplete = formHasAllApplicableWriters(form);
       const completedWithThisSelection =
         assignmentsAreComplete && !writerAssignmentsComplete.current;
       writerAssignmentsComplete.current = assignmentsAreComplete;
 
-      if (completedWithThisSelection && autoSendAssignmentsButtonRef.current) {
-        form.requestSubmit(autoSendAssignmentsButtonRef.current);
-      }
+      const previousSave =
+        writerAssignmentQueues.current.get(categoryId) ?? Promise.resolve();
+      const nextSave = previousSave.then(async () => {
+        const result = await savePanelNarrativeAssignment(
+          applicationId,
+          categoryId,
+          nextAssignee,
+        );
+        const isLatestRequest =
+          writerAssignmentRequestVersions.current.get(categoryId) ===
+          requestVersion;
+
+        if (result.ok) {
+          persistedWriterAssignments.current[categoryId] = nextAssignee;
+        }
+        if (!isLatestRequest) return;
+
+        pendingWriterAssignments.current.delete(categoryId);
+        writerAssignmentQueues.current.delete(categoryId);
+        if (!result.ok) {
+          setWriterAssignments((current) => ({
+            ...current,
+            [categoryId]:
+              persistedWriterAssignments.current[categoryId] ?? null,
+          }));
+          setWriterAssignmentSaveState((current) => ({
+            ...current,
+            [categoryId]: {
+              status: "error",
+              error:
+                result.error ?? "The writer assignment could not be saved.",
+            },
+          }));
+          writerAssignmentsComplete.current = false;
+          return;
+        }
+
+        setWriterAssignmentSaveState((current) => ({
+          ...current,
+          [categoryId]: { status: "saved" },
+        }));
+        if (
+          completedWithThisSelection &&
+          formHasAllApplicableWriters(form) &&
+          autoSendAssignmentsButtonRef.current
+        ) {
+          form.requestSubmit(autoSendAssignmentsButtonRef.current);
+        }
+      });
+      writerAssignmentQueues.current.set(categoryId, nextSave);
+      await nextSave;
     },
-    [],
+    [applicationId],
   );
   const openRangeReview = useCallback(() => {
     setAdjudicatorCategoryAverages(
@@ -986,6 +1087,10 @@ export function AdjudicationConsensusBar({
                         ? reviewerById.get(assigneeId)
                         : undefined;
                       const assigneeFieldName = `assigned_to_${category.id}`;
+                      const writerSaveState =
+                        writerAssignmentSaveState[category.id] ?? {
+                          status: "idle" as const,
+                        };
                       const panelAverage = panelAverageByCategory.get(
                         category.id,
                       );
@@ -1208,11 +1313,17 @@ export function AdjudicationConsensusBar({
                               </label>
                             {canSetDecisions ? (
                               <select
+                                aria-busy={writerSaveState.status === "saving"}
                                 className="select"
-                                defaultValue={assigneeId ?? ""}
                                 id={assigneeFieldName}
                                 name={assigneeFieldName}
-                                onChange={handleWriterSelectionChange}
+                                onChange={(event) => {
+                                  void handleWriterSelectionChange(
+                                    category.id,
+                                    event,
+                                  );
+                                }}
+                                value={assigneeId ?? ""}
                               >
                                 <option value="">Choose panel member</option>
                                 {panelReviewers.map((reviewer) => (
@@ -1225,6 +1336,22 @@ export function AdjudicationConsensusBar({
                               <strong className="advisory-decision-assignee">
                                 {assignedReviewer?.name ?? "Unassigned"}
                               </strong>
+                            )}
+                            {canSetDecisions && writerSaveState.status !== "idle" && (
+                              <small
+                                aria-live="polite"
+                                className={
+                                  writerSaveState.status === "error"
+                                    ? "form-error"
+                                    : undefined
+                                }
+                              >
+                                {writerSaveState.status === "saving"
+                                  ? "Saving writer…"
+                                  : writerSaveState.status === "saved"
+                                    ? "Writer saved"
+                                    : writerSaveState.error}
+                              </small>
                             )}
                             </div>
                             <div className="advisory-decision-field advisory-decision-note">

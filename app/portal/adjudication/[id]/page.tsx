@@ -591,12 +591,12 @@ export default async function AdjudicationApplicationPage({
         panelApproverIds.has(item.approved_by),
     )
     .map((item) => item.category_id);
-  const panelVisibleFeedback = feedback.filter(
-    (item) =>
-      item.status === "approved" &&
-      (effectiveParticipantRole !== "adjudicator" ||
-        item.assigned_to === profile.id),
-  );
+  const canReadPanelFinalComments =
+    !isReadOnlyObserver &&
+    (profile.role === "owner" || isScoringParticipant || canPanelReview);
+  const panelVisibleFeedback = canReadPanelFinalComments
+    ? feedback.filter((item) => item.status === "approved")
+    : [];
 
   let scheduleSlot: ScheduleSlotReference | null = null;
   let scheduleSchoolDetails: ScheduleSchoolDetailReference | null = null;

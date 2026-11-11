@@ -201,6 +201,15 @@ function AdvisoryCategoryNarrative({
           </div>
         ) : null}
 
+
+        {finalComment && !panelApproved ? (
+          <div className="notice page-message" role="status">
+            <strong>The Owner sent this final comment to the panel.</strong>{" "}
+            Everyone on the panel can read it. Only the assigned writer can edit
+            and approve it.
+          </div>
+        ) : null}
+
         {finalComment ? (
           canEdit ? (
             <PanelNarrativeReviewEditor
