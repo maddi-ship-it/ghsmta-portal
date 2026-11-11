@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isPortalChatAuthorId,
+  PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT,
+  PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT,
   PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT,
   PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX,
   PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX,
@@ -57,6 +59,31 @@ describe("portal-authored chat notifications", () => {
       presentPortalAuthoredChannel({
         latest_author_name: "School User",
         latest_message_preview: `${PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX}Playbill.pdf.`,
+      }).latest_author_name,
+    ).toBe("The Portal");
+  });
+
+  it.each([
+    PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT,
+    PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT,
+  ])("presents %s as coming from The Portal", (subject) => {
+    const presented = presentPortalAuthoredThread({
+      author_id: "acm-user",
+      author_name: "ACM Name",
+      post_id: "candidate-post",
+      subject,
+    });
+
+    expect(presented.author_name).toBe("The Portal");
+    expect(isPortalChatAuthorId(presented.author_id)).toBe(true);
+  });
+
+  it("uses The Portal in the channel preview for acting-candidate notices", () => {
+    expect(
+      presentPortalAuthoredChannel({
+        latest_author_name: "ACM Name",
+        latest_message_preview:
+          "Hi Leila! Congratulations on a successful run of your production! We are so proud to have your program and students",
       }).latest_author_name,
     ).toBe("The Portal");
   });

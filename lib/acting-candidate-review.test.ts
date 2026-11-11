@@ -150,7 +150,6 @@ describe("acting candidate review", () => {
     );
     const message = buildActingCandidateSchoolMessage({
       directorName: "Wesley Smith",
-      coordinatorName: "Beth",
       candidates,
       changedSlots: ["featured_performer"],
       sectionDeadline: "March 13, 2027",
@@ -168,5 +167,7 @@ describe("acting candidate review", () => {
     expect(message).toContain("School Files:");
     expect(message).not.toContain("drive.google.com");
     expect(message).not.toContain("Section C");
+    expect(message).toContain("Warm regards,\nThe Portal");
+    expect(message).not.toContain("Warm regards,\nBeth");
   });
 });

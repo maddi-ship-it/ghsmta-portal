@@ -1,4 +1,5 @@
 import type { ApplicationReferencePanel } from "@/lib/application-reference-panels";
+import { PORTAL_CHAT_AUTHOR_NAME } from "@/lib/chat/portal-authored";
 
 export const ACTING_CANDIDATE_REVIEW_ACTIONS = [
   "acting_candidates_submitted",
@@ -295,7 +296,6 @@ function changedCandidateLine(candidate: ActingCandidate) {
 
 export function buildActingCandidateSchoolMessage({
   directorName,
-  coordinatorName,
   candidates,
   changedSlots,
   sectionDeadline,
@@ -303,7 +303,6 @@ export function buildActingCandidateSchoolMessage({
   schoolFilesUrl,
 }: {
   directorName: string | null;
-  coordinatorName: string;
   candidates: ActingCandidate[];
   changedSlots: ActingCandidateSlot[];
   sectionDeadline: string | null;
@@ -349,6 +348,6 @@ export function buildActingCandidateSchoolMessage({
     "If you have any issues or questions regarding any of this, please let me know and I’m happy to help.",
     "",
     "Warm regards,",
-    coordinatorName,
+    PORTAL_CHAT_AUTHOR_NAME,
   ].join("\n");
 }

@@ -18,6 +18,11 @@ import {
 import { buildApplicationReferencePanels } from "@/lib/application-reference-panels";
 import { requireProfile } from "@/lib/auth";
 import { sendChatEmailNotifications } from "@/lib/chat/email-notifications";
+import {
+  PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT,
+  PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT,
+  PORTAL_CHAT_AUTHOR_NAME,
+} from "@/lib/chat/portal-authored";
 import { logEvent } from "@/lib/observability";
 import { portalSiteUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -368,7 +373,6 @@ async function publishApprovedCandidates({
   const body = buildActingCandidateSchoolMessage({
     directorName:
       state.directorName || application.external_applicant_name,
-    coordinatorName: state.coordinatorName ?? "GHSMTA Advisory Committee",
     candidates: state.candidates,
     changedSlots: state.changedSlots,
     sectionDeadline: formatDeadline(stage?.closes_at),
@@ -376,8 +380,8 @@ async function publishApprovedCandidates({
     schoolFilesUrl: `${siteUrl}/portal/files`,
   });
   const subject = state.changedSlots.length
-    ? "Acting candidate changes approved"
-    : "Acting candidates confirmed";
+    ? PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT
+    : PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT;
   const authorId = state.coordinatorId ?? actorId;
   const { data: post, error: postError } = await admin
     .from("chat_posts")
@@ -419,7 +423,7 @@ async function publishApprovedCandidates({
       messageId: post.id,
       messageKind: "post",
       authorId,
-      authorName: state.coordinatorName ?? "GHSMTA Advisory Committee",
+      authorName: PORTAL_CHAT_AUTHOR_NAME,
       subject,
       body,
     });
