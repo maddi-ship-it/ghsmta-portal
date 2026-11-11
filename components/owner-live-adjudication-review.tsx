@@ -1015,18 +1015,23 @@ export function OwnerLiveAdjudicationReview({
   const refreshData = useCallback(async () => {
     if (practiceMode) return true;
 
+    let assignmentQuery = supabase
+      .from("adjudicator_assignments")
+      .select("*")
+      .eq("application_id", applicationId);
+    if (!isOwner) {
+      assignmentQuery = assignmentQuery.or(
+        "removed_at.is.null,status.eq.complete",
+      );
+    }
+
     const [scorecardResult, assignmentResult] = await Promise.all([
       supabase
         .from("adjudication_scorecards")
         .select("*")
         .eq("application_id", applicationId)
         .order("created_at"),
-      supabase
-        .from("adjudicator_assignments")
-        .select("*")
-        .eq("application_id", applicationId)
-        .or("removed_at.is.null,status.eq.complete")
-        .order("assigned_at"),
+      assignmentQuery.order("assigned_at"),
     ]);
 
     if (scorecardResult.error || assignmentResult.error) {

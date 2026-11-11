@@ -376,7 +376,13 @@ export default async function AdjudicationApplicationPage({
   ] = await Promise.all([
     supabase.from("scoring_categories").select("*").eq("rubric_id", rubric.id).eq("active", true).order("sort_order"),
     supabase.from("scoring_scale_levels").select("*").eq("rubric_id", rubric.id).order("score", { ascending: false }),
-    effectiveParticipantRole === "adjudicator"
+    profile.role === "owner"
+      ? supabase
+          .from("adjudicator_assignments")
+          .select("*")
+          .eq("application_id", id)
+          .order("assigned_at")
+      : effectiveParticipantRole === "adjudicator"
       ? supabase
           .from("adjudicator_assignments")
           .select("*")

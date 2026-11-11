@@ -810,7 +810,7 @@ export async function reopenAdjudicatorScorecard(
 
   const { error: assignmentError } = await supabase
     .from("adjudicator_assignments")
-    .update({ status: "reopened" })
+    .update({ status: "reopened", removed_at: null })
     .eq("id", card.assignment_id);
   if (assignmentError) throw new Error(assignmentError.message);
 
