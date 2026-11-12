@@ -1,3 +1,8 @@
+import {
+  buildAdjudicationBrainDumpTemplate,
+  type AdjudicationBrainDumpField,
+} from "./adjudication-brain-dump";
+
 export const PLAYBILL_SONG_LIST_EXTRACTOR_VERSION = 2;
 export const MAX_PLAYBILL_SONGS = 250;
 export const PLAYBILL_SONG_LIST_READY_EVENT =
@@ -34,10 +39,6 @@ export type PlaybillSongListSection = {
 export type PlaybillSongListReadyDetail = {
   songs: PlaybillSong[];
 };
-
-export type PlaybillBrainDumpField =
-  | "scorecard_internal_notes"
-  | "scorecard_post_show_notes";
 
 export type PlaybillInputKind =
   | { kind: "pdf"; mimeType: "application/pdf" }
@@ -116,7 +117,7 @@ export function buildPlaybillSongListSections(
 
 export function playbillSongsForBrainDump(
   songs: PlaybillSong[],
-  fieldName: PlaybillBrainDumpField,
+  fieldName: AdjudicationBrainDumpField,
 ) {
   const sections = buildPlaybillSongListSections(songs);
   if (sections.length <= 1) return sections.flatMap((section) => section.songs);
@@ -128,20 +129,19 @@ export function playbillSongsForBrainDump(
 
 export function buildPlaybillBrainDumpOutline(
   songs: PlaybillSong[],
-  fieldName: PlaybillBrainDumpField,
+  fieldName: AdjudicationBrainDumpField,
 ) {
   const selectedSongs = playbillSongsForBrainDump(songs, fieldName);
   if (selectedSongs.length === 0) return "";
 
-  const actHeading =
-    fieldName === "scorecard_internal_notes" ? "ACT I NOTES:" : "ACT II NOTES:";
-  const lines = [actHeading, ""];
+  const template = buildAdjudicationBrainDumpTemplate(fieldName);
+  const lines: string[] = [];
   for (const song of selectedSongs) {
     const songHeading = `“${song.title}”${song.performers ? ` — ${song.performers}` : ""}`;
-    if ([...lines, songHeading, ""].join("\n").length > 24_000) break;
+    if (`${template}${[...lines, songHeading, ""].join("\n")}`.length > 24_000) break;
     lines.push(songHeading, "");
   }
-  return lines.join("\n");
+  return `${template}${lines.join("\n")}`;
 }
 
 export function resolvePlaybillInputKind({

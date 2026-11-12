@@ -12,9 +12,13 @@ import { createPortal } from "react-dom";
 
 import {
   APPLY_ADJUDICATION_BRAIN_DUMP_EVENT,
+  buildAdjudicationBrainDumpTemplate,
+  ensureAdjudicationBrainDumpTemplate,
   groupAdjudicationBrainDumpAssignments,
   RESTORE_ADJUDICATION_BRAIN_DUMP_EVENT,
+  segmentAdjudicationBrainDump,
   selectAutomaticallyApplicableBrainDumpNotes,
+  type AdjudicationBrainDumpField,
   type AdjudicationBrainDumpReviewNote,
   type AdjudicationBrainDumpTarget,
 } from "@/lib/adjudication-brain-dump";
@@ -412,7 +416,7 @@ export function AdjudicationBrainDump({
   applicationId: string;
   defaultValue: string | null | undefined;
   canComment: boolean;
-  fieldName?: "scorecard_internal_notes" | "scorecard_post_show_notes";
+  fieldName?: AdjudicationBrainDumpField;
   playbillSongs?: PlaybillSong[];
   practiceMode?: boolean;
   readOnly: boolean;
@@ -422,11 +426,21 @@ export function AdjudicationBrainDump({
   const supabase = useMemo(() => createClient(), []);
   const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}:${fieldName}`;
   const savedValue = defaultValue ?? "";
+  const preparedDefaultValue = ensureAdjudicationBrainDumpTemplate(
+    savedValue,
+    fieldName,
+  );
+  const preparedSavedValue = savedValue.trim()
+    ? preparedDefaultValue
+    : "";
   const initialPlaybillOutline =
-    canComment && !readOnly && !savedValue.trim()
+    canComment && !readOnly && !preparedSavedValue
       ? buildPlaybillBrainDumpOutline(playbillSongs, fieldName)
       : "";
-  const initialValue = savedValue || initialPlaybillOutline;
+  const initialValue =
+    preparedSavedValue ||
+    initialPlaybillOutline ||
+    buildAdjudicationBrainDumpTemplate(fieldName);
   const [value, setValue] = useState(initialValue);
   const [expanded, setExpanded] = useState(!savedValue.trim());
   const [playbillOutlineReady, setPlaybillOutlineReady] = useState(
@@ -442,8 +456,8 @@ export function AdjudicationBrainDump({
   const valueRef = useRef(initialValue);
   const dirtyRef = useRef(false);
   const focusedRef = useRef(false);
-  const remoteValueRef = useRef(savedValue);
-  const previousDefaultValueRef = useRef(savedValue);
+  const remoteValueRef = useRef(initialValue);
+  const previousDefaultValueRef = useRef(preparedDefaultValue);
   const dismissedRemoteValueRef = useRef<string | null>(null);
 
   const receiveRemoteValue = useCallback(
@@ -492,7 +506,10 @@ export function AdjudicationBrainDump({
   );
 
   useEffect(() => {
-    const nextDefaultValue = defaultValue ?? "";
+    const nextDefaultValue = ensureAdjudicationBrainDumpTemplate(
+      defaultValue ?? "",
+      fieldName,
+    );
     if (nextDefaultValue === previousDefaultValueRef.current) return;
     previousDefaultValueRef.current = nextDefaultValue;
     setPlaybillOutlineReady(false);
@@ -500,11 +517,17 @@ export function AdjudicationBrainDump({
       nextDefaultValue,
       "Brain dump refreshed with the latest saved version.",
     );
-  }, [defaultValue, receiveRemoteValue]);
+  }, [defaultValue, fieldName, receiveRemoteValue]);
 
   useEffect(() => {
     const applyPlaybillOutline = (songs: PlaybillSong[]) => {
-      if (!canComment || readOnly || valueRef.current.trim()) return;
+      if (
+        !canComment ||
+        readOnly ||
+        segmentAdjudicationBrainDump(valueRef.current).length > 0
+      ) {
+        return;
+      }
       const outline = buildPlaybillBrainDumpOutline(songs, fieldName);
       if (!outline) return;
 
@@ -568,7 +591,10 @@ export function AdjudicationBrainDump({
         },
         (payload) => {
           const remoteValue = payload.new[databaseField];
-          const nextValue = typeof remoteValue === "string" ? remoteValue : "";
+          const nextValue = ensureAdjudicationBrainDumpTemplate(
+            typeof remoteValue === "string" ? remoteValue : "",
+            fieldName,
+          );
           receiveRemoteValue(
             nextValue,
             "Brain dump updated live from another signed-in device.",

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { segmentAdjudicationBrainDump } from "./adjudication-brain-dump";
+import {
+  ADJUDICATION_BRAIN_DUMP_LEDGER,
+  buildAdjudicationBrainDumpTemplate,
+  ensureAdjudicationBrainDumpTemplate,
+  segmentAdjudicationBrainDump,
+} from "./adjudication-brain-dump";
 import {
   buildPlaybillBrainDumpOutline,
   buildPlaybillSongListSections,
@@ -86,13 +91,40 @@ describe("Playbill song-list extraction", () => {
 
     expect(
       buildPlaybillBrainDumpOutline(songs, "scorecard_internal_notes"),
-    ).toContain("ACT I NOTES:\n\n“Opening” — Company\n\n“Solo” — Alice");
+    ).toContain(
+      `${ADJUDICATION_BRAIN_DUMP_LEDGER}\n\nACT I NOTES:\n\n“Opening” — Company\n\n“Solo” — Alice`,
+    );
     expect(
       buildPlaybillBrainDumpOutline(songs, "scorecard_internal_notes"),
     ).not.toContain("Finale");
     expect(
       buildPlaybillBrainDumpOutline(songs, "scorecard_post_show_notes"),
-    ).toContain("ACT II NOTES:\n\n“Finale” — Alice and Company");
+    ).toContain(
+      `${ADJUDICATION_BRAIN_DUMP_LEDGER}\n\nACT II NOTES:\n\n“Finale” — Alice and Company`,
+    );
+  });
+
+  it("starts every brain-dump template with the complete category ledger", () => {
+    expect(buildAdjudicationBrainDumpTemplate("scorecard_internal_notes")).toBe(
+      `${ADJUDICATION_BRAIN_DUMP_LEDGER}\n\nACT I NOTES:\n\n`,
+    );
+    expect(buildAdjudicationBrainDumpTemplate("scorecard_post_show_notes")).toBe(
+      `${ADJUDICATION_BRAIN_DUMP_LEDGER}\n\nACT II NOTES:\n\n`,
+    );
+    expect(ADJUDICATION_BRAIN_DUMP_LEDGER).toContain(
+      "Actress- Leading Actress\nActor- Leading Actor",
+    );
+  });
+
+  it("adds the ledger above existing notes without duplicating act headings", () => {
+    expect(
+      ensureAdjudicationBrainDumpTemplate(
+        "ACT I NOTES:\n\nMD- Strong musical storytelling.",
+        "scorecard_internal_notes",
+      ),
+    ).toBe(
+      `${ADJUDICATION_BRAIN_DUMP_LEDGER}\n\nACT I NOTES:\n\nMD- Strong musical storytelling.`,
+    );
   });
 
   it("keeps notes typed beneath an auto-placed song tied to that song", () => {

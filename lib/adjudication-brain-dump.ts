@@ -9,10 +9,75 @@ const LEDGER_HEADER_LINE = /^ledger\s*:?\s*$/i;
 const ACT_NOTES_HEADER_LINE =
   /^act\s+(?:\d+|[ivxlcdm]+)\s*(?:notes?)?\s*:?\s*$/i;
 const ADJUDICATION_NOTE_PREFIX =
-  /^(?:md|o|c|e|te|ld|sd|s|lactress|lactor|spa|spb|fp|d)(?:\s*(?:\/|&|\+)\s*(?:md|o|c|e|te|ld|sd|s|lactress|lactor|spa|spb|fp|d))*$/i;
+  /^(?:md|o|ch|c|e|te|ld|sd|sc|s|co|actress|actor|lactress|lactor|spa|spb|fp|d)(?:\s*(?:\/|&|\+)\s*(?:md|o|ch|c|e|te|ld|sd|sc|s|co|actress|actor|lactress|lactor|spa|spb|fp|d))*$/i;
 const SENTENCE_SEGMENTER = new Intl.Segmenter("en", {
   granularity: "sentence",
 });
+
+export type AdjudicationBrainDumpField =
+  | "scorecard_internal_notes"
+  | "scorecard_post_show_notes";
+
+export const ADJUDICATION_BRAIN_DUMP_LEDGER = [
+  "Ledger:",
+  "MD- Music Direction",
+  "O- Orchestra",
+  "CH- Choreography",
+  "E- Ensemble",
+  "TE- Technical Execution",
+  "LD- Lighting Design",
+  "SD- Sound Design",
+  "SC- Scenic",
+  "CO- Costumes",
+  "Actress- Leading Actress",
+  "Actor- Leading Actor",
+  "SPA- Supporting Performer A",
+  "SPB- Supporting Performer B",
+  "FP - Featured Performer",
+  "D- Direction",
+].join("\n");
+
+function brainDumpActHeading(fieldName: AdjudicationBrainDumpField) {
+  return fieldName === "scorecard_internal_notes"
+    ? "ACT I NOTES:"
+    : "ACT II NOTES:";
+}
+
+export function buildAdjudicationBrainDumpTemplate(
+  fieldName: AdjudicationBrainDumpField,
+) {
+  return `${ADJUDICATION_BRAIN_DUMP_LEDGER}\n\n${brainDumpActHeading(fieldName)}\n\n`;
+}
+
+export function ensureAdjudicationBrainDumpTemplate(
+  value: string,
+  fieldName: AdjudicationBrainDumpField,
+) {
+  const normalizedValue = value
+    .replaceAll("\r\n", "\n")
+    .replaceAll("\r", "\n")
+    .trimStart();
+  const template = buildAdjudicationBrainDumpTemplate(fieldName);
+  if (!normalizedValue) return template;
+
+  const lines = normalizedValue.split("\n");
+  const ledgerIndex = lines.findIndex((line) =>
+    LEDGER_HEADER_LINE.test(line.trim()),
+  );
+  const actHeadingIndex = lines.findIndex((line) =>
+    ACT_NOTES_HEADER_LINE.test(line.trim()),
+  );
+
+  if (ledgerIndex >= 0 && actHeadingIndex > ledgerIndex) {
+    return `${template}${lines.slice(actHeadingIndex + 1).join("\n").trimStart()}`;
+  }
+
+  if (ledgerIndex < 0 && actHeadingIndex === 0) {
+    return `${ADJUDICATION_BRAIN_DUMP_LEDGER}\n\n${normalizedValue}`;
+  }
+
+  return `${template}${normalizedValue}`;
+}
 
 export type AdjudicationBrainDumpSourceNote = {
   id: string;

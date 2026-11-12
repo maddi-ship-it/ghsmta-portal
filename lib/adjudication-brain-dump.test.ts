@@ -91,6 +91,33 @@ D- Make sure the actor’s movements don’t cause vocal-support problems.`);
     ]);
   });
 
+  it("ignores the complete current ledger when segmenting observations", () => {
+    const notes = segmentAdjudicationBrainDump(`Ledger:
+MD- Music Direction
+O- Orchestra
+CH- Choreography
+E- Ensemble
+TE- Technical Execution
+LD- Lighting Design
+SD- Sound Design
+SC- Scenic
+CO- Costumes
+Actress- Leading Actress
+Actor- Leading Actor
+SPA- Supporting Performer A
+SPB- Supporting Performer B
+FP - Featured Performer
+D- Direction
+
+ACT I NOTES:
+
+CH- The movement consistently advanced the story.`);
+
+    expect(notes.map((note) => note.text)).toEqual([
+      "CH- The movement consistently advanced the story.",
+    ]);
+  });
+
   it("does not mistake adjudication labels for unquoted song headings", () => {
     const notes = segmentAdjudicationBrainDump(
       "SD/O- Music is too loud compared with the voice.\nS & D - Curtains move with the performers.",
