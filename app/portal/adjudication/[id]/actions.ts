@@ -27,11 +27,25 @@ import {
   canCompleteAdjudication,
   outstandingAssignedFinalComments,
 } from "@/lib/adjudication-completion";
+import {
+  activeAdjudicatorAssignmentIds,
+  allScorecardsSubmittedPanelAnnouncement,
+  scorecardSubmittedOwnerNotificationBody,
+  scorecardSubmissionMilestoneId,
+  scorecardSubmissionOwnerNotificationId,
+  submittedAdjudicatorScorecards,
+  type ScorecardNotificationAssignment,
+  type ScorecardNotificationProfile,
+  type ScorecardNotificationScorecard,
+} from "@/lib/adjudication-scorecard-notifications";
 import { categoryDecisionApprovedForUser } from "@/lib/adjudication-category-decisions";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
-import { PORTAL_FINAL_COMMENTS_READY_SUBJECT } from "@/lib/chat/portal-authored";
+import {
+  PORTAL_ALL_SCORECARDS_SUBMITTED_SUBJECT,
+  PORTAL_FINAL_COMMENTS_READY_SUBJECT,
+} from "@/lib/chat/portal-authored";
 import {
   activePanelMemberUserIds,
   finalCommentsReadyAnnouncement,
@@ -89,6 +103,7 @@ type PersistScorecardResult = {
   submitted: boolean;
   savedAt: string;
   savedBy: string;
+  scorecardId: string;
 };
 
 function errorMessage(error: unknown) {
@@ -170,6 +185,173 @@ async function announceAdjudicationRelease({
 
   revalidatePath("/portal/chat");
   return true;
+}
+
+async function notifyScorecardSubmission({
+  applicationId,
+  scorecardId,
+  submittedAt,
+  submittedBy,
+}: {
+  applicationId: string;
+  scorecardId: string;
+  submittedAt: string;
+  submittedBy: string;
+}) {
+  const admin = createAdminClient();
+  const [
+    applicationResult,
+    ownersResult,
+    submitterResult,
+    assignmentsResult,
+    channelResult,
+  ] = await Promise.all([
+    admin
+      .from("applications")
+      .select("school_name,production_title")
+      .eq("id", applicationId)
+      .maybeSingle(),
+    admin
+      .from("profiles")
+      .select("id")
+      .eq("role", "owner")
+      .eq("active", true),
+    admin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", submittedBy)
+      .maybeSingle(),
+    admin
+      .from("adjudicator_assignments")
+      .select(
+        "id,adjudicator_user_id,can_score,participant_role,removed_at",
+      )
+      .eq("application_id", applicationId)
+      .is("removed_at", null),
+    admin
+      .from("chat_channels")
+      .select("id")
+      .eq("application_id", applicationId)
+      .eq("channel_type", ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const lookupError =
+    applicationResult.error ??
+    ownersResult.error ??
+    submitterResult.error ??
+    assignmentsResult.error;
+  if (lookupError || !applicationResult.data) {
+    console.error("Unable to prepare scorecard submission notifications.", {
+      applicationId,
+      scorecardId,
+      error: lookupError?.message ?? "Application not found.",
+    });
+    return;
+  }
+
+  const application = applicationResult.data;
+  const ownerIds = (ownersResult.data ?? []).map((owner) => owner.id);
+  if (ownerIds.length > 0) {
+    const adjudicatorName =
+      submitterResult.data?.full_name?.trim() || "An adjudicator";
+    const { error: ownerNotificationError } = await admin
+      .from("user_notifications")
+      .insert(
+        ownerIds.map((ownerId) => ({
+          id: scorecardSubmissionOwnerNotificationId({
+            ownerId,
+            scorecardId,
+            submittedAt,
+          }),
+          user_id: ownerId,
+          notification_type: "adjudicator_scorecard_submitted",
+          title: "Adjudicator scorecard submitted",
+          body: scorecardSubmittedOwnerNotificationBody({
+            adjudicatorName,
+            schoolName: application.school_name,
+            productionTitle: application.production_title,
+          }),
+          href: `/portal/adjudication/${applicationId}`,
+          related_application_id: applicationId,
+        })),
+      );
+    if (ownerNotificationError && ownerNotificationError.code !== "23505") {
+      console.error("Unable to notify Owners about a submitted scorecard.", {
+        applicationId,
+        scorecardId,
+        ownerNotificationError,
+      });
+    }
+  }
+
+  const assignments = (assignmentsResult.data ??
+    []) as ScorecardNotificationAssignment[];
+  const panelUserIds = [
+    ...new Set(
+      assignments.map((assignment) => assignment.adjudicator_user_id),
+    ),
+  ];
+  if (panelUserIds.length === 0) return;
+
+  const [profilesResult, scorecardsResult] = await Promise.all([
+    admin.from("profiles").select("id,role").in("id", panelUserIds),
+    admin
+      .from("adjudication_scorecards")
+      .select("assignment_id,status,submitted_at")
+      .eq("application_id", applicationId),
+  ]);
+  if (profilesResult.error || scorecardsResult.error) {
+    console.error("Unable to check panel scorecard completion.", {
+      applicationId,
+      profileError: profilesResult.error?.message,
+      scorecardError: scorecardsResult.error?.message,
+    });
+    return;
+  }
+
+  const adjudicatorAssignmentIds = activeAdjudicatorAssignmentIds({
+    assignments,
+    profiles: (profilesResult.data ?? []) as ScorecardNotificationProfile[],
+  });
+  const submittedScorecards = submittedAdjudicatorScorecards({
+    assignmentIds: adjudicatorAssignmentIds,
+    scorecards: (scorecardsResult.data ??
+      []) as ScorecardNotificationScorecard[],
+  });
+  if (submittedScorecards.length === 0) return;
+
+  if (channelResult.error || !channelResult.data) {
+    console.error(
+      "Unable to locate the panel channel after all scorecards were submitted.",
+      { applicationId, channelError: channelResult.error?.message },
+    );
+    return;
+  }
+
+  const milestoneId = scorecardSubmissionMilestoneId({
+    applicationId,
+    scorecards: submittedScorecards,
+  });
+  const { error: panelPostError } = await admin.from("chat_posts").insert({
+    id: milestoneId,
+    channel_id: channelResult.data.id,
+    author_id: submittedBy,
+    subject: PORTAL_ALL_SCORECARDS_SUBMITTED_SUBJECT,
+    body: allScorecardsSubmittedPanelAnnouncement({
+      schoolName: application.school_name,
+      productionTitle: application.production_title,
+      adjudicatorCount: adjudicatorAssignmentIds.length,
+    }),
+  });
+  if (panelPostError && panelPostError.code !== "23505") {
+    console.error(
+      "Unable to announce completed adjudicator scorecards in the panel channel.",
+      { applicationId, panelPostError },
+    );
+  }
 }
 
 async function persistAdjudicatorScorecard(
@@ -612,12 +794,25 @@ async function persistAdjudicatorScorecard(
       formText(formData, "scorecard_post_show_notes") || null;
   }
 
-  const { error: cardUpdateError } = await supabase
+  const scorecardUpdateQuery = supabase
     .from("adjudication_scorecards")
     .update(scorecardUpdate)
     .eq("id", scorecard.id)
     .eq("adjudicator_user_id", adjudicator.id);
+  const { data: savedCard, error: cardUpdateError } = shouldSubmit
+    ? await scorecardUpdateQuery
+        .in("status", ["draft", "reopened"])
+        .select("id")
+        .maybeSingle()
+    : await scorecardUpdateQuery.select("id").maybeSingle();
   if (cardUpdateError) throw new Error(cardUpdateError.message);
+  if (!savedCard) {
+    throw new Error(
+      shouldSubmit
+        ? "This scorecard has already been submitted."
+        : "The scorecard could not be saved.",
+    );
+  }
 
   const admin = createAdminClient();
   const { data: updatedAssignment, error: assignmentError } = await admin
@@ -639,6 +834,7 @@ async function persistAdjudicatorScorecard(
     submitted: shouldSubmit,
     savedAt: now,
     savedBy: adjudicator.id,
+    scorecardId: scorecard.id,
   };
 }
 
@@ -680,6 +876,26 @@ export async function saveAdjudicatorScorecard(
         await refreshLivePanelNarratives(applicationId, result.savedBy);
       } catch (error) {
         console.error("Unable to refresh the live panel narratives.", error);
+      }
+    });
+  }
+
+  if (result.submitted) {
+    after(async () => {
+      try {
+        await notifyScorecardSubmission({
+          applicationId,
+          scorecardId: result.scorecardId,
+          submittedAt: result.savedAt,
+          submittedBy: result.savedBy,
+        });
+      } catch (error) {
+        console.error("Unable to send scorecard submission notifications.", {
+          applicationId,
+          scorecardId: result.scorecardId,
+          submittedAt: result.savedAt,
+          error,
+        });
       }
     });
   }

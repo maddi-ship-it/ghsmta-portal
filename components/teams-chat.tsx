@@ -29,6 +29,7 @@ import {
   startChatDirectMessage,
 } from "@/app/portal/chat/actions";
 import { ApplicationReferencePanelDialog } from "@/components/application-reference-bar";
+import { AutoLinkText } from "@/components/auto-link-text";
 import { AutoClosingDetails } from "@/components/auto-closing-details";
 import styles from "@/components/chat-workspace.module.css";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
@@ -1581,7 +1582,7 @@ function MentionedMessage({
         const member = memberByMention.get(part.toLowerCase());
 
         if (!member) {
-          return <span key={`${part}-${index}`}>{part}</span>;
+          return <AutoLinkText key={`${part}-${index}`} text={part} />;
         }
 
         return (

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isPortalChatAuthorId,
+  PORTAL_ALL_SCORECARDS_SUBMITTED_SUBJECT,
   PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT,
   PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT,
   PORTAL_FINAL_COMMENTS_READY_SUBJECT,
@@ -61,6 +62,25 @@ describe("portal-authored chat notifications", () => {
         latest_author_name: "Owner Name",
         latest_message_preview:
           "The Owner sent final comments to the panel for Demo School — Newsies.",
+      }).latest_author_name,
+    ).toBe("The Portal");
+  });
+
+  it("presents the completed-scorecards milestone as coming from The Portal", () => {
+    const presented = presentPortalAuthoredThread({
+      author_id: "adjudicator-user",
+      author_name: "Adjudicator Name",
+      post_id: "scorecard-post",
+      subject: PORTAL_ALL_SCORECARDS_SUBMITTED_SUBJECT,
+    });
+
+    expect(presented.author_name).toBe("The Portal");
+    expect(isPortalChatAuthorId(presented.author_id)).toBe(true);
+    expect(
+      presentPortalAuthoredChannel({
+        latest_author_name: "Adjudicator Name",
+        latest_message_preview:
+          "All 3 adjudicator scorecards have been submitted for Demo School — Newsies.",
       }).latest_author_name,
     ).toBe("The Portal");
   });

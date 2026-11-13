@@ -8,6 +8,7 @@ import {
   type CategoryJumpOption,
 } from "@/components/adjudication-category-sidebar";
 import { AdjudicationReferenceDocumentModal } from "@/components/adjudication-reference-document-modal";
+import { AutoLinkText } from "@/components/auto-link-text";
 import type {
   ApplicationReferencePanel,
 } from "@/lib/application-reference-panels";
@@ -150,7 +151,7 @@ export function ApplicationReferencePanelDialog({
                                 : undefined
                             }
                           >
-                            {formattedValue}
+                            <AutoLinkText text={formattedValue} />
                           </dd>
                         </div>
                       );

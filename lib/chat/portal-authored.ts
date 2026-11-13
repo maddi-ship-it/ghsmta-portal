@@ -7,6 +7,8 @@ export const PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT =
   "Final comment assignments";
 export const PORTAL_FINAL_COMMENTS_READY_SUBJECT =
   "Final comments sent to panel";
+export const PORTAL_ALL_SCORECARDS_SUBMITTED_SUBJECT =
+  "All adjudicator scorecards submitted";
 export const PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX =
   "Playbill song list not found:";
 
@@ -15,6 +17,7 @@ const NARRATIVE_ASSIGNMENT_PREVIEW_PREFIX =
   "Final comment writers have been assigned for ";
 const FINAL_COMMENTS_READY_PREVIEW_PREFIX =
   "The Owner sent final comments to the panel for ";
+const ALL_SCORECARDS_SUBMITTED_PREVIEW_PREFIX = "All ";
 const ACTING_CANDIDATE_PREVIEW_PHRASE =
   "Congratulations on a successful run of your production!";
 export const PORTAL_PLAYBILL_SONG_LIST_MISSING_PREVIEW_PREFIX =
@@ -24,6 +27,7 @@ function isPortalAuthoredSubject(subject: string) {
   return (
     subject === PORTAL_NARRATIVE_ASSIGNMENTS_SUBJECT ||
     subject === PORTAL_FINAL_COMMENTS_READY_SUBJECT ||
+    subject === PORTAL_ALL_SCORECARDS_SUBMITTED_SUBJECT ||
     subject === PORTAL_ACTING_CANDIDATES_CONFIRMED_SUBJECT ||
     subject === PORTAL_ACTING_CANDIDATE_CHANGES_SUBJECT ||
     subject.startsWith(PORTAL_PLAYBILL_SONG_LIST_MISSING_SUBJECT_PREFIX)
@@ -65,6 +69,14 @@ export function presentPortalAuthoredChannel<
     ) &&
     !channel.latest_message_preview?.startsWith(
       FINAL_COMMENTS_READY_PREVIEW_PREFIX,
+    ) &&
+    !(
+      channel.latest_message_preview?.startsWith(
+        ALL_SCORECARDS_SUBMITTED_PREVIEW_PREFIX,
+      ) &&
+      channel.latest_message_preview.includes(
+        "adjudicator scorecards have been submitted for ",
+      )
     ) &&
     !channel.latest_message_preview?.includes(
       ACTING_CANDIDATE_PREVIEW_PHRASE,

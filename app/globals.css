@@ -4583,6 +4583,25 @@ html[data-theme="light"] .scorecard-submit-control-compact[data-tooltip]::after 
   white-space: pre-wrap;
 }
 
+.auto-link {
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-color: var(--portal-gold, #b6902f);
+  text-decoration-thickness: .1em;
+  text-underline-offset: .18em;
+}
+
+.auto-link:hover {
+  text-decoration-thickness: .16em;
+}
+
+.auto-link:focus-visible {
+  border-radius: 3px;
+  outline: 3px solid color-mix(in srgb, var(--portal-gold, #b6902f) 45%, transparent);
+  outline-offset: 2px;
+}
+
 .application-reference-empty {
   margin: 0;
   padding: 16px;
