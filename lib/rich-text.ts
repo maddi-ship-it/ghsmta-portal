@@ -154,3 +154,41 @@ export function richTextHasContent(
 ) {
   return richTextToPlainText(value).length > 0;
 }
+
+function normalizedRichTextComparison(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function appendUniquePlainTextToRichText(
+  currentValue: string | null | undefined,
+  candidates: string[],
+) {
+  const current = sanitizeRichTextHtml(currentValue);
+  const existingText = normalizedRichTextComparison(
+    richTextToPlainText(current),
+  );
+  const seenAdditions = new Set<string>();
+  const additions = candidates.flatMap((candidate) => {
+    const text = candidate.trim();
+    const normalized = normalizedRichTextComparison(text);
+    if (
+      !normalized ||
+      existingText.includes(normalized) ||
+      seenAdditions.has(normalized)
+    ) {
+      return [];
+    }
+
+    seenAdditions.add(normalized);
+    return [plainTextToHtml(text)];
+  });
+
+  if (additions.length === 0) return current;
+  return richTextHasContent(current)
+    ? `${current}${additions.join("")}`
+    : additions.join("");
+}

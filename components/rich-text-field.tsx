@@ -7,8 +7,8 @@ import {
 } from "react";
 
 import {
+  appendUniquePlainTextToRichText,
   richTextHasContent,
-  richTextToPlainText,
   sanitizeRichTextHtml,
 } from "@/lib/rich-text";
 import {
@@ -172,36 +172,11 @@ export function RichTextField({
       if (!assignments?.length) return;
 
       const current = sanitizeRichTextHtml(editor.innerHTML);
-      const existingText = richTextToPlainText(current)
-        .normalize("NFKC")
-        .toLocaleLowerCase()
-        .replace(/\s+/g, " ");
-      const additions = assignments
-        .map((assignment) => assignment.text.trim())
-        .filter(Boolean)
-        .filter((text, index, allTexts) => {
-          const normalized = text
-            .normalize("NFKC")
-            .toLocaleLowerCase()
-            .replace(/\s+/g, " ");
-          return (
-            !existingText.includes(normalized) &&
-            allTexts.findIndex(
-              (candidate) =>
-                candidate
-                  .normalize("NFKC")
-                  .toLocaleLowerCase()
-                  .replace(/\s+/g, " ") === normalized,
-            ) === index
-          );
-        })
-        .map((text) => sanitizeRichTextHtml(text));
-      if (additions.length === 0) return;
-
-      const addition = additions.join("");
-      const nextValue = richTextHasContent(current)
-        ? `${current}${addition}`
-        : addition;
+      const nextValue = appendUniquePlainTextToRichText(
+        current,
+        assignments.map((assignment) => assignment.text),
+      );
+      if (nextValue === current) return;
 
       editor.innerHTML = nextValue;
       dirtyRef.current = nextValue !== remoteValueRef.current;
