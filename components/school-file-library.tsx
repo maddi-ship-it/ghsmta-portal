@@ -1,11 +1,22 @@
 "use client";
 
-import { type DragEvent, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  type DragEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import { archiveSchoolFile } from "@/app/portal/files/actions";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import { uploadPortalFiles } from "@/lib/portal-file-client";
+import {
+  schoolApplicationMatchesSearch,
+  schoolFileMatchesSearch,
+} from "@/lib/school-file-search";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 
@@ -18,6 +29,7 @@ const FILE_TYPES = [
   ["playbill", "Playbill", ".pdf"],
   ["process_to_performance", "Process to Performance", ".pdf,.doc,.docx,image/*,video/*"],
   ["virtual_audition_packet", "Virtual Audition Packet", ".pdf,.doc,.docx,image/*,video/*"],
+  ["production_photos", "Production Photos", ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*"],
   ["poster", "Poster", "image/*,.pdf"],
   ["logo", "Logo", "image/*,.pdf,.svg,.eps"],
   ["scenic", "Scenic Drawings / Renderings", "image/*,.pdf"],
@@ -35,6 +47,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
   const [applicationId, setApplicationId] = useState(applications[0]?.application_id ?? "");
   const [fileType, setFileType] = useState("playbill");
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [dropActive, setDropActive] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -68,7 +81,100 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
     };
   }, [pending, uploadOpen]);
 
-  const visibleFiles = initialFiles.filter((file) => file.application_id === applicationId && [file.original_name, file.generated_name, file.person_name, file.award_category, file.document_category].join(" ").toLowerCase().includes(search.trim().toLowerCase()));
+  const searchActive = deferredSearch.trim().length > 0;
+  const filesByApplicationId = useMemo(() => {
+    const filesByApplication = new Map<string, SchoolFileRecord[]>();
+    for (const file of initialFiles) {
+      const files = filesByApplication.get(file.application_id) ?? [];
+      files.push(file);
+      filesByApplication.set(file.application_id, files);
+    }
+    return filesByApplication;
+  }, [initialFiles]);
+  const applicationsById = useMemo(
+    () =>
+      new Map(
+        applications.map((applicationItem) => [
+          applicationItem.application_id,
+          applicationItem,
+        ]),
+      ),
+    [applications],
+  );
+  const searchResults = useMemo(() => {
+    const matchingApplicationIds = new Set<string>();
+    const matchingFileIds = new Set<string>();
+    const matchingFileCounts = new Map<string, number>();
+
+    if (!searchActive) {
+      for (const applicationItem of applications) {
+        matchingApplicationIds.add(applicationItem.application_id);
+      }
+      for (const file of initialFiles) {
+        matchingFileIds.add(file.id);
+      }
+      return { matchingApplicationIds, matchingFileCounts, matchingFileIds };
+    }
+
+    for (const applicationItem of applications) {
+      if (schoolApplicationMatchesSearch(applicationItem, deferredSearch)) {
+        matchingApplicationIds.add(applicationItem.application_id);
+      }
+    }
+
+    for (const file of initialFiles) {
+      if (
+        schoolFileMatchesSearch({
+          application: applicationsById.get(file.application_id),
+          categoryLabel: labelFor(file.document_category),
+          file,
+          query: deferredSearch,
+        })
+      ) {
+        matchingApplicationIds.add(file.application_id);
+        matchingFileIds.add(file.id);
+        matchingFileCounts.set(
+          file.application_id,
+          (matchingFileCounts.get(file.application_id) ?? 0) + 1,
+        );
+      }
+    }
+
+    return { matchingApplicationIds, matchingFileCounts, matchingFileIds };
+  }, [
+    applications,
+    applicationsById,
+    deferredSearch,
+    initialFiles,
+    searchActive,
+  ]);
+  const searchedApplications = searchActive
+    ? applications.filter((applicationItem) =>
+        searchResults.matchingApplicationIds.has(applicationItem.application_id),
+      )
+    : applications;
+  const selectedApplicationMatchesSearch =
+    !searchActive || searchResults.matchingApplicationIds.has(applicationId);
+  const selectedApplicationMatchesByName = Boolean(
+    searchActive &&
+      application &&
+      schoolApplicationMatchesSearch(application, deferredSearch),
+  );
+  const visibleFiles = (filesByApplicationId.get(applicationId) ?? []).filter(
+    (file) =>
+      !searchActive ||
+      selectedApplicationMatchesByName ||
+      searchResults.matchingFileIds.has(file.id),
+  );
+  const totalMatchingFiles = searchedApplications.reduce(
+    (total, applicationItem) =>
+      total +
+      (schoolApplicationMatchesSearch(applicationItem, deferredSearch)
+        ? (filesByApplicationId.get(applicationItem.application_id) ?? []).length
+        : (searchResults.matchingFileCounts.get(applicationItem.application_id) ??
+          0)),
+    0,
+  );
   const allVisibleSelected =
     visibleFiles.length > 0 &&
     visibleFiles.every((file) => selectedFileIds.has(file.id));
@@ -253,24 +359,85 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
     <div className="school-files-layout">
       <aside className="panel school-files-sidebar">
         <div className="panel-header">
-          <div><p className="eyebrow">School library</p><h2>Applications</h2></div>
+          <div>
+            <p className="eyebrow">School library</p>
+            <h2>Applications</h2>
+          </div>
+        </div>
+        <div className="school-file-sidebar-search">
+          <label className="sr-only" htmlFor="school-file-search">
+            Search schools, folders, and files
+          </label>
+          <input
+            aria-describedby="school-file-search-summary"
+            className="input"
+            id="school-file-search"
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setSelectedFileIds(new Set());
+            }}
+            placeholder={
+              profile.role === "applicant"
+                ? "Search folders or files"
+                : "Search schools or files"
+            }
+            type="search"
+            value={search}
+          />
+          <p id="school-file-search-summary" role="status">
+            {searchActive
+              ? `${searchedApplications.length} school${searchedApplications.length === 1 ? "" : "s"} · ${totalMatchingFiles} file${totalMatchingFiles === 1 ? "" : "s"}`
+              : `${applications.length} school${applications.length === 1 ? "" : "s"} · ${initialFiles.length} file${initialFiles.length === 1 ? "" : "s"}`}
+          </p>
         </div>
         <div className="panel-body school-file-application-list">
-          {applications.map((item) => (
-            <button
-              className={item.application_id === applicationId ? "school-file-application active" : "school-file-application"}
-              key={item.application_id}
-              onClick={() => chooseApplication(item.application_id)}
-              type="button"
-            >
-              <span className="school-file-application-icon" aria-hidden="true">▰</span>
-              <span className="school-file-application-copy">
-                <strong>{item.school_name}</strong>
-                <span>{item.production_title || item.program_name}</span>
-                <small>{item.can_upload ? "Upload + manage" : "Reviewer access"}</small>
-              </span>
-            </button>
-          ))}
+          {searchedApplications.length === 0 && (
+            <div className="school-file-search-empty">
+              <strong>No matches</strong>
+              <span>Try a school, production, folder, person, or file name.</span>
+            </div>
+          )}
+          {searchedApplications.map((item) => {
+            const schoolNameMatches = schoolApplicationMatchesSearch(
+              item,
+              deferredSearch,
+            );
+            const matchingFileCount = schoolNameMatches
+              ? (filesByApplicationId.get(item.application_id) ?? []).length
+              : (searchResults.matchingFileCounts.get(item.application_id) ??
+                0);
+
+            return (
+              <button
+                className={
+                  item.application_id === applicationId
+                    ? "school-file-application active"
+                    : "school-file-application"
+                }
+                key={item.application_id}
+                onClick={() => chooseApplication(item.application_id)}
+                type="button"
+              >
+                <span
+                  aria-hidden="true"
+                  className="school-file-application-icon"
+                >
+                  ▰
+                </span>
+                <span className="school-file-application-copy">
+                  <strong>{item.school_name}</strong>
+                  <span>{item.production_title || item.program_name}</span>
+                  <small>
+                    {searchActive
+                      ? `${matchingFileCount} matching file${matchingFileCount === 1 ? "" : "s"}`
+                      : item.can_upload
+                        ? "Upload + manage"
+                        : "Reviewer access"}
+                  </small>
+                </span>
+              </button>
+            );
+          })}
         </div>
       </aside>
 
@@ -281,7 +448,11 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
             <h2>{application?.school_name}</h2>
             <p>{application?.production_title}</p>
           </div>
-          <span className="badge">{visibleFiles.length} files</span>
+          <span className="badge">
+            {searchActive
+              ? `${visibleFiles.length} matching file${visibleFiles.length === 1 ? "" : "s"}`
+              : `${visibleFiles.length} file${visibleFiles.length === 1 ? "" : "s"}`}
+          </span>
         </div>
         <div className="panel-body form-stack">
           {pronunciationRequirement && (
@@ -300,14 +471,6 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
                 {FILE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
               </select>
             </div>
-            <input
-              aria-label="Search school files"
-              className="input school-file-search"
-              type="search"
-              placeholder="Search files"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
             <button
               className="button button-secondary button-compact"
               disabled={visibleFiles.length === 0}
@@ -375,7 +538,28 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
               <span>Actions</span>
             </div>
             {visibleFiles.length === 0 ? (
-              <div className="empty-state"><strong>No files uploaded yet.</strong><p>{application?.can_upload ? "Drop files above or use Upload files to add the first item." : "This school has not shared any files yet."}</p></div>
+              <div className="empty-state">
+                <strong>
+                  {searchActive
+                    ? searchedApplications.length === 0
+                      ? "No school files match your search."
+                      : selectedApplicationMatchesSearch
+                      ? "No matching files in this school."
+                      : "Choose a matching school."
+                    : "No files uploaded yet."}
+                </strong>
+                <p>
+                  {searchActive
+                    ? searchedApplications.length === 0
+                      ? "Try a school, production, folder, file name, person, role, designer, note, or upload date."
+                      : selectedApplicationMatchesSearch
+                      ? "Try a file name, folder, person, role, designer, note, or upload date."
+                      : "Select one of the search results in the School library."
+                    : application?.can_upload
+                      ? "Drop files above or use Upload files to add the first item."
+                      : "This school has not shared any files yet."}
+                </p>
+              </div>
             ) : visibleFiles.map((file) => (
               <article className="school-file-row" key={file.id}>
                 <label className="school-file-select">
@@ -466,12 +650,46 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
                   </div>
                   <div className="field">
                     <label htmlFor="school_file_input">Choose file</label>
-                    <input className="input file-input" id="school_file_input" name="files" type="file" accept={selectedType[2]} multiple={fileType === "scenic"} required />
+                    <input
+                      accept={selectedType[2]}
+                      className="input file-input"
+                      id="school_file_input"
+                      multiple={["production_photos", "scenic"].includes(
+                        fileType,
+                      )}
+                      name="files"
+                      required
+                      type="file"
+                    />
                   </div>
                 </div>
 
                 {fileType === "logo" && <div className="field"><label>Display name</label><input className="input" name="display_name" placeholder="Official school or production logo" /></div>}
                 {fileType === "scenic" && <div className="form-grid two-column-form"><div className="field"><label>Drawing / rendering title</label><input className="input" name="display_name" required /></div><div className="field"><label>Scenic designer</label><input className="input" name="designer_name" /></div></div>}
+                {fileType === "production_photos" && (
+                  <div className="form-grid two-column-form">
+                    <div className="field">
+                      <label>
+                        Photo caption <span>Optional</span>
+                      </label>
+                      <input
+                        className="input"
+                        name="display_name"
+                        placeholder="Example: Full company curtain call"
+                      />
+                    </div>
+                    <div className="field">
+                      <label>
+                        Photographer credit <span>Optional</span>
+                      </label>
+                      <input
+                        className="input"
+                        name="designer_name"
+                        placeholder="Photographer name"
+                      />
+                    </div>
+                  </div>
+                )}
                 {personFields && <div className="form-grid two-column-form"><div className="field"><label>Name of person</label><input className="input" name="person_name" required /></div><div className="field"><label>Award category</label><input className="input" name="award_category" required placeholder="Example: Leading Performer" /></div></div>}
                 {["headshot", "resume"].includes(fileType) && <div className="field"><label>Role / character <span>Optional</span></label><input className="input" name="role_or_character" /></div>}
                 {fileType === "name_pronunciation" && <div className="field"><label>Phonetic spelling <span>Optional</span></label><input className="input" name="phonetic_spelling" placeholder="Example: muh-RYE-uh" /></div>}

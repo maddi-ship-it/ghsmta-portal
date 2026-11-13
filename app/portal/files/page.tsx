@@ -178,8 +178,8 @@ export default async function SchoolFilesPage() {
           <h1>{profile.role === "applicant" ? "Your school files" : "School files"}</h1>
           <p>
             {profile.role === "applicant"
-              ? "Upload and view your school’s playbills, Process to Performance materials, virtual audition packets, posters, logos, scenic materials, name pronunciations, headshots, and résumés."
-              : "View playbills, Process to Performance materials, virtual audition packets, posters, logos, scenic materials, name pronunciations, headshots, and résumés shared by school teams."}
+              ? "Upload, search, and manage your school’s playbills, production photos, Process to Performance materials, virtual audition packets, posters, logos, scenic materials, name pronunciations, headshots, and résumés."
+              : "Search playbills, production photos, Process to Performance materials, virtual audition packets, posters, logos, scenic materials, name pronunciations, headshots, and résumés shared by school teams."}
           </p>
         </div>
       </div>

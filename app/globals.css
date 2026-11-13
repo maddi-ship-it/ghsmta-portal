@@ -6559,6 +6559,24 @@ body.modal-open {
   min-width: 0;
 }
 
+.school-file-sidebar-search {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0 1rem 1rem;
+  border-bottom: 1px solid var(--portal-line, #e0e3ec);
+}
+
+.school-file-sidebar-search .input {
+  width: 100%;
+}
+
+.school-file-sidebar-search p {
+  margin: 0;
+  color: var(--portal-muted, var(--muted));
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
 .school-file-application-list {
   display: grid;
   gap: 0.45rem;
@@ -6613,6 +6631,24 @@ body.modal-open {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.school-file-search-empty {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border: 1px dashed var(--portal-line, #d9dce5);
+  border-radius: 0.8rem;
+  color: var(--portal-muted, var(--muted));
+}
+
+.school-file-search-empty strong {
+  color: var(--portal-text, #172033);
+}
+
+.school-file-search-empty span {
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .school-files-heading {
@@ -6776,11 +6812,6 @@ body.modal-open {
   min-width: 210px;
 }
 
-.school-file-search {
-  max-width: 300px;
-  margin-left: auto;
-}
-
 .school-file-drop-zone {
   margin-bottom: 0;
 }
@@ -6815,6 +6846,8 @@ body.modal-open {
 
 .school-file-row {
   align-items: center;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
   display: grid;
   gap: 0.9rem;
   grid-template-columns: auto minmax(210px, 1fr) minmax(150px, 0.35fr) auto;
@@ -7429,11 +7462,6 @@ body.modal-open {
     align-items: stretch;
     flex-direction: column;
     width: 100%;
-  }
-
-  .school-file-search {
-    max-width: none;
-    margin-left: 0;
   }
 
   .school-file-upload-backdrop {
