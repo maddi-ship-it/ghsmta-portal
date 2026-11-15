@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE,
+  ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE,
   buildAdjudicationReleaseAnnouncement,
   mergeReleasedFeedback,
   PICK_SIX_RELEASE_MESSAGE,
   updateSelectedCategoryIds,
 } from "@/lib/adjudication-release";
 import type { ReleasedFeedbackSummary } from "@/lib/types";
+
+describe("adjudication chat destinations", () => {
+  it("keeps panel workflow notices out of School Messaging", () => {
+    expect(ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE).toBe("school");
+    expect(ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE).toBe("school_dm");
+    expect(ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE).not.toBe(
+      ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE,
+    );
+  });
+});
 
 function feedback(
   categoryId: string,

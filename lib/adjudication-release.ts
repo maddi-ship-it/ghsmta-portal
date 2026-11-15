@@ -1,6 +1,9 @@
 import type { ReleasedFeedbackSummary } from "@/lib/types";
 
+// The database keeps school-facing messages in `school_dm` and the assigned
+// adjudication panel's internal conversation in `school`.
 export const ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE = "school_dm" as const;
+export const ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE = "school" as const;
 
 export const PICK_SIX_RELEASE_MESSAGE = `Hi Director,
 

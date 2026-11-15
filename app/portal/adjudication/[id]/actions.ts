@@ -19,6 +19,7 @@ import {
   scorecardCategoryLabel,
 } from "@/lib/adjudication-overall-score";
 import {
+  ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE,
   ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE,
   buildAdjudicationReleaseAnnouncement,
   mergeReleasedFeedback,
@@ -232,7 +233,7 @@ async function notifyScorecardSubmission({
       .from("chat_channels")
       .select("id")
       .eq("application_id", applicationId)
-      .eq("channel_type", ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE)
+      .eq("channel_type", ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE)
       .eq("active", true)
       .limit(1)
       .maybeSingle(),
@@ -2065,7 +2066,7 @@ export async function sendAllPanelNarrativesToPanel(
       .from("chat_channels")
       .select("id")
       .eq("application_id", applicationId)
-      .eq("channel_type", ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE)
+      .eq("channel_type", ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE)
       .eq("active", true)
       .limit(1)
       .maybeSingle();
@@ -2304,7 +2305,7 @@ export async function savePanelFeedback(
       .from("chat_channels")
       .select("id")
       .eq("application_id", applicationId)
-      .eq("channel_type", ADJUDICATION_SCHOOL_CHAT_CHANNEL_TYPE)
+      .eq("channel_type", ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE)
       .eq("active", true)
       .limit(1)
       .maybeSingle();
@@ -2343,7 +2344,7 @@ export async function savePanelFeedback(
         .from("chat_channels")
         .select("id")
         .eq("application_id", applicationId)
-        .eq("channel_type", "school")
+        .eq("channel_type", ADJUDICATION_PANEL_CHAT_CHANNEL_TYPE)
         .eq("active", true)
         .maybeSingle();
 
