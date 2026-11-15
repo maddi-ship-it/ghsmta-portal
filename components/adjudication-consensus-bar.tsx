@@ -38,6 +38,10 @@ import {
   type AdjudicationRangeSelectionDetail,
 } from "@/lib/adjudication-range-sync";
 import {
+  categoryPresenceDecisionLabel,
+  eligibilityDecisionLabel,
+} from "@/lib/adjudication-category-review-labels";
+import {
   buildRangeApprovalRoster,
   type RangeApprovalReviewer,
 } from "@/lib/adjudication-range-approvals";
@@ -188,6 +192,41 @@ function initialRangeSelections(categories: ScoringCategory[], proposals: Propos
   );
 }
 
+function initialEligibilitySelections(
+  categories: ScoringCategory[],
+  proposals: Proposal[],
+  categoryEligibilityDefaults: Record<string, boolean>,
+) {
+  const proposalByCategory = new Map(
+    proposals.map((proposal) => [proposal.category_id, proposal]),
+  );
+
+  return Object.fromEntries(
+    categories.map((category) => [
+      category.id,
+      proposalByCategory.get(category.id)?.is_eligible ??
+        categoryEligibilityDefaults[category.id] ??
+        true,
+    ]),
+  );
+}
+
+function initialCategoryPresenceSelections(
+  categories: ScoringCategory[],
+  scoreability: CategoryScoreability[],
+) {
+  const scoreabilityByCategory = new Map(
+    scoreability.map((decision) => [decision.category_id, decision]),
+  );
+
+  return Object.fromEntries(
+    categories.map((category) => [
+      category.id,
+      scoreabilityByCategory.get(category.id)?.is_scoreable ?? true,
+    ]),
+  );
+}
+
 const initialCategorySaveResult: CategoryProposalSaveResult = { ok: false };
 const initialAssignmentAnnouncementResult: PanelAssignmentAnnouncementResult = {
   ok: false,
@@ -244,6 +283,18 @@ export function AdjudicationConsensusBar({
   const [rangeSelections, setRangeSelections] = useState<Record<string, string>>(
     () => initialRangeSelections(categories, proposals),
   );
+  const [eligibilitySelections, setEligibilitySelections] = useState<
+    Record<string, boolean>
+  >(() =>
+    initialEligibilitySelections(
+      categories,
+      proposals,
+      categoryEligibilityDefaults,
+    ),
+  );
+  const [categoryPresenceSelections, setCategoryPresenceSelections] = useState<
+    Record<string, boolean>
+  >(() => initialCategoryPresenceSelections(categories, scoreability));
   const [writerAssignments, setWriterAssignments] = useState<
     Record<string, string | null>
   >(() =>
@@ -380,6 +431,16 @@ export function AdjudicationConsensusBar({
   const openDecisionMatrix = useCallback(() => {
     setLiveApprovals(approvals);
     setLiveApprovalStatus(proposals.length > 0 ? "loading" : "live");
+    setEligibilitySelections(
+      initialEligibilitySelections(
+        categories,
+        proposals,
+        categoryEligibilityDefaults,
+      ),
+    );
+    setCategoryPresenceSelections(
+      initialCategoryPresenceSelections(categories, scoreability),
+    );
     const applicableCategoryIds = categories
       .filter(
         (category) =>
@@ -396,7 +457,9 @@ export function AdjudicationConsensusBar({
     approvals,
     assignmentByCategory,
     categories,
+    categoryEligibilityDefaults,
     proposals,
+    scoreability,
     scoreabilityByCategory,
   ]);
 
@@ -426,6 +489,11 @@ export function AdjudicationConsensusBar({
   }, [applicationId]);
   const handleApplicabilityChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
+      const categoryId = event.currentTarget.name.replace("scoreable_", "");
+      setCategoryPresenceSelections((current) => ({
+        ...current,
+        [categoryId]: event.currentTarget.checked,
+      }));
       const form = event.currentTarget.form;
       if (form) writerAssignmentsComplete.current = formHasAllApplicableWriters(form);
     },
@@ -1015,8 +1083,9 @@ export function AdjudicationConsensusBar({
                   </p>
                   <h2 id="category-decision-title">Review all categories</h2>
                   <p>
-                    Confirm acting candidates, eligibility, applicability,
-                    two-point ranges, and final comment writers in one place.
+                    Confirm acting candidates, eligibility, whether each
+                    category is present, two-point ranges, and final comment
+                    writers in one place.
                   </p>
                 </div>
                 <div className="modal-header-actions">
@@ -1045,10 +1114,10 @@ export function AdjudicationConsensusBar({
               <div className="advisory-decision-help">
                 <p>
                   <strong>Eligible</strong> controls awards consideration.
-                  <strong> Applicable</strong> controls whether scoring fields
-                  appear and whether the category counts toward Overall
-                  Production. Every applicable category requires a 2-point
-                  range, even when it is not award eligible.
+                  <strong> Does it have this category?</strong> controls whether
+                  scoring fields appear and whether the category counts toward
+                  Overall Production. Every category marked Yes requires a
+                  2-point range, even when it is not award eligible.
                 </p>
                 <span aria-live="polite" className="range-review-live-status">
                   <span
@@ -1223,16 +1292,24 @@ export function AdjudicationConsensusBar({
                           <div className="advisory-decision-grid">
                             <label className="advisory-decision-toggle advisory-decision-eligibility">
                               <input
-                                defaultChecked={
-                                  proposal?.is_eligible ??
-                                  categoryEligibilityDefaults[category.id] ??
-                                  true
+                                checked={
+                                  eligibilitySelections[category.id] ?? true
                                 }
                                 name={`eligible_${category.id}`}
+                                onChange={(event) => {
+                                  setEligibilitySelections((current) => ({
+                                    ...current,
+                                    [category.id]: event.currentTarget.checked,
+                                  }));
+                                }}
                                 type="checkbox"
                               />
                               <span>
-                                <strong>Eligible</strong>
+                                <strong>
+                                  {eligibilityDecisionLabel(
+                                    eligibilitySelections[category.id] ?? true,
+                                  )}
+                                </strong>
                                 <small>
                                   {proposal
                                     ? "Awards consideration"
@@ -1246,21 +1323,29 @@ export function AdjudicationConsensusBar({
                             </label>
                             <label className="advisory-decision-toggle advisory-decision-applicability">
                               <input
-                                defaultChecked={
-                                  scoreabilityDecision?.is_scoreable ?? true
+                                checked={
+                                  categoryPresenceSelections[category.id] ??
+                                  true
                                 }
                                 name={`scoreable_${category.id}`}
                                 onChange={handleApplicabilityChange}
                                 type="checkbox"
                               />
                               <span>
-                                <strong>Applicable</strong>
+                                <strong>
+                                  {categoryPresenceDecisionLabel({
+                                    categoryTitle: category.title,
+                                    isPresent:
+                                      categoryPresenceSelections[category.id] ??
+                                      true,
+                                  })}
+                                </strong>
                                 <small>Counts toward Overall Production</small>
                               </span>
                             </label>
                             <div className="advisory-decision-field advisory-decision-reason">
                               <label htmlFor={`scoreability_reason_${category.id}`}>
-                                Reason not applicable
+                                Reason the answer is No
                               </label>
                               <input
                                 className="input input-compact"
@@ -1270,7 +1355,7 @@ export function AdjudicationConsensusBar({
                                 placeholder="Optional context"
                               />
                               <small>
-                                Shown when the category is not applicable.
+                                Shown when this category is marked No.
                               </small>
                             </div>
                             <div className="advisory-decision-field advisory-decision-range">
