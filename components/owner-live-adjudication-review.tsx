@@ -7,6 +7,7 @@ import {
   generatePanelNarrativeNow,
   reopenAdjudicatorScorecard,
   savePanelFeedback,
+  syncOwnerPanelFeedbackDraft,
 } from "@/app/portal/adjudication/[id]/actions";
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
 import { AdjudicationBigPictureComment } from "@/components/adjudication-overall-production";
@@ -31,6 +32,11 @@ import {
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { resolveFocusSafeRemoteUpdate } from "@/lib/focus-safe-remote-value";
 import { panelNarrativeSourceAssignmentIds } from "@/lib/panel-narrative";
+import {
+  panelNarrativeDraftHasNewerServerVersion,
+  rebasePanelNarrativeLocalDraft,
+  type PanelNarrativeLocalDraft,
+} from "@/lib/panel-narrative-local-draft";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
 import { createClient } from "@/lib/supabase/client";
 import { richTextHasContent, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/rich-text";
@@ -376,6 +382,7 @@ function LivePanelFeedbackEditor({
   const followingLiveDraftRef = useRef(!storedComment);
   const remoteValueRef = useRef(initialValue);
   const valueRef = useRef(initialValue);
+  const latestSourceGeneratedAtRef = useRef(feedback?.generated_at ?? "");
   const [manualValue, setManualValue] = useState(initialValue);
   const [followingLiveDraft, setFollowingLiveDraft] = useState(!storedComment);
   const [online, setOnline] = useState(true);
@@ -391,6 +398,10 @@ function LivePanelFeedbackEditor({
   useEffect(() => {
     followingLiveDraftRef.current = followingLiveDraft;
   }, [followingLiveDraft]);
+
+  useEffect(() => {
+    latestSourceGeneratedAtRef.current = feedback?.generated_at ?? "";
+  }, [feedback?.generated_at]);
 
   const receiveRemoteValue = useCallback((nextValue: string) => {
     if (
@@ -443,11 +454,7 @@ function LivePanelFeedbackEditor({
     try {
       const raw = window.localStorage.getItem(storageKey);
       if (!raw) return null;
-      return JSON.parse(raw) as {
-        finalComment?: string;
-        approved?: boolean;
-        sourceGeneratedAt?: string;
-      };
+      return JSON.parse(raw) as PanelNarrativeLocalDraft;
     } catch {
       window.localStorage.removeItem(storageKey);
       return null;
@@ -459,6 +466,19 @@ function LivePanelFeedbackEditor({
     const draft = readLocalDraft();
     const finalComment = draft?.finalComment?.trim();
     if (!draft || !finalComment) return;
+
+    if (
+      panelNarrativeDraftHasNewerServerVersion({
+        draftSourceGeneratedAt: draft.sourceGeneratedAt,
+        latestSourceGeneratedAt: latestSourceGeneratedAtRef.current,
+      })
+    ) {
+      setPendingRemoteValue(remoteValueRef.current);
+      setSyncMessage(
+        "A newer live narrative is available. Choose which version to keep.",
+      );
+      return;
+    }
 
     syncingRef.current = true;
     setSyncMessage("Syncing panel narrative…");
@@ -474,7 +494,22 @@ function LivePanelFeedbackEditor({
     }
 
     try {
-      await savePanelFeedback(applicationId, category.id, formData);
+      const result = await syncOwnerPanelFeedbackDraft(
+        applicationId,
+        category.id,
+        formData,
+      );
+      if (!result.ok) {
+        if (result.code === "stale") {
+          latestSourceGeneratedAtRef.current = result.latestGeneratedAt;
+          remoteValueRef.current = result.latestFinalComment;
+          dirtyRef.current = valueRef.current !== result.latestFinalComment;
+          setPendingRemoteValue(result.latestFinalComment);
+          setSyncMessage(result.message);
+          return;
+        }
+        throw new Error(result.message);
+      }
       remoteValueRef.current = finalComment;
       dirtyRef.current = valueRef.current !== finalComment;
       if (!dirtyRef.current) {
@@ -547,11 +582,7 @@ function LivePanelFeedbackEditor({
         };
       }
 
-      const draft = JSON.parse(raw) as {
-        finalComment?: string;
-        approved?: boolean;
-        sourceGeneratedAt?: string;
-      };
+      const draft = JSON.parse(raw) as PanelNarrativeLocalDraft;
 
       if ((draft.finalComment ?? "").trim() === storedComment) {
         window.localStorage.removeItem(storageKey);
@@ -580,6 +611,7 @@ function LivePanelFeedbackEditor({
   }, [storageKey, storedComment]);
 
   const writeLocalDraft = (finalComment: string, approved?: boolean) => {
+    const existingDraft = readLocalDraft();
     window.localStorage.setItem(
       storageKey,
       JSON.stringify({
@@ -587,7 +619,9 @@ function LivePanelFeedbackEditor({
         categoryId: category.id,
         finalComment,
         approved: Boolean(approved),
-        sourceGeneratedAt: feedback?.generated_at ?? "",
+        sourceGeneratedAt:
+          existingDraft?.sourceGeneratedAt ??
+          latestSourceGeneratedAtRef.current,
         savedAt: new Date().toISOString(),
       }),
     );
@@ -631,12 +665,19 @@ function LivePanelFeedbackEditor({
         action={savePanelFeedback.bind(null, applicationId, category.id)}
         className="form-stack"
         onSubmit={(event) => {
-          if (!navigator.onLine) {
-            event.preventDefault();
-            const approvedField = event.currentTarget.elements.namedItem("approved");
-            writeLocalDraft(
-              value,
-              approvedField instanceof HTMLInputElement ? approvedField.checked : false,
+          event.preventDefault();
+          const approvedField = event.currentTarget.elements.namedItem("approved");
+          writeLocalDraft(
+            value,
+            approvedField instanceof HTMLInputElement
+              ? approvedField.checked
+              : false,
+          );
+          if (navigator.onLine) {
+            if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+            syncTimerRef.current = setTimeout(
+              () => void syncLocalDraftRef.current(),
+              0,
             );
           }
         }}
@@ -774,10 +815,36 @@ function LivePanelFeedbackEditor({
               <div className="remote-edit-conflict-actions">
                 <button
                   className="button button-secondary"
-                  onClick={() => setPendingRemoteValue(null)}
+                  onClick={() => {
+                    const draft = readLocalDraft() ?? {
+                      applicationId,
+                      categoryId: category.id,
+                      finalComment: valueRef.current,
+                    };
+                    const rebasedDraft = rebasePanelNarrativeLocalDraft({
+                      draft,
+                      latestSourceGeneratedAt:
+                        latestSourceGeneratedAtRef.current,
+                      savedAt: new Date().toISOString(),
+                    });
+                    window.localStorage.setItem(
+                      storageKey,
+                      JSON.stringify(rebasedDraft),
+                    );
+                    setPendingRemoteValue(null);
+                    setHasLocalDraft(true);
+                    setSyncMessage("Keeping your draft — syncing…");
+                    if (syncTimerRef.current) {
+                      clearTimeout(syncTimerRef.current);
+                    }
+                    syncTimerRef.current = setTimeout(
+                      () => void syncLocalDraftRef.current(),
+                      0,
+                    );
+                  }}
                   type="button"
                 >
-                  Keep my draft
+                  Keep and sync my draft
                 </button>
                 <button
                   className="button button-secondary"
@@ -802,7 +869,7 @@ function LivePanelFeedbackEditor({
                   }}
                   type="button"
                 >
-                  Load saved version
+                  Load newer saved version
                 </button>
               </div>
             </div>

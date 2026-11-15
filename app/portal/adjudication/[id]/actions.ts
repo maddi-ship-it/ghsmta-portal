@@ -2114,6 +2114,9 @@ export async function sendAllPanelNarrativesToPanel(
   }
 }
 
+const STALE_PANEL_FEEDBACK_ERROR =
+  "This final comment was regenerated after this page loaded. Refresh before saving.";
+
 export async function savePanelFeedback(
   applicationId: string,
   categoryId: string,
@@ -2188,9 +2191,7 @@ export async function savePanelFeedback(
     existingFeedback &&
     (!sourceGeneratedAt || sourceGeneratedAt !== existingFeedback.generated_at)
   ) {
-    throw new Error(
-      "This final comment was regenerated after this page loaded. Refresh before saving.",
-    );
+    throw new Error(STALE_PANEL_FEEDBACK_ERROR);
   }
 
   if (editor.role !== "owner") {
@@ -2400,6 +2401,81 @@ export async function savePanelFeedback(
   }
 
   revalidatePath(`/portal/adjudication/${applicationId}`);
+}
+
+export type OwnerPanelFeedbackSyncResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: "stale";
+      latestFinalComment: string;
+      latestGeneratedAt: string;
+      message: string;
+    }
+  | { ok: false; code: "error"; message: string };
+
+export async function syncOwnerPanelFeedbackDraft(
+  applicationId: string,
+  categoryId: string,
+  formData: FormData,
+): Promise<OwnerPanelFeedbackSyncResult> {
+  try {
+    await savePanelFeedback(applicationId, categoryId, formData);
+    return { ok: true };
+  } catch (error) {
+    const message = errorMessage(error);
+    if (message !== STALE_PANEL_FEEDBACK_ERROR) {
+      console.error("Unable to sync the Owner panel narrative draft.", {
+        applicationId,
+        categoryId,
+        error: message,
+      });
+      return {
+        ok: false,
+        code: "error",
+        message:
+          "The panel narrative could not be synced. Your draft is still saved on this device.",
+      };
+    }
+
+    try {
+      await requireProfile(["owner"]);
+      const admin = createAdminClient();
+      const { data: latestFeedback, error: latestFeedbackError } = await admin
+        .from("adjudication_panel_feedback")
+        .select("final_comment,generated_at")
+        .eq("application_id", applicationId)
+        .eq("category_id", categoryId)
+        .maybeSingle();
+
+      if (latestFeedbackError || !latestFeedback?.generated_at) {
+        throw new Error(
+          latestFeedbackError?.message ?? "The newer narrative was not found.",
+        );
+      }
+
+      return {
+        ok: false,
+        code: "stale",
+        latestFinalComment: latestFeedback.final_comment ?? "",
+        latestGeneratedAt: latestFeedback.generated_at,
+        message:
+          "A newer live narrative was generated while you were editing. Choose which version to keep.",
+      };
+    } catch (recoveryError) {
+      console.error("Unable to load the newer panel narrative version.", {
+        applicationId,
+        categoryId,
+        error: errorMessage(recoveryError),
+      });
+      return {
+        ok: false,
+        code: "error",
+        message:
+          "A newer panel narrative exists, but it could not be loaded. Your draft is still saved on this device.",
+      };
+    }
+  }
 }
 
 export async function autosavePanelFeedbackDraft(
