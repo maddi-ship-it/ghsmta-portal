@@ -18,6 +18,33 @@ const panels = [
 }));
 
 describe("ApplicationReferenceBar", () => {
+  it("groups the Owner review controls in the top header without Panel review", () => {
+    const html = renderToStaticMarkup(
+      <ApplicationReferenceBar
+        categoryNavigation={{
+          categories: [{ id: "direction", title: "Direction" }],
+          showCompletion: false,
+        }}
+        panels={panels}
+        reviewActions={{
+          showCategoryReview: true,
+          showPanelReview: false,
+        }}
+        showFullScoreView
+        showOwnerCommentReview
+      />,
+    );
+
+    const reviewCategories = html.indexOf("Review all categories");
+    const reviewComments = html.indexOf("Review all comments");
+    const fullScoreView = html.indexOf("Full score view");
+
+    expect(reviewCategories).toBeGreaterThanOrEqual(0);
+    expect(reviewComments).toBeGreaterThan(reviewCategories);
+    expect(fullScoreView).toBeGreaterThan(reviewComments);
+    expect(html).not.toContain("Panel review");
+  });
+
   it("renders category navigation and adjudicator actions in the requested order", () => {
     const html = renderToStaticMarkup(
       <ApplicationReferenceBar

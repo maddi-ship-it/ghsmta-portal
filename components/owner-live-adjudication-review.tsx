@@ -29,7 +29,10 @@ import {
   ADJUDICATION_CATEGORY_COMPLETION_EVENT,
   isAdjudicationCategoryComplete,
 } from "@/lib/adjudication-category-completion";
-import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
+import {
+  OVERALL_PRODUCTION_CATEGORY_KEY,
+  scorecardCategoryLabel,
+} from "@/lib/adjudication-overall-score";
 import { resolveFocusSafeRemoteUpdate } from "@/lib/focus-safe-remote-value";
 import { panelNarrativeSourceAssignmentIds } from "@/lib/panel-narrative";
 import {
@@ -307,7 +310,7 @@ function composeLiveCommentDraft(
   ].filter(Boolean);
 
   if (sections.length === 0) return "";
-  return `${category.title}\n\n${sections.join("\n\n")}`;
+  return `${scorecardCategoryLabel(category)}\n\n${sections.join("\n\n")}`;
 }
 
 function categoryAverage(
@@ -1335,6 +1338,19 @@ export function OwnerLiveAdjudicationReview({
         scorecards={scorecards}
         scores={scores}
       />
+      {isOwner ? (
+        <OwnerCommentReviewModal
+          applicationId={applicationId}
+          acceptdPickSix={acceptdPickSix}
+          categories={categories}
+          feedback={feedback}
+          panelApprovedCategoryIds={ownerPanelApprovedCategoryIds}
+          releasedCategoryIds={
+            release?.feedback_snapshot?.map((item) => item.category_id) ?? []
+          }
+          showTrigger={false}
+        />
+      ) : null}
       <div
         className={`live-review-status live-review-status-${
           practiceMode ? "live" : connectionState
@@ -1398,33 +1414,6 @@ export function OwnerLiveAdjudicationReview({
         ) : null}
       </section>
 
-      {isOwner ? (
-        <section className="panel owner-comment-review-launcher" id="owner-comment-review">
-          <div className="panel-header">
-            <div>
-              <span className="eyebrow">Owner workflow</span>
-              <h2>Comment review</h2>
-              <p>
-                Generate every category comment, review the complete set in one
-                window, and send all finished comments to the panel together.
-              </p>
-            </div>
-            <OwnerCommentReviewModal
-              applicationId={applicationId}
-              acceptdPickSix={acceptdPickSix}
-              categories={categories}
-              feedback={feedback}
-              panelApprovedCategoryIds={ownerPanelApprovedCategoryIds}
-              releasedCategoryIds={
-                release?.feedback_snapshot?.map(
-                  (item) => item.category_id,
-                ) ?? []
-              }
-            />
-          </div>
-        </section>
-      ) : null}
-
       <section className="panel panel-progress-section">
         <div className="panel-header">
           <div>
@@ -1486,6 +1475,7 @@ export function OwnerLiveAdjudicationReview({
         );
         const isOverallProductionCategory =
           category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY;
+        const categoryLabel = scorecardCategoryLabel(category);
         const subjectName = category.subject_label
           ? categorySubjectDefaults[category.category_key] ||
             comments.find(
@@ -1534,7 +1524,7 @@ export function OwnerLiveAdjudicationReview({
             <div className="panel-header scoring-category-header">
               <div>
                 <span className="section-order">Category {categoryIndex + 1}</span>
-                <h2>{category.title}</h2>
+                <h2>{categoryLabel}</h2>
                 {category.subject_label ? (
                   <p className="panel-review-category-subject">
                     <strong>{category.subject_label}:</strong> {subjectName}
@@ -1550,7 +1540,7 @@ export function OwnerLiveAdjudicationReview({
               <AdvisoryCategoryRangeControl
                 applicationId={applicationId}
                 categoryId={category.id}
-                categoryTitle={category.title}
+                categoryTitle={categoryLabel}
                 initialRangeStart={categoryProposal?.range_min}
                 isEligible={
                   categoryProposal?.is_eligible ??
@@ -1608,7 +1598,7 @@ export function OwnerLiveAdjudicationReview({
                             ? "Adjudicators only"
                             : "Full panel"}
                         </small>
-                        <strong aria-label={`${category.title} full panel average`}>
+                        <strong aria-label={`${categoryLabel} full panel average`}>
                           {formatScoreAverage(average)}
                         </strong>
                       </span>
@@ -1653,7 +1643,7 @@ export function OwnerLiveAdjudicationReview({
                           {!isOverallProductionCategory ? (
                             <div className="panel-review-criterion-guide">
                               <CriterionScoringGuideButton
-                                categoryTitle={category.title}
+                                categoryTitle={categoryLabel}
                                 criterionId={criterion.id}
                                 criterionTitle={criterion.title}
                                 productionTitle={productionTitle}

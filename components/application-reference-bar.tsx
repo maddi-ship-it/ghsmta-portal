@@ -21,6 +21,8 @@ export const OPEN_PANEL_REVIEW_EVENT =
   "ghsmta:open-adjudication-panel-review";
 export const OPEN_FULL_SCORE_VIEW_EVENT =
   "ghsmta:open-adjudication-full-score-view";
+export const OPEN_OWNER_COMMENT_REVIEW_EVENT =
+  "ghsmta:open-owner-comment-review";
 export const PANEL_COMMENT_VISIBILITY_EVENT =
   "ghsmta:panel-comment-visibility";
 
@@ -201,6 +203,7 @@ export function ApplicationReferenceBar({
   scoringTools,
   scorecardSubmitControl,
   showFullScoreView = false,
+  showOwnerCommentReview = false,
 }: {
   categoryWorkflowControl?: ReactNode;
   categoryNavigation?: {
@@ -222,6 +225,7 @@ export function ApplicationReferenceBar({
   scoringTools?: ReactNode;
   scorecardSubmitControl?: ReactNode;
   showFullScoreView?: boolean;
+  showOwnerCommentReview?: boolean;
 }) {
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
@@ -354,7 +358,8 @@ export function ApplicationReferenceBar({
               categoryWorkflowControl ||
               reviewActions?.showCategoryReview ||
               panelCommentControl ||
-              showFullScoreView ? (
+              showFullScoreView ||
+              showOwnerCommentReview ? (
                 <div className="application-reference-action-group application-reference-workflow-actions application-category-workflow-actions">
                   {reviewActions?.showCategoryReview ? (
                     <button
@@ -374,6 +379,19 @@ export function ApplicationReferenceBar({
                     </button>
                   ) : null}
                   {categoryWorkflowControl}
+                  {showOwnerCommentReview ? (
+                    <button
+                      className="application-reference-button application-reference-review-button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new Event(OPEN_OWNER_COMMENT_REVIEW_EVENT),
+                        )
+                      }
+                      type="button"
+                    >
+                      Review all comments
+                    </button>
+                  ) : null}
                   {showFullScoreView ? (
                     <button
                       className="application-reference-button application-reference-score-overview-button"
@@ -439,7 +457,8 @@ export function ApplicationReferenceBar({
                 categoryWorkflowControl ||
                 reviewActions?.showCategoryReview ||
                 panelCommentControl ||
-                showFullScoreView)) ? (
+                showFullScoreView ||
+                showOwnerCommentReview)) ? (
               <div className="application-reference-action-group application-reference-workflow-actions">
                 {reviewActions?.showPanelReview ? (
                   <button
@@ -468,6 +487,19 @@ export function ApplicationReferenceBar({
                   </button>
                 ) : null}
                 {!categoryNavigation ? categoryWorkflowControl : null}
+                {!categoryNavigation && showOwnerCommentReview ? (
+                  <button
+                    className="application-reference-button application-reference-review-button"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new Event(OPEN_OWNER_COMMENT_REVIEW_EVENT),
+                      )
+                    }
+                    type="button"
+                  >
+                    Review all comments
+                  </button>
+                ) : null}
                 {!categoryNavigation && showFullScoreView ? (
                   <button
                     className="application-reference-button application-reference-score-overview-button"

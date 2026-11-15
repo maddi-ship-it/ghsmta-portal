@@ -962,7 +962,8 @@ export default async function AdjudicationApplicationPage({
   const showConsensusControls = showEditableScorecard || canPanelReview;
   const compactConsensusControls =
     showConsensusControls &&
-    (effectiveParticipantRole === "adjudicator" ||
+    (profile.role === "owner" ||
+      effectiveParticipantRole === "adjudicator" ||
       effectiveParticipantRole === "advisory_member");
   const scorecardFormId = `adjudication-scorecard-${id}`;
   const proposalByCategoryId = new Map(
@@ -1130,6 +1131,7 @@ export default async function AdjudicationApplicationPage({
           (profile.role === "owner" ||
             effectiveParticipantRole === "advisory_member")
         }
+        showOwnerCommentReview={profile.role === "owner"}
         reviewActions={compactConsensusControls
           ? {
               categoryReviewStatus: categoryReviewComplete

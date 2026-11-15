@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
@@ -9,6 +17,9 @@ import {
   releaseSelectedAdjudicationFeedback,
   sendAllPanelNarrativesToPanel,
 } from "@/app/portal/adjudication/[id]/actions";
+import {
+  OPEN_OWNER_COMMENT_REVIEW_EVENT,
+} from "@/components/application-reference-bar";
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { updateSelectedCategoryIds } from "@/lib/adjudication-release";
@@ -108,6 +119,7 @@ export function OwnerCommentReviewModal({
   feedback,
   panelApprovedCategoryIds,
   releasedCategoryIds,
+  showTrigger = true,
 }: {
   applicationId: string;
   acceptdPickSix?: string[];
@@ -115,12 +127,14 @@ export function OwnerCommentReviewModal({
   feedback: AdjudicationPanelFeedback[];
   panelApprovedCategoryIds: string[];
   releasedCategoryIds: string[];
+  showTrigger?: boolean;
 }) {
   const router = useRouter();
   const reactId = useId();
   const titleId = `owner-comment-review-${reactId.replaceAll(":", "")}`;
   const pickSixTitleId = `acceptd-pick-six-${reactId.replaceAll(":", "")}`;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const pickSixTriggerRef = useRef<HTMLButtonElement | null>(null);
   const pickSixCloseButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -180,7 +194,7 @@ export function OwnerCommentReviewModal({
   useEffect(() => {
     if (!open) return;
 
-    const triggerElement = triggerRef.current;
+    const triggerElement = returnFocusRef.current ?? triggerRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const focusFrame = window.requestAnimationFrame(() => {
@@ -247,7 +261,11 @@ export function OwnerCommentReviewModal({
     unresolvedDrafts.length === 0 &&
     readyDrafts.length + completedCount === drafts.length;
 
-  const openReview = () => {
+  const openReview = useCallback(() => {
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : triggerRef.current;
     setDrafts(initialDrafts);
     setMessage("");
     setSelectedReleaseIds(new Set());
@@ -257,7 +275,14 @@ export function OwnerCommentReviewModal({
     setShowReleaseConfirmation(false);
     setPickSixOpen(false);
     setOpen(true);
-  };
+  }, [initialDrafts]);
+
+  useEffect(() => {
+    window.addEventListener(OPEN_OWNER_COMMENT_REVIEW_EVENT, openReview);
+    return () => {
+      window.removeEventListener(OPEN_OWNER_COMMENT_REVIEW_EVENT, openReview);
+    };
+  }, [openReview]);
 
   const generateAll = () => {
     setMessage("Generating all Owner drafts from the latest saved panel comments…");
@@ -387,15 +412,17 @@ export function OwnerCommentReviewModal({
 
   return (
     <>
-      <button
-        aria-haspopup="dialog"
-        className="button button-dark"
-        onClick={openReview}
-        ref={triggerRef}
-        type="button"
-      >
-        Review all comments
-      </button>
+      {showTrigger ? (
+        <button
+          aria-haspopup="dialog"
+          className="button button-dark"
+          onClick={openReview}
+          ref={triggerRef}
+          type="button"
+        >
+          Review all comments
+        </button>
+      ) : null}
 
       {open
         ? createPortal(
