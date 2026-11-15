@@ -1,11 +1,34 @@
 export type PanelNarrativeLocalDraft = {
   applicationId?: string;
+  approvalChanged?: boolean;
   categoryId?: string;
   finalComment?: string;
   approved?: boolean;
   sourceGeneratedAt?: string;
   savedAt?: string;
 };
+
+export function resolvePanelNarrativeDraftApproval({
+  existingDraftApprovalChanged,
+  existingDraftApproved,
+  nextApproved,
+  serverApproved,
+}: {
+  existingDraftApprovalChanged: boolean | undefined;
+  existingDraftApproved: boolean | undefined;
+  nextApproved: boolean | undefined;
+  serverApproved: boolean;
+}) {
+  if (nextApproved !== undefined) return nextApproved;
+  if (
+    existingDraftApprovalChanged &&
+    existingDraftApproved !== undefined
+  ) {
+    return existingDraftApproved;
+  }
+  if (serverApproved) return true;
+  return existingDraftApproved ?? false;
+}
 
 export function panelNarrativeDraftHasNewerServerVersion({
   draftSourceGeneratedAt,

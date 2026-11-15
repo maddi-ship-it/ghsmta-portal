@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   panelNarrativeDraftHasNewerServerVersion,
   rebasePanelNarrativeLocalDraft,
+  resolvePanelNarrativeDraftApproval,
 } from "./panel-narrative-local-draft";
 
 describe("panel narrative local draft recovery", () => {
@@ -39,5 +40,47 @@ describe("panel narrative local draft recovery", () => {
       sourceGeneratedAt: "new-version",
       savedAt: "2026-11-15T02:00:00.000Z",
     });
+  });
+
+  it("preserves panel approval while the Owner edits the narrative text", () => {
+    expect(
+      resolvePanelNarrativeDraftApproval({
+        existingDraftApprovalChanged: undefined,
+        existingDraftApproved: undefined,
+        nextApproved: undefined,
+        serverApproved: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      resolvePanelNarrativeDraftApproval({
+        existingDraftApprovalChanged: undefined,
+        existingDraftApproved: true,
+        nextApproved: undefined,
+        serverApproved: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("honors an explicit Owner approval change", () => {
+    expect(
+      resolvePanelNarrativeDraftApproval({
+        existingDraftApprovalChanged: true,
+        existingDraftApproved: true,
+        nextApproved: false,
+        serverApproved: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("repairs a legacy local draft that accidentally dropped server approval", () => {
+    expect(
+      resolvePanelNarrativeDraftApproval({
+        existingDraftApprovalChanged: undefined,
+        existingDraftApproved: false,
+        nextApproved: undefined,
+        serverApproved: true,
+      }),
+    ).toBe(true);
   });
 });

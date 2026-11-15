@@ -38,6 +38,7 @@ import { panelNarrativeSourceAssignmentIds } from "@/lib/panel-narrative";
 import {
   panelNarrativeDraftHasNewerServerVersion,
   rebasePanelNarrativeLocalDraft,
+  resolvePanelNarrativeDraftApproval,
   type PanelNarrativeLocalDraft,
 } from "@/lib/panel-narrative-local-draft";
 import { resolvePanelAveragePolicy } from "@/lib/panel-average-policy";
@@ -619,9 +620,18 @@ function LivePanelFeedbackEditor({
       storageKey,
       JSON.stringify({
         applicationId,
+        approvalChanged:
+          approved !== undefined
+            ? true
+            : existingDraft?.approvalChanged ?? false,
         categoryId: category.id,
         finalComment,
-        approved: Boolean(approved),
+        approved: resolvePanelNarrativeDraftApproval({
+          existingDraftApprovalChanged: existingDraft?.approvalChanged,
+          existingDraftApproved: existingDraft?.approved,
+          nextApproved: approved,
+          serverApproved: feedback?.status === "approved",
+        }),
         sourceGeneratedAt:
           existingDraft?.sourceGeneratedAt ??
           latestSourceGeneratedAtRef.current,
