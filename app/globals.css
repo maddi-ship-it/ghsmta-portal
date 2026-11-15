@@ -14176,7 +14176,7 @@ html[data-theme="light"] .regal-path-section {
 
 .advisory-decision-card-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   padding: 13px 16px;
@@ -14214,9 +14214,9 @@ html[data-theme="light"] .regal-path-section {
 }
 
 .advisory-decision-summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -14479,24 +14479,35 @@ html[data-theme="light"] .regal-path-section {
   line-height: 1.25;
 }
 
-.advisory-decision-reason {
-  grid-column: span 3;
-}
-
 .advisory-decision-range {
   grid-column: span 2;
 }
 
+.advisory-live-average-inline {
+  height: 100%;
+  grid-column: span 3;
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 8px;
+}
+
+.advisory-live-average-inline .advisory-live-average-value {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.advisory-live-average-inline .advisory-live-average-value > span {
+  white-space: nowrap;
+}
+
+.advisory-live-average-inline .advisory-live-average-details small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .advisory-decision-writer {
   grid-column: span 3;
-}
-
-.advisory-decision-note {
-  grid-column: 1 / -1;
-}
-
-.advisory-decision-note .compact-textarea {
-  min-height: 58px;
 }
 
 .advisory-decision-assignee {
@@ -14897,12 +14908,11 @@ html[data-theme="light"] .acting-candidate-approval {
   }
 
   .advisory-decision-writer,
-  .advisory-decision-note,
   .advisory-owner-override,
   .advisory-decision-statuses,
+  .advisory-live-average-inline,
   .advisory-decision-eligibility,
   .advisory-decision-applicability,
-  .advisory-decision-reason,
   .advisory-decision-range {
     grid-column: auto;
   }
@@ -14963,13 +14973,12 @@ html[data-theme="light"] .acting-candidate-approval {
 
   .advisory-decision-eligibility,
   .advisory-decision-applicability,
-  .advisory-decision-reason,
+  .advisory-live-average-inline,
   .advisory-decision-range {
     grid-column: span 3;
   }
 
   .advisory-decision-writer,
-  .advisory-decision-note,
   .advisory-owner-override {
     grid-column: span 6;
   }

@@ -1237,44 +1237,6 @@ export function AdjudicationConsensusBar({
                               )}
                             </div>
                             <div className="advisory-decision-summary">
-                              <div className="advisory-live-average">
-                                <div className="advisory-live-average-value">
-                                  <span>Live panel average</span>
-                                  <strong>
-                                    {liveAverageStatus === "loading" && average == null
-                                      ? "Loading…"
-                                      : average == null
-                                        ? "—"
-                                        : average.toFixed(2)}
-                                  </strong>
-                                </div>
-                                <div className="advisory-live-average-details">
-                                  <small>
-                                    {panelAverage
-                                      ? `${Number(panelAverage.score_count)} scores · ${Number(
-                                          panelAverage.scoring_member_count,
-                                        )}/${Number(
-                                          panelAverage.assigned_scorer_count,
-                                        )} members reporting`
-                                      : "Updates as panel scores are entered"}
-                                  </small>
-                                  {naturalRange ? (
-                                    <small className="advisory-live-range advisory-live-range-within">
-                                      Natural range {naturalRange.rangeMinimum.toFixed(2)}–
-                                      {naturalRange.rangeMaximum.toFixed(2)}
-                                    </small>
-                                  ) : hasComparableScores ? (
-                                    <small className="advisory-live-range advisory-live-range-outside">
-                                      Outside two points: {minimumMemberAverage?.toFixed(2)}–
-                                      {maximumMemberAverage?.toFixed(2)}
-                                    </small>
-                                  ) : (
-                                    <small className="advisory-live-range">
-                                      Waiting for two panel scores
-                                    </small>
-                                  )}
-                                </div>
-                              </div>
                               <span
                                 className={`badge ${
                                   proposal?.status === "approved" ||
@@ -1391,113 +1353,138 @@ export function AdjudicationConsensusBar({
                                 </span>
                               </label>
                             </div>
-                            <div className="advisory-decision-field advisory-decision-reason">
-                              <label htmlFor={`scoreability_reason_${category.id}`}>
-                                Reason the answer is No
-                              </label>
-                              <input
-                                className="input input-compact"
-                                defaultValue={scoreabilityDecision?.reason ?? ""}
-                                id={`scoreability_reason_${category.id}`}
-                                name={`scoreability_reason_${category.id}`}
-                                placeholder="Optional context"
-                              />
-                              <small>
-                                Shown when this category is marked No.
-                              </small>
-                            </div>
+                            <input
+                              name={`scoreability_reason_${category.id}`}
+                              type="hidden"
+                              value={scoreabilityDecision?.reason ?? ""}
+                            />
+                            <input
+                              name={`note_${category.id}`}
+                              type="hidden"
+                              value={proposal?.advisory_note ?? ""}
+                            />
                             <div className="advisory-decision-field advisory-decision-range">
                               <label htmlFor={`range_${category.id}`}>
                                 Two-point range
                               </label>
-                            <select
-                              className="select"
-                              id={`range_${category.id}`}
-                              name={`range_${category.id}`}
-                              onChange={(event) => {
-                                const rangeStart = event.target.value;
-                                setRangeSelections((current) => ({
-                                  ...current,
-                                  [category.id]: rangeStart,
-                                }));
-                                announceAdjudicationRangeSelection({
-                                  applicationId,
-                                  categoryId: category.id,
-                                  rangeStart,
-                                });
-                              }}
-                              value={rangeSelections[category.id] ?? ""}
-                            >
-                              <option value="">Select range</option>
-                              {TWO_POINT_RANGE_START_OPTIONS.map((value) => (
-                                <option key={value} value={value.toFixed(2)}>
-                                  {value.toFixed(2)}–{(value + 2).toFixed(2)}
-                                </option>
-                              ))}
-                            </select>
+                              <select
+                                className="select"
+                                id={`range_${category.id}`}
+                                name={`range_${category.id}`}
+                                onChange={(event) => {
+                                  const rangeStart = event.target.value;
+                                  setRangeSelections((current) => ({
+                                    ...current,
+                                    [category.id]: rangeStart,
+                                  }));
+                                  announceAdjudicationRangeSelection({
+                                    applicationId,
+                                    categoryId: category.id,
+                                    rangeStart,
+                                  });
+                                }}
+                                value={rangeSelections[category.id] ?? ""}
+                              >
+                                <option value="">Select range</option>
+                                {TWO_POINT_RANGE_START_OPTIONS.map((value) => (
+                                  <option key={value} value={value.toFixed(2)}>
+                                    {value.toFixed(2)}–{(value + 2).toFixed(2)}
+                                  </option>
+                                ))}
+                              </select>
                               <small>
                                 Enter the ACM-approved range. Live scores are
                                 reference only and never fill this field.
                               </small>
                             </div>
+                            <div className="advisory-live-average advisory-live-average-inline">
+                              <div className="advisory-live-average-value">
+                                <span>Live panel average</span>
+                                <strong>
+                                  {liveAverageStatus === "loading" &&
+                                  average == null
+                                    ? "Loading…"
+                                    : average == null
+                                      ? "—"
+                                      : average.toFixed(2)}
+                                </strong>
+                              </div>
+                              <div className="advisory-live-average-details">
+                                <small>
+                                  {panelAverage
+                                    ? `${Number(panelAverage.score_count)} scores · ${Number(
+                                        panelAverage.scoring_member_count,
+                                      )}/${Number(
+                                        panelAverage.assigned_scorer_count,
+                                      )} members reporting`
+                                    : "Updates as panel scores are entered"}
+                                </small>
+                                {naturalRange ? (
+                                  <small className="advisory-live-range advisory-live-range-within">
+                                    Natural range {naturalRange.rangeMinimum.toFixed(2)}–
+                                    {naturalRange.rangeMaximum.toFixed(2)}
+                                  </small>
+                                ) : hasComparableScores ? (
+                                  <small className="advisory-live-range advisory-live-range-outside">
+                                    Outside two points: {minimumMemberAverage?.toFixed(2)}–
+                                    {maximumMemberAverage?.toFixed(2)}
+                                  </small>
+                                ) : (
+                                  <small className="advisory-live-range">
+                                    Waiting for two panel scores
+                                  </small>
+                                )}
+                              </div>
+                            </div>
                             <div className="advisory-decision-field advisory-decision-writer">
                               <label htmlFor={assigneeFieldName}>
                                 Final comment writer
                               </label>
-                            {canSetDecisions ? (
-                              <select
-                                aria-busy={writerSaveState.status === "saving"}
-                                className="select"
-                                id={assigneeFieldName}
-                                name={assigneeFieldName}
-                                onChange={(event) => {
-                                  void handleWriterSelectionChange(
-                                    category.id,
-                                    event,
-                                  );
-                                }}
-                                value={assigneeId ?? ""}
-                              >
-                                <option value="">Choose panel member</option>
-                                {panelReviewers.map((reviewer) => (
-                                  <option key={reviewer.id} value={reviewer.id}>
-                                    {reviewer.name}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <strong className="advisory-decision-assignee">
-                                {assignedReviewer?.name ?? "Unassigned"}
-                              </strong>
-                            )}
-                            {canSetDecisions && writerSaveState.status !== "idle" && (
-                              <small
-                                aria-live="polite"
-                                className={
-                                  writerSaveState.status === "error"
-                                    ? "form-error"
-                                    : undefined
-                                }
-                              >
-                                {writerSaveState.status === "saving"
-                                  ? "Saving writer…"
-                                  : writerSaveState.status === "saved"
-                                    ? "Writer saved"
-                                    : writerSaveState.error}
-                              </small>
-                            )}
-                            </div>
-                            <div className="advisory-decision-field advisory-decision-note">
-                              <label htmlFor={`note_${category.id}`}>
-                                Advisory note
-                              </label>
-                            <textarea
-                              className="textarea compact-textarea"
-                              defaultValue={proposal?.advisory_note ?? ""}
-                              id={`note_${category.id}`}
-                              name={`note_${category.id}`}
-                              placeholder="Optional context for adjudicators"
-                            />
+                              {canSetDecisions ? (
+                                <select
+                                  aria-busy={
+                                    writerSaveState.status === "saving"
+                                  }
+                                  className="select"
+                                  id={assigneeFieldName}
+                                  name={assigneeFieldName}
+                                  onChange={(event) => {
+                                    void handleWriterSelectionChange(
+                                      category.id,
+                                      event,
+                                    );
+                                  }}
+                                  value={assigneeId ?? ""}
+                                >
+                                  <option value="">Choose panel member</option>
+                                  {panelReviewers.map((reviewer) => (
+                                    <option key={reviewer.id} value={reviewer.id}>
+                                      {reviewer.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <strong className="advisory-decision-assignee">
+                                  {assignedReviewer?.name ?? "Unassigned"}
+                                </strong>
+                              )}
+                              {canSetDecisions &&
+                                writerSaveState.status !== "idle" && (
+                                  <small
+                                    aria-live="polite"
+                                    className={
+                                      writerSaveState.status === "error"
+                                        ? "form-error"
+                                        : undefined
+                                    }
+                                  >
+                                    {writerSaveState.status === "saving"
+                                      ? "Saving writer…"
+                                      : writerSaveState.status === "saved"
+                                        ? "Writer saved"
+                                        : writerSaveState.error}
+                                  </small>
+                                )}
                             </div>
                             {role === "owner" && (
                               <div className="advisory-decision-field advisory-owner-override">
@@ -1662,46 +1649,46 @@ export function AdjudicationConsensusBar({
                       : "Loading live panel averages…"}
                 </span>
                 <div className="button-row">
-                <button
-                  className="button button-secondary"
-                  onClick={() => setMatrixOpen(false)}
-                  type="button"
-                >
-                  Discard changes
-                </button>
-                <ScheduleSubmitButton
-                  className="button button-secondary"
-                  formNoValidate
-                  name="save_intent"
-                  pendingLabel="Saving draft…"
-                  value="draft"
-                >
-                  Save and close
-                </ScheduleSubmitButton>
-                {canSetDecisions && (
+                  <button
+                    className="button button-secondary"
+                    onClick={() => setMatrixOpen(false)}
+                    type="button"
+                  >
+                    Discard changes
+                  </button>
                   <ScheduleSubmitButton
                     className="button button-secondary"
-                    formAction={sendAssignments}
                     formNoValidate
-                    pendingLabel="Sending assigned writers…"
+                    name="save_intent"
+                    pendingLabel="Saving draft…"
+                    value="draft"
                   >
-                    Send assigned writers
+                    Save and close
                   </ScheduleSubmitButton>
-                )}
-                <ScheduleSubmitButton
-                  className="button button-gold"
-                  name="save_intent"
-                  pendingLabel={
-                    role === "advisory_member"
-                      ? "Sending for approval…"
-                      : "Saving decisions…"
-                  }
-                  value="approval"
-                >
-                  {role === "advisory_member"
-                    ? "Send for approval"
-                    : "Save category decisions"}
-                </ScheduleSubmitButton>
+                  {canSetDecisions && (
+                    <ScheduleSubmitButton
+                      className="button button-secondary"
+                      formAction={sendAssignments}
+                      formNoValidate
+                      pendingLabel="Sending assigned writers…"
+                    >
+                      Send assigned writers
+                    </ScheduleSubmitButton>
+                  )}
+                  <ScheduleSubmitButton
+                    className="button button-gold"
+                    name="save_intent"
+                    pendingLabel={
+                      role === "advisory_member"
+                        ? "Sending for approval…"
+                        : "Saving decisions…"
+                    }
+                    value="approval"
+                  >
+                    {role === "advisory_member"
+                      ? "Send for approval"
+                      : "Save category decisions"}
+                  </ScheduleSubmitButton>
                 </div>
               </div>
             </form>

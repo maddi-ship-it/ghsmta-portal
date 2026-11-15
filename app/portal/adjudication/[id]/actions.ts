@@ -39,6 +39,14 @@ import {
   type ScorecardNotificationProfile,
   type ScorecardNotificationScorecard,
 } from "@/lib/adjudication-scorecard-notifications";
+import {
+  categoryCommentDraftRowChanged,
+  scoreDraftRowChanged,
+  type ExistingCategoryCommentDraftRow,
+  type ExistingScoreDraftRow,
+  type NextCategoryCommentDraftRow,
+  type NextScoreDraftRow,
+} from "@/lib/adjudication-scorecard-draft";
 import { categoryDecisionApprovedForUser } from "@/lib/adjudication-category-decisions";
 import { isValidTwoPointRange } from "@/lib/adjudication-ranges";
 import { requireProfile } from "@/lib/auth";
@@ -526,8 +534,39 @@ async function persistAdjudicatorScorecard(
     answers: (applicationAnswersResult.data ?? []) as ApplicationAnswer[],
   });
 
-  const scoreRows: Array<Record<string, unknown>> = [];
-  const commentRows: Array<Record<string, unknown>> = [];
+  const [existingScoresResult, existingCommentsResult] = await Promise.all([
+    supabase
+      .from("adjudication_scores")
+      .select("criterion_id,score,observation")
+      .eq("scorecard_id", scorecard.id),
+    supabase
+      .from("adjudication_category_comments")
+      .select(
+        "category_id,subject_name,is_applicable,is_eligible,not_applicable_reason,score_range_min,score_range_max,private_notes",
+      )
+      .eq("scorecard_id", scorecard.id),
+  ]);
+  if (existingScoresResult.error) {
+    throw new Error(existingScoresResult.error.message);
+  }
+  if (existingCommentsResult.error) {
+    throw new Error(existingCommentsResult.error.message);
+  }
+
+  const existingScoreByCriterionId = new Map(
+    ((existingScoresResult.data ?? []) as ExistingScoreDraftRow[]).map(
+      (score) => [score.criterion_id, score],
+    ),
+  );
+  const existingCommentByCategoryId = new Map(
+    (
+      (existingCommentsResult.data ?? []) as ExistingCategoryCommentDraftRow[]
+    ).map((comment) => [comment.category_id, comment]),
+  );
+  const scoreRows: Array<NextScoreDraftRow & { scorecard_id: string }> = [];
+  const commentRows: Array<
+    NextCategoryCommentDraftRow & { scorecard_id: string }
+  > = [];
   const missing: string[] = [];
   const sourceScores = new Map<string, number | null>();
 
@@ -601,7 +640,9 @@ async function persistAdjudicatorScorecard(
       missing.push(`${categoryLabel}: ${category.subject_label}`);
     }
 
-    const commentRow: Record<string, unknown> = {
+    const commentRow: NextCategoryCommentDraftRow & {
+      scorecard_id: string;
+    } = {
       scorecard_id: scorecard.id,
       category_id: category.id,
       subject_name: formText(formData, `subject_name_${category.id}`) ||
@@ -656,7 +697,7 @@ async function persistAdjudicatorScorecard(
         missing.push(`${categoryLabel}: ${criterion.title} observation`);
       }
 
-      const scoreRow: Record<string, unknown> = {
+      const scoreRow: NextScoreDraftRow & { scorecard_id: string } = {
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
         ...(canScore ? { score: validScore ? numericScore : null } : {}),
@@ -761,17 +802,34 @@ async function persistAdjudicatorScorecard(
     }
   }
 
-  if (scoreRows.length > 0) {
-    const { error } = await supabase.from("adjudication_scores").upsert(scoreRows, {
-      onConflict: "scorecard_id,criterion_id",
-    });
+  const changedScoreRows = scoreRows.filter((row) =>
+    scoreDraftRowChanged(
+      existingScoreByCriterionId.get(row.criterion_id),
+      row,
+    ),
+  );
+  const changedCommentRows = commentRows.filter((row) =>
+    categoryCommentDraftRowChanged(
+      existingCommentByCategoryId.get(row.category_id),
+      row,
+    ),
+  );
+
+  if (changedScoreRows.length > 0) {
+    const { error } = await supabase
+      .from("adjudication_scores")
+      .upsert(changedScoreRows, {
+        onConflict: "scorecard_id,criterion_id",
+      });
     if (error) throw new Error(error.message);
   }
 
-  if (commentRows.length > 0) {
-    const { error } = await supabase.from("adjudication_category_comments").upsert(commentRows, {
-      onConflict: "scorecard_id,category_id",
-    });
+  if (changedCommentRows.length > 0) {
+    const { error } = await supabase
+      .from("adjudication_category_comments")
+      .upsert(changedCommentRows, {
+        onConflict: "scorecard_id,category_id",
+      });
     if (error) throw new Error(error.message);
   }
 
