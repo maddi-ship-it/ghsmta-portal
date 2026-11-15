@@ -1292,9 +1292,13 @@ export function AdjudicationConsensusBar({
                           <div className="advisory-decision-grid">
                             <label className="advisory-decision-toggle advisory-decision-eligibility">
                               <input
+                                aria-label={eligibilityDecisionLabel(
+                                  eligibilitySelections[category.id] ?? true,
+                                )}
                                 checked={
                                   eligibilitySelections[category.id] ?? true
                                 }
+                                className="advisory-decision-switch-input"
                                 name={`eligible_${category.id}`}
                                 onChange={(event) => {
                                   setEligibilitySelections((current) => ({
@@ -1302,9 +1306,22 @@ export function AdjudicationConsensusBar({
                                     [category.id]: event.currentTarget.checked,
                                   }));
                                 }}
+                                role="switch"
                                 type="checkbox"
                               />
-                              <span>
+                              <span
+                                aria-hidden="true"
+                                className="advisory-decision-switch"
+                              >
+                                <span className="advisory-decision-switch-option">
+                                  No
+                                </span>
+                                <span className="advisory-decision-switch-option">
+                                  Yes
+                                </span>
+                                <span className="advisory-decision-switch-thumb" />
+                              </span>
+                              <span className="advisory-decision-toggle-copy">
                                 <strong>
                                   {eligibilityDecisionLabel(
                                     eligibilitySelections[category.id] ?? true,
@@ -1323,15 +1340,35 @@ export function AdjudicationConsensusBar({
                             </label>
                             <label className="advisory-decision-toggle advisory-decision-applicability">
                               <input
+                                aria-label={categoryPresenceDecisionLabel({
+                                  categoryTitle: category.title,
+                                  isPresent:
+                                    categoryPresenceSelections[category.id] ??
+                                    true,
+                                })}
                                 checked={
                                   categoryPresenceSelections[category.id] ??
                                   true
                                 }
+                                className="advisory-decision-switch-input"
                                 name={`scoreable_${category.id}`}
                                 onChange={handleApplicabilityChange}
+                                role="switch"
                                 type="checkbox"
                               />
-                              <span>
+                              <span
+                                aria-hidden="true"
+                                className="advisory-decision-switch"
+                              >
+                                <span className="advisory-decision-switch-option">
+                                  No
+                                </span>
+                                <span className="advisory-decision-switch-option">
+                                  Yes
+                                </span>
+                                <span className="advisory-decision-switch-thumb" />
+                              </span>
+                              <span className="advisory-decision-toggle-copy">
                                 <strong>
                                   {categoryPresenceDecisionLabel({
                                     categoryTitle: category.title,

@@ -14278,6 +14278,7 @@ html[data-theme="light"] .regal-path-section {
 }
 
 .advisory-decision-toggle {
+  position: relative;
   display: flex;
   min-height: 66px;
   align-items: center;
@@ -14290,6 +14291,110 @@ html[data-theme="light"] .regal-path-section {
   width: 17px;
   height: 17px;
   flex: 0 0 auto;
+}
+
+.advisory-decision-toggle .advisory-decision-switch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+.advisory-decision-toggle .advisory-decision-switch {
+  position: relative;
+  display: grid;
+  width: 92px;
+  height: 38px;
+  flex: 0 0 92px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  padding: 3px;
+  overflow: hidden;
+  color: var(--portal-muted);
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--portal-muted) 16%, var(--portal-surface-2));
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.advisory-decision-toggle .advisory-decision-switch-option {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 160ms ease;
+}
+
+.advisory-decision-toggle .advisory-decision-switch-option:first-child {
+  color: var(--portal-ivory);
+}
+
+.advisory-decision-toggle .advisory-decision-switch-thumb {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  display: block;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--portal-muted) 54%, var(--portal-surface-3));
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--portal-bg-deep) 36%, transparent);
+  transition:
+    transform 180ms ease,
+    background 180ms ease;
+}
+
+.advisory-decision-switch-input:checked + .advisory-decision-switch {
+  color: color-mix(in srgb, var(--portal-ivory) 64%, transparent);
+  border-color: color-mix(in srgb, var(--portal-success) 65%, var(--portal-line));
+  background: color-mix(in srgb, var(--portal-success) 28%, var(--portal-surface-2));
+}
+
+.advisory-decision-switch-input:checked
+  + .advisory-decision-switch
+  .advisory-decision-switch-option:first-child {
+  color: color-mix(in srgb, var(--portal-ivory) 58%, transparent);
+}
+
+.advisory-decision-switch-input:checked
+  + .advisory-decision-switch
+  .advisory-decision-switch-option:nth-child(2) {
+  color: #ffffff;
+}
+
+.advisory-decision-switch-input:checked
+  + .advisory-decision-switch
+  .advisory-decision-switch-thumb {
+  background: var(--portal-success);
+  transform: translateX(100%);
+}
+
+.advisory-decision-switch-input:focus-visible + .advisory-decision-switch {
+  outline: 3px solid color-mix(in srgb, var(--portal-gold-bright) 60%, transparent);
+  outline-offset: 3px;
+}
+
+.advisory-decision-toggle:hover .advisory-decision-switch {
+  border-color: var(--portal-gold);
+}
+
+.advisory-decision-toggle .advisory-decision-toggle-copy {
+  min-width: 0;
 }
 
 .advisory-decision-toggle span,
