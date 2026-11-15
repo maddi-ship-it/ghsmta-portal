@@ -490,9 +490,10 @@ export function AdjudicationConsensusBar({
   const handleApplicabilityChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const categoryId = event.currentTarget.name.replace("scoreable_", "");
+      const isPresent = event.currentTarget.checked;
       setCategoryPresenceSelections((current) => ({
         ...current,
-        [categoryId]: event.currentTarget.checked,
+        [categoryId]: isPresent,
       }));
       const form = event.currentTarget.form;
       if (form) writerAssignmentsComplete.current = formHasAllApplicableWriters(form);
@@ -1290,96 +1291,106 @@ export function AdjudicationConsensusBar({
                           </header>
 
                           <div className="advisory-decision-grid">
-                            <label className="advisory-decision-toggle advisory-decision-eligibility">
-                              <input
-                                aria-label={eligibilityDecisionLabel(
-                                  eligibilitySelections[category.id] ?? true,
-                                )}
-                                checked={
-                                  eligibilitySelections[category.id] ?? true
-                                }
-                                className="advisory-decision-switch-input"
-                                name={`eligible_${category.id}`}
-                                onChange={(event) => {
-                                  setEligibilitySelections((current) => ({
-                                    ...current,
-                                    [category.id]: event.currentTarget.checked,
-                                  }));
-                                }}
-                                role="switch"
-                                type="checkbox"
-                              />
-                              <span
-                                aria-hidden="true"
-                                className="advisory-decision-switch"
-                              >
-                                <span className="advisory-decision-switch-option">
-                                  No
-                                </span>
-                                <span className="advisory-decision-switch-option">
-                                  Yes
-                                </span>
-                                <span className="advisory-decision-switch-thumb" />
+                            <div className="advisory-decision-statuses">
+                              <span className="advisory-decision-statuses-title">
+                                Category status
                               </span>
-                              <span className="advisory-decision-toggle-copy">
-                                <strong>
-                                  {eligibilityDecisionLabel(
+                              <label className="advisory-decision-toggle advisory-decision-eligibility">
+                                <input
+                                  aria-label={eligibilityDecisionLabel(
                                     eligibilitySelections[category.id] ?? true,
                                   )}
-                                </strong>
-                                <small>
-                                  {proposal
-                                    ? "Awards consideration"
-                                    : `Application: ${
-                                        categoryEligibilityDefaults[category.id]
-                                          ? "eligible"
-                                          : "not eligible"
-                                      }`}
-                                </small>
-                              </span>
-                            </label>
-                            <label className="advisory-decision-toggle advisory-decision-applicability">
-                              <input
-                                aria-label={categoryPresenceDecisionLabel({
-                                  categoryTitle: category.title,
-                                  isPresent:
-                                    categoryPresenceSelections[category.id] ??
-                                    true,
-                                })}
-                                checked={
-                                  categoryPresenceSelections[category.id] ??
-                                  true
-                                }
-                                className="advisory-decision-switch-input"
-                                name={`scoreable_${category.id}`}
-                                onChange={handleApplicabilityChange}
-                                role="switch"
-                                type="checkbox"
-                              />
-                              <span
-                                aria-hidden="true"
-                                className="advisory-decision-switch"
-                              >
-                                <span className="advisory-decision-switch-option">
-                                  No
+                                  checked={
+                                    eligibilitySelections[category.id] ?? true
+                                  }
+                                  className="advisory-decision-switch-input"
+                                  name={`eligible_${category.id}`}
+                                  onChange={(event) => {
+                                    const isEligible = event.currentTarget.checked;
+                                    setEligibilitySelections((current) => ({
+                                      ...current,
+                                      [category.id]: isEligible,
+                                    }));
+                                  }}
+                                  role="switch"
+                                  type="checkbox"
+                                />
+                                <span
+                                  aria-hidden="true"
+                                  className="advisory-decision-switch"
+                                >
+                                  <span className="advisory-decision-switch-option">
+                                    No
+                                  </span>
+                                  <span className="advisory-decision-switch-option">
+                                    Yes
+                                  </span>
+                                  <span className="advisory-decision-switch-thumb" />
                                 </span>
-                                <span className="advisory-decision-switch-option">
-                                  Yes
+                                <span className="advisory-decision-toggle-copy">
+                                  <strong>
+                                    {eligibilityDecisionLabel(
+                                      eligibilitySelections[category.id] ?? true,
+                                    )}
+                                  </strong>
+                                  <small>
+                                    {proposal
+                                      ? "Awards consideration"
+                                      : `Application: ${
+                                          categoryEligibilityDefaults[
+                                            category.id
+                                          ]
+                                            ? "eligible"
+                                            : "not eligible"
+                                        }`}
+                                  </small>
                                 </span>
-                                <span className="advisory-decision-switch-thumb" />
-                              </span>
-                              <span className="advisory-decision-toggle-copy">
-                                <strong>
-                                  {categoryPresenceDecisionLabel({
+                              </label>
+                              <label className="advisory-decision-toggle advisory-decision-applicability">
+                                <input
+                                  aria-label={categoryPresenceDecisionLabel({
                                     categoryTitle: category.title,
                                     isPresent:
-                                      categoryPresenceSelections[category.id] ??
-                                      true,
+                                      categoryPresenceSelections[
+                                        category.id
+                                      ] ?? true,
                                   })}
-                                </strong>
-                                <small>Counts toward Overall Production</small>
-                              </span>
-                            </label>
+                                  checked={
+                                    categoryPresenceSelections[category.id] ??
+                                    true
+                                  }
+                                  className="advisory-decision-switch-input"
+                                  name={`scoreable_${category.id}`}
+                                  onChange={handleApplicabilityChange}
+                                  role="switch"
+                                  type="checkbox"
+                                />
+                                <span
+                                  aria-hidden="true"
+                                  className="advisory-decision-switch"
+                                >
+                                  <span className="advisory-decision-switch-option">
+                                    No
+                                  </span>
+                                  <span className="advisory-decision-switch-option">
+                                    Yes
+                                  </span>
+                                  <span className="advisory-decision-switch-thumb" />
+                                </span>
+                                <span className="advisory-decision-toggle-copy">
+                                  <strong>
+                                    {categoryPresenceDecisionLabel({
+                                      categoryTitle: category.title,
+                                      isPresent:
+                                        categoryPresenceSelections[
+                                          category.id
+                                        ] ?? true,
+                                    })}
+                                  </strong>
+                                  <small>Counts toward Overall Production</small>
+                                </span>
+                              </label>
+                            </div>
                             <div className="advisory-decision-field advisory-decision-reason">
                               <label htmlFor={`scoreability_reason_${category.id}`}>
                                 Reason the answer is No
@@ -1491,14 +1502,29 @@ export function AdjudicationConsensusBar({
                             {role === "owner" && (
                               <div className="advisory-decision-field advisory-owner-override">
                                 <label className="advisory-decision-toggle">
-                                <input
-                                  defaultChecked={
-                                    proposal?.status === "overridden"
-                                  }
-                                  name={`override_${category.id}`}
-                                  type="checkbox"
-                                />
-                                  <span>
+                                  <input
+                                    aria-label="Owner override"
+                                    className="advisory-decision-switch-input"
+                                    defaultChecked={
+                                      proposal?.status === "overridden"
+                                    }
+                                    name={`override_${category.id}`}
+                                    role="switch"
+                                    type="checkbox"
+                                  />
+                                  <span
+                                    aria-hidden="true"
+                                    className="advisory-decision-switch"
+                                  >
+                                    <span className="advisory-decision-switch-option">
+                                      No
+                                    </span>
+                                    <span className="advisory-decision-switch-option">
+                                      Yes
+                                    </span>
+                                    <span className="advisory-decision-switch-thumb" />
+                                  </span>
+                                  <span className="advisory-decision-toggle-copy">
                                     <strong>Owner override</strong>
                                     <small>Finalize without panel approval</small>
                                   </span>

@@ -14324,6 +14324,7 @@ html[data-theme="light"] .regal-path-section {
     color 160ms ease,
     border-color 160ms ease,
     background 160ms ease;
+  order: 2;
 }
 
 .advisory-decision-toggle .advisory-decision-switch-option {
@@ -14395,6 +14396,8 @@ html[data-theme="light"] .regal-path-section {
 
 .advisory-decision-toggle .advisory-decision-toggle-copy {
   min-width: 0;
+  flex: 1 1 auto;
+  order: 1;
 }
 
 .advisory-decision-toggle span,
@@ -14437,9 +14440,43 @@ html[data-theme="light"] .regal-path-section {
   min-width: 0;
 }
 
-.advisory-decision-eligibility,
-.advisory-decision-applicability {
-  grid-column: span 2;
+.advisory-decision-statuses {
+  display: grid;
+  min-width: 0;
+  grid-column: span 4;
+  align-content: start;
+  overflow: hidden;
+  border: 1px solid var(--portal-line);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--portal-surface) 70%, transparent);
+}
+
+.advisory-decision-statuses-title {
+  padding: 9px 11px 7px;
+  color: var(--portal-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--portal-line);
+  background: color-mix(in srgb, var(--portal-surface-2) 72%, transparent);
+}
+
+.advisory-decision-statuses .advisory-decision-toggle {
+  min-height: 64px;
+  grid-column: auto;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.advisory-decision-statuses .advisory-decision-toggle + .advisory-decision-toggle {
+  border-top: 1px solid var(--portal-line);
+}
+
+.advisory-decision-statuses .advisory-decision-toggle strong {
+  line-height: 1.25;
 }
 
 .advisory-decision-reason {
@@ -14469,7 +14506,26 @@ html[data-theme="light"] .regal-path-section {
 }
 
 .advisory-owner-override {
+  grid-template-columns: minmax(240px, 0.8fr) minmax(0, 2fr);
   grid-column: 1 / -1;
+  align-items: end;
+  column-gap: 12px;
+}
+
+.advisory-owner-override > .advisory-decision-toggle {
+  min-height: 61px;
+  grid-row: 1 / span 2;
+  grid-column: 1;
+}
+
+.advisory-owner-override > label[for^="override_note_"] {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.advisory-owner-override > .input {
+  grid-row: 2;
+  grid-column: 2;
 }
 
 .advisory-range-approvals {
@@ -14614,6 +14670,7 @@ html[data-theme="light"] .advisory-decision-help {
 
 html[data-theme="light"] .advisory-decision-toggle,
 html[data-theme="light"] .advisory-decision-field,
+html[data-theme="light"] .advisory-decision-statuses,
 html[data-theme="light"] .advisory-range-approval-person {
   background: #ffffff;
 }
@@ -14842,11 +14899,23 @@ html[data-theme="light"] .acting-candidate-approval {
   .advisory-decision-writer,
   .advisory-decision-note,
   .advisory-owner-override,
+  .advisory-decision-statuses,
   .advisory-decision-eligibility,
   .advisory-decision-applicability,
   .advisory-decision-reason,
   .advisory-decision-range {
     grid-column: auto;
+  }
+
+  .advisory-owner-override {
+    grid-template-columns: 1fr;
+  }
+
+  .advisory-owner-override > .advisory-decision-toggle,
+  .advisory-owner-override > label[for^="override_note_"],
+  .advisory-owner-override > .input {
+    grid-row: auto;
+    grid-column: 1;
   }
 
   .advisory-live-average {
@@ -14886,6 +14955,10 @@ html[data-theme="light"] .acting-candidate-approval {
 @media (min-width: 761px) and (max-width: 1100px) {
   .advisory-decision-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .advisory-decision-statuses {
+    grid-column: span 6;
   }
 
   .advisory-decision-eligibility,
