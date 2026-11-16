@@ -29,6 +29,7 @@ type RichSegment = {
   text: string;
   font?: PDFFont;
   color?: RGB;
+  underline?: boolean;
 };
 
 const LEGAL_SECTIONS = [
@@ -120,6 +121,15 @@ function formatLongDate(value: string | null, fallback: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(`${value.slice(0, 10)}T12:00:00Z`));
+}
+
+function formatExportDate(value: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(value);
 }
 
 function formatEventDate(value: string | null) {
@@ -270,6 +280,14 @@ class ContractPdfWriter {
           font,
           color: segment.color ?? BLACK,
         });
+        if (segment.underline) {
+          this.page.drawLine({
+            start: { x: cursorX, y: this.y - size - 1.2 },
+            end: { x: cursorX + font.widthOfTextAtSize(word, size), y: this.y - size - 1.2 },
+            thickness: 0.55,
+            color: segment.color ?? BLACK,
+          });
+        }
         cursorX += width;
       });
     });
@@ -400,7 +418,10 @@ class ContractPdfWriter {
   }
 }
 
-export async function buildGhsmtaWorkForHirePdf(contract: ContractDocumentData) {
+export async function buildGhsmtaWorkForHirePdf(
+  contract: ContractDocumentData,
+  exportedAt = new Date(),
+) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`GHSMTA Contractor Agreement - ${ascii(contract.contractorName)}`);
   pdf.setAuthor("ArtsBridge Foundation, Inc.");
@@ -413,7 +434,7 @@ export async function buildGhsmtaWorkForHirePdf(contract: ContractDocumentData) 
     italic: await pdf.embedFont(StandardFonts.HelveticaOblique),
   };
   const writer = new ContractPdfWriter(pdf, fonts);
-  const agreementDate = formatLongDate(contract.agreementDate, "the date signed below");
+  const exportDate = formatExportDate(exportedAt);
   const startsOn = formatLongDate(contract.startsOn, "the date signed below");
   const endsOn = formatLongDate(contract.endsOn, "satisfactory completion of the work");
   const eventDate = formatEventDate(contract.eventDate);
@@ -425,19 +446,34 @@ export async function buildGhsmtaWorkForHirePdf(contract: ContractDocumentData) 
   writer.center("(770) 916-2808", 9, fonts.regular, 14);
   writer.center("CONTRACTOR AGREEMENT", 15, fonts.bold, 2);
   writer.center("Work For Hire", 11, fonts.italic, 15);
-  writer.paragraph(
-    `This Agreement is made and entered into this ${agreementDate} between the ArtsBridge Foundation, Inc., 2800 Cobb Galleria Parkway, Atlanta, GA 30339 (hereinafter referred to as the \"Foundation\") and ${contract.contractorName} as Georgia High School Musical Theatre Awards (\"GHSMTA\") ${contract.roleTitle}, hereinafter referred to as the \"Contractor\".`,
-    { size: 9.2, lineHeight: 11.4, gap: 10 },
-  );
+  writer.richParagraph([
+    { text: "This Agreement is made and entered into this", font: fonts.regular },
+    { text: exportDate, font: fonts.bold, underline: true },
+    { text: "between the", font: fonts.regular },
+    { text: "ArtsBridge Foundation, Inc.,", font: fonts.bold },
+    { text: "2800 Cobb Galleria Parkway, Atlanta, GA 30339 (hereinafter referred to as the \"Foundation\") and", font: fonts.regular },
+    { text: contract.contractorName, font: fonts.bold, underline: true },
+    { text: "as", font: fonts.regular },
+    { text: `Georgia High School Musical Theatre Awards (\"GHSMTA\") ${contract.roleTitle}`, font: fonts.bold },
+    { text: ", hereinafter referred to as the \"Contractor\".", font: fonts.regular },
+  ], { size: 9.2, lineHeight: 11.4, gap: 10 });
 
   LEGAL_SECTIONS.forEach((section, index) => {
     if (index === 6) writer.pageBreak();
-    const body = section.heading === "TERM:"
-      ? `The term of this Agreement shall commence on ${startsOn} and end upon the satisfactory completion of the work through the end of business day on ${endsOn} or upon termination of this Agreement as provided in Paragraph 10. Fees will be paid as per the attached Schedule A. Any additional services will be contracted as requested by the Foundation.`
-      : section.body;
+    if (section.heading === "TERM:") {
+      writer.richParagraph([
+        { text: `${index + 1}. ${section.heading}`, font: fonts.bold },
+        { text: "The term of this Agreement shall commence on", font: fonts.regular },
+        { text: startsOn, font: fonts.bold, underline: true },
+        { text: "and end upon the satisfactory completion of the work through the end of business day on", font: fonts.regular },
+        { text: endsOn, font: fonts.bold, underline: true },
+        { text: "or upon termination of this Agreement as provided in Paragraph 10. Fees will be paid as per the attached Schedule A. Any additional services will be contracted as requested by the Foundation.", font: fonts.regular },
+      ]);
+      return;
+    }
     writer.richParagraph([
       { text: `${index + 1}. ${section.heading}`, font: fonts.bold },
-      { text: body, font: fonts.regular },
+      { text: section.body, font: fonts.regular },
     ]);
   });
 

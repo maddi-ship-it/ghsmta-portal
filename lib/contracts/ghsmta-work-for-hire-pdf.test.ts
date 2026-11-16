@@ -35,7 +35,7 @@ describe("GHSMTA work-for-hire contract PDF", () => {
           due_date: "2027-04-24",
         },
       ],
-    });
+    }, new Date("2026-11-16T17:00:00Z"));
 
     expect(Buffer.from(result).subarray(0, 5).toString()).toBe("%PDF-");
     const pdf = await PDFDocument.load(result);
