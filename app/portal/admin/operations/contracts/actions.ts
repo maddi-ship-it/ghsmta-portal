@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { requireProfile } from "@/lib/auth";
+import { productionChatParticipantIds } from "@/lib/contracts/production-chat";
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { portalAuthCallbackUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -113,7 +114,7 @@ async function ensureProductionChannel(
   const { error: memberError } = await admin
     .from("chat_direct_participants")
     .upsert(
-      [ownerId, productionUserId].map((userId) => ({
+      productionChatParticipantIds(ownerId, productionUserId).map((userId) => ({
         channel_id: channelId,
         user_id: userId,
         added_by: ownerId,
