@@ -129,6 +129,24 @@ CH- The movement consistently advanced the story.`);
     ]);
   });
 
+  it("ignores known Playbill song titles instead of returning them as sort errors", () => {
+    const notes = segmentAdjudicationBrainDump(
+      `ACT I NOTES:
+
+Believe
+MD- The ensemble sustained clear rhythmic momentum.
+
+Song Title: All That Matters
+Actress- The phrasing felt connected to the character's objective.`,
+      ["Believe", "All That Matters"],
+    );
+
+    expect(notes.map((note) => note.text)).toEqual([
+      "Song: “Believe” — MD- The ensemble sustained clear rhythmic momentum.",
+      "Song: “All That Matters” — Actress- The phrasing felt connected to the character's objective.",
+    ]);
+  });
+
   it("builds one traceable assignment per selected source note", () => {
     expect(
       groupAdjudicationBrainDumpAssignments([

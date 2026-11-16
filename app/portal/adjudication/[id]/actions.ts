@@ -388,6 +388,8 @@ async function persistAdjudicatorScorecard(
 
   const canScore = Boolean(assignment.can_score);
   const canComment = Boolean(assignment.can_comment);
+  const canWriteBigPicture =
+    canComment && adjudicator.role === "advisory_member";
 
   const { data: scorecardId, error: scorecardError } = await supabase.rpc(
     "ensure_adjudication_scorecard",
@@ -743,7 +745,7 @@ async function persistAdjudicatorScorecard(
       category.category_key === OVERALL_PRODUCTION_CATEGORY_KEY,
   );
   if (
-    canScore &&
+    (canScore || canWriteBigPicture) &&
     overallCategory &&
     !unscoreableCategoryIds.has(overallCategory.id)
   ) {
@@ -759,6 +761,7 @@ async function persistAdjudicatorScorecard(
 
     if (
       submit &&
+      canScore &&
       (overall.score == null ||
         overall.completedCategoryCount !== overall.scoreableCategoryCount)
     ) {
@@ -774,7 +777,7 @@ async function persistAdjudicatorScorecard(
       not_applicable_reason: null,
       score_range_min: null,
       score_range_max: null,
-      ...(canComment
+      ...(canWriteBigPicture
         ? {
             private_notes:
               formText(formData, `private_notes_${overallCategory.id}`) || null,
@@ -787,7 +790,11 @@ async function persistAdjudicatorScorecard(
         formText(formData, `observation_${criterion.id}`),
       );
 
-      if (submit && canComment && !richTextHasContent(observation)) {
+      if (
+        submit &&
+        canWriteBigPicture &&
+        !richTextHasContent(observation)
+      ) {
         missing.push(
           `${scorecardCategoryLabel(overallCategory)}: ${criterion.title} observation`,
         );
@@ -796,8 +803,8 @@ async function persistAdjudicatorScorecard(
       scoreRows.push({
         scorecard_id: scorecard.id,
         criterion_id: criterion.id,
-        score: overall.score,
-        ...(canComment ? { observation: observation || null } : {}),
+        ...(canScore ? { score: overall.score } : {}),
+        ...(canWriteBigPicture ? { observation: observation || null } : {}),
       });
     }
   }

@@ -424,7 +424,7 @@ export function AdjudicationBrainDump({
   title?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
-  const storageKey = `ghsmta:brain-dump-sort-review:v3:${applicationId}:${fieldName}`;
+  const storageKey = `ghsmta:brain-dump-sort-review:v4:${applicationId}:${fieldName}`;
   const savedValue = defaultValue ?? "";
   const preparedDefaultValue = ensureAdjudicationBrainDumpTemplate(
     savedValue,
@@ -524,7 +524,10 @@ export function AdjudicationBrainDump({
       if (
         !canComment ||
         readOnly ||
-        segmentAdjudicationBrainDump(valueRef.current).length > 0
+        segmentAdjudicationBrainDump(
+          valueRef.current,
+          playbillSongs.map((song) => song.title),
+        ).length > 0
       ) {
         return;
       }
@@ -655,7 +658,11 @@ export function AdjudicationBrainDump({
       const response = await fetch("/api/writing-assist/adjudication-sort", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId, notes }),
+        body: JSON.stringify({
+          applicationId,
+          notes,
+          songTitles: playbillSongs.map((song) => song.title),
+        }),
       });
       const payload = (await response.json().catch(() => null)) as
         | SortResponse

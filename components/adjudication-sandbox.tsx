@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdjudicationBrainDump } from "@/components/adjudication-brain-dump";
 import {
-  AdjudicationBigPictureComment,
   AdjudicationOverallProduction,
 } from "@/components/adjudication-overall-production";
 import {
@@ -798,21 +797,11 @@ export function AdjudicationSandbox({
               />
               <CollaborativeAdjudicatorScorecard
                 afterCategory={
-                  <>
-                    <AdjudicationBigPictureComment
-                      canComment
-                      categories={scoreableCategories}
-                      criteria={scoreableCriteria}
-                      ownScores={[]}
-                      privateNotes=""
-                      readOnly={practiceSubmitted}
-                    />
-                    <AdjudicationOverallProduction
-                      categories={scoreableCategories}
-                      criteria={scoreableCriteria}
-                      ownScores={[]}
-                    />
-                  </>
+                  <AdjudicationOverallProduction
+                    categories={scoreableCategories}
+                    criteria={scoreableCriteria}
+                    ownScores={[]}
+                  />
                 }
                 applicationId={SANDBOX_APPLICATION_ID}
                 canComment

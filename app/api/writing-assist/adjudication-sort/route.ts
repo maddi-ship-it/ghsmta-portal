@@ -89,11 +89,18 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { applicationId?: unknown; notes?: unknown }
+    | { applicationId?: unknown; notes?: unknown; songTitles?: unknown }
     | null;
   const applicationId =
     typeof body?.applicationId === "string" ? body.applicationId.trim() : "";
   const notes = typeof body?.notes === "string" ? body.notes.trim() : "";
+  const songTitles = Array.isArray(body?.songTitles)
+    ? body.songTitles
+        .filter((title): title is string => typeof title === "string")
+        .map((title) => title.trim().slice(0, 300))
+        .filter(Boolean)
+        .slice(0, 250)
+    : [];
 
   if (!applicationId || !notes) {
     return NextResponse.json(
@@ -108,7 +115,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const sourceNotes = segmentAdjudicationBrainDump(notes);
+  const sourceNotes = segmentAdjudicationBrainDump(notes, songTitles);
   if (sourceNotes.length === 0) {
     return NextResponse.json(
       { error: "No individual observations were found in the brain dump." },

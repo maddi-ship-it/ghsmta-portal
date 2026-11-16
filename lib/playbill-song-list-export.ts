@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from "fflate";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+import { ADJUDICATION_BRAIN_DUMP_LEDGER } from "./adjudication-brain-dump";
 import {
   buildPlaybillSongListSections,
   type PlaybillSong,
@@ -125,6 +126,20 @@ function pdfSafeText(value: string) {
     .replace(/[^\x20-\x7e]/g, "?");
 }
 
+function fitPdfText(
+  text: string,
+  maxWidth: number,
+  measure: (value: string) => number,
+) {
+  if (measure(text) <= maxWidth) return text;
+
+  let fitted = text;
+  while (fitted.length > 1 && measure(`${fitted}...`) > maxWidth) {
+    fitted = fitted.slice(0, -1);
+  }
+  return `${fitted.trimEnd()}...`;
+}
+
 export async function createPlaybillSongListPdf({
   productionTitle,
   schoolName,
@@ -134,6 +149,11 @@ export async function createPlaybillSongListPdf({
   const document = await PDFDocument.create();
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const navy = rgb(0.05, 0.1, 0.2);
+  const gold = rgb(0.84, 0.67, 0.22);
+  const muted = rgb(0.35, 0.4, 0.5);
+  const rule = rgb(0.76, 0.79, 0.84);
+  const ledgerBackground = rgb(0.96, 0.94, 0.86);
   const pageWidth = 612;
   const pageHeight = 792;
   const margin = 54;
@@ -143,12 +163,42 @@ export async function createPlaybillSongListPdf({
   const newPage = () => {
     page = document.addPage([pageWidth, pageHeight]);
     y = pageHeight - margin;
+    page.drawText("PLAYBILL SONG LIST | NOTES", {
+      x: margin,
+      y,
+      size: 9,
+      font: bold,
+      color: gold,
+    });
+    const continuationTitle = fitPdfText(
+      pdfSafeText(productionTitle || "Untitled production"),
+      250,
+      (value) => regular.widthOfTextAtSize(value, 9),
+    );
+    page.drawText(continuationTitle, {
+      x:
+        pageWidth -
+        margin -
+        regular.widthOfTextAtSize(continuationTitle, 9),
+      y,
+      size: 9,
+      font: regular,
+      color: muted,
+    });
+    y -= 10;
+    page.drawLine({
+      start: { x: margin, y },
+      end: { x: pageWidth - margin, y },
+      thickness: 1,
+      color: gold,
+    });
+    y -= 24;
   };
   const ensureSpace = (height: number) => {
     if (y - height < margin) newPage();
   };
   const drawLines = ({
-    color = rgb(0.09, 0.15, 0.27),
+    color = navy,
     font = regular,
     size,
     text,
@@ -179,28 +229,121 @@ export async function createPlaybillSongListPdf({
     size: 16,
     font: bold,
   });
-  drawLines({ text: schoolName, size: 11, color: rgb(0.35, 0.4, 0.5) });
-  y -= 14;
+  drawLines({ text: schoolName, size: 11, color: muted });
+  y -= 12;
+
+  const ledgerItems = ADJUDICATION_BRAIN_DUMP_LEDGER.split("\n").slice(1);
+  const ledgerRows = Math.ceil(ledgerItems.length / 2);
+  const ledgerHeight = 34 + ledgerRows * 11;
+  ensureSpace(ledgerHeight + 16);
+  page.drawRectangle({
+    x: margin,
+    y: y - ledgerHeight,
+    width: pageWidth - margin * 2,
+    height: ledgerHeight,
+    color: ledgerBackground,
+    borderColor: gold,
+    borderWidth: 0.8,
+  });
+  page.drawText("ADJUDICATION LEDGER", {
+    x: margin + 12,
+    y: y - 18,
+    size: 9,
+    font: bold,
+    color: navy,
+  });
+  const ledgerColumnWidth = (pageWidth - margin * 2 - 24) / 2;
+  ledgerItems.forEach((item, index) => {
+    const column = Math.floor(index / ledgerRows);
+    const row = index % ledgerRows;
+    page.drawText(pdfSafeText(item), {
+      x: margin + 12 + column * ledgerColumnWidth,
+      y: y - 34 - row * 11,
+      size: 7.6,
+      font: regular,
+      color: navy,
+    });
+  });
+  y -= ledgerHeight + 18;
 
   for (const section of buildPlaybillSongListSections(songs)) {
-    ensureSpace(48);
-    drawLines({ text: section.heading, size: 13, font: bold });
-    y -= 4;
+    ensureSpace(42);
+    drawLines({ text: section.heading, size: 13, font: bold, color: gold });
+    page.drawLine({
+      start: { x: margin, y: y - 1 },
+      end: { x: pageWidth - margin, y: y - 1 },
+      thickness: 0.8,
+      color: gold,
+    });
+    y -= 12;
     for (const [index, song] of section.songs.entries()) {
+      const entryText = `${index + 1}. ${song.title}${song.performers ? ` - ${song.performers}` : ""}`;
+      const safeEntryText = pdfSafeText(entryText);
+      const entryLines = wrapPdfText(
+        safeEntryText,
+        pageWidth - margin * 2,
+        (value) => bold.widthOfTextAtSize(value, 10.5),
+      );
+      ensureSpace(entryLines.length * 14.2 + 58);
       drawLines({
-        text: `${index + 1}. ${song.title}${song.performers ? ` — ${song.performers}` : ""}`,
+        text: entryText,
         size: 10.5,
+        font: bold,
       });
+      y -= 2;
+      page.drawText("COMMENTS", {
+        x: margin,
+        y,
+        size: 7,
+        font: bold,
+        color: muted,
+      });
+      y -= 11;
+      for (let line = 0; line < 3; line += 1) {
+        page.drawLine({
+          start: { x: margin, y },
+          end: { x: pageWidth - margin, y },
+          thickness: 0.55,
+          color: rule,
+        });
+        y -= 15;
+      }
       y -= 4;
     }
-    y -= 10;
+    y -= 4;
   }
 
-  ensureSpace(28);
-  drawLines({
-    text: `Source: ${sourceFileName}`,
-    size: 8.5,
-    color: rgb(0.4, 0.44, 0.52),
+  const pages = document.getPages();
+  const footerSource = fitPdfText(
+    pdfSafeText(`Source: ${sourceFileName}`),
+    365,
+    (value) => regular.widthOfTextAtSize(value, 7.5),
+  );
+  pages.forEach((documentPage, index) => {
+    documentPage.drawLine({
+      start: { x: margin, y: 43 },
+      end: { x: pageWidth - margin, y: 43 },
+      thickness: 0.6,
+      color: rule,
+    });
+    documentPage.drawText(footerSource, {
+      x: margin,
+      y: 29,
+      size: 7.5,
+      font: regular,
+      color: muted,
+    });
+    const pageNumber = `Page ${index + 1} of ${pages.length}`;
+    documentPage.drawText(pageNumber, {
+      x:
+        pageWidth -
+        margin -
+        regular.widthOfTextAtSize(pageNumber, 7.5),
+      y: 29,
+      size: 7.5,
+      font: regular,
+      color: muted,
+    });
   });
 
   document.setTitle(`${productionTitle} song list`);

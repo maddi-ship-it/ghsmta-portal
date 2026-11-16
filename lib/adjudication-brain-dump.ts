@@ -127,7 +127,25 @@ function sentenceParts(value: string) {
     .filter(Boolean);
 }
 
-function songTitleFromHeading(value: string) {
+function normalizedSongTitle(value: string) {
+  return value
+    .normalize("NFKC")
+    .replace(/^song(?:\s+title)?\s*:\s*/i, "")
+    .replace(/^[“”"']+|[“”"']+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase();
+}
+
+function songTitleFromHeading(
+  value: string,
+  knownSongTitleByNormalizedValue: Map<string, string>,
+) {
+  const knownSongTitle = knownSongTitleByNormalizedValue.get(
+    normalizedSongTitle(value),
+  );
+  if (knownSongTitle) return knownSongTitle;
+
   const quotedHeading = value.match(
     /^[“"]\s*(.+?)\s*[”"]\s*(?:[-–—]\s*.*)?$/u,
   );
@@ -163,8 +181,15 @@ function withSongContext(text: string, songTitle: string | null) {
 
 export function segmentAdjudicationBrainDump(
   value: string,
+  knownSongTitles: string[] = [],
 ): AdjudicationBrainDumpSourceNote[] {
   const sourceNotes: string[] = [];
+  const knownSongTitleByNormalizedValue = new Map(
+    knownSongTitles
+      .map((title) => title.trim())
+      .filter(Boolean)
+      .map((title) => [normalizedSongTitle(title), title]),
+  );
   const lines = value
     .replaceAll("\r\n", "\n")
     .replaceAll("\r", "\n")
@@ -193,7 +218,10 @@ export function segmentAdjudicationBrainDump(
 
     if (insideLedger || !acceptingObservations) continue;
 
-    const songTitle = songTitleFromHeading(line);
+    const songTitle = songTitleFromHeading(
+      line,
+      knownSongTitleByNormalizedValue,
+    );
     if (songTitle) {
       currentSongTitle = songTitle;
       continue;

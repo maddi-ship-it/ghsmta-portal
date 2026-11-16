@@ -26,6 +26,7 @@ function evaluateCompletion(
   categories: ScoringCategory[],
   criteria: ScoringCriterion[],
   requireComments: boolean,
+  requireBigPicture: boolean,
 ): CompletionState {
   const formData = new FormData(form);
   let missingCount = 0;
@@ -89,6 +90,7 @@ function evaluateCompletion(
 
       if (
         requireComments &&
+        (!isOverallProduction || requireBigPicture) &&
         !richTextHasContent(
           formText(formData, `observation_${criterion.id}`),
         )
@@ -152,6 +154,7 @@ export function ScorecardSubmitControls({
   onPracticeSubmit,
   practiceMode = false,
   practiceSubmitted = false,
+  requireBigPicture = false,
   requireComments = true,
 }: {
   applicationId: string;
@@ -162,6 +165,7 @@ export function ScorecardSubmitControls({
   onPracticeSubmit?: () => void;
   practiceMode?: boolean;
   practiceSubmitted?: boolean;
+  requireBigPicture?: boolean;
   requireComments?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -185,8 +189,16 @@ export function ScorecardSubmitControls({
   const updateCompletion = useCallback(() => {
     const form = findForm();
     if (!form) return;
-    setCompletion(evaluateCompletion(form, categories, criteria, requireComments));
-  }, [categories, criteria, findForm, requireComments]);
+    setCompletion(
+      evaluateCompletion(
+        form,
+        categories,
+        criteria,
+        requireComments,
+        requireBigPicture,
+      ),
+    );
+  }, [categories, criteria, findForm, requireBigPicture, requireComments]);
 
   useEffect(() => {
     const form = findForm();

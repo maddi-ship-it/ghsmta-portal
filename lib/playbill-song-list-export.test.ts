@@ -32,6 +32,22 @@ describe("Playbill song-list exports", () => {
     const document = await PDFDocument.load(bytes);
 
     expect(document.getPageCount()).toBeGreaterThan(0);
+    expect(document.getTitle()).toBe("Finding Neverland song list");
+    expect(document.getAuthor()).toBe("GHSMTA Portal");
     expect(new TextDecoder().decode(bytes.slice(0, 4))).toBe("%PDF");
+  });
+
+  it("reserves enough printable comment space to continue across pages", async () => {
+    const bytes = await createPlaybillSongListPdf({
+      ...exportInput,
+      songs: Array.from({ length: 18 }, (_, index) => ({
+        section: index < 9 ? "Act I" : "Act II",
+        title: `Musical Number ${index + 1}`,
+        performers: "Company",
+      })),
+    });
+    const document = await PDFDocument.load(bytes);
+
+    expect(document.getPageCount()).toBeGreaterThan(1);
   });
 });

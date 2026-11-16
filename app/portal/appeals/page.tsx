@@ -120,7 +120,7 @@ export default async function AppealsPage() {
   if (applicationRubricIds.length > 0) {
     const categoriesResult = await admin
       .from("scoring_categories")
-      .select("id,title,rubric_id")
+      .select("id,title,rubric_id,category_key")
       .in("rubric_id", applicationRubricIds)
       .eq("active", true)
       .order("sort_order");
@@ -128,7 +128,9 @@ export default async function AppealsPage() {
     if (categoriesResult.error) {
       throw new Error(categoriesResult.error.message);
     }
-    categories = categoriesResult.data ?? [];
+    categories = (categoriesResult.data ?? [])
+      .filter((category) => category.category_key !== "overall_production")
+      .map(({ id, rubric_id, title }) => ({ id, rubric_id, title }));
   }
 
   const activeApplicationIds = new Set(
