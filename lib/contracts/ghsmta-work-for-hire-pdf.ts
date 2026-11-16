@@ -309,7 +309,30 @@ class ContractPdfWriter {
     this.center(value, 13, this.fonts.bold, 12);
   }
 
-  signatureBlock(contractorName: string, signerName: string, address: string | null) {
+  private addAdobeSignField(
+    name: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
+    const field = this.pdf.getForm().createTextField(name);
+    field.addToPage(this.page, {
+      x,
+      y,
+      width,
+      height,
+      borderWidth: 0,
+      font: this.fonts.regular,
+    });
+  }
+
+  signatureBlock(
+    blockName: "agreement" | "schedule_b",
+    contractorName: string,
+    signerName: string,
+    address: string | null,
+  ) {
     const needed = 98;
     this.ensure(needed);
     const gap = 24;
@@ -321,6 +344,38 @@ class ContractPdfWriter {
     const lineY = labelY - 31;
     this.page.drawLine({ start: { x: MARGIN, y: lineY }, end: { x: MARGIN + columnWidth, y: lineY }, thickness: 0.7, color: BLACK });
     this.page.drawLine({ start: { x: rightX, y: lineY }, end: { x: rightX + columnWidth, y: lineY }, thickness: 0.7, color: BLACK });
+    const signatureWidth = columnWidth - 66;
+    const dateWidth = 58;
+    const fieldY = lineY + 2;
+    const fieldHeight = 25;
+    this.addAdobeSignField(
+      `abf_signature_${blockName}_es_:signer1:signature`,
+      rightX,
+      fieldY,
+      signatureWidth,
+      fieldHeight,
+    );
+    this.addAdobeSignField(
+      `abf_date_${blockName}_es_:signer1:date`,
+      rightX + columnWidth - dateWidth,
+      fieldY,
+      dateWidth,
+      fieldHeight,
+    );
+    this.addAdobeSignField(
+      `contractor_signature_${blockName}_es_:signer2:signature`,
+      MARGIN,
+      fieldY,
+      signatureWidth,
+      fieldHeight,
+    );
+    this.addAdobeSignField(
+      `contractor_date_${blockName}_es_:signer2:date`,
+      MARGIN + columnWidth - dateWidth,
+      fieldY,
+      dateWidth,
+      fieldHeight,
+    );
     this.page.drawText(ascii(contractorName), { x: MARGIN, y: lineY - 12, size: 7.5, font: this.fonts.regular, color: BLACK });
     this.page.drawText("Date", { x: MARGIN + columnWidth - 25, y: lineY - 12, size: 7.5, font: this.fonts.regular, color: BLACK });
     this.page.drawText(ascii(signerName), { x: rightX, y: lineY - 12, size: 7.5, font: this.fonts.regular, color: BLACK });
@@ -478,7 +533,7 @@ export async function buildGhsmtaWorkForHirePdf(
   });
 
   writer.y -= 5;
-  writer.signatureBlock(contract.contractorName, signer, contract.contractorAddress);
+  writer.signatureBlock("agreement", contract.contractorName, signer, contract.contractorAddress);
 
   writer.pageBreak();
   writer.sectionTitle("SCHEDULE A");
@@ -532,7 +587,7 @@ export async function buildGhsmtaWorkForHirePdf(
   writer.center("(Inclusion, Diversity, Equity, and Access)", 9.5, fonts.italic, 14);
   IDEA_PARAGRAPHS.forEach((paragraph) => writer.paragraph(paragraph, { size: 9.25, lineHeight: 12, gap: 12 }));
   writer.y -= 8;
-  writer.signatureBlock(contract.contractorName, signer, contract.contractorAddress);
+  writer.signatureBlock("schedule_b", contract.contractorName, signer, contract.contractorAddress);
   writer.ensure(35);
   writer.center("PLEASE PROVIDE A FORM W-9 ALONG WITH THIS AGREEMENT.", 9.5, fonts.bold, 0);
 

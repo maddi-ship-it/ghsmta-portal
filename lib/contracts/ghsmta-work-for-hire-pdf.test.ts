@@ -41,6 +41,24 @@ describe("GHSMTA work-for-hire contract PDF", () => {
     const pdf = await PDFDocument.load(result);
     expect(pdf.getTitle()).toBe("GHSMTA Contractor Agreement - Alex Morgan");
     expect(pdf.getPageCount()).toBeGreaterThanOrEqual(4);
+    const adobeSignFields = [
+      "abf_signature_agreement_es_:signer1:signature",
+      "abf_date_agreement_es_:signer1:date",
+      "contractor_signature_agreement_es_:signer2:signature",
+      "contractor_date_agreement_es_:signer2:date",
+      "abf_signature_schedule_b_es_:signer1:signature",
+      "abf_date_schedule_b_es_:signer1:date",
+      "contractor_signature_schedule_b_es_:signer2:signature",
+      "contractor_date_schedule_b_es_:signer2:date",
+    ];
+    expect(pdf.getForm().getFields().map((field) => field.getName()).sort()).toEqual(
+      [...adobeSignFields].sort(),
+    );
+    adobeSignFields.forEach((name) => {
+      const field = pdf.getForm().getTextField(name);
+      expect(field.acroField.getWidgets()).toHaveLength(1);
+      expect(field.needsAppearancesUpdate()).toBe(false);
+    });
     pdf.getPages().forEach((page) => {
       expect(page.getWidth()).toBe(612);
       expect(page.getHeight()).toBe(792);
