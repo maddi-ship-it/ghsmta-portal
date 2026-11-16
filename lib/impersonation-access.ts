@@ -4,6 +4,7 @@ export const IMPERSONATABLE_ROLES: AppRole[] = [
   "applicant",
   "adjudicator",
   "advisory_member",
+  "production",
 ];
 
 export function canOwnerImpersonateProfile(
@@ -28,6 +29,7 @@ export function canOwnerImpersonateProfile(
 export function impersonationRoleName(role: AppRole) {
   if (role === "advisory_member") return "Advisory Committee member";
   if (role === "adjudicator") return "adjudicator";
+  if (role === "production") return "Production team member";
   return "applicant";
 }
 

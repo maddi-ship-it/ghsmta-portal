@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type OperationsModule = "productions" | "schedule" | "calls" | "budgets" | "trucking";
+type OperationsModule = "productions" | "schedule" | "calls" | "budgets" | "trucking" | "contracts";
 type DataRow = Record<string, unknown>;
 
 function text(value: unknown) {
@@ -446,6 +446,120 @@ async function loadTrucking(params: URLSearchParams): Promise<LoadedReport> {
   return report("daily-trucking-schedule", "GHSMTA Daily Trucking Schedule", columns, rows);
 }
 
+async function loadContracts(params: URLSearchParams): Promise<LoadedReport> {
+  const supabase = await createClient();
+  const variant = params.get("variant") || "register";
+  const productionId = params.get("production") || "";
+  const status = params.get("status") || "";
+  const search = (params.get("q") || "").trim().replace(/[^a-zA-Z0-9@._' -]/g, "");
+  let contractQuery = supabase
+    .from("ghsmta_operations_contracts")
+    .select("id,production_id,contract_number,contract_type,status,contractor_name,contractor_email,contractor_phone,role_title,agreement_date,starts_on,ends_on,event_date,total_consideration,w9_received,contractor_signed_at,foundation_signed_at,contract_document_url,signed_document_url,w9_document_url,internal_notes")
+    .order("starts_on", { ascending: false, nullsFirst: false })
+    .order("contractor_name");
+  if (productionId) contractQuery = contractQuery.eq("production_id", productionId);
+  if (status) contractQuery = contractQuery.eq("status", status);
+  if (search) {
+    contractQuery = contractQuery.or(
+      `contractor_name.ilike.%${search}%,contractor_email.ilike.%${search}%,role_title.ilike.%${search}%,contract_number.ilike.%${search}%`,
+    );
+  }
+
+  const [contractsResult, paymentsResult, productionsResult] = await Promise.all([
+    contractQuery,
+    supabase
+      .from("ghsmta_operations_contract_payments")
+      .select("contract_id,installment_order,label,deliverable,amount,due_date,status,invoice_received_at,paid_at,notes")
+      .order("installment_order")
+      .order("due_date", { nullsFirst: false }),
+    supabase.from("ghsmta_operations_productions").select("id,name"),
+  ]);
+  const error = contractsResult.error || paymentsResult.error || productionsResult.error;
+  if (error) throw new Error(error.message);
+
+  const contracts = (contractsResult.data ?? []) as DataRow[];
+  const contractIds = new Set(contracts.map((contract) => text(contract.id)));
+  const payments = ((paymentsResult.data ?? []) as DataRow[]).filter((payment) =>
+    contractIds.has(text(payment.contract_id)),
+  );
+  const productions = mapById((productionsResult.data ?? []) as DataRow[], "name");
+
+  if (variant === "payments") {
+    const contractMap = new Map(contracts.map((contract) => [text(contract.id), contract]));
+    const columns = [
+      { key: "contractor", label: "Contractor" },
+      { key: "role", label: "Role" },
+      { key: "production", label: "Production" },
+      { key: "installment", label: "Installment" },
+      { key: "deliverable", label: "Deliverable" },
+      { key: "due", label: "Due" },
+      { key: "amount", label: "Amount" },
+      { key: "status", label: "Status" },
+      { key: "invoice_received", label: "Invoice Received" },
+      { key: "paid", label: "Paid" },
+      { key: "notes", label: "Notes" },
+    ];
+    const rows = payments.map((payment) => {
+      const contract = contractMap.get(text(payment.contract_id)) ?? {};
+      return {
+        contractor: text(contract.contractor_name),
+        role: text(contract.role_title),
+        production: productions.get(text(contract.production_id)) || "General GHSMTA",
+        installment: `${text(payment.installment_order)}. ${text(payment.label)}`,
+        deliverable: text(payment.deliverable),
+        due: dateOnly(payment.due_date),
+        amount: money(payment.amount),
+        status: label(payment.status),
+        invoice_received: dateOnly(payment.invoice_received_at),
+        paid: dateOnly(payment.paid_at),
+        notes: text(payment.notes),
+      };
+    });
+    return report("contract-payment-schedule", "GHSMTA Contract Payment Schedule", columns, rows);
+  }
+
+  const paidByContract = new Map<string, number>();
+  payments.forEach((payment) => {
+    if (payment.status !== "paid") return;
+    const contractId = text(payment.contract_id);
+    paidByContract.set(contractId, (paidByContract.get(contractId) ?? 0) + Number(payment.amount || 0));
+  });
+  const columns = [
+    { key: "number", label: "Contract Number" },
+    { key: "contractor", label: "Contractor" },
+    { key: "email", label: "Email" },
+    { key: "role", label: "Role" },
+    { key: "production", label: "Production" },
+    { key: "term", label: "Term" },
+    { key: "value", label: "Contract Value" },
+    { key: "paid", label: "Paid" },
+    { key: "status", label: "Status" },
+    { key: "signatures", label: "Signatures" },
+    { key: "w9", label: "W-9" },
+    { key: "notes", label: "Owner Notes" },
+  ];
+  const rows = contracts.map((contract) => ({
+    number: text(contract.contract_number),
+    contractor: text(contract.contractor_name),
+    email: text(contract.contractor_email),
+    role: text(contract.role_title),
+    production: productions.get(text(contract.production_id)) || "General GHSMTA",
+    term: [dateOnly(contract.starts_on), dateOnly(contract.ends_on)].filter(Boolean).join(" - "),
+    value: money(contract.total_consideration),
+    paid: money(paidByContract.get(text(contract.id)) ?? 0),
+    status: label(contract.status),
+    signatures:
+      contract.contractor_signed_at && contract.foundation_signed_at
+        ? "Complete"
+        : contract.contractor_signed_at || contract.foundation_signed_at
+          ? "Partial"
+          : "Outstanding",
+    w9: contract.w9_received ? "Received" : "Outstanding",
+    notes: text(contract.internal_notes),
+  }));
+  return report("contract-register", "GHSMTA Contract Register", columns, rows);
+}
+
 export async function GET(request: Request) {
   await requireProfile(["owner"]);
   const url = new URL(request.url);
@@ -458,6 +572,7 @@ export async function GET(request: Request) {
   else if (operationsModule === "calls") loaded = await loadCalls(url.searchParams);
   else if (operationsModule === "budgets") loaded = await loadBudgets(url.searchParams);
   else if (operationsModule === "trucking") loaded = await loadTrucking(url.searchParams);
+  else if (operationsModule === "contracts") loaded = await loadContracts(url.searchParams);
   else return NextResponse.json({ error: "Unknown Production Operations export." }, { status: 404 });
 
   loaded.filters.format = format;

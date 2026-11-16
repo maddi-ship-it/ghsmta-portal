@@ -20378,7 +20378,7 @@ html[data-theme="light"] .advisory-live-range-outside {
 
 .operations-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin: 0 0 22px;
 }
@@ -20633,12 +20633,86 @@ html[data-theme="light"] .advisory-live-range-outside {
 .operations-route-stop[open] > summary { border-bottom: 1px solid var(--portal-line, #2d3b55); }
 .operations-stop-order { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; color: var(--portal-navy, #081329); background: var(--portal-gold, #d5b350); font-size: .8rem; font-weight: 900; }
 
+.operations-contract-filter {
+  grid-template-columns: minmax(260px, 1.4fr) minmax(190px, 1fr) minmax(170px, .8fr) auto;
+}
+
+.operations-contract-record > summary {
+  min-height: 94px;
+}
+
+.operations-contract-overview {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 16px 20px 0;
+}
+
+.operations-contract-overview > span {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--portal-line, #2d3b55);
+  border-radius: 13px;
+  background: var(--portal-surface, #0f1729);
+}
+
+.operations-contract-overview small {
+  color: var(--portal-muted, #aab5ca);
+  font-size: .66rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.operations-contract-overview strong {
+  overflow: hidden;
+  color: var(--portal-text, #f9f7f0);
+  font-size: .88rem;
+  text-overflow: ellipsis;
+}
+
+.operations-contract-documents {
+  display: grid;
+  gap: 10px;
+  margin: 16px 20px 0;
+  padding: 15px 16px;
+  border: 1px solid color-mix(in srgb, var(--portal-gold, #d5b350) 34%, var(--portal-line, #2d3b55));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--portal-gold, #d5b350) 6%, var(--portal-surface, #0f1729));
+}
+
+.operations-contract-documents > strong { color: var(--portal-text, #f9f7f0); }
+.operations-contract-documents > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.operations-contract-documents span { color: var(--portal-muted, #aab5ca); font-size: .78rem; }
+
+.operations-contract-payments {
+  display: grid;
+  gap: 14px;
+  margin: 0 20px 20px;
+  padding: 18px;
+  border: 1px solid var(--portal-line, #2d3b55);
+  border-radius: 16px;
+  background: var(--portal-surface, #0f1729);
+}
+
+.operations-contract-payments .operations-section-heading { padding: 0; }
+.operations-contract-payments .operations-section-heading h3 { margin: 3px 0 0; color: var(--portal-text, #f9f7f0); font-family: Georgia, "Times New Roman", serif; font-size: 1.45rem; }
+.operations-payment-list { display: grid; gap: 10px; }
+.operations-payment-row { padding: 14px; border: 1px solid var(--portal-line, #2d3b55); border-radius: 14px; background: var(--portal-surface-2, #141f36); }
+.operations-payment-form { display: grid; grid-template-columns: 80px minmax(180px, 1.4fr) repeat(4, minmax(135px, .8fr)); gap: 10px; align-items: end; }
+.operations-payment-form .field-span-2 { grid-column: span 3; }
+.operations-add-payment { border-top: 1px solid var(--portal-line, #2d3b55); padding-top: 13px; }
+.operations-add-payment > summary { width: fit-content; color: var(--portal-gold, #e6c968); cursor: pointer; font-size: .84rem; font-weight: 850; }
+.operations-add-payment > form { margin-top: 14px; }
+
 .operations-workspace .badge-planning,
 .operations-workspace .badge-draft { color: #d7deec; background: #29344a; }
-.operations-workspace :where(.badge-active, .badge-confirmed, .badge-final, .badge-complete, .badge-paid) { color: #99e4bd; background: #163d34; }
-.operations-workspace :where(.badge-scheduled, .badge-approved, .badge-committed, .badge-invoiced, .badge-estimated) { color: #b9d3ff; background: #183c6e; }
+.operations-workspace :where(.badge-active, .badge-confirmed, .badge-final, .badge-complete, .badge-paid, .badge-executed) { color: #99e4bd; background: #163d34; }
+.operations-workspace :where(.badge-scheduled, .badge-approved, .badge-committed, .badge-invoiced, .badge-estimated, .badge-sent, .badge-partially_signed, .badge-preparing, .badge-invoice_requested) { color: #b9d3ff; background: #183c6e; }
 .operations-workspace :where(.badge-loading, .badge-in_transit, .badge-delivered) { color: #c9f3ff; background: #164356; }
-.operations-workspace :where(.badge-on_hold, .badge-requested) { color: #ffe7a0; background: #503f16; }
+.operations-workspace :where(.badge-on_hold, .badge-requested, .badge-held) { color: #ffe7a0; background: #503f16; }
 .operations-workspace :where(.badge-cancelled, .badge-archived) { color: #ffb4b9; background: #55242a; }
 
 html[data-theme="light"] .operations-heading {
@@ -20650,25 +20724,29 @@ html[data-theme="light"] .operations-heading {
 html[data-theme="light"] .operations-negative { color: #a61b28 !important; }
 html[data-theme="light"] .operations-workspace .badge-planning,
 html[data-theme="light"] .operations-workspace .badge-draft { color: #344054; background: #f2f4f7; }
-html[data-theme="light"] .operations-workspace :where(.badge-active, .badge-confirmed, .badge-final, .badge-complete, .badge-paid) { color: #067647; background: #ecfdf3; }
-html[data-theme="light"] .operations-workspace :where(.badge-scheduled, .badge-approved, .badge-committed, .badge-invoiced, .badge-estimated) { color: #175cd3; background: #eff8ff; }
+html[data-theme="light"] .operations-workspace :where(.badge-active, .badge-confirmed, .badge-final, .badge-complete, .badge-paid, .badge-executed) { color: #067647; background: #ecfdf3; }
+html[data-theme="light"] .operations-workspace :where(.badge-scheduled, .badge-approved, .badge-committed, .badge-invoiced, .badge-estimated, .badge-sent, .badge-partially_signed, .badge-preparing, .badge-invoice_requested) { color: #175cd3; background: #eff8ff; }
 html[data-theme="light"] .operations-workspace :where(.badge-loading, .badge-in_transit, .badge-delivered) { color: #05603a; background: #ecfdf3; }
-html[data-theme="light"] .operations-workspace :where(.badge-on_hold, .badge-requested) { color: #854a0e; background: #fffaeb; }
+html[data-theme="light"] .operations-workspace :where(.badge-on_hold, .badge-requested, .badge-held) { color: #854a0e; background: #fffaeb; }
 html[data-theme="light"] .operations-workspace :where(.badge-cancelled, .badge-archived) { color: #b42318; background: #fef3f2; }
 
 @media (max-width: 1050px) {
   .operations-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .operations-summary-grid, .operations-budget-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .operations-trucking-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operations-contract-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .operations-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operations-payment-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operations-payment-form .field-span-2 { grid-column: span 2; }
   .operations-filter-actions { grid-column: 1 / -1; }
 }
 
 @media (max-width: 760px) {
   .operations-heading, .operations-section-heading { align-items: flex-start; flex-direction: column; }
-  .operations-tabs, .operations-summary-grid, .operations-summary-grid-three, .operations-budget-summary, .operations-two-column, .operations-form-grid, .operations-inline-form, .operations-location-form, .operations-filter-bar, .operations-filter-bar-compact, .operations-trucking-meta { grid-template-columns: 1fr; }
+  .operations-tabs, .operations-summary-grid, .operations-summary-grid-three, .operations-budget-summary, .operations-two-column, .operations-form-grid, .operations-inline-form, .operations-location-form, .operations-filter-bar, .operations-filter-bar-compact, .operations-trucking-meta, .operations-contract-overview, .operations-payment-form { grid-template-columns: 1fr; }
   .operations-tabs a { min-height: 72px; }
   .operations-form-grid .field-span-2, .operations-filter-actions { grid-column: auto; }
+  .operations-payment-form .field-span-2 { grid-column: auto; }
   .operations-form-actions, .operations-danger-zone { align-items: stretch; flex-direction: column; }
   .operations-form-actions .button, .operations-filter-actions .button, .operations-danger-zone .button { width: 100%; }
   .operations-export-options { display: grid; grid-template-columns: 1fr; }

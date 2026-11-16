@@ -6,6 +6,7 @@ export function roleLabel(role: AppRole): string {
     adjudicator: "Adjudicator",
     advisory_member: "Advisory Member",
     program_manager: "Program Manager",
+    production: "Production",
     owner: "Owner",
   };
   return labels[role];

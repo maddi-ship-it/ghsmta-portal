@@ -85,6 +85,7 @@ function revalidateOperations(extraPath?: string) {
   revalidatePath(`${OPERATIONS_ROOT}/calls`);
   revalidatePath(`${OPERATIONS_ROOT}/budgets`);
   revalidatePath(`${OPERATIONS_ROOT}/trucking`);
+  revalidatePath(`${OPERATIONS_ROOT}/contracts`);
   if (extraPath) revalidatePath(extraPath);
 }
 

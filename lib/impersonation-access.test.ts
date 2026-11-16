@@ -16,7 +16,7 @@ const eligibleProfile = {
 };
 
 describe("Owner impersonation access", () => {
-  it("allows active applicants, adjudicators, and Advisory Committee members", () => {
+  it("allows active applicants, adjudicators, Advisory Committee, and Production members", () => {
     expect(canOwnerImpersonateProfile(eligibleProfile, ownerId)).toBe(true);
     expect(
       canOwnerImpersonateProfile(
@@ -27,6 +27,12 @@ describe("Owner impersonation access", () => {
     expect(
       canOwnerImpersonateProfile(
         { ...eligibleProfile, role: "advisory_member" },
+        ownerId,
+      ),
+    ).toBe(true);
+    expect(
+      canOwnerImpersonateProfile(
+        { ...eligibleProfile, role: "production" },
         ownerId,
       ),
     ).toBe(true);
@@ -61,6 +67,7 @@ describe("Owner impersonation access", () => {
       "Advisory Committee member",
     );
     expect(impersonationRoleName("adjudicator")).toBe("adjudicator");
+    expect(impersonationRoleName("production")).toBe("Production team member");
   });
 
   it("only recognizes the signed session's target profile", () => {

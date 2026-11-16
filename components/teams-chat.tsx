@@ -467,6 +467,8 @@ function roleName(role: AppRole) {
       return "Advisory Committee";
     case "program_manager":
       return "Program Manager";
+    case "production":
+      return "Production";
     case "owner":
       return "Owner";
   }

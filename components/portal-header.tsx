@@ -22,16 +22,28 @@ function buildNavigation(profile: Profile) {
       shortLabel: "Home",
       icon: "⌂",
     },
-    {
+  ];
+
+  if (profile.role === "production") {
+    primary.push({
+      href: "/portal/chat",
+      label: "PRODUCTION chat",
+      shortLabel: "Chat",
+      icon: "◫",
+    });
+  } else {
+    primary.push({
       href: "/portal/schedule",
       label: "Scheduling",
       shortLabel: "Schedule",
       icon: "◷",
-    },
-  ];
+    });
+  }
 
   const resources: NavItem[] =
-    profile.role === "program_manager"
+    profile.role === "production"
+      ? []
+      : profile.role === "program_manager"
       ? [
           {
             href: "/portal/feedback",
@@ -122,7 +134,7 @@ function buildNavigation(profile: Profile) {
         icon: "★",
       },
     );
-  } else {
+  } else if (profile.role !== "production") {
     primary.push({
       href: "/portal/admin/applications",
       label: "Applications",
@@ -180,6 +192,11 @@ function buildNavigation(profile: Profile) {
         href: "/portal/admin/operations/trucking",
         label: "Trucking",
         icon: "▰",
+      },
+      {
+        href: "/portal/admin/operations/contracts",
+        label: "Contracts",
+        icon: "✎",
       },
     );
 

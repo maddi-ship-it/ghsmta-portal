@@ -28,6 +28,11 @@ const sections = [
     label: "Trucking",
     description: "Vehicles, drivers, moves, route stops, and load logistics.",
   },
+  {
+    href: "/portal/admin/operations/contracts",
+    label: "Contracts",
+    description: "Agreements, signatures, W-9s, and payment schedules.",
+  },
 ];
 
 export default async function OperationsLayout({
@@ -43,8 +48,8 @@ export default async function OperationsLayout({
           <h1>Production operations</h1>
           <p>
             Plan GHSMTA work, publish internal schedules, build labor calls,
-            track production budgets, and coordinate trucking in one connected
-            workspace.
+            track production budgets, coordinate trucking, and administer
+            contractor agreements in one connected workspace.
           </p>
         </div>
       </div>

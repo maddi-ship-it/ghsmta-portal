@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    "/api/admin/operations/contracts/[contractId]/document": [
+      "./public/templates/ghsmta-work-for-hire-contract.docx",
+    ],
+  },
   async headers() {
     return [
       {

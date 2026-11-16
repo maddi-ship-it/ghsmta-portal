@@ -2,7 +2,7 @@ import Link from "next/link";
 
 type ExportOption = {
   label: string;
-  module: "productions" | "schedule" | "calls" | "budgets" | "trucking";
+  module: "productions" | "schedule" | "calls" | "budgets" | "trucking" | "contracts";
   format: "pdf" | "csv";
   variant?: string;
   query?: Record<string, string | undefined>;

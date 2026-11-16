@@ -11,26 +11,28 @@ const roles = [
   "adjudicator",
   "advisory_member",
   "program_manager",
+  "production",
   "owner",
 ];
 
 const allRoles = [...roles];
+const standardPortalRoles = roles.filter((role) => role !== "production");
 const reviewRoles = ["adjudicator", "advisory_member", "owner"];
 const ownerOnly = ["owner"];
 
 const routeRoleCoverage = new Map([
   ["/portal", allRoles],
   ["/portal/account", allRoles],
-  ["/portal/admin/applications", allRoles],
-  ["/portal/appeals", allRoles],
-  ["/portal/applications/[id]", allRoles],
+  ["/portal/admin/applications", standardPortalRoles],
+  ["/portal/appeals", standardPortalRoles],
+  ["/portal/applications/[id]", standardPortalRoles],
   ["/portal/chat", allRoles],
   ["/portal/feedback", allRoles],
-  ["/portal/files", allRoles],
-  ["/portal/invoices", allRoles],
+  ["/portal/files", standardPortalRoles],
+  ["/portal/invoices", standardPortalRoles],
   ["/portal/notifications", allRoles],
-  ["/portal/reference-documents", allRoles],
-  ["/portal/schedule", allRoles],
+  ["/portal/reference-documents", standardPortalRoles],
+  ["/portal/schedule", standardPortalRoles],
   ["/portal/adjudication", reviewRoles],
   ["/portal/adjudication-sandbox", reviewRoles],
   ["/portal/adjudication/[id]", reviewRoles],
@@ -52,6 +54,7 @@ const routeRoleCoverage = new Map([
   ["/portal/admin/operations/budgets", ownerOnly],
   ["/portal/admin/operations/budgets/[productionId]", ownerOnly],
   ["/portal/admin/operations/trucking", ownerOnly],
+  ["/portal/admin/operations/contracts", ownerOnly],
   ["/portal/admin/reports", ownerOnly],
   ["/portal/admin/scoring", ownerOnly],
   ["/portal/admin/scoring/rubrics/[id]", ownerOnly],

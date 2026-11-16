@@ -133,6 +133,8 @@ export default async function PortalDashboard() {
     ? "Manage your school’s application and submission status."
     : profile.role === "adjudicator"
       ? "Review the applications currently assigned to you."
+      : profile.role === "production"
+        ? "Use the private PRODUCTION chat for contract and production team communication."
       : profile.role === "program_manager"
         ? "Coordinate submitted applications and scholarship applicant conversations."
       : `View the current awards cycle as an ${roleLabel(profile.role).toLowerCase()}.`;
@@ -141,15 +143,19 @@ export default async function PortalDashboard() {
     <>
       <div className="page-heading">
         <div><h1>Welcome, {profile.full_name?.split(" ")[0] ?? "there"}.</h1><p>{intro}</p></div>
-        <Link className="button button-dark" href="/portal/admin/applications">View applications</Link>
+        <Link className="button button-dark" href={profile.role === "production" ? "/portal/chat" : "/portal/admin/applications"}>{profile.role === "production" ? "Open PRODUCTION chat" : "View applications"}</Link>
       </div>
 
-      <section className="metric-grid" aria-label="Application overview">
+      {profile.role === "production" ? (
+        <section className="panel">
+          <div className="panel-header"><div><span className="eyebrow">Production team</span><h2>Your GHSMTA workspace</h2><p>Your current access includes portal notifications, account settings, and the private PRODUCTION chat. Additional Production permissions will appear here as they are enabled.</p></div><Link href="/portal/chat">Open chat</Link></div>
+        </section>
+      ) : <section className="metric-grid" aria-label="Application overview">
         <article className="metric-card"><span className="metric-label">Accessible</span><strong className="metric-value">{counts.total}</strong></article>
         <article className="metric-card"><span className="metric-label">Draft</span><strong className="metric-value">{counts.draft}</strong></article>
         <article className="metric-card"><span className="metric-label">Submitted</span><strong className="metric-value">{counts.submitted}</strong></article>
         <article className="metric-card"><span className="metric-label">In review</span><strong className="metric-value">{counts.review}</strong></article>
-      </section>
+      </section>}
 
       {profile.role === "owner" ? (
         <OwnerDashboardActionCenter actions={ownerDashboardActions} />
@@ -186,7 +192,7 @@ export default async function PortalDashboard() {
         </section>
       )}
 
-      <section className="panel">
+      {profile.role !== "production" ? <section className="panel">
         <div className="panel-header"><h2>Recently updated</h2><Link href="/portal/admin/applications">See all</Link></div>
         {applications.length === 0 ? (
           <div className="empty-state">
@@ -205,7 +211,7 @@ export default async function PortalDashboard() {
             ))}
           </tbody></table></div>
         )}
-      </section>
+      </section> : null}
     </>
   );
 }

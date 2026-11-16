@@ -162,6 +162,7 @@ export default async function UsersPage({
     "adjudicator",
     "advisory_member",
     "program_manager",
+    "production",
     "owner",
   ];
 
@@ -193,7 +194,7 @@ export default async function UsersPage({
       <form action={bulkUpdateUsers} className="panel user-bulk-toolbar" id="bulk-users-form">
         <div><strong>{profiles.length} users shown</strong><small>Select users in the table, then apply one action.</small></div>
         <select className="select" name="bulk_operation" required><option value="">Bulk action</option><option value="message_group">Send one group chat</option><option value="message_individual">Send individual chats</option><option value="role">Change role</option><option value="activate">Activate</option><option value="deactivate">Deactivate</option></select>
-        <select className="select" name="bulk_role"><option value="applicant">Applicant</option><option value="adjudicator">Adjudicator</option><option value="advisory_member">Advisory Committee</option><option value="program_manager">Program Manager</option><option value="owner">Owner</option></select>
+        <select className="select" name="bulk_role"><option value="applicant">Applicant</option><option value="adjudicator">Adjudicator</option><option value="advisory_member">Advisory Committee</option><option value="program_manager">Program Manager</option><option value="production">Production</option><option value="owner">Owner</option></select>
         <input className="input input-compact" maxLength={160} name="message_subject" placeholder="Chat subject for message actions" />
         <textarea className="textarea user-bulk-message" maxLength={5000} name="message_body" placeholder="Message body for group or individual chat actions" rows={2} />
         <ConfirmedSubmitButton
@@ -268,7 +269,7 @@ export default async function UsersPage({
                 <small>
                   {IMPERSONATABLE_ROLES.includes(profile.role)
                     ? "Unavailable"
-                    : "Applicant, Adjudicator, or Advisory Committee only"}
+                    : "Applicant, Adjudicator, Advisory Committee, or Production only"}
                 </small>
               )}
 
