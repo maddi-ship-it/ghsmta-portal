@@ -683,7 +683,9 @@ function LivePanelFeedbackEditor({
           const approvedField = event.currentTarget.elements.namedItem("approved");
           writeLocalDraft(
             value,
-            approvedField instanceof HTMLInputElement
+            panelApproved
+              ? true
+              : approvedField instanceof HTMLInputElement
               ? approvedField.checked
               : false,
           );
@@ -908,6 +910,7 @@ function LivePanelFeedbackEditor({
             name="approved"
             type="checkbox"
             defaultChecked={feedback?.status === "approved"}
+            disabled={panelApproved}
             onChange={(event) => writeLocalDraft(value, event.currentTarget.checked)}
           />
           {panelApproved

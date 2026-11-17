@@ -61,6 +61,7 @@ import {
   isAssignedPanelNarrativeReviewer,
   panelNarrativeSourceAssignmentIds,
   resolveGeneratedNarrativeFinal,
+  resolveOwnerPanelNarrativeApproval,
   shouldRefreshGeneratedNarrative,
 } from "@/lib/panel-narrative";
 import {
@@ -2282,17 +2283,23 @@ export async function savePanelFeedback(
     }
   }
 
-  const approved = editor.role === "owner" ? ownerRequestedPanelReview : true;
-  const approvedBy = approved
-    ? editor.role === "owner" && panelAlreadyApproved
-      ? existingFeedback?.approved_by ?? editor.id
-      : editor.id
-    : null;
-  const approvedAt = approved
-    ? editor.role === "owner" && panelAlreadyApproved
-      ? existingFeedback?.approved_at ?? new Date().toISOString()
-      : new Date().toISOString()
-    : null;
+  const savedAt = new Date().toISOString();
+  const approvalState =
+    editor.role === "owner"
+      ? resolveOwnerPanelNarrativeApproval({
+          existingApprovedAt: existingFeedback?.approved_at,
+          existingApprovedBy: existingFeedback?.approved_by,
+          ownerId: editor.id,
+          ownerRequestedPanelReview,
+          panelAlreadyApproved,
+          savedAt,
+        })
+      : {
+          approved: true,
+          approvedAt: savedAt,
+          approvedBy: editor.id,
+        };
+  const { approved, approvedAt, approvedBy } = approvalState;
 
   let panelApprovalSaved = false;
 

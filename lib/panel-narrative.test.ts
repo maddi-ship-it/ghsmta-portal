@@ -7,6 +7,7 @@ import {
   isPanelNarrativeApprovalComplete,
   panelNarrativeSourceAssignmentIds,
   resolveGeneratedNarrativeFinal,
+  resolveOwnerPanelNarrativeApproval,
   shouldRefreshGeneratedNarrative,
 } from "./panel-narrative";
 import { resolvePanelAveragePolicy } from "./panel-average-policy";
@@ -193,6 +194,40 @@ describe("Owner panel narrative generation", () => {
         reviewerId: "panelist-1",
       }),
     ).toBe(false);
+  });
+
+  it("preserves panel approval when an Owner saves another draft", () => {
+    expect(
+      resolveOwnerPanelNarrativeApproval({
+        existingApprovedAt: "2026-11-16T19:44:23.146Z",
+        existingApprovedBy: "panelist-1",
+        ownerId: "owner-1",
+        ownerRequestedPanelReview: false,
+        panelAlreadyApproved: true,
+        savedAt: "2026-11-17T16:00:00.000Z",
+      }),
+    ).toEqual({
+      approved: true,
+      approvedAt: "2026-11-16T19:44:23.146Z",
+      approvedBy: "panelist-1",
+    });
+  });
+
+  it("keeps an unsent Owner draft out of panel review", () => {
+    expect(
+      resolveOwnerPanelNarrativeApproval({
+        existingApprovedAt: null,
+        existingApprovedBy: null,
+        ownerId: "owner-1",
+        ownerRequestedPanelReview: false,
+        panelAlreadyApproved: false,
+        savedAt: "2026-11-17T16:00:00.000Z",
+      }),
+    ).toEqual({
+      approved: false,
+      approvedAt: null,
+      approvedBy: null,
+    });
   });
 
   it("shares released final comments with every active scoring or commenting panel member", () => {

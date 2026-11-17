@@ -73,6 +73,38 @@ export function isAssignedPanelNarrativeReviewer({
   return Boolean(assignedTo && assignedTo === reviewerId);
 }
 
+export function resolveOwnerPanelNarrativeApproval({
+  existingApprovedAt,
+  existingApprovedBy,
+  ownerId,
+  ownerRequestedPanelReview,
+  panelAlreadyApproved,
+  savedAt,
+}: {
+  existingApprovedAt: string | null | undefined;
+  existingApprovedBy: string | null | undefined;
+  ownerId: string;
+  ownerRequestedPanelReview: boolean;
+  panelAlreadyApproved: boolean;
+  savedAt: string;
+}) {
+  const approved = ownerRequestedPanelReview || panelAlreadyApproved;
+
+  return {
+    approved,
+    approvedAt: approved
+      ? panelAlreadyApproved
+        ? existingApprovedAt ?? savedAt
+        : savedAt
+      : null,
+    approvedBy: approved
+      ? panelAlreadyApproved
+        ? existingApprovedBy ?? ownerId
+        : ownerId
+      : null,
+  };
+}
+
 export function activePanelMemberUserIds(
   assignments: ReadonlyArray<{
     adjudicator_user_id: string;
