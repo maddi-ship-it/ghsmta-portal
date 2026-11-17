@@ -521,10 +521,15 @@ async function savePanelNarrativeAssignments({
   announceChanges: boolean;
   formData: FormData;
 }) {
-  const assignments = categoryIds.map((categoryId) => ({
-    categoryId,
-    assignedTo: text(formData, `assigned_to_${categoryId}`) || null,
-  }));
+  const assignments = categoryIds.flatMap((categoryId) => {
+    const fieldName = `assigned_to_${categoryId}`;
+    if (!formData.has(fieldName)) return [];
+
+    return [{
+      categoryId,
+      assignedTo: text(formData, fieldName) || null,
+    }];
+  });
   const admin = createAdminClient();
   const { data: application, error: applicationError } = await admin
     .from("applications")
@@ -585,9 +590,20 @@ async function savePanelNarrativeAssignments({
     );
   }
 
+  const feedbackByCategory = new Map(
+    (feedbackResult.data ?? []).map((feedback) => [
+      feedback.category_id,
+      feedback,
+    ]),
+  );
+  const changedAssignments = assignments.filter(
+    (assignment) =>
+      (feedbackByCategory.get(assignment.categoryId)?.assigned_to ?? null) !==
+      assignment.assignedTo,
+  );
   const selectedReviewerIds = [
     ...new Set(
-      assignments.flatMap((assignment) =>
+      changedAssignments.flatMap((assignment) =>
         assignment.assignedTo ? [assignment.assignedTo] : [],
       ),
     ),
@@ -621,18 +637,6 @@ async function savePanelNarrativeAssignments({
   ) {
     throw new Error("Choose an active commenting member of this panel.");
   }
-
-  const feedbackByCategory = new Map(
-    (feedbackResult.data ?? []).map((feedback) => [
-      feedback.category_id,
-      feedback,
-    ]),
-  );
-  const changedAssignments = assignments.filter(
-    (assignment) =>
-      (feedbackByCategory.get(assignment.categoryId)?.assigned_to ?? null) !==
-      assignment.assignedTo,
-  );
 
   const assignmentSaveResults = await Promise.all(
     changedAssignments.map((assignment) => {

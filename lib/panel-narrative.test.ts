@@ -64,7 +64,7 @@ describe("Owner panel narrative generation", () => {
     ).toBe(true);
   });
 
-  it("uses notes only from active assignments with commenting enabled", () => {
+  it("keeps completed adjudicators in the narrative source history", () => {
     expect(
       [...panelNarrativeSourceAssignmentIds([
         {
@@ -86,12 +86,19 @@ describe("Owner panel narrative generation", () => {
           removed_at: "2026-10-20T18:00:00.000Z",
         },
         {
+          id: "completed-commenter",
+          adjudicator_user_id: "adj-5",
+          can_comment: true,
+          removed_at: "2026-10-20T19:00:00.000Z",
+          status: "complete",
+        },
+        {
           id: "legacy-without-permission",
           adjudicator_user_id: "adj-4",
           removed_at: null,
         },
-      ], new Set(["adj-1", "adj-2", "adj-3", "adj-4"]))],
-    ).toEqual(["active-commenter"]);
+      ], new Set(["adj-1", "adj-2", "adj-3", "adj-4", "adj-5"]))],
+    ).toEqual(["active-commenter", "completed-commenter"]);
   });
 
   it("excludes comment-enabled assignments outside the scoring contributor panel", () => {

@@ -404,9 +404,9 @@ export default async function AdjudicationApplicationPage({
     isScoringParticipant || canPanelReview || isReadOnlyObserver
       ? admin
           .from("adjudicator_assignments")
-          .select("adjudicator_user_id,can_comment,can_score")
+          .select("adjudicator_user_id,can_comment,can_score,removed_at,status")
           .eq("application_id", id)
-          .is("removed_at", null)
+          .or("removed_at.is.null,status.eq.complete")
       : Promise.resolve({ data: [], error: null }),
     admin
       .from("appeals")
@@ -556,6 +556,14 @@ export default async function AdjudicationApplicationPage({
   const commentingPanelMemberIds = new Set(
     (panelAssignmentsResult.data ?? [])
       .filter((assignment) => assignment.can_comment)
+      .map((assignment) => assignment.adjudicator_user_id),
+  );
+  const activeCommentingPanelMemberIds = new Set(
+    (panelAssignmentsResult.data ?? [])
+      .filter(
+        (assignment) =>
+          assignment.can_comment && assignment.removed_at == null,
+      )
       .map((assignment) => assignment.adjudicator_user_id),
   );
 
@@ -838,6 +846,7 @@ export default async function AdjudicationApplicationPage({
       id: reviewer.id,
       name: reviewer.full_name ?? reviewer.email ?? "Panel member",
       role: reviewer.role as PanelNarrativeReviewer["role"],
+      assignable: activeCommentingPanelMemberIds.has(reviewer.id),
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
   const panelNarrativeReviewers = candidatePanelReviewers.filter((reviewer) =>

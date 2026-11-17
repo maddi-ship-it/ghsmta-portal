@@ -26,6 +26,7 @@ export function panelNarrativeSourceAssignmentIds(
     adjudicator_user_id: string;
     can_comment?: boolean;
     removed_at?: string | null;
+    status?: string | null;
   }>,
   contributorUserIds: ReadonlySet<string>,
 ) {
@@ -33,7 +34,7 @@ export function panelNarrativeSourceAssignmentIds(
     assignments
       .filter(
         (assignment) =>
-          assignment.removed_at == null &&
+          (assignment.removed_at == null || assignment.status === "complete") &&
           assignment.can_comment === true &&
           contributorUserIds.has(assignment.adjudicator_user_id),
       )

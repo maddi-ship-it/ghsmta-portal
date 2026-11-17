@@ -95,6 +95,7 @@ type PanelNarrativeReviewer = {
   id: string;
   name: string;
   role: "adjudicator" | "advisory_member";
+  assignable?: boolean;
 };
 
 type ObserverWorkspaceResponse = {

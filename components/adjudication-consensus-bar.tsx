@@ -72,6 +72,7 @@ type PanelReviewer = {
   id: string;
   name: string;
   role: "adjudicator" | "advisory_member";
+  assignable?: boolean;
 };
 
 type NarrativeAssignment = {
@@ -1457,11 +1458,20 @@ export function AdjudicationConsensusBar({
                                   value={assigneeId ?? ""}
                                 >
                                   <option value="">Choose panel member</option>
-                                  {panelReviewers.map((reviewer) => (
-                                    <option key={reviewer.id} value={reviewer.id}>
-                                      {reviewer.name}
-                                    </option>
-                                  ))}
+                                  {panelReviewers
+                                    .filter(
+                                      (reviewer) =>
+                                        reviewer.assignable !== false ||
+                                        reviewer.id === assigneeId,
+                                    )
+                                    .map((reviewer) => (
+                                      <option key={reviewer.id} value={reviewer.id}>
+                                        {reviewer.name}
+                                        {reviewer.assignable === false
+                                          ? " · completed"
+                                          : ""}
+                                      </option>
+                                    ))}
                                 </select>
                               ) : (
                                 <strong className="advisory-decision-assignee">

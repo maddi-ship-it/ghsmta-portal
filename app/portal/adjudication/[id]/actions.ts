@@ -1495,10 +1495,10 @@ async function refreshLivePanelNarratives(
     admin
       .from("adjudicator_assignments")
       .select(
-        "id,adjudicator_user_id,participant_role,can_score,can_comment,removed_at",
+        "id,adjudicator_user_id,participant_role,can_score,can_comment,removed_at,status",
       )
       .eq("application_id", applicationId)
-      .is("removed_at", null),
+      .or("removed_at.is.null,status.eq.complete"),
   ]);
   const { data: allScorecards, error: scorecardError } = scorecardResult;
   if (scorecardError) throw new Error(scorecardError.message);
@@ -1511,6 +1511,7 @@ async function refreshLivePanelNarratives(
     | "can_score"
     | "can_comment"
     | "removed_at"
+    | "status"
   >[];
   const refreshPanelUserIds = [
     ...new Set(
