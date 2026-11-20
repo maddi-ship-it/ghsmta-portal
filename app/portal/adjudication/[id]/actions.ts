@@ -987,7 +987,7 @@ export async function completeAdjudication(
 
   const { data: assignment, error: assignmentError } = await admin
     .from("adjudicator_assignments")
-    .select("id,status,participant_role,removed_at")
+    .select("id,status,participant_role,retain_role_until_panel_complete,removed_at")
     .eq("application_id", applicationId)
     .eq("adjudicator_user_id", adjudicator.id)
     .is("removed_at", null)
@@ -1059,7 +1059,12 @@ export async function completeAdjudication(
 
   const { data: completedAssignment, error: completionError } = await admin
     .from("adjudicator_assignments")
-    .update({ status: "complete", removed_at: completedAt })
+    .update({
+      status: "complete",
+      removed_at: assignment.retain_role_until_panel_complete
+        ? null
+        : completedAt,
+    })
     .eq("id", assignment.id)
     .eq("adjudicator_user_id", adjudicator.id)
     .is("removed_at", null)
@@ -1071,11 +1076,26 @@ export async function completeAdjudication(
     throw new Error("This adjudication assignment is no longer active.");
   }
 
+  const panelCompleteResult = assignment.retain_role_until_panel_complete
+    ? await admin.rpc("adjudication_panel_complete", {
+        p_application_id: applicationId,
+      })
+    : { data: false, error: null };
+
+  if (panelCompleteResult.error) {
+    throw new Error(panelCompleteResult.error.message);
+  }
+
   revalidatePath(`/portal/adjudication/${applicationId}`);
   revalidatePath("/portal/adjudication");
   revalidatePath("/portal/files");
   revalidatePath("/portal/chat");
-  redirect("/portal/adjudication?completed=1");
+  const completionState = assignment.retain_role_until_panel_complete
+    ? panelCompleteResult.data
+      ? "&school_role=advisory"
+      : "&school_role=retained"
+    : "";
+  redirect(`/portal/adjudication?completed=1${completionState}`);
 }
 
 export async function reopenAdjudicatorScorecard(

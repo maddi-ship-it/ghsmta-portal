@@ -282,7 +282,7 @@ export default async function AdjudicationApplicationPage({
       ? { data: null, error: null }
       : await supabase
           .from("adjudicator_assignments")
-          .select("id,participant_role,can_score,can_comment,removed_at")
+          .select("id,participant_role,can_score,can_comment,retain_role_until_panel_complete,removed_at")
           .eq("application_id", id)
           .eq("adjudicator_user_id", profile.id)
           .is("removed_at", null)
@@ -292,10 +292,19 @@ export default async function AdjudicationApplicationPage({
     throw new Error(ownParticipantResult.error.message);
   }
 
-  const effectiveParticipantRole = (
+  const applicationParticipantRoleResult =
     profile.role === "owner"
-      ? "owner"
-      : ownParticipantResult.data?.participant_role ?? profile.role
+      ? { data: "owner", error: null }
+      : await supabase.rpc("current_application_participant_role", {
+          p_application_id: id,
+        });
+
+  if (applicationParticipantRoleResult.error) {
+    throw new Error(applicationParticipantRoleResult.error.message);
+  }
+
+  const effectiveParticipantRole = (
+    applicationParticipantRoleResult.data ?? profile.role
   ) as AppRole;
 
   const hasReadOnlyAssignment = observerAccess.readOnlyAssignment;
@@ -1164,6 +1173,10 @@ export default async function AdjudicationApplicationPage({
             <CompleteAdjudicationControl
               applicationId={id}
               outstandingCommentCount={outstandingAssignedCommentCount}
+              retainsSchoolAccessUntilPanelComplete={Boolean(
+                ownParticipantResult.data
+                  ?.retain_role_until_panel_complete,
+              )}
             />
           ) : undefined
         }

@@ -18,6 +18,7 @@ import type {
 type AdjudicationSearchParams = {
   completed?: string;
   q?: string;
+  school_role?: string;
 };
 
 type ScheduleBookingReference = {
@@ -182,10 +183,32 @@ export default async function AdjudicationDashboard({
     }
   }
 
+  const schoolSpecificAdjudicatorCandidates = assignments.filter(
+    (assignment) =>
+      assignment.adjudicator_user_id === profile.id &&
+      assignment.participant_role === "adjudicator" &&
+      assignment.retain_role_until_panel_complete === true,
+  );
+  const schoolSpecificAdjudicatorCompletion = await Promise.all(
+    schoolSpecificAdjudicatorCandidates.map(async (assignment) => {
+      const result = await supabase.rpc("adjudication_panel_complete", {
+        p_application_id: assignment.application_id,
+      });
+      if (result.error) throw new Error(result.error.message);
+      return [assignment.application_id, Boolean(result.data)] as const;
+    }),
+  );
+  const schoolSpecificAdjudicatorApplicationIds = new Set(
+    schoolSpecificAdjudicatorCompletion
+      .filter(([, panelComplete]) => !panelComplete)
+      .map(([applicationId]) => applicationId),
+  );
+
   if (profile.role === "advisory_member") {
     applications = applications.filter(
       (application) =>
         advisoryReviewApplicationIds.has(application.id) ||
+        schoolSpecificAdjudicatorApplicationIds.has(application.id) ||
         readOnlyObserverApplicationIds.has(application.id),
     );
     const visibleApplicationIds = new Set(
@@ -336,7 +359,11 @@ export default async function AdjudicationDashboard({
 
       {params.completed && (
         <div className="notice page-message">
-          Adjudication completed. Your access to that school has been removed.
+          {params.school_role === "retained"
+            ? "Adjudication completed. Your school-specific adjudicator access remains available until every adjudicator completes this school."
+            : params.school_role === "advisory"
+              ? "Adjudication completed. The full panel is complete, so your Advisory Committee access is now active for this school."
+              : "Adjudication completed. Your access to that school has been removed."}
         </div>
       )}
 
@@ -455,6 +482,10 @@ export default async function AdjudicationDashboard({
                         className={`badge ${
                           row.isReadOnlyObserver
                             ? "badge-draft"
+                            : schoolSpecificAdjudicatorApplicationIds.has(
+                                  row.application.id,
+                                )
+                              ? "badge-submitted"
                             : advisoryReviewApplicationIds.has(row.application.id)
                             ? "badge-submitted"
                             : "badge-draft"
@@ -462,6 +493,10 @@ export default async function AdjudicationDashboard({
                       >
                         {row.isReadOnlyObserver
                           ? observerLabel
+                          : schoolSpecificAdjudicatorApplicationIds.has(
+                                row.application.id,
+                              )
+                            ? "Adjudicator · school-specific"
                           : "Review enabled"}
                       </span>
                     )}

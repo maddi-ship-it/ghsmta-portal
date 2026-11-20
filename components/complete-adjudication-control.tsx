@@ -3,13 +3,17 @@ import { completeAdjudication } from "@/app/portal/adjudication/[id]/actions";
 export function CompleteAdjudicationControl({
   applicationId,
   outstandingCommentCount,
+  retainsSchoolAccessUntilPanelComplete = false,
 }: {
   applicationId: string;
   outstandingCommentCount: number;
+  retainsSchoolAccessUntilPanelComplete?: boolean;
 }) {
   const canComplete = outstandingCommentCount === 0;
   const helpMessage = canComplete
-    ? "All assigned final comments have been returned to the Owners. Completing adjudication removes your access to this school."
+    ? retainsSchoolAccessUntilPanelComplete
+      ? "All assigned final comments have been returned to the Owners. Your adjudicator access remains available until every adjudicator completes this school."
+      : "All assigned final comments have been returned to the Owners. Completing adjudication removes your access to this school."
     : `Return ${outstandingCommentCount} assigned final comment${
         outstandingCommentCount === 1 ? "" : "s"
       } to the Owners before completing adjudication.`;

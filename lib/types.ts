@@ -278,6 +278,7 @@ export type AdjudicatorAssignment = {
   participant_role?: AppRole | null;
   can_score?: boolean;
   can_comment?: boolean;
+  retain_role_until_panel_complete?: boolean;
   removed_at?: string | null;
 };
 
