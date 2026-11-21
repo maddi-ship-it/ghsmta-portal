@@ -17775,28 +17775,36 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
 }
 
 .owner-comment-review-pick-six-marker {
-  display: grid;
-  width: 3.1rem;
-  flex: 0 0 3.1rem;
-  align-content: center;
-  justify-items: center;
-  gap: 0.02rem;
-  border-right: 1px solid var(--portal-line);
-  color: #111827;
-  background: color-mix(in srgb, var(--portal-gold) 88%, #ffffff);
+  display: inline-flex;
+  min-width: 3.75rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin: 0 0.2rem 0 0.65rem;
+  padding: 0 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--portal-gold) 72%, var(--portal-line));
+  border-radius: 999px;
+  color: var(--portal-gold);
+  background: color-mix(in srgb, var(--portal-gold) 10%, var(--portal-surface-1));
   line-height: 1;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--portal-gold) 8%, transparent);
 }
 
 .owner-comment-review-pick-six-marker small {
-  font-size: 0.54rem;
+  color: var(--portal-gold);
+  font-size: 0.56rem;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .owner-comment-review-pick-six-marker strong {
-  font-family: var(--font-serif), Georgia, serif;
-  font-size: 1.15rem;
+  color: var(--portal-gold);
+  font-size: 0.9rem;
+  font-weight: 950;
 }
 
 .owner-comment-review-item-toggle {
