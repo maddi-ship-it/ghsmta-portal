@@ -1,7 +1,83 @@
 "use client";
 
+import { Upload } from "tus-js-client";
+
 import { buildGeneratedFileName } from "@/lib/file-naming";
+import { SCHOOL_FILE_MAX_FILE_BYTES } from "@/lib/file-upload-policy";
 import { createClient } from "@/lib/supabase/client";
+
+const DEFAULT_PORTAL_FILE_MAX_BYTES = 50 * 1024 * 1024;
+const RESUMABLE_CHUNK_SIZE = 6 * 1024 * 1024;
+
+function resumableStorageEndpoint() {
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!projectUrl) {
+    throw new Error("Supabase storage is not configured.");
+  }
+
+  const url = new URL(projectUrl);
+  if (url.hostname.endsWith(".supabase.co")) {
+    const projectRef = url.hostname.split(".")[0];
+    return `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`;
+  }
+
+  return new URL("/storage/v1/upload/resumable", url).toString();
+}
+
+async function uploadSchoolFileResumable({
+  accessToken,
+  file,
+  publishableKey,
+  storagePath,
+}: {
+  accessToken: string;
+  file: File;
+  publishableKey: string;
+  storagePath: string;
+}) {
+  let resolvedStoragePath = storagePath;
+
+  await new Promise<void>((resolve, reject) => {
+    const upload = new Upload(file, {
+      endpoint: resumableStorageEndpoint(),
+      retryDelays: [0, 3_000, 5_000, 10_000, 20_000],
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        apikey: publishableKey,
+        "x-upsert": "false",
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      chunkSize: RESUMABLE_CHUNK_SIZE,
+      metadata: {
+        bucketName: "portal-files",
+        objectName: resolvedStoragePath,
+        contentType: file.type || "application/octet-stream",
+        cacheControl: "3600",
+      },
+      onError: reject,
+      onSuccess: () => resolve(),
+    });
+
+    void upload
+      .findPreviousUploads()
+      .then((previousUploads) => {
+        const previousUpload = previousUploads.find(
+          (candidate) =>
+            candidate.metadata.bucketName === "portal-files" &&
+            Boolean(candidate.metadata.objectName),
+        );
+        if (previousUpload) {
+          resolvedStoragePath = previousUpload.metadata.objectName;
+          upload.resumeFromPreviousUpload(previousUpload);
+        }
+        upload.start();
+      })
+      .catch(reject);
+  });
+
+  return resolvedStoragePath;
+}
 
 export type PortalFileContext =
   | "appeal"
@@ -50,8 +126,16 @@ export async function uploadPortalFiles({
   const uploaded: Array<{ id: string; generatedName: string }> = [];
 
   for (const file of files) {
-    if (file.size > 50 * 1024 * 1024) {
-      throw new Error(`${file.name} is larger than 50 MB.`);
+    const maximumFileBytes =
+      contextType === "application"
+        ? SCHOOL_FILE_MAX_FILE_BYTES
+        : DEFAULT_PORTAL_FILE_MAX_BYTES;
+    const maximumFileMegabytes = maximumFileBytes / (1024 * 1024);
+
+    if (file.size > maximumFileBytes) {
+      throw new Error(
+        `${file.name} is larger than ${maximumFileMegabytes} MB.`,
+      );
     }
 
     const generatedName = buildGeneratedFileName({
@@ -61,17 +145,38 @@ export async function uploadPortalFiles({
       documentType,
       originalName: file.name,
     });
-    const storagePath = `${userId}/${contextType}/${contextId}/${crypto.randomUUID()}-${generatedName}`;
+    let storagePath = `${userId}/${contextType}/${contextId}/${crypto.randomUUID()}-${generatedName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("portal-files")
-      .upload(storagePath, file, {
-        contentType: file.type || undefined,
-        cacheControl: "3600",
-        upsert: false,
+    if (contextType === "application" && file.size > RESUMABLE_CHUNK_SIZE) {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+      if (sessionError || !accessToken || !publishableKey) {
+        throw new Error(
+          sessionError?.message ??
+            "Your upload session is unavailable. Sign in again and retry.",
+        );
+      }
+
+      storagePath = await uploadSchoolFileResumable({
+        accessToken,
+        file,
+        publishableKey,
+        storagePath,
       });
+    } else {
+      const { error: uploadError } = await supabase.storage
+        .from("portal-files")
+        .upload(storagePath, file, {
+          contentType: file.type || undefined,
+          cacheControl: "3600",
+          upsert: false,
+        });
 
-    if (uploadError) throw new Error(uploadError.message);
+      if (uploadError) throw new Error(uploadError.message);
+    }
 
     const { data, error: metadataError } = await supabase
       .from("portal_files")

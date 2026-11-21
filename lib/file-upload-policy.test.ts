@@ -4,6 +4,7 @@ import {
   isAllowedPortalFile,
   portalFileMimeType,
   REFERENCE_DOCUMENT_MAX_FILE_BYTES,
+  SCHOOL_FILE_MAX_FILE_BYTES,
 } from "./file-upload-policy";
 
 describe("portal upload policy", () => {
@@ -23,6 +24,10 @@ describe("portal upload policy", () => {
 
   it("sets the Owner reference-document boundary to exactly 500 MiB", () => {
     expect(REFERENCE_DOCUMENT_MAX_FILE_BYTES).toBe(524_288_000);
+  });
+
+  it("sets the school-file boundary to exactly 200 MiB", () => {
+    expect(SCHOOL_FILE_MAX_FILE_BYTES).toBe(209_715_200);
   });
 
   it("provides an allowed MIME fallback when the browser omits one", () => {

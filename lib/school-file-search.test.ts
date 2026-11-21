@@ -60,4 +60,15 @@ describe("school file search", () => {
     expect(matches("november 2026")).toBe(true);
     expect(matches("playbill")).toBe(false);
   });
+
+  it("searches the Backstage Photos folder label", () => {
+    expect(
+      schoolFileMatchesSearch({
+        application,
+        file: { ...file, document_category: "backstage_photos" },
+        query: "backstage photos",
+        categoryLabel: "Backstage Photos",
+      }),
+    ).toBe(true);
+  });
 });

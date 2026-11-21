@@ -61,6 +61,7 @@ const FALLBACK_MIME_TYPES: Record<string, string> = {
 };
 
 export const REFERENCE_DOCUMENT_MAX_FILE_BYTES = 500 * 1024 * 1024;
+export const SCHOOL_FILE_MAX_FILE_BYTES = 200 * 1024 * 1024;
 
 export const PORTAL_FILE_ACCEPT = [
   ".pdf", ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
