@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractAcceptdPickSix } from "./pick-six";
+import { acceptdPickSixOrder, extractAcceptdPickSix } from "./pick-six";
 
 function answer(value: unknown, id = 156852, label = "Pick 6 categories you'd like to receive feedback on within 3 weeks of your adjudication:") {
   return {
@@ -57,5 +57,55 @@ describe("extractAcceptdPickSix", () => {
         ],
       }),
     ).toEqual([]);
+  });
+});
+
+describe("acceptdPickSixOrder", () => {
+  const selections = [
+    "Direction",
+    "Music Direction",
+    "Technical Execution",
+    "Scenic",
+    "Lighting Design",
+    "Costumes",
+  ];
+
+  it("returns the school's one-based Pick 6 order", () => {
+    expect(
+      acceptdPickSixOrder(
+        { category_key: "music_direction", title: "MUSIC DIRECTION" },
+        selections,
+      ),
+    ).toBe(2);
+    expect(
+      acceptdPickSixOrder(
+        { category_key: "scenic_design", title: "SCENIC" },
+        selections,
+      ),
+    ).toBe(4);
+    expect(
+      acceptdPickSixOrder(
+        { category_key: "costume_design", title: "COSTUMES" },
+        selections,
+      ),
+    ).toBe(6);
+  });
+
+  it("returns null for categories outside the Pick 6", () => {
+    expect(
+      acceptdPickSixOrder(
+        { category_key: "orchestra", title: "ORCHESTRA" },
+        selections,
+      ),
+    ).toBeNull();
+  });
+
+  it("ignores any accidental selections after the first six", () => {
+    expect(
+      acceptdPickSixOrder(
+        { category_key: "ensemble", title: "ENSEMBLE" },
+        [...selections, "Ensemble"],
+      ),
+    ).toBeNull();
   });
 });

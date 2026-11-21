@@ -17774,6 +17774,31 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   font-weight: 900;
 }
 
+.owner-comment-review-pick-six-marker {
+  display: grid;
+  width: 3.1rem;
+  flex: 0 0 3.1rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.02rem;
+  border-right: 1px solid var(--portal-line);
+  color: #111827;
+  background: color-mix(in srgb, var(--portal-gold) 88%, #ffffff);
+  line-height: 1;
+}
+
+.owner-comment-review-pick-six-marker small {
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.owner-comment-review-pick-six-marker strong {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1.15rem;
+}
+
 .owner-comment-review-item-toggle {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -17809,6 +17834,25 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
   font-size: 0.7rem;
 }
 
+.owner-comment-review-item-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.owner-comment-review-item-status > small {
+  color: var(--portal-muted);
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.owner-comment-review-item-status > small strong {
+  color: var(--portal-text);
+  font-weight: 800;
+}
+
 .owner-comment-review-chevron {
   display: grid;
   width: 1.7rem;
@@ -17833,11 +17877,20 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
 }
 
 .owner-comment-review-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   color: var(--portal-muted);
   font-size: 0.67rem;
   font-weight: 850;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.owner-comment-review-field-label > span {
+  color: var(--portal-gold);
+  font-size: 0.62rem;
 }
 
 .owner-comment-review-comment-copy {
@@ -18075,6 +18128,10 @@ html[data-theme="light"] .portal-shell .portal-header .portal-utility-link:focus
 
   .owner-comment-review-item-toggle .badge {
     display: none;
+  }
+
+  .owner-comment-review-item-status > small {
+    white-space: normal;
   }
 
   .acceptd-pick-six-backdrop {

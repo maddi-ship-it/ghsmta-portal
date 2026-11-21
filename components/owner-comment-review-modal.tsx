@@ -16,6 +16,7 @@ import {
   generateAllPanelNarrativesNow,
   releaseSelectedAdjudicationFeedback,
   sendAllPanelNarrativesToPanel,
+  syncOwnerPanelFeedbackDraft,
 } from "@/app/portal/adjudication/[id]/actions";
 import {
   OPEN_OWNER_COMMENT_REVIEW_EVENT,
@@ -23,8 +24,10 @@ import {
 import { RegalConfirmDialog } from "@/components/regal-confirm-dialog";
 import { OVERALL_PRODUCTION_CATEGORY_KEY } from "@/lib/adjudication-overall-score";
 import { updateSelectedCategoryIds } from "@/lib/adjudication-release";
+import { acceptdPickSixOrder } from "@/lib/acceptd/pick-six";
 import type {
   AdjudicationPanelFeedback,
+  Profile,
   ScoringCategory,
 } from "@/lib/types";
 
@@ -37,9 +40,11 @@ type ReviewDraftStatus =
   | "sent";
 
 type ReviewDraft = {
+  assignedWriter: string;
   categoryId: string;
   error: string;
   generatedAt: string;
+  pickSixOrder: number | null;
   status: ReviewDraftStatus;
   title: string;
   value: string;
@@ -47,18 +52,23 @@ type ReviewDraft = {
 
 function createReviewDrafts({
   categories,
+  acceptdPickSix,
   feedback,
   panelApprovedCategoryIds,
+  profiles,
   releasedCategoryIds,
 }: {
   categories: ScoringCategory[];
+  acceptdPickSix: string[];
   feedback: AdjudicationPanelFeedback[];
   panelApprovedCategoryIds: Set<string>;
+  profiles: Profile[];
   releasedCategoryIds: Set<string>;
 }) {
   const feedbackByCategory = new Map(
     feedback.map((item) => [item.category_id, item]),
   );
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
   return categories
     .filter(
@@ -74,11 +84,17 @@ function createReviewDrafts({
       const panelApproved = panelApprovedCategoryIds.has(category.id);
       const schoolReleased = releasedCategoryIds.has(category.id);
       const sent = categoryFeedback?.status === "approved";
+      const assignedProfile = categoryFeedback?.assigned_to
+        ? profileById.get(categoryFeedback.assigned_to)
+        : undefined;
 
       return {
+        assignedWriter:
+          assignedProfile?.full_name?.trim() || assignedProfile?.email || "",
         categoryId: category.id,
         error: "",
         generatedAt: categoryFeedback?.generated_at ?? "",
+        pickSixOrder: acceptdPickSixOrder(category, acceptdPickSix),
         status: schoolReleased
           ? "school_released"
           : panelApproved
@@ -118,6 +134,7 @@ export function OwnerCommentReviewModal({
   categories,
   feedback,
   panelApprovedCategoryIds,
+  profiles,
   releasedCategoryIds,
   showTrigger = true,
 }: {
@@ -126,6 +143,7 @@ export function OwnerCommentReviewModal({
   categories: ScoringCategory[];
   feedback: AdjudicationPanelFeedback[];
   panelApprovedCategoryIds: string[];
+  profiles: Profile[];
   releasedCategoryIds: string[];
   showTrigger?: boolean;
 }) {
@@ -152,11 +170,20 @@ export function OwnerCommentReviewModal({
     () =>
       createReviewDrafts({
         categories,
+        acceptdPickSix,
         feedback,
         panelApprovedCategoryIds: approvedCategoryIds,
+        profiles,
         releasedCategoryIds: releasedIds,
       }),
-    [approvedCategoryIds, categories, feedback, releasedIds],
+    [
+      acceptdPickSix,
+      approvedCategoryIds,
+      categories,
+      feedback,
+      profiles,
+      releasedIds,
+    ],
   );
   const [open, setOpen] = useState(false);
   const [drafts, setDrafts] = useState(initialDrafts);
@@ -167,10 +194,14 @@ export function OwnerCommentReviewModal({
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [dirtyCategoryIds, setDirtyCategoryIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [showReleaseConfirmation, setShowReleaseConfirmation] = useState(false);
   const [pickSixOpen, setPickSixOpen] = useState(false);
   const [isGenerating, startGeneration] = useTransition();
   const [isReleasing, startRelease] = useTransition();
+  const [isSaving, startSaving] = useTransition();
   const [isSending, startSending] = useTransition();
 
   useEffect(() => {
@@ -269,6 +300,7 @@ export function OwnerCommentReviewModal({
     setDrafts(initialDrafts);
     setMessage("");
     setSelectedReleaseIds(new Set());
+    setDirtyCategoryIds(new Set());
     setExpandedCategoryIds(
       new Set(initialDrafts.slice(0, 1).map((draft) => draft.categoryId)),
     );
@@ -323,6 +355,7 @@ export function OwnerCommentReviewModal({
           };
         }),
       );
+      setDirtyCategoryIds(new Set());
 
       const generatedCount = result.results.filter(
         (item) => item.status === "generated",
@@ -365,10 +398,113 @@ export function OwnerCommentReviewModal({
             : draft,
         ),
       );
+      setDirtyCategoryIds((current) => {
+        const next = new Set(current);
+        for (const categoryId of sentCategoryIds) next.delete(categoryId);
+        return next;
+      });
       setMessage(
         `${result.sentCount} comments were sent to the panel for review.`,
       );
       router.refresh();
+    });
+  };
+
+  const persistDraftEdits = async (onlyCategoryIds?: Set<string>) => {
+    const changedDrafts = drafts.filter(
+      (draft) =>
+        dirtyCategoryIds.has(draft.categoryId) &&
+        (!onlyCategoryIds || onlyCategoryIds.has(draft.categoryId)),
+    );
+    if (changedDrafts.length === 0) return true;
+
+    const invalidDrafts = changedDrafts.filter(
+      (draft) => !draft.generatedAt || !draft.value.trim(),
+    );
+    if (invalidDrafts.length > 0) {
+      const invalidIds = new Set(
+        invalidDrafts.map((draft) => draft.categoryId),
+      );
+      setDrafts((current) =>
+        current.map((draft) =>
+          invalidIds.has(draft.categoryId)
+            ? {
+                ...draft,
+                error: !draft.value.trim()
+                  ? "The school-facing comment cannot be blank."
+                  : "Generate this comment before editing it.",
+              }
+            : draft,
+        ),
+      );
+      setMessage("Resolve the highlighted comment before saving.");
+      return false;
+    }
+
+    const results = await Promise.all(
+      changedDrafts.map(async (draft) => {
+        const formData = new FormData();
+        formData.set("final_comment", draft.value.trim());
+        formData.set("source_generated_at", draft.generatedAt);
+        if (
+          draft.status === "sent" ||
+          draft.status === "panel_approved" ||
+          draft.status === "school_released"
+        ) {
+          formData.set("approved", "on");
+        }
+        const result = await syncOwnerPanelFeedbackDraft(
+          applicationId,
+          draft.categoryId,
+          formData,
+        );
+        return { categoryId: draft.categoryId, result };
+      }),
+    );
+
+    const savedIds = new Set(
+      results
+        .filter((item) => item.result.ok)
+        .map((item) => item.categoryId),
+    );
+    const errorsByCategory = new Map<string, string>();
+    for (const item of results) {
+      if (!item.result.ok) {
+        errorsByCategory.set(item.categoryId, item.result.message);
+      }
+    }
+
+    setDrafts((current) =>
+      current.map((draft) => ({
+        ...draft,
+        error: savedIds.has(draft.categoryId)
+          ? ""
+          : errorsByCategory.get(draft.categoryId) ?? draft.error,
+      })),
+    );
+    setDirtyCategoryIds((current) => {
+      const next = new Set(current);
+      for (const categoryId of savedIds) next.delete(categoryId);
+      return next;
+    });
+
+    if (errorsByCategory.size > 0) {
+      setMessage(
+        `${savedIds.size} ${savedIds.size === 1 ? "edit was" : "edits were"} saved. ${errorsByCategory.size} still need attention.`,
+      );
+      return false;
+    }
+
+    setMessage(
+      `${savedIds.size} ${savedIds.size === 1 ? "comment edit was" : "comment edits were"} saved. Existing panel approvals were preserved.`,
+    );
+    router.refresh();
+    return true;
+  };
+
+  const saveEdits = () => {
+    startSaving(async () => {
+      await persistDraftEdits();
     });
   };
 
@@ -377,6 +513,9 @@ export function OwnerCommentReviewModal({
     setShowReleaseConfirmation(false);
     setMessage("Releasing the selected comments to the school…");
     startRelease(async () => {
+      const editsSaved = await persistDraftEdits(new Set(categoryIds));
+      if (!editsSaved) return;
+
       const result = await releaseSelectedAdjudicationFeedback(
         applicationId,
         categoryIds,
@@ -408,7 +547,7 @@ export function OwnerCommentReviewModal({
     });
   };
 
-  const busy = isGenerating || isReleasing || isSending;
+  const busy = isGenerating || isReleasing || isSaving || isSending;
 
   return (
     <>
@@ -547,7 +686,7 @@ export function OwnerCommentReviewModal({
                       {ownerWorkCount > 0 ? (
                         <button
                           className="button button-dark button-compact"
-                          disabled={busy}
+                          disabled={busy || dirtyCategoryIds.size > 0}
                           onClick={generateAll}
                           type="button"
                         >
@@ -570,7 +709,7 @@ export function OwnerCommentReviewModal({
 
                   <div className="owner-comment-review-list">
                     {drafts.map((draft) => {
-                      const editable = draft.status === "ready";
+                      const editable = Boolean(draft.generatedAt);
                       const canRelease = draft.status === "panel_approved";
                       const expanded = expandedCategoryIds.has(
                         draft.categoryId,
@@ -626,6 +765,16 @@ export function OwnerCommentReviewModal({
                                 •
                               </span>
                             )}
+                            {draft.pickSixOrder ? (
+                              <span
+                                aria-label={`Pick 6 selection ${draft.pickSixOrder}`}
+                                className="owner-comment-review-pick-six-marker"
+                                title={`Pick 6 selection ${draft.pickSixOrder}`}
+                              >
+                                <small>Pick</small>
+                                <strong>{draft.pickSixOrder}</strong>
+                              </span>
+                            ) : null}
                             <button
                               aria-controls={`owner-comment-body-${draft.categoryId}`}
                               aria-expanded={expanded}
@@ -647,15 +796,22 @@ export function OwnerCommentReviewModal({
                                 <strong>{draft.title}</strong>
                                 <small>{statusDetail(draft.status)}</small>
                               </span>
-                              <span
-                                className={`badge ${
-                                  draft.status === "panel_approved" ||
-                                  draft.status === "school_released"
-                                    ? "badge-complete"
-                                    : "badge-warning"
-                                }`}
-                              >
-                                {statusLabel(draft.status)}
+                              <span className="owner-comment-review-item-status">
+                                <span
+                                  className={`badge ${
+                                    draft.status === "panel_approved" ||
+                                    draft.status === "school_released"
+                                      ? "badge-complete"
+                                      : "badge-warning"
+                                  }`}
+                                >
+                                  {statusLabel(draft.status)}
+                                </span>
+                                {draft.assignedWriter ? (
+                                  <small>
+                                    Writer: <strong>{draft.assignedWriter}</strong>
+                                  </small>
+                                ) : null}
                               </span>
                               <span
                                 aria-hidden="true"
@@ -679,6 +835,9 @@ export function OwnerCommentReviewModal({
                                     htmlFor={`owner-comment-${draft.categoryId}`}
                                   >
                                     School-facing comment
+                                    {dirtyCategoryIds.has(draft.categoryId) ? (
+                                      <span>Unsaved changes</span>
+                                    ) : null}
                                   </label>
                                   <textarea
                                     className="textarea owner-comment-review-textarea"
@@ -689,10 +848,15 @@ export function OwnerCommentReviewModal({
                                       setDrafts((current) =>
                                         current.map((item) =>
                                           item.categoryId === draft.categoryId
-                                            ? { ...item, value }
+                                            ? { ...item, error: "", value }
                                             : item,
                                         ),
                                       );
+                                      setDirtyCategoryIds((current) => {
+                                        const next = new Set(current);
+                                        next.add(draft.categoryId);
+                                        return next;
+                                      });
                                     }}
                                     placeholder="Generate this category comment to begin review."
                                     value={draft.value}
@@ -736,6 +900,18 @@ export function OwnerCommentReviewModal({
                       >
                         Close
                       </button>
+                      {dirtyCategoryIds.size > 0 ? (
+                        <button
+                          className="button button-dark"
+                          disabled={busy}
+                          onClick={saveEdits}
+                          type="button"
+                        >
+                          {isSaving
+                            ? "Saving…"
+                            : `Save edits (${dirtyCategoryIds.size})`}
+                        </button>
+                      ) : null}
                       {readyDrafts.length > 0 ? (
                         <button
                           className="button button-dark"

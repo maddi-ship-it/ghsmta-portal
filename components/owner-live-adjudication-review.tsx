@@ -1359,6 +1359,7 @@ export function OwnerLiveAdjudicationReview({
           categories={categories}
           feedback={feedback}
           panelApprovedCategoryIds={ownerPanelApprovedCategoryIds}
+          profiles={profiles}
           releasedCategoryIds={
             release?.feedback_snapshot?.map((item) => item.category_id) ?? []
           }
