@@ -91,6 +91,34 @@ D- Make sure the actor’s movements don’t cause vocal-support problems.`);
     ]);
   });
 
+  it("treats an underscore before a ledger key as scene context around the song", () => {
+    const notes = segmentAdjudicationBrainDump(
+      `ACT I NOTES:
+
+Believe
+MD- The ensemble sustained the musical phrase cleanly.
+_D- The dialogue transition into the number needed more momentum.
+LD- The color shift supported the musical climax.`,
+      ["Believe"],
+    );
+
+    expect(notes.map((note) => note.text)).toEqual([
+      "Song: “Believe” — MD- The ensemble sustained the musical phrase cleanly.",
+      "Scene around “Believe” — D- The dialogue transition into the number needed more momentum.",
+      "Song: “Believe” — LD- The color shift supported the musical climax.",
+    ]);
+  });
+
+  it("treats an underscored ledger note without a song heading as scene context", () => {
+    const notes = segmentAdjudicationBrainDump(
+      "_SD/O- The scene transition covered the underscoring inconsistently.",
+    );
+
+    expect(notes.map((note) => note.text)).toEqual([
+      "Scene context — SD/O- The scene transition covered the underscoring inconsistently.",
+    ]);
+  });
+
   it("ignores the complete current ledger when segmenting observations", () => {
     const notes = segmentAdjudicationBrainDump(`Ledger:
 MD- Music Direction

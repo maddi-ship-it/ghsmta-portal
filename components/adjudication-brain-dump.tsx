@@ -929,7 +929,7 @@ export function AdjudicationBrainDump({
                 ? "Song titles and printed characters came from the Playbill. Type each observation on a new line beneath the matching song; you can edit or remove any part of the outline."
                 : practiceMode
                 ? "These practice notes remain on this page and are cleared when you leave or reset the sandbox. Auto-sort does not send practice text to a school record."
-                : "These private notes autosave with your scorecard. Auto-sort adds matched observations to their criterion comments and opens a placement window only for observations it cannot categorize. It never assigns scores or removes the original brain dump."}
+                : "These private notes autosave with your scorecard. Auto-sort adds matched observations to their criterion comments and opens a placement window only for observations it cannot categorize. Prefix a ledger key with an underscore (for example, _D-) to mark a scene around the current song instead of the song itself. It never assigns scores or removes the original brain dump."}
             </small>
           </div>
 

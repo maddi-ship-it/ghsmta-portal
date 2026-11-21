@@ -10,6 +10,8 @@ const ACT_NOTES_HEADER_LINE =
   /^act\s+(?:\d+|[ivxlcdm]+)\s*(?:notes?)?\s*:?\s*$/i;
 const ADJUDICATION_NOTE_PREFIX =
   /^(?:md|o|ch|c|e|te|ld|sd|sc|s|co|actress|actor|lactress|lactor|spa|spb|fp|d)(?:\s*(?:\/|&|\+)\s*(?:md|o|ch|c|e|te|ld|sd|sc|s|co|actress|actor|lactress|lactor|spa|spb|fp|d))*$/i;
+const SCENE_AROUND_SONG_NOTE =
+  /^_\s*((?:md|o|ch|c|e|te|ld|sd|sc|s|co|actress|actor|lactress|lactor|spa|spb|fp|d)(?:\s*(?:\/|&|\+)\s*(?:md|o|ch|c|e|te|ld|sd|sc|s|co|actress|actor|lactress|lactor|spa|spb|fp|d))*\s*[-–—:]\s*.+)$/i;
 const SENTENCE_SEGMENTER = new Intl.Segmenter("en", {
   granularity: "sentence",
 });
@@ -179,6 +181,15 @@ function withSongContext(text: string, songTitle: string | null) {
   return songTitle ? `Song: “${songTitle}” — ${text}` : text;
 }
 
+function sceneAroundSongNote(text: string, songTitle: string | null) {
+  const match = text.match(SCENE_AROUND_SONG_NOTE);
+  if (!match?.[1]) return null;
+
+  return songTitle
+    ? `Scene around “${songTitle}” — ${match[1].trim()}`
+    : `Scene context — ${match[1].trim()}`;
+}
+
 export function segmentAdjudicationBrainDump(
   value: string,
   knownSongTitles: string[] = [],
@@ -217,6 +228,12 @@ export function segmentAdjudicationBrainDump(
     }
 
     if (insideLedger || !acceptingObservations) continue;
+
+    const sceneNote = sceneAroundSongNote(line, currentSongTitle);
+    if (sceneNote) {
+      sourceNotes.push(sceneNote);
+      continue;
+    }
 
     const songTitle = songTitleFromHeading(
       line,
