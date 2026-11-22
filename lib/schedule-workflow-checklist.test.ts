@@ -14,6 +14,8 @@ describe("schedule workflow checklist", () => {
       section_c_reminder_sent: false,
       section_c_complete: false,
       final_results_released: false,
+      comments_sent_to_adjudicators: false,
+      all_comments_reviewed_and_approved: false,
     });
   });
 
@@ -26,6 +28,8 @@ describe("schedule workflow checklist", () => {
         section_c_reminder_sent: true,
         section_c_complete: false,
         final_results_released: false,
+        comments_sent_to_adjudicators: false,
+        all_comments_reviewed_and_approved: false,
       },
       "owner-id",
     );
@@ -37,6 +41,8 @@ describe("schedule workflow checklist", () => {
       section_c_reminder_sent: true,
       section_c_complete: false,
       final_results_released: false,
+      comments_sent_to_adjudicators: false,
+      all_comments_reviewed_and_approved: false,
     });
   });
 
@@ -48,6 +54,8 @@ describe("schedule workflow checklist", () => {
           releasedFeedbackCount: 6,
           scoresReleased: true,
           sectionCStatus: "complete",
+          commentsSentToAdjudicators: true,
+          allCommentsReviewedAndApproved: true,
         },
       ),
     ).toEqual({
@@ -56,6 +64,8 @@ describe("schedule workflow checklist", () => {
       section_c_reminder_sent: false,
       section_c_complete: true,
       final_results_released: true,
+      comments_sent_to_adjudicators: true,
+      all_comments_reviewed_and_approved: true,
     });
   });
 
@@ -81,6 +91,8 @@ describe("schedule workflow checklist", () => {
       section_c_reminder_sent: true,
       section_c_complete: false,
       final_results_released: false,
+      comments_sent_to_adjudicators: false,
+      all_comments_reviewed_and_approved: false,
     });
   });
 });

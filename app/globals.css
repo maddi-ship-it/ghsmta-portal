@@ -7276,6 +7276,15 @@ body.modal-open {
   margin-top: 0.08rem;
 }
 
+.schedule-monthly-checklist .schedule-monthly-checklist-automatic {
+  color: var(--portal-muted, #5e687a);
+}
+
+.schedule-monthly-checklist .schedule-monthly-checklist-automatic input:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .schedule-monthly-checklist .text-button {
   grid-column: 1 / -1;
   justify-self: end;

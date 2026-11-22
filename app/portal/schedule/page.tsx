@@ -37,6 +37,7 @@ import {
   scheduleStaffCapacity,
   scheduleSlotHasPrimaryAdvisoryMember,
 } from "@/lib/schedule-staff";
+import { buildScheduleCommentWorkflowMilestones } from "@/lib/schedule-comment-workflow";
 import { resolveScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -821,7 +822,14 @@ export default async function SchedulePage({
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const [workflowReleaseResult, sectionCStageResult] = await Promise.all([
+  const [
+    workflowReleaseResult,
+    sectionCStageResult,
+    workflowFormVersionResult,
+    workflowScoreabilityResult,
+    workflowFeedbackResult,
+    workflowAssignmentResult,
+  ] = await Promise.all([
     ownerWorkflowApplicationIds.length
       ? admin
           .from("adjudication_releases")
@@ -835,6 +843,34 @@ export default async function SchedulePage({
           .in("form_version_id", ownerWorkflowFormVersionIds)
           .eq("stage_key", "section_c_postproduction")
       : Promise.resolve({ data: [], error: null }),
+    profile.role === "owner" && ownerWorkflowFormVersionIds.length
+      ? admin
+          .from("application_form_versions")
+          .select("id,scoring_rubric_id")
+          .in("id", ownerWorkflowFormVersionIds)
+      : Promise.resolve({ data: [], error: null }),
+    ownerWorkflowApplicationIds.length
+      ? admin
+          .from("adjudication_category_scoreability")
+          .select("application_id,category_id,is_scoreable")
+          .in("application_id", ownerWorkflowApplicationIds)
+      : Promise.resolve({ data: [], error: null }),
+    ownerWorkflowApplicationIds.length
+      ? admin
+          .from("adjudication_panel_feedback")
+          .select(
+            "application_id,category_id,status,final_comment,assigned_to,approved_by",
+          )
+          .in("application_id", ownerWorkflowApplicationIds)
+      : Promise.resolve({ data: [], error: null }),
+    ownerWorkflowApplicationIds.length
+      ? admin
+          .from("adjudicator_assignments")
+          .select(
+            "application_id,adjudicator_user_id,can_comment,removed_at",
+          )
+          .in("application_id", ownerWorkflowApplicationIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (workflowReleaseResult.error) {
     console.error("Unable to load schedule release milestones.", {
@@ -846,6 +882,46 @@ export default async function SchedulePage({
       message: sectionCStageResult.error.message,
     });
   }
+  for (const [label, result] of [
+    ["form versions", workflowFormVersionResult],
+    ["category applicability", workflowScoreabilityResult],
+    ["panel comments", workflowFeedbackResult],
+    ["panel assignments", workflowAssignmentResult],
+  ] as const) {
+    if (result.error) {
+      console.error(`Unable to load schedule comment ${label}.`, {
+        message: result.error.message,
+      });
+    }
+  }
+  const workflowRubricIds = [
+    ...new Set(
+      (workflowFormVersionResult.data ?? [])
+        .map((formVersion) => formVersion.scoring_rubric_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const workflowCategoryResult = workflowRubricIds.length
+    ? await admin
+        .from("scoring_categories")
+        .select("id,rubric_id,category_key,active")
+        .in("rubric_id", workflowRubricIds)
+        .eq("active", true)
+    : { data: [], error: null };
+  if (workflowCategoryResult.error) {
+    console.error("Unable to load schedule comment categories.", {
+      message: workflowCategoryResult.error.message,
+    });
+  }
+  const commentWorkflowByApplication =
+    buildScheduleCommentWorkflowMilestones({
+      applications: scheduleApplicationsForLocations,
+      formVersions: workflowFormVersionResult.data ?? [],
+      categories: workflowCategoryResult.data ?? [],
+      scoreability: workflowScoreabilityResult.data ?? [],
+      feedback: workflowFeedbackResult.data ?? [],
+      assignments: workflowAssignmentResult.data ?? [],
+    });
   const sectionCStages = (sectionCStageResult.data ?? []) as SectionCStage[];
   const sectionCProgressResult =
     ownerWorkflowApplicationIds.length && sectionCStages.length
@@ -1058,6 +1134,9 @@ export default async function SchedulePage({
                 `${booking.application_id}:${sectionCStageId}`,
               )
             : null;
+          const commentWorkflow = commentWorkflowByApplication.get(
+            booking.application_id,
+          );
 
           return [{
             id: slot.id,
@@ -1085,6 +1164,10 @@ export default async function SchedulePage({
                   : 0,
                 scoresReleased: Boolean(workflowRelease?.scores_released_at),
                 sectionCStatus: sectionCProgress?.status ?? null,
+                commentsSentToAdjudicators:
+                  commentWorkflow?.commentsSentToAdjudicators,
+                allCommentsReviewedAndApproved:
+                  commentWorkflow?.allCommentsReviewedAndApproved,
               },
             ),
             canOpenAdjudication:

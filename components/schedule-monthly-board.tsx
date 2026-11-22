@@ -124,6 +124,20 @@ function WorkflowChecklist({ item }: { item: MonthlyScheduleItem }) {
         <input defaultChecked={item.checklist.section_c_complete} name="section_c_complete" type="checkbox" />
         <span>Section C Complete</span>
       </label>
+      <label
+        className="schedule-monthly-checklist-automatic"
+        title="Updates automatically when every applicable category comment has been sent to its assigned adjudicator."
+      >
+        <input checked={item.checklist.comments_sent_to_adjudicators} disabled type="checkbox" />
+        <span>Comments Sent to Adjudicators</span>
+      </label>
+      <label
+        className="schedule-monthly-checklist-automatic"
+        title="Updates automatically when every assigned writer has approved their category comment."
+      >
+        <input checked={item.checklist.all_comments_reviewed_and_approved} disabled type="checkbox" />
+        <span>All Comments reviewed and approved</span>
+      </label>
       <label>
         <input defaultChecked={item.checklist.final_results_released} name="final_results_released" type="checkbox" />
         <span>Final Comments/scores released</span>

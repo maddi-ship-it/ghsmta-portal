@@ -8,8 +8,18 @@ export const SCHEDULE_WORKFLOW_CHECKLIST_FIELDS = [
   "final_results_released",
 ] as const;
 
-export type ScheduleWorkflowChecklistField =
+export const SCHEDULE_WORKFLOW_AUTOMATED_FIELDS = [
+  "comments_sent_to_adjudicators",
+  "all_comments_reviewed_and_approved",
+] as const;
+
+export type ScheduleWorkflowManualChecklistField =
   (typeof SCHEDULE_WORKFLOW_CHECKLIST_FIELDS)[number];
+export type ScheduleWorkflowAutomatedChecklistField =
+  (typeof SCHEDULE_WORKFLOW_AUTOMATED_FIELDS)[number];
+export type ScheduleWorkflowChecklistField =
+  | ScheduleWorkflowManualChecklistField
+  | ScheduleWorkflowAutomatedChecklistField;
 
 export type ScheduleWorkflowChecklist = Record<
   ScheduleWorkflowChecklistField,
@@ -20,6 +30,8 @@ export type ScheduleWorkflowMilestones = {
   releasedFeedbackCount?: number | null;
   scoresReleased?: boolean | null;
   sectionCStatus?: string | null;
+  commentsSentToAdjudicators?: boolean | null;
+  allCommentsReviewedAndApproved?: boolean | null;
 };
 
 export const EMPTY_SCHEDULE_WORKFLOW_CHECKLIST: ScheduleWorkflowChecklist = {
@@ -28,6 +40,8 @@ export const EMPTY_SCHEDULE_WORKFLOW_CHECKLIST: ScheduleWorkflowChecklist = {
   section_c_reminder_sent: false,
   section_c_complete: false,
   final_results_released: false,
+  comments_sent_to_adjudicators: false,
+  all_comments_reviewed_and_approved: false,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -47,6 +61,8 @@ export function readScheduleWorkflowChecklist(
     section_c_reminder_sent: stored.section_c_reminder_sent === true,
     section_c_complete: stored.section_c_complete === true,
     final_results_released: stored.final_results_released === true,
+    comments_sent_to_adjudicators: false,
+    all_comments_reviewed_and_approved: false,
   };
 }
 
@@ -70,6 +86,10 @@ export function resolveScheduleWorkflowChecklist(
       stored.section_c_complete || sectionCStatus === "complete",
     final_results_released:
       stored.final_results_released || milestones.scoresReleased === true,
+    comments_sent_to_adjudicators:
+      milestones.commentsSentToAdjudicators === true,
+    all_comments_reviewed_and_approved:
+      milestones.allCommentsReviewedAndApproved === true,
   };
 }
 
@@ -81,7 +101,11 @@ export function writeScheduleWorkflowChecklist(
   return {
     ...(formData ?? {}),
     [SCHEDULE_WORKFLOW_CHECKLIST_KEY]: {
-      ...checklist,
+      pick_six_sent: checklist.pick_six_sent,
+      moved_to_section_c: checklist.moved_to_section_c,
+      section_c_reminder_sent: checklist.section_c_reminder_sent,
+      section_c_complete: checklist.section_c_complete,
+      final_results_released: checklist.final_results_released,
       updated_at: new Date().toISOString(),
       updated_by: actorId,
     },

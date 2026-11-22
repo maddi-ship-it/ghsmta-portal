@@ -13,6 +13,7 @@ import { resolveScoringCategorySubjects } from "@/lib/application-scoring-subjec
 import { buildApplicationCategoryEligibilityDefaults } from "@/lib/application-reference-panels";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
 import { selectAuditPanelAssignments } from "@/lib/reports/audit-panel-selection";
+import { buildScheduleCommentWorkflowMilestones } from "@/lib/schedule-comment-workflow";
 import { cityFromVenueAddress, scheduleCityLabel } from "@/lib/schedule-location";
 import { resolveScheduleWorkflowChecklist } from "@/lib/schedule-workflow-checklist";
 import { portalSiteUrl } from "@/lib/site-url";
@@ -839,7 +840,14 @@ async function loadScheduleReport(
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const [workflowReleases, sectionCStages] = await Promise.all([
+  const [
+    workflowReleases,
+    sectionCStages,
+    workflowFormVersions,
+    workflowScoreability,
+    workflowFeedback,
+    workflowAssignments,
+  ] = await Promise.all([
     applicationIds.length
       ? safeFetchPaged<any>(warnings, "Schedule release milestones", () =>
           supabase
@@ -857,7 +865,68 @@ async function loadScheduleReport(
             .eq("stage_key", "section_c_postproduction"),
         )
       : Promise.resolve([]),
+    formVersionIds.length
+      ? safeFetchPaged<any>(warnings, "Schedule comment form versions", () =>
+          supabase
+            .from("application_form_versions")
+            .select("id,scoring_rubric_id")
+            .in("id", formVersionIds),
+        )
+      : Promise.resolve([]),
+    applicationIds.length
+      ? safeFetchPaged<any>(warnings, "Schedule category applicability", () =>
+          supabase
+            .from("adjudication_category_scoreability")
+            .select("application_id,category_id,is_scoreable")
+            .in("application_id", applicationIds),
+        )
+      : Promise.resolve([]),
+    applicationIds.length
+      ? safeFetchPaged<any>(warnings, "Schedule panel comments", () =>
+          supabase
+            .from("adjudication_panel_feedback")
+            .select(
+              "application_id,category_id,status,final_comment,assigned_to,approved_by",
+            )
+            .in("application_id", applicationIds),
+        )
+      : Promise.resolve([]),
+    applicationIds.length
+      ? safeFetchPaged<any>(warnings, "Schedule panel assignments", () =>
+          supabase
+            .from("adjudicator_assignments")
+            .select(
+              "application_id,adjudicator_user_id,can_comment,removed_at",
+            )
+            .in("application_id", applicationIds),
+        )
+      : Promise.resolve([]),
   ]);
+  const workflowRubricIds = [
+    ...new Set(
+      workflowFormVersions
+        .map((formVersion) => formVersion.scoring_rubric_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const workflowCategories = workflowRubricIds.length
+    ? await safeFetchPaged<any>(warnings, "Schedule comment categories", () =>
+        supabase
+          .from("scoring_categories")
+          .select("id,rubric_id,category_key,active")
+          .in("rubric_id", workflowRubricIds)
+          .eq("active", true),
+      )
+    : [];
+  const commentWorkflowByApplication =
+    buildScheduleCommentWorkflowMilestones({
+      applications,
+      formVersions: workflowFormVersions,
+      categories: workflowCategories,
+      scoreability: workflowScoreability,
+      feedback: workflowFeedback,
+      assignments: workflowAssignments,
+    });
   const sectionCStageIds = sectionCStages.map((stage) => stage.id);
   const sectionCProgress =
     applicationIds.length && sectionCStageIds.length
@@ -1011,6 +1080,9 @@ async function loadScheduleReport(
               `${application.id}:${sectionCStageId}`,
             )
           : null;
+      const commentWorkflow = application
+        ? commentWorkflowByApplication.get(application.id)
+        : null;
       const checklist = resolveScheduleWorkflowChecklist(
         application?.form_data,
         {
@@ -1019,6 +1091,10 @@ async function loadScheduleReport(
             : 0,
           scoresReleased: Boolean(workflowRelease?.scores_released_at),
           sectionCStatus: sectionCProgress?.status ?? null,
+          commentsSentToAdjudicators:
+            commentWorkflow?.commentsSentToAdjudicators,
+          allCommentsReviewedAndApproved:
+            commentWorkflow?.allCommentsReviewedAndApproved,
         },
       );
       const detail = schoolDetailsBySlot.get(slot.id);
@@ -1056,6 +1132,10 @@ async function loadScheduleReport(
         pick_six_sent: checklist.pick_six_sent,
         moved_to_section_c: checklist.moved_to_section_c,
         section_c_complete: checklist.section_c_complete,
+        comments_sent_to_adjudicators:
+          checklist.comments_sent_to_adjudicators,
+        all_comments_reviewed_and_approved:
+          checklist.all_comments_reviewed_and_approved,
         final_results_released: checklist.final_results_released,
         portal_link: portalLink("/portal/schedule"),
       };

@@ -472,6 +472,14 @@ function drawScheduleCard({
     ["Pick 6 Sent", Boolean(row.pick_six_sent)],
     ["Moved to Section C", Boolean(row.moved_to_section_c)],
     ["Section C Complete", Boolean(row.section_c_complete)],
+    [
+      "Comments Sent to Adjudicators",
+      Boolean(row.comments_sent_to_adjudicators),
+    ],
+    [
+      "All Comments reviewed and approved",
+      Boolean(row.all_comments_reviewed_and_approved),
+    ],
     ["Final Comments/scores released", Boolean(row.final_results_released)],
   ].forEach(([label, checked], index) => {
     const column = index % 2;
@@ -486,8 +494,8 @@ function drawScheduleCard({
     });
   });
   page.drawLine({
-    start: { x: x + 5, y: checklistTop - 27 },
-    end: { x: x + width - 5, y: checklistTop - 27 },
+    start: { x: x + 5, y: checklistTop - 36.5 },
+    end: { x: x + width - 5, y: checklistTop - 36.5 },
     thickness: 0.5,
     color: COLORS.line,
   });
@@ -505,7 +513,7 @@ function drawScheduleCard({
     ["SHADOW 2", shadows[1] ?? ""],
     ["SHADOW 3", shadows[2] ?? ""],
   ];
-  let staffY = y + height - 86;
+  let staffY = y + height - 95.5;
   staffRows.forEach(([label, value], index) => {
     drawStaffRow({
       page,

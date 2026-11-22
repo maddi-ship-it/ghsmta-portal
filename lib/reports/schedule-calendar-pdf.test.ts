@@ -21,6 +21,8 @@ function row(index: number, startsAt: string): ReportRow {
     pick_six_sent: true,
     moved_to_section_c: true,
     section_c_complete: false,
+    comments_sent_to_adjudicators: true,
+    all_comments_reviewed_and_approved: false,
     final_results_released: false,
   };
 }
