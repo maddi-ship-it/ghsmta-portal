@@ -61,13 +61,13 @@ describe("school file search", () => {
     expect(matches("playbill")).toBe(false);
   });
 
-  it("searches the Backstage Photos folder label", () => {
+  it("searches the Behind the Scenes folder label", () => {
     expect(
       schoolFileMatchesSearch({
         application,
-        file: { ...file, document_category: "backstage_photos" },
-        query: "backstage photos",
-        categoryLabel: "Backstage Photos",
+        file: { ...file, document_category: "behind_the_scenes" },
+        query: "behind the scenes",
+        categoryLabel: "Behind the Scenes",
       }),
     ).toBe(true);
   });

@@ -103,6 +103,16 @@ export function resolveScheduleDateFilter(requestedDate: string | undefined) {
   return requestedDate;
 }
 
+export function resolveScheduleMonthFilter(requestedMonth: string | undefined) {
+  if (!requestedMonth) return null;
+
+  const match = /^(\d{4})-(\d{2})$/.exec(requestedMonth);
+  if (!match) return null;
+
+  const month = Number(match[2]);
+  return month >= 1 && month <= 12 ? requestedMonth : null;
+}
+
 export function scheduleDateKey(
   startsAt: string,
   timeZone = SCHEDULE_TIME_ZONE,
@@ -127,4 +137,11 @@ export function scheduleSlotMatchesDate(
   selectedDate: string | null,
 ) {
   return !selectedDate || scheduleDateKey(startsAt) === selectedDate;
+}
+
+export function scheduleSlotMatchesMonth(
+  startsAt: string,
+  selectedMonth: string | null,
+) {
+  return !selectedMonth || scheduleDateKey(startsAt).startsWith(selectedMonth);
 }

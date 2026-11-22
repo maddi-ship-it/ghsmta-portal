@@ -10,14 +10,17 @@ import { ScheduleOwnerTools } from "@/components/schedule-owner-tools";
 import { OwnerScheduleMessages } from "@/components/owner-schedule-messages";
 import { requireProfile } from "@/lib/auth";
 import { loadBillingApplicationDetails } from "@/lib/billing/application-details";
+import { isTrainingOrDemoAdjudication } from "@/lib/chat/upcoming-adjudications";
 import { roleLabel } from "@/lib/format";
 import {
   defaultScheduleFilter,
   defaultScheduleTrackFilter,
   resolveScheduleDateFilter,
   resolveScheduleFilter,
+  resolveScheduleMonthFilter,
   resolveScheduleTrackFilter,
   scheduleSlotMatchesDate,
+  scheduleSlotMatchesMonth,
   scheduleSlotMatchesTrack,
   type ScheduleFilter,
   type ScheduleTrackFilter,
@@ -197,6 +200,7 @@ type ScheduleSearchParams = {
   filter?: ScheduleFilter;
   track?: ScheduleTrackFilter;
   date?: string;
+  month?: string;
   q?: string;
   section?: OwnerScheduleSection;
   page?: string;
@@ -328,6 +332,7 @@ export default async function SchedulePage({
   const defaultTrack = defaultScheduleTrackFilter(profile.role);
   const selectedTrack = resolveScheduleTrackFilter(profile.role, params.track);
   const selectedDate = resolveScheduleDateFilter(params.date);
+  const selectedMonth = resolveScheduleMonthFilter(params.month);
   const scheduleSearch = (params.q ?? "").trim();
   const ownerSections: OwnerScheduleSection[] = ["overview", "timeslots", "staffing", "waitlists", "messages"];
   const ownerSection: OwnerScheduleSection = ownerSections.includes(params.section as OwnerScheduleSection)
@@ -570,6 +575,17 @@ export default async function SchedulePage({
   const bookingMap = new Map(
     staffBookings.map((booking) => [booking.slot_id, booking]),
   );
+  const hiddenTrainingSlotIds = new Set(
+    slots.flatMap((slot) => {
+      const booking = bookingMap.get(slot.id);
+      const hidden = isTrainingOrDemoAdjudication({
+        id: booking?.application_id ?? slot.id,
+        school_name: booking?.school_name ?? slot.title,
+        production_title: booking?.production_title ?? slot.title,
+      });
+      return hidden ? [slot.id] : [];
+    }),
+  );
   const staffBySlot = new Map<string, StaffEnrollment[]>();
   const scoringPermissionMap = new Map(
     scoringPermissions.map((permission) => [
@@ -602,6 +618,10 @@ export default async function SchedulePage({
 
   const displaySlots = slots
     .filter((slot) => {
+      if (hiddenTrainingSlotIds.has(slot.id)) {
+        return false;
+      }
+
       const booking = bookingMap.get(slot.id);
       const participants = staffBySlot.get(slot.id) ?? [];
       const availabilityItem = availabilityMap.get(slot.id);
@@ -627,6 +647,10 @@ export default async function SchedulePage({
       }
 
       if (!scheduleSlotMatchesDate(slot.starts_at, selectedDate)) {
+        return false;
+      }
+
+      if (!scheduleSlotMatchesMonth(slot.starts_at, selectedMonth)) {
         return false;
       }
 
@@ -708,6 +732,7 @@ export default async function SchedulePage({
     filter: selectedFilter,
     track: selectedTrack,
     ...(selectedDate ? { date: selectedDate } : {}),
+    ...(selectedMonth ? { month: selectedMonth } : {}),
     ...(scheduleSearch ? { q: scheduleSearch } : {}),
   };
 
@@ -727,6 +752,7 @@ export default async function SchedulePage({
       ? slots
           .filter(
             (slot) =>
+              !hiddenTrainingSlotIds.has(slot.id) &&
               slot.status !== "cancelled" &&
               new Date(slot.starts_at).getTime() > serverTime,
           )
@@ -897,9 +923,14 @@ export default async function SchedulePage({
     applicantApplications.some((application) => application.id === entry.application_id),
   );
 
-  const ownerWaitlistEntries = waitlistEntries.filter((entry) =>
-    ["waiting", "offered"].includes(entry.status),
-  );
+  const ownerWaitlistEntries = waitlistEntries.filter((entry) => {
+    const application = applicationLookup.get(entry.application_id);
+    return (
+      !hiddenTrainingSlotIds.has(entry.slot_id) &&
+      (!application || !isTrainingOrDemoAdjudication(application)) &&
+      ["waiting", "offered"].includes(entry.status)
+    );
+  });
 
   const applicantScheduleSlots = profile.role === "applicant"
     ? displaySlots.map((slot) => {
@@ -1300,6 +1331,15 @@ export default async function SchedulePage({
             <option value="mentorship">Mentorship Track</option>
             <option value="all">All Tracks</option>
           </select>
+          <label className="sr-only" htmlFor="schedule_month">Filter by month</label>
+          <input
+            aria-label="Filter schedule by month"
+            className="input schedule-date-filter"
+            defaultValue={selectedMonth ?? ""}
+            id="schedule_month"
+            name="month"
+            type="month"
+          />
           <label className="sr-only" htmlFor="schedule_date">Filter by date</label>
           <input
             aria-label="Filter schedule by date"
@@ -1320,7 +1360,7 @@ export default async function SchedulePage({
             {supportsWaitlistFilters && <option value="waitlist_desc">Waitlist count</option>}
           </select>
           <button className="button button-secondary button-compact" type="submit">Apply</button>
-          {(scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== defaultTrack || selectedSort !== "date_asc") && (
+          {(scheduleSearch || selectedDate || selectedMonth || selectedFilter !== defaultFilter || selectedTrack !== defaultTrack || selectedSort !== "date_asc") && (
             <Link
               className="text-button"
               href={{
@@ -1345,7 +1385,7 @@ export default async function SchedulePage({
             <span className="badge">{ownerWaitlistEntries.length}</span>
           </div>
           <div className="panel-body schedule-owner-waitlist-list">
-            {slots.filter((slot) => slotWaitlistCount(slot) > 0).map((slot) => {
+            {slots.filter((slot) => !hiddenTrainingSlotIds.has(slot.id) && slotWaitlistCount(slot) > 0).map((slot) => {
               const queue = ownerWaitlistEntries.filter((entry) => entry.slot_id === slot.id).sort((a, b) => a.queue_rank - b.queue_rank);
               const activeOffer = queue.find((entry) => entry.status === "offered" && entry.offer_expires_at && new Date(entry.offer_expires_at).getTime() > serverTime);
               return (
@@ -1421,7 +1461,7 @@ export default async function SchedulePage({
               <h3>
                 {(profile.role as AppRole) === "applicant"
                   ? "No schedule slots are currently open."
-                  : scheduleSearch || selectedDate || selectedFilter !== defaultFilter || selectedTrack !== defaultTrack
+                  : scheduleSearch || selectedDate || selectedMonth || selectedFilter !== defaultFilter || selectedTrack !== defaultTrack
                     ? "No schedule slots match these filters."
                     : "No schedule slots are configured."}
               </h3>
@@ -1476,6 +1516,7 @@ export default async function SchedulePage({
               const ownerSlotApplications = ownerApplications.filter(
                 (application) =>
                   application.cycle_id === slot.cycle_id &&
+                  !isTrainingOrDemoAdjudication(application) &&
                   !bookedApplicationIds.has(application.id),
               );
               const ownerAvailableStaff = ownerStaff.filter(

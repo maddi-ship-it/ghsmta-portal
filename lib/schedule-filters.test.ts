@@ -6,9 +6,11 @@ import {
   defaultScheduleTrackFilter,
   resolveScheduleDateFilter,
   resolveScheduleFilter,
+  resolveScheduleMonthFilter,
   resolveScheduleTrackFilter,
   scheduleDateKey,
   scheduleSlotMatchesDate,
+  scheduleSlotMatchesMonth,
   scheduleSlotMatchesTrack,
 } from "./schedule-filters";
 
@@ -117,5 +119,29 @@ describe("schedule date filters", () => {
     expect(scheduleSlotMatchesDate("2026-09-05T02:00:00.000Z", null)).toBe(
       true,
     );
+  });
+});
+
+describe("schedule month filters", () => {
+  it("accepts valid months and rejects malformed or impossible months", () => {
+    expect(resolveScheduleMonthFilter("2026-11")).toBe("2026-11");
+    expect(resolveScheduleMonthFilter("11/2026")).toBeNull();
+    expect(resolveScheduleMonthFilter("2026-13")).toBeNull();
+    expect(resolveScheduleMonthFilter(undefined)).toBeNull();
+  });
+
+  it("matches the Eastern calendar month", () => {
+    expect(
+      scheduleSlotMatchesMonth("2026-12-01T02:00:00.000Z", "2026-11"),
+    ).toBe(true);
+    expect(
+      scheduleSlotMatchesMonth("2026-12-01T02:00:00.000Z", "2026-12"),
+    ).toBe(false);
+  });
+
+  it("does not filter slots when no month is selected", () => {
+    expect(
+      scheduleSlotMatchesMonth("2026-12-01T02:00:00.000Z", null),
+    ).toBe(true);
   });
 });

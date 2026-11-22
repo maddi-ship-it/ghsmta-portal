@@ -30,7 +30,7 @@ const FILE_TYPES = [
   ["process_to_performance", "Process to Performance", ".pdf,.doc,.docx,image/*,video/*"],
   ["virtual_audition_packet", "Virtual Audition Packet", ".pdf,.doc,.docx,image/*,video/*"],
   ["production_photos", "Production Photos", ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*"],
-  ["backstage_photos", "Backstage Photos", ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*"],
+  ["behind_the_scenes", "Behind the Scenes", ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*"],
   ["poster", "Poster", "image/*,.pdf"],
   ["logo", "Logo", "image/*,.pdf,.svg,.eps"],
   ["scenic", "Scenic Drawings / Renderings", "image/*,.pdf"],
@@ -39,7 +39,10 @@ const FILE_TYPES = [
   ["resume", "Resume", ".pdf"],
 ] as const;
 
-function labelFor(value: string) { return FILE_TYPES.find(([key]) => key === value)?.[1] ?? value; }
+function labelFor(value: string) {
+  if (value === "backstage_photos") return "Behind the Scenes";
+  return FILE_TYPES.find(([key]) => key === value)?.[1] ?? value;
+}
 function formatBytes(value: number | null) { if (!value) return "—"; if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`; return `${(value / (1024 * 1024)).toFixed(1)} MB`; }
 
 export function SchoolFileLibrary({ profile, applications, initialFiles, pronunciationRequirements = [] }: { profile: Profile; applications: SchoolFileApplication[]; initialFiles: SchoolFileRecord[]; pronunciationRequirements?: SchoolFilePronunciationRequirement[] }) {
@@ -655,7 +658,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
                       accept={selectedType[2]}
                       className="input file-input"
                       id="school_file_input"
-                      multiple={["production_photos", "backstage_photos", "scenic"].includes(
+                      multiple={["production_photos", "behind_the_scenes", "backstage_photos", "scenic"].includes(
                         fileType,
                       )}
                       name="files"
@@ -668,7 +671,7 @@ export function SchoolFileLibrary({ profile, applications, initialFiles, pronunc
 
                 {fileType === "logo" && <div className="field"><label>Display name</label><input className="input" name="display_name" placeholder="Official school or production logo" /></div>}
                 {fileType === "scenic" && <div className="form-grid two-column-form"><div className="field"><label>Drawing / rendering title</label><input className="input" name="display_name" required /></div><div className="field"><label>Scenic designer</label><input className="input" name="designer_name" /></div></div>}
-                {["production_photos", "backstage_photos"].includes(fileType) && (
+                {["production_photos", "behind_the_scenes", "backstage_photos"].includes(fileType) && (
                   <div className="form-grid two-column-form">
                     <div className="field">
                       <label>
