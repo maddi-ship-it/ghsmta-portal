@@ -497,6 +497,43 @@ describe("buildApplicationReferencePanels", () => {
     });
   });
 
+  it("treats an ensemble with 30% or fewer K-8 students as award eligible", () => {
+    const input = {
+      application,
+      questions: [
+        question(
+          "ensemble-description",
+          "Please describe your ensemble by choosing one option below.",
+          1,
+        ),
+      ],
+      answers: [
+        answer(
+          "ensemble-description",
+          "30% or less of our ensemble is made of K-8 students.",
+        ),
+      ],
+      eligibilityCategories: [
+        { category_key: "ensemble", title: "ENSEMBLE" },
+      ],
+    };
+
+    expect(buildApplicationCategoryEligibilityDefaults(input)).toEqual({
+      ensemble: true,
+    });
+    expect(
+      buildApplicationReferencePanels(input)
+        .find((panel) => panel.key === "eligibility")
+        ?.groups.find((group) => group.title === "Current eligibility")
+        ?.items,
+    ).toEqual([
+      {
+        label: "Ensemble - Award Eligible",
+        value: "true",
+      },
+    ]);
+  });
+
   it("calculates overall production as false at five ineligible categories", () => {
     const panels = buildApplicationReferencePanels({
       application,

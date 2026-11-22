@@ -374,8 +374,12 @@ function inferredCategoryEligibility(
     );
     if (!ensembleDescription?.value.trim()) return null;
 
-    return normalize(ensembleDescription.value).includes(
-      "exclusively_features_eligible_9th_12th_grade_performers",
+    const value = normalize(ensembleDescription.value);
+    return (
+      value.includes(
+        "exclusively_features_eligible_9th_12th_grade_performers",
+      ) ||
+      (value.includes("30_or_less") && value.includes("k_8"))
     );
   }
 
