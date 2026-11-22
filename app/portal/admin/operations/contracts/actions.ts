@@ -57,9 +57,13 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-function revalidateContracts() {
+function revalidateContracts(productionId?: string | null) {
   revalidatePath(CONTRACTS_PATH);
   revalidatePath("/portal/admin/operations");
+  revalidatePath("/portal/admin/operations/budgets");
+  if (productionId) {
+    revalidatePath(`/portal/admin/operations/budgets/${productionId}`);
+  }
   revalidatePath("/portal/chat");
   revalidatePath("/portal/notifications");
   revalidatePath("/portal/admin/users");
@@ -327,12 +331,13 @@ export async function createContractPayment(formData: FormData) {
     amount: amount(formData, "amount"),
     due_date: nullable(formData, "due_date"),
     status: text(formData, "status") || "scheduled",
+    budget_line_id: nullable(formData, "budget_line_id"),
     notes: nullable(formData, "notes"),
     created_by: owner.id,
     updated_by: owner.id,
   });
   if (error) throw new Error(error.message);
-  revalidateContracts();
+  revalidateContracts(nullable(formData, "production_id"));
 }
 
 export async function updateContractPayment(formData: FormData) {
@@ -348,6 +353,7 @@ export async function updateContractPayment(formData: FormData) {
       amount: amount(formData, "amount"),
       due_date: nullable(formData, "due_date"),
       status: text(formData, "status") || "scheduled",
+      budget_line_id: nullable(formData, "budget_line_id"),
       invoice_received_at: dateAtNoonUtc(formData, "invoice_received_on"),
       paid_at: dateAtNoonUtc(formData, "paid_on"),
       notes: nullable(formData, "notes"),
@@ -355,7 +361,7 @@ export async function updateContractPayment(formData: FormData) {
     })
     .eq("id", paymentId);
   if (error) throw new Error(error.message);
-  revalidateContracts();
+  revalidateContracts(nullable(formData, "production_id"));
 }
 
 export async function deleteContractPayment(formData: FormData) {
@@ -367,5 +373,5 @@ export async function deleteContractPayment(formData: FormData) {
     .delete()
     .eq("id", paymentId);
   if (error) throw new Error(error.message);
-  revalidateContracts();
+  revalidateContracts(nullable(formData, "production_id"));
 }

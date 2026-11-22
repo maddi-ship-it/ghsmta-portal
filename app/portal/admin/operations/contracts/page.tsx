@@ -18,6 +18,12 @@ type SearchParams = {
 };
 
 type Production = { id: string; name: string };
+type BudgetLine = {
+  id: string;
+  production_id: string;
+  gl_code: string;
+  department: string | null;
+};
 type Contract = {
   id: string;
   production_id: string | null;
@@ -59,6 +65,7 @@ type Payment = {
   amount: number;
   due_date: string | null;
   status: string;
+  budget_line_id: string | null;
   invoice_received_at: string | null;
   paid_at: string | null;
   notes: string | null;
@@ -180,26 +187,37 @@ export default async function ContractsPage({
     );
   }
 
-  const [contractsResult, paymentsResult, productionsResult] = await Promise.all([
+  const [contractsResult, paymentsResult, productionsResult, budgetLinesResult] = await Promise.all([
     contractQuery,
     supabase
       .from("ghsmta_operations_contract_payments")
-      .select("id,contract_id,installment_order,label,deliverable,amount,due_date,status,invoice_received_at,paid_at,notes")
+      .select("id,contract_id,installment_order,label,deliverable,amount,due_date,status,budget_line_id,invoice_received_at,paid_at,notes")
       .order("installment_order")
       .order("due_date", { nullsFirst: false }),
     supabase
       .from("ghsmta_operations_productions")
       .select("id,name")
       .order("name"),
+    supabase
+      .from("ghsmta_operations_budget_lines")
+      .select("id,production_id,gl_code,department")
+      .order("gl_code"),
   ]);
 
-  const loadError = contractsResult.error || paymentsResult.error || productionsResult.error;
+  const loadError = contractsResult.error || paymentsResult.error || productionsResult.error || budgetLinesResult.error;
   if (loadError) throw new Error(loadError.message);
 
   const contracts = (contractsResult.data ?? []) as Contract[];
   const allPayments = (paymentsResult.data ?? []) as Payment[];
   const productions = (productionsResult.data ?? []) as Production[];
+  const budgetLines = (budgetLinesResult.data ?? []) as BudgetLine[];
   const productionNames = new Map(productions.map((item) => [item.id, item.name]));
+  const budgetLinesByProduction = new Map<string, BudgetLine[]>();
+  budgetLines.forEach((budgetLine) => {
+    const rows = budgetLinesByProduction.get(budgetLine.production_id) ?? [];
+    rows.push(budgetLine);
+    budgetLinesByProduction.set(budgetLine.production_id, rows);
+  });
   const paymentsByContract = new Map<string, Payment[]>();
   allPayments.forEach((payment) => {
     const rows = paymentsByContract.get(payment.contract_id) ?? [];
@@ -266,6 +284,10 @@ export default async function ContractsPage({
             <div className="operations-empty"><strong>No contracts match these filters.</strong><p>Create a contract or clear the current filters.</p></div>
           ) : contracts.map((contract) => {
             const payments = paymentsByContract.get(contract.id) ?? [];
+            const contractBudgetLines = contract.production_id
+              ? budgetLinesByProduction.get(contract.production_id) ?? []
+              : [];
+            const linkedPaymentCount = payments.filter((payment) => payment.budget_line_id).length;
             const scheduled = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
             const paid = payments.filter((payment) => payment.status === "paid").reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
             const signatureState = contract.contractor_signed_at && contract.foundation_signed_at ? "Fully signed" : contract.contractor_signed_at || contract.foundation_signed_at ? "Partially signed" : "Not signed";
@@ -296,24 +318,43 @@ export default async function ContractsPage({
                 </form>
 
                 <section className="operations-contract-payments">
-                  <div className="operations-section-heading"><div><span className="eyebrow">Schedule A compensation</span><h3>Payment schedule</h3></div><span className="badge">{payments.length} installments</span></div>
+                  <div className="operations-section-heading">
+                    <div>
+                      <span className="eyebrow">Schedule A compensation</span>
+                      <h3>Payment schedule</h3>
+                      <p>Select a budget line once and this installment will update the production budget automatically as its amount, date, invoice, or payment status changes.</p>
+                    </div>
+                    <div>
+                      <span className="badge">{linkedPaymentCount}/{payments.length} linked to budget</span>
+                      {contract.production_id ? <a className="text-button" href={`/portal/admin/operations/budgets/${contract.production_id}`}>Open production budget</a> : null}
+                    </div>
+                  </div>
                   <div className="operations-payment-list">
                     {payments.map((payment) => (
                       <div className="operations-payment-row" key={payment.id}>
                         <form action={updateContractPayment} className="operations-payment-form">
                           <input name="payment_id" type="hidden" value={payment.id} />
+                          <input name="production_id" type="hidden" value={contract.production_id ?? ""} />
                           <div className="field"><label>Order</label><input className="input" defaultValue={payment.installment_order} min="0" name="installment_order" type="number" /></div>
                           <div className="field"><label>Payment label</label><input className="input" defaultValue={payment.label} name="label" required /></div>
                           <div className="field"><label>Amount</label><input className="input" defaultValue={payment.amount} min="0" name="amount" step="0.01" type="number" /></div>
                           <div className="field"><label>Due date</label><input className="input" defaultValue={payment.due_date ?? ""} name="due_date" type="date" /></div>
                           <div className="field"><label>Status</label><select className="select" defaultValue={payment.status} name="status">{paymentStatuses.map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></div>
+                          <div className="field">
+                            <label>Budget line</label>
+                            <select className="select" defaultValue={payment.budget_line_id ?? ""} disabled={!contract.production_id || contractBudgetLines.length === 0} name="budget_line_id">
+                              <option value="">Not linked</option>
+                              {contractBudgetLines.map((budgetLine) => <option key={budgetLine.id} value={budgetLine.id}>{budgetLine.gl_code}{budgetLine.department ? ` · ${budgetLine.department}` : ""}</option>)}
+                            </select>
+                            <small>{!contract.production_id ? "Choose a production on the contract first." : contractBudgetLines.length === 0 ? "Add a budget line to this production first." : payment.budget_line_id ? "This installment is updating the production budget automatically." : "Choose where this contract expense belongs."}</small>
+                          </div>
                           <div className="field"><label>Invoice received</label><input className="input" defaultValue={dateInput(payment.invoice_received_at)} name="invoice_received_on" type="date" /></div>
                           <div className="field"><label>Paid</label><input className="input" defaultValue={dateInput(payment.paid_at)} name="paid_on" type="date" /></div>
                           <div className="field field-span-2"><label>Deliverable</label><input className="input" defaultValue={payment.deliverable ?? ""} name="deliverable" /></div>
                           <div className="field field-span-2"><label>Notes</label><input className="input" defaultValue={payment.notes ?? ""} name="notes" /></div>
                           <div className="operations-form-actions field-span-2"><button className="button button-secondary button-compact" type="submit">Save payment</button></div>
                         </form>
-                        <form action={deleteContractPayment} className="operations-inline-delete"><input name="payment_id" type="hidden" value={payment.id} /><ConfirmedSubmitButton className="text-button danger-text" destructive description="This permanently removes this payment installment from the contract schedule." label="Delete payment" title={`Delete ${payment.label}?`} /></form>
+                        <form action={deleteContractPayment} className="operations-inline-delete"><input name="payment_id" type="hidden" value={payment.id} /><input name="production_id" type="hidden" value={contract.production_id ?? ""} /><ConfirmedSubmitButton className="text-button danger-text" destructive description="This permanently removes this payment installment and its linked budget transaction." label="Delete payment" title={`Delete ${payment.label}?`} /></form>
                       </div>
                     ))}
                     {payments.length === 0 ? <p className="operations-muted">No payment installments added yet.</p> : null}
@@ -322,11 +363,20 @@ export default async function ContractsPage({
                     <summary>Add payment installment</summary>
                     <form action={createContractPayment} className="operations-form-grid">
                       <input name="contract_id" type="hidden" value={contract.id} />
+                      <input name="production_id" type="hidden" value={contract.production_id ?? ""} />
                       <div className="field"><label>Order</label><input className="input" defaultValue={payments.length + 1} min="0" name="installment_order" type="number" /></div>
                       <div className="field"><label>Payment label</label><input className="input" name="label" placeholder="First installment" required /></div>
                       <div className="field"><label>Amount</label><input className="input" min="0" name="amount" step="0.01" type="number" /></div>
                       <div className="field"><label>Due date</label><input className="input" name="due_date" type="date" /></div>
                       <div className="field"><label>Status</label><select className="select" defaultValue="scheduled" name="status">{paymentStatuses.map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></div>
+                      <div className="field">
+                        <label>Budget line</label>
+                        <select className="select" defaultValue="" disabled={!contract.production_id || contractBudgetLines.length === 0} name="budget_line_id">
+                          <option value="">Not linked</option>
+                          {contractBudgetLines.map((budgetLine) => <option key={budgetLine.id} value={budgetLine.id}>{budgetLine.gl_code}{budgetLine.department ? ` · ${budgetLine.department}` : ""}</option>)}
+                        </select>
+                        <small>{!contract.production_id ? "Choose a production on the contract first." : contractBudgetLines.length === 0 ? "Add a budget line to this production first." : "The linked budget entry will be created when this installment is added."}</small>
+                      </div>
                       <div className="field"><label>Deliverable</label><input className="input" name="deliverable" /></div>
                       <div className="field field-span-2"><label>Notes</label><input className="input" name="notes" /></div>
                       <div className="operations-form-actions field-span-2"><button className="button button-primary button-compact" type="submit">Add installment</button></div>
