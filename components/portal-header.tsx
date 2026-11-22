@@ -117,6 +117,14 @@ function buildNavigation(profile: Profile) {
 
   const management: NavItem[] = [];
   const production: NavItem[] = [];
+  const community: NavItem[] = [
+    {
+      href: "/portal/community/testimonials",
+      label: "Submit a testimonial",
+      shortLabel: "Testimonial",
+      icon: "✦",
+    },
+  ];
 
   if (profile.role === "applicant") {
     primary.push({
@@ -252,11 +260,13 @@ function buildNavigation(profile: Profile) {
 
   return {
     primary,
+    community,
     resources,
     production,
     management,
     mobile: [
       ...primary,
+      ...community,
       ...resources,
       ...production,
       ...management,
@@ -371,6 +381,8 @@ export async function PortalHeader({
               label={profile.role === "applicant" ? "School" : "Resources"}
               items={navigation.resources}
             />
+
+            <DesktopMenu label="Community" items={navigation.community} />
 
             <DesktopMenu label="Production" items={navigation.production} />
 
