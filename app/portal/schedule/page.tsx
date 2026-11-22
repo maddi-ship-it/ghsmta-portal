@@ -1426,7 +1426,7 @@ export default async function SchedulePage({
             <div className="info-banner">
               Your school cannot remove or change this reservation. Contact GHSMTA staff if a change is required.
             </div>
-            <form action={updateOwnScheduleSchoolDetails.bind(null, bookedSlot.id)} className="school-visit-details-form form-stack">
+            <form action={updateOwnScheduleSchoolDetails.bind(null, bookedSlot.id)} className="school-visit-details-form form-stack" id="school-visit-details">
               <div className="school-visit-details-heading"><div><span className="eyebrow">School editable</span><h3>Location, parking &amp; Wi-Fi</h3></div>{bookedSchoolDetails?.edit_deadline && <span className="badge">Edit by {formatAccessDateTime(bookedSchoolDetails.edit_deadline)}</span>}</div>
               <div className="two-column-grid"><div className="field"><label>Venue name</label><input className="input" defaultValue={bookedSchoolDetails?.venue_name ?? ""} name="venue_name" /></div><div className="field"><label>Venue address</label><input className="input" defaultValue={bookedSchoolDetails?.venue_address ?? ""} name="venue_address" /></div></div>
               <div className="field"><label>Arrival entrance</label><input className="input" defaultValue={bookedSchoolDetails?.arrival_entrance ?? ""} name="arrival_entrance" /></div>

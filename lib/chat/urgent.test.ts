@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildUrgentChatSms,
+  buildUrgentFeedbackSms,
   canUseUrgentTag,
   containsUrgentMention,
 } from "@/lib/chat/urgent";
@@ -50,5 +51,20 @@ describe("urgent chat messages", () => {
 
     expect(result.length).toBeLessThanOrEqual(320);
     expect(result).toContain("/portal/chat?channel=123");
+  });
+
+  it("builds a compact urgent bug text with a direct owner link", () => {
+    const result = buildUrgentFeedbackSms({
+      referenceCode: "GH-1234ABCD",
+      title: "The scorecard submit button is not responding",
+      submittedBy: "Example User",
+      ticketUrl:
+        "https://ghsmta.getproductionops.com/portal/admin/feedback?q=GH-1234ABCD",
+    });
+
+    expect(result).toContain("URGENT GHSMTA BUG — GH-1234ABCD");
+    expect(result).toContain("From Example User");
+    expect(result).toContain("/portal/admin/feedback?q=GH-1234ABCD");
+    expect(result.length).toBeLessThanOrEqual(320);
   });
 });

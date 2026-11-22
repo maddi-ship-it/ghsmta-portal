@@ -12,7 +12,12 @@ import {
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
 import { AdjudicationBigPictureComment } from "@/components/adjudication-overall-production";
 import { AdvisoryCategoryRangeControl } from "@/components/advisory-category-range-control";
-import { OPEN_FULL_SCORE_VIEW_EVENT } from "@/components/application-reference-bar";
+import {
+  OPEN_FULL_SCORE_VIEW_EVENT,
+  SCORE_VISIBILITY_EVENT,
+  scoreVisibilityStorageKey,
+  type ScoreVisibilityDetail,
+} from "@/components/application-reference-bar";
 import {
   FullScoreOverviewModal,
   type FullScoreCategoryProposal,
@@ -941,6 +946,7 @@ export function OwnerLiveAdjudicationReview({
   initialScores,
   initialComments,
   initialFeedback,
+  scoreVisibilityUserId,
   productionTitle,
   categorySubjectDefaults,
   practiceMode = false,
@@ -961,6 +967,7 @@ export function OwnerLiveAdjudicationReview({
   initialScores: AdjudicationScore[];
   initialComments: AdjudicationCategoryComment[];
   initialFeedback: AdjudicationPanelFeedback[];
+  scoreVisibilityUserId?: string;
   productionTitle: string;
   categorySubjectDefaults: Record<string, string>;
   practiceMode?: boolean;
@@ -973,12 +980,40 @@ export function OwnerLiveAdjudicationReview({
   const [comments, setComments] = useState(initialComments);
   const [feedback, setFeedback] = useState(initialFeedback);
   const [fullScoreOverviewOpen, setFullScoreOverviewOpen] = useState(false);
+  const [showScores, setShowScores] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "error">(
     "connecting",
   );
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const currentUserId = scoreVisibilityUserId;
+    if (!currentUserId) return;
+
+    const savedPreference = window.localStorage.getItem(
+      scoreVisibilityStorageKey(currentUserId),
+    );
+    const preferenceTimer = window.setTimeout(() => {
+      setShowScores(savedPreference !== "hidden");
+    }, 0);
+
+    const updateScoreVisibility = (event: Event) => {
+      const detail = (event as CustomEvent<ScoreVisibilityDetail>).detail;
+      if (detail.currentUserId !== currentUserId) return;
+      setShowScores(detail.showScores);
+    };
+    window.addEventListener(SCORE_VISIBILITY_EVENT, updateScoreVisibility);
+
+    return () => {
+      window.clearTimeout(preferenceTimer);
+      window.removeEventListener(
+        SCORE_VISIBILITY_EVENT,
+        updateScoreVisibility,
+      );
+    };
+  }, [scoreVisibilityUserId]);
 
   const profileMap = useMemo(
     () => new Map(profiles.map((profile) => [profile.id, profile])),
@@ -1565,7 +1600,11 @@ export function OwnerLiveAdjudicationReview({
               />
             ) : null}
 
-            <div className="table-wrap criterion-score-table">
+            <div
+              className={`table-wrap criterion-score-table${
+                showScores ? "" : " criterion-score-table-scores-hidden"
+              }`}
+            >
               <table className="data-table">
                 <thead>
                   <tr>
@@ -1597,7 +1636,10 @@ export function OwnerLiveAdjudicationReview({
                                 ? scorecardStatusLabel(scorecard.status)
                                 : "Not started"}
                           </small>
-                          <strong aria-label={`${panelistAverages[panelistIndex]?.name ?? "Panelist"} category average`}>
+                          <strong
+                            aria-label={`${panelistAverages[panelistIndex]?.name ?? "Panelist"} category average`}
+                            hidden={!showScores}
+                          >
                             {formatScoreAverage(
                               panelistAverages[panelistIndex]?.average ?? null,
                             )}
@@ -1613,7 +1655,10 @@ export function OwnerLiveAdjudicationReview({
                             ? "Adjudicators only"
                             : "Full panel"}
                         </small>
-                        <strong aria-label={`${categoryLabel} full panel average`}>
+                        <strong
+                          aria-label={`${categoryLabel} full panel average`}
+                          hidden={!showScores}
+                        >
                           {formatScoreAverage(average)}
                         </strong>
                       </span>
@@ -1684,7 +1729,7 @@ export function OwnerLiveAdjudicationReview({
                               {isEditableOwnColumn && advisoryScoreEntry ? (
                                 <div className="panel-review-score-entry">
                                   {advisoryScoreEntry.canScore ? (
-                                    <>
+                                    <div hidden={!showScores}>
                                       <label htmlFor={`score_${criterion.id}`}>
                                         Your score
                                       </label>
@@ -1719,7 +1764,7 @@ export function OwnerLiveAdjudicationReview({
                                           )}
                                         </select>
                                       )}
-                                    </>
+                                    </div>
                                   ) : null}
 
                                   {advisoryScoreEntry.canComment &&
@@ -1740,7 +1785,9 @@ export function OwnerLiveAdjudicationReview({
                                 </div>
                               ) : (
                                 <>
-                                  <strong>{formatScore(row?.score)}</strong>
+                                  <strong hidden={!showScores}>
+                                    {formatScore(row?.score)}
+                                  </strong>
                                   {row?.observation ? (
                                     <div className="live-score-observation">
                                       <RichTextPreview value={row.observation} />
@@ -1752,7 +1799,9 @@ export function OwnerLiveAdjudicationReview({
                           );
                         })}
                         <td>
-                          <strong>{formatScoreAverage(criterionAverage)}</strong>
+                          <strong hidden={!showScores}>
+                            {formatScoreAverage(criterionAverage)}
+                          </strong>
                         </td>
                       </tr>
                     );

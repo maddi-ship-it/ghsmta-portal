@@ -37,6 +37,8 @@ const routeRoleCoverage = new Map([
   ["/portal/adjudication-sandbox", reviewRoles],
   ["/portal/adjudication/[id]", reviewRoles],
   ["/portal/digital-signing", ["adjudicator", "advisory_member"]],
+  ["/portal/guest-ticket-request", ["adjudicator", "advisory_member"]],
+  ["/portal/reimbursement", ["adjudicator", "advisory_member"]],
   ["/portal/results", ["applicant", "program_manager"]],
   ["/portal/school-team", ["applicant"]],
   ["/portal/admin/cycles", ["advisory_member", "owner"]],

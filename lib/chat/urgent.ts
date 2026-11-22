@@ -40,3 +40,24 @@ export function buildUrgentChatSms({
 
   return `${heading}\n${byline}\n${preview}\n${chatUrl}`;
 }
+
+export function buildUrgentFeedbackSms({
+  referenceCode,
+  title,
+  submittedBy,
+  ticketUrl,
+}: {
+  referenceCode: string;
+  title: string;
+  submittedBy: string;
+  ticketUrl: string;
+}) {
+  const heading = `URGENT GHSMTA BUG — ${normalizeForSms(referenceCode)}`;
+  const byline = truncate(`From ${normalizeForSms(submittedBy)}`, 70);
+  const reservedLength = heading.length + byline.length + ticketUrl.length + 6;
+  const preview = truncate(
+    normalizeForSms(title),
+    Math.max(20, 320 - reservedLength),
+  );
+  return `${heading}\n${byline}\n${preview}\n${ticketUrl}`;
+}

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { processAdjudicationVisitReminders } from "@/lib/adjudication-visit-reminders";
+import { processAdjudicationScheduleNotifications } from "@/lib/adjudication-schedule-notifications";
 import { sendSmtpEmail } from "@/lib/email/smtp";
 import { deliverSchoolInvoice } from "@/lib/billing/delivery";
 import { sendOwnerDigestEmail } from "@/lib/email/owner-digest";
@@ -317,11 +318,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [notifications, digests, invoiceReminders, adjudicationVisitReminders] = await Promise.all([
+    const [
+      notifications,
+      digests,
+      invoiceReminders,
+      adjudicationVisitReminders,
+      adjudicationScheduleNotifications,
+    ] = await Promise.all([
       processScheduleNotifications(),
       processOwnerDigests(),
       processInvoiceReminders(),
       processAdjudicationVisitReminders(),
+      processAdjudicationScheduleNotifications(),
     ]);
     const result = {
       ok: true,
@@ -329,6 +337,7 @@ export async function GET(request: Request) {
       digests,
       invoiceReminders,
       adjudicationVisitReminders,
+      adjudicationScheduleNotifications,
     };
     logEvent("info", "cron.notifications.completed", result);
     return Response.json(result);

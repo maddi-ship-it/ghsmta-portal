@@ -15,7 +15,10 @@ import { respondCategoryProposal } from "@/app/portal/adjudication/[id]/workflow
 import {
   OPEN_CATEGORY_REVIEW_EVENT,
   PANEL_COMMENT_VISIBILITY_EVENT,
+  SCORE_VISIBILITY_EVENT,
   panelCommentVisibilityStorageKey,
+  scoreVisibilityStorageKey,
+  type ScoreVisibilityDetail,
   type PanelCommentVisibilityDetail,
 } from "@/components/application-reference-bar";
 import { CriterionScoringGuideButton } from "@/components/criterion-scoring-guide-button";
@@ -102,6 +105,10 @@ type ObserverWorkspaceResponse = {
   panelRows: PanelObservationRow[];
   proposals: CategoryProposal[];
   approvals: CategoryApproval[];
+};
+
+type PanelFeedbackResponse = {
+  feedback: AdjudicationPanelFeedback[];
 };
 
 function RichTextPreview({
@@ -1208,7 +1215,7 @@ export function CollaborativeAdjudicatorScorecard({
   const [refreshError, setRefreshError] = useState(false);
   const [liveConnection, setLiveConnection] = useState(false);
   const [showPeerComments, setShowPeerComments] = useState(true);
-  const [showScores, setShowScores] = useState(false);
+  const [showScores, setShowScores] = useState(true);
   const [liveOwnScoreValues, setLiveOwnScoreValues] = useState<
     Record<string, number | null>
   >(() =>
@@ -1255,11 +1262,24 @@ export function CollaborativeAdjudicatorScorecard({
         .eq("application_id", applicationId)
         .neq("status", "draft"),
       canScore || canComment
-        ? supabase
-            .from("adjudication_panel_feedback")
-            .select("*")
-            .eq("application_id", applicationId)
-            .eq("status", "approved")
+        ? fetch(`/api/adjudication/panel-feedback/${applicationId}`, {
+            cache: "no-store",
+            credentials: "same-origin",
+          })
+            .then(async (response) => {
+              if (!response.ok) {
+                throw new Error("Final comment refresh failed.");
+              }
+              const payload = (await response.json()) as PanelFeedbackResponse;
+              return { data: payload.feedback, error: null };
+            })
+            .catch((error: unknown) => ({
+              data: null,
+              error:
+                error instanceof Error
+                  ? error
+                  : new Error("Final comment refresh failed."),
+            }))
         : Promise.resolve({ data: null, error: null }),
     ]);
 
@@ -1427,6 +1447,30 @@ export function CollaborativeAdjudicatorScorecard({
     };
   }, [currentUserId]);
 
+  useEffect(() => {
+    const savedPreference = window.localStorage.getItem(
+      scoreVisibilityStorageKey(currentUserId),
+    );
+    const preferenceTimer = window.setTimeout(() => {
+      setShowScores(savedPreference !== "hidden");
+    }, 0);
+
+    const updateScoreVisibility = (event: Event) => {
+      const detail = (event as CustomEvent<ScoreVisibilityDetail>).detail;
+      if (detail.currentUserId !== currentUserId) return;
+      setShowScores(detail.showScores);
+    };
+    window.addEventListener(SCORE_VISIBILITY_EVENT, updateScoreVisibility);
+
+    return () => {
+      window.clearTimeout(preferenceTimer);
+      window.removeEventListener(
+        SCORE_VISIBILITY_EVENT,
+        updateScoreVisibility,
+      );
+    };
+  }, [currentUserId]);
+
   const observationMap = useMemo(
     () =>
       new Map(
@@ -1545,16 +1589,6 @@ export function CollaborativeAdjudicatorScorecard({
               : "Waiting for the next panel update…"}
           </small>
         </div>
-        {canScore ? (
-          <button
-            aria-pressed={showScores}
-            className="button button-secondary button-compact score-visibility-toggle"
-            onClick={() => setShowScores((current) => !current)}
-            type="button"
-          >
-            {showScores ? "Hide scores" : "Show scores"}
-          </button>
-        ) : null}
       </div>
 
       {categories.map((category) => (

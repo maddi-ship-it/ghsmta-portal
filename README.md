@@ -71,6 +71,7 @@ For the complete production release, also configure these server-only values:
 - `OPENAI_TRANSCRIBE_MODEL` (optional; defaults to `gpt-4o-mini-transcribe`)
 - `ADOBE_SIGN_ADJUDICATOR_EMBED_URL` — adjudicator Adobe Sign Web Form URL
 - `ADOBE_SIGN_ADVISORY_MEMBER_EMBED_URL` — Advisory Committee Adobe Sign Web Form URL
+- `REIMBURSEMENT_DOCUMENT_URL` — HTTPS embed URL for the Adjudicator and ACM reimbursement document
 
 Before deploying the release:
 
@@ -79,7 +80,8 @@ Before deploying the release:
 3. Keep both Storage buckets private and verify their RLS policies after migration.
 4. Confirm `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS production URL so invoice, receipt, and payment emails contain production links.
 5. Confirm both Adobe Sign Web Form URLs use the Adobe-provided `esignWidget` HTTPS URL.
-6. Run `npm run lint` and `npm run build` before promoting the deployment.
+6. Confirm the reimbursement document URL permits iframe embedding and is available to everyone who should access it.
+7. Run `npm run lint` and `npm run build` before promoting the deployment.
 
 ## Mobile direction
 

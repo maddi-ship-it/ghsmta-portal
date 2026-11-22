@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireProfile } from "@/lib/auth";
+import { sendUrgentFeedbackSmsNotification } from "@/lib/chat/urgent-sms";
 import {
   parsePortalPageErrors,
   sanitizePortalPageUrl,
@@ -77,6 +78,24 @@ export async function submitPortalFeedback(
 
   if (error || !request) {
     return { ok: false, error: error?.message ?? "Could not submit your request." };
+  }
+
+  if (requestType === "bug_report" && priority === "urgent") {
+    try {
+      await sendUrgentFeedbackSmsNotification({
+        requestId: request.id as string,
+        referenceCode: request.reference_code as string,
+        title,
+        authorId: profile.id,
+        authorName: profile.full_name ?? profile.email ?? "Portal user",
+      });
+    } catch (smsError) {
+      console.error("Urgent bug report SMS delivery failed", {
+        requestId: request.id,
+        message:
+          smsError instanceof Error ? smsError.message : "SMS delivery failed",
+      });
+    }
   }
 
   revalidatePath("/portal/feedback");

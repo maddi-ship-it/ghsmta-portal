@@ -25,14 +25,24 @@ export const OPEN_OWNER_COMMENT_REVIEW_EVENT =
   "ghsmta:open-owner-comment-review";
 export const PANEL_COMMENT_VISIBILITY_EVENT =
   "ghsmta:panel-comment-visibility";
+export const SCORE_VISIBILITY_EVENT = "ghsmta:score-visibility";
 
 export type PanelCommentVisibilityDetail = {
   currentUserId: string;
   showPeerComments: boolean;
 };
 
+export type ScoreVisibilityDetail = {
+  currentUserId: string;
+  showScores: boolean;
+};
+
 export function panelCommentVisibilityStorageKey(currentUserId: string) {
   return `ghsmta:adjudication:peer-comments:v1:${currentUserId}`;
+}
+
+export function scoreVisibilityStorageKey(currentUserId: string) {
+  return `ghsmta:adjudication:scores:v1:${currentUserId}`;
 }
 
 export function ApplicationReferencePanelDialog({
@@ -198,6 +208,7 @@ export function ApplicationReferenceBar({
   categoryNavigation,
   links = [],
   panelCommentControls,
+  scoreVisibilityControls,
   panels,
   reviewActions,
   scoringTools,
@@ -216,6 +227,9 @@ export function ApplicationReferenceBar({
     currentUserId: string;
     peerCount: number;
   };
+  scoreVisibilityControls?: {
+    currentUserId: string;
+  };
   panels: ApplicationReferencePanel[];
   reviewActions?: {
     categoryReviewStatus?: "needs-action" | "complete";
@@ -230,9 +244,11 @@ export function ApplicationReferenceBar({
   const [activePanel, setActivePanel] =
     useState<ApplicationReferencePanel | null>(null);
   const [showPeerComments, setShowPeerComments] = useState(true);
+  const [showScores, setShowScores] = useState(true);
   const barRef = useRef<HTMLDivElement>(null);
   const panelCommentUserId = panelCommentControls?.currentUserId;
   const panelCommentPeerCount = panelCommentControls?.peerCount ?? 0;
+  const scoreVisibilityUserId = scoreVisibilityControls?.currentUserId;
   const panelByKey = new Map(panels.map((panel) => [panel.key, panel]));
   const primaryPanels = PRIMARY_PANEL_ORDER.flatMap((key) => {
     const panel = panelByKey.get(key);
@@ -264,6 +280,28 @@ export function ApplicationReferenceBar({
 
     return () => window.clearTimeout(preferenceTimer);
   }, [panelCommentUserId]);
+
+  useEffect(() => {
+    if (!scoreVisibilityUserId) return;
+
+    const savedPreference = window.localStorage.getItem(
+      scoreVisibilityStorageKey(scoreVisibilityUserId),
+    );
+    const nextVisibility = savedPreference !== "hidden";
+    const preferenceTimer = window.setTimeout(() => {
+      setShowScores(nextVisibility);
+      window.dispatchEvent(
+        new CustomEvent<ScoreVisibilityDetail>(SCORE_VISIBILITY_EVENT, {
+          detail: {
+            currentUserId: scoreVisibilityUserId,
+            showScores: nextVisibility,
+          },
+        }),
+      );
+    }, 0);
+
+    return () => window.clearTimeout(preferenceTimer);
+  }, [scoreVisibilityUserId]);
 
   const togglePanelComments = () => {
     if (!panelCommentUserId) return;
@@ -302,6 +340,38 @@ export function ApplicationReferenceBar({
         </strong>
       </button>
     ) : null;
+
+  const toggleScores = () => {
+    if (!scoreVisibilityUserId) return;
+
+    const next = !showScores;
+    setShowScores(next);
+    window.localStorage.setItem(
+      scoreVisibilityStorageKey(scoreVisibilityUserId),
+      next ? "visible" : "hidden",
+    );
+    window.dispatchEvent(
+      new CustomEvent<ScoreVisibilityDetail>(SCORE_VISIBILITY_EVENT, {
+        detail: {
+          currentUserId: scoreVisibilityUserId,
+          showScores: next,
+        },
+      }),
+    );
+  };
+
+  const scoreVisibilityControl = scoreVisibilityUserId ? (
+    <button
+      aria-label={`${showScores ? "Hide" : "Show"} scores`}
+      aria-pressed={showScores}
+      className="application-reference-button application-reference-panel-comments-button application-reference-score-visibility-button"
+      onClick={toggleScores}
+      type="button"
+    >
+      <span>Scores</span>
+      <strong>{showScores ? "Hide" : "Show"}</strong>
+    </button>
+  ) : null;
 
   const panelButton = (panel: ApplicationReferencePanel) => (
     <button
@@ -358,6 +428,7 @@ export function ApplicationReferenceBar({
               categoryWorkflowControl ||
               reviewActions?.showCategoryReview ||
               panelCommentControl ||
+              scoreVisibilityControl ||
               showFullScoreView ||
               showOwnerCommentReview ? (
                 <div className="application-reference-action-group application-reference-workflow-actions application-category-workflow-actions">
@@ -407,6 +478,7 @@ export function ApplicationReferenceBar({
                   ) : null}
                   {scorecardSubmitControl}
                   {panelCommentControl}
+                  {scoreVisibilityControl}
                 </div>
               ) : null}
             </div>
@@ -457,6 +529,7 @@ export function ApplicationReferenceBar({
                 categoryWorkflowControl ||
                 reviewActions?.showCategoryReview ||
                 panelCommentControl ||
+                scoreVisibilityControl ||
                 showFullScoreView ||
                 showOwnerCommentReview)) ? (
               <div className="application-reference-action-group application-reference-workflow-actions">
@@ -515,6 +588,7 @@ export function ApplicationReferenceBar({
                 ) : null}
                 {!categoryNavigation ? scorecardSubmitControl : null}
                 {!categoryNavigation ? panelCommentControl : null}
+                {!categoryNavigation ? scoreVisibilityControl : null}
               </div>
             ) : null}
           </div>

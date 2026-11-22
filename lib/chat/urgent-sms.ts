@@ -7,6 +7,7 @@ import {
 } from "@/lib/chat/email-notifications";
 import {
   buildUrgentChatSms,
+  buildUrgentFeedbackSms,
   canUseUrgentTag,
   containsUrgentMention,
 } from "@/lib/chat/urgent";
@@ -42,7 +43,7 @@ type TwilioMessageResponse = {
   code?: number;
 };
 
-type UrgentSmsMessageKind = "post" | "reply" | "broadcast";
+type UrgentSmsMessageKind = "post" | "reply" | "broadcast" | "feedback";
 
 type UrgentSmsRecipient = {
   id: string;
@@ -492,6 +493,72 @@ export async function sendUrgentSchoolBroadcastSmsNotifications({
     channelId: null,
     messageId: broadcastId,
     messageKind: "broadcast",
+    authorId,
+    smsBody,
+  });
+}
+
+export async function sendUrgentFeedbackSmsNotification({
+  requestId,
+  referenceCode,
+  title,
+  authorId,
+  authorName,
+}: {
+  requestId: string;
+  referenceCode: string;
+  title: string;
+  authorId: string;
+  authorName: string;
+}): Promise<UrgentSmsResult> {
+  const config = loadTwilioConfig();
+  if (!config) {
+    return {
+      triggered: true,
+      status: "not_configured",
+      recipientCount: 0,
+      queuedCount: 0,
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id,phone_e164,phone_verified_at")
+    .eq("role", "owner")
+    .eq("active", true)
+    .not("phone_verified_at", "is", null);
+  if (error) {
+    throw new Error(`Urgent bug text recipients could not be loaded: ${error.message}`);
+  }
+
+  const recipients = (profiles ?? []).filter(
+    (profile): profile is UrgentSmsRecipient => isE164Phone(profile.phone_e164),
+  );
+  if (!recipients.length) {
+    return {
+      triggered: true,
+      status: "no_recipients",
+      recipientCount: 0,
+      queuedCount: 0,
+    };
+  }
+
+  const ticketUrl = `${portalSiteUrl()}/portal/admin/feedback?q=${encodeURIComponent(referenceCode)}`;
+  const smsBody = buildUrgentFeedbackSms({
+    referenceCode,
+    title,
+    submittedBy: authorName,
+    ticketUrl,
+  });
+
+  return deliverUrgentSms({
+    admin,
+    config,
+    recipients,
+    channelId: null,
+    messageId: requestId,
+    messageKind: "feedback",
     authorId,
     smsBody,
   });

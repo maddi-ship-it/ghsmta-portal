@@ -413,7 +413,9 @@ async function saveAssignedWorkspaceCategoryProposals({
       (ownerOverride && existing.status !== "overridden") ||
       (!ownerOverride && existing.status === "overridden");
     const nextStatus = !sendForApproval
-      ? "draft"
+      ? existing && !contentChanged
+        ? existing.status
+        : "draft"
       : ownerOverride
       ? "overridden"
       : existing && !contentChanged && existing.status !== "draft"

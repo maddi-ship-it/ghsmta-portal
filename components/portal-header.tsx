@@ -82,6 +82,18 @@ function buildNavigation(profile: Profile) {
       2,
       0,
       {
+        href: "/portal/reimbursement",
+        label: "Reimbursement",
+        shortLabel: "Reimbursement",
+        icon: "$",
+      },
+      {
+        href: "/portal/guest-ticket-request",
+        label: "Guest ticket request",
+        shortLabel: "Guest ticket",
+        icon: "☆",
+      },
+      {
         href: "/portal/adjudication-sandbox",
         label: "Adjudication sandbox",
         shortLabel: "Sandbox",

@@ -106,4 +106,27 @@ describe("ApplicationReferenceBar", () => {
     );
     expect(html).toContain("application-category-workflow-actions");
   });
+
+  it("places score visibility beside panel comment visibility and shows scores by default", () => {
+    const html = renderToStaticMarkup(
+      <ApplicationReferenceBar
+        categoryNavigation={{
+          categories: [{ id: "direction", title: "Direction" }],
+          showCompletion: true,
+        }}
+        panelCommentControls={{ currentUserId: "user-1", peerCount: 3 }}
+        panels={panels}
+        scoreVisibilityControls={{ currentUserId: "user-1" }}
+      />,
+    );
+
+    const commentControl = html.indexOf(
+      'aria-label="Hide 3 other panel comments"',
+    );
+    const scoreControl = html.indexOf('aria-label="Hide scores"');
+
+    expect(commentControl).toBeGreaterThanOrEqual(0);
+    expect(scoreControl).toBeGreaterThan(commentControl);
+    expect(html).toContain('aria-pressed="true"');
+  });
 });

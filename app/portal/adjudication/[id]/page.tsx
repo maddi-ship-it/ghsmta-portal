@@ -1062,6 +1062,11 @@ export default async function AdjudicationApplicationPage({
       initialFeedback={
         profile.role === "owner" ? feedback : panelVisibleFeedback
       }
+      scoreVisibilityUserId={
+        effectiveParticipantRole === "advisory_member"
+          ? profile.id
+          : undefined
+      }
       productionTitle={application.production_title ?? "Untitled production"}
       release={release}
     />
@@ -1127,6 +1132,13 @@ export default async function AdjudicationApplicationPage({
                   (reviewerId) => reviewerId !== profile.id,
                 ).length,
               }
+            : undefined
+        }
+        scoreVisibilityControls={
+          (effectiveParticipantRole === "adjudicator" &&
+            showEditableScorecard) ||
+          (effectiveParticipantRole === "advisory_member" && canPanelReview)
+            ? { currentUserId: profile.id }
             : undefined
         }
         panels={referencePanels}
