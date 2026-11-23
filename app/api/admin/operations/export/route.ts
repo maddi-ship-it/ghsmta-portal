@@ -497,7 +497,7 @@ async function loadContracts(params: URLSearchParams): Promise<LoadedReport> {
       { key: "status", label: "Status" },
       { key: "invoice_received", label: "Invoice Received" },
       { key: "paid", label: "Paid" },
-      { key: "notes", label: "Notes" },
+      { key: "account_code", label: "Account Code" },
     ];
     const rows = payments.map((payment) => {
       const contract = contractMap.get(text(payment.contract_id)) ?? {};
@@ -512,7 +512,7 @@ async function loadContracts(params: URLSearchParams): Promise<LoadedReport> {
         status: label(payment.status),
         invoice_received: dateOnly(payment.invoice_received_at),
         paid: dateOnly(payment.paid_at),
-        notes: text(payment.notes),
+        account_code: text(payment.notes),
       };
     });
     return report("contract-payment-schedule", "GHSMTA Contract Payment Schedule", columns, rows);

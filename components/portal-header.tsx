@@ -119,6 +119,12 @@ function buildNavigation(profile: Profile) {
   const production: NavItem[] = [];
   const community: NavItem[] = [
     {
+      href: "/portal/community/donor-letter",
+      label: "Donor letter request",
+      shortLabel: "Donor letter",
+      icon: "✉",
+    },
+    {
       href: "/portal/community/testimonials",
       label: "Submit a testimonial",
       shortLabel: "Testimonial",

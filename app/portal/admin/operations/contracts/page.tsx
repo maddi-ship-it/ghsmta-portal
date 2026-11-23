@@ -351,7 +351,7 @@ export default async function ContractsPage({
                           <div className="field"><label>Invoice received</label><input className="input" defaultValue={dateInput(payment.invoice_received_at)} name="invoice_received_on" type="date" /></div>
                           <div className="field"><label>Paid</label><input className="input" defaultValue={dateInput(payment.paid_at)} name="paid_on" type="date" /></div>
                           <div className="field field-span-2"><label>Deliverable</label><input className="input" defaultValue={payment.deliverable ?? ""} name="deliverable" /></div>
-                          <div className="field field-span-2"><label>Notes</label><input className="input" defaultValue={payment.notes ?? ""} name="notes" /></div>
+                          <div className="field field-span-2"><label>Account code</label><input className="input" defaultValue={payment.notes ?? ""} name="notes" placeholder="Account code" /></div>
                           <div className="operations-form-actions field-span-2"><button className="button button-secondary button-compact" type="submit">Save payment</button></div>
                         </form>
                         <form action={deleteContractPayment} className="operations-inline-delete"><input name="payment_id" type="hidden" value={payment.id} /><input name="production_id" type="hidden" value={contract.production_id ?? ""} /><ConfirmedSubmitButton className="text-button danger-text" destructive description="This permanently removes this payment installment and its linked budget transaction." label="Delete payment" title={`Delete ${payment.label}?`} /></form>
@@ -378,7 +378,7 @@ export default async function ContractsPage({
                         <small>{!contract.production_id ? "Choose a production on the contract first." : contractBudgetLines.length === 0 ? "Add a budget line to this production first." : "The linked budget entry will be created when this installment is added."}</small>
                       </div>
                       <div className="field"><label>Deliverable</label><input className="input" name="deliverable" /></div>
-                      <div className="field field-span-2"><label>Notes</label><input className="input" name="notes" /></div>
+                      <div className="field field-span-2"><label>Account code</label><input className="input" name="notes" placeholder="Account code" /></div>
                       <div className="operations-form-actions field-span-2"><button className="button button-primary button-compact" type="submit">Add installment</button></div>
                     </form>
                   </details>

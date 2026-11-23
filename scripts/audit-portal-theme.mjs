@@ -27,6 +27,7 @@ const routeRoleCoverage = new Map([
   ["/portal/appeals", standardPortalRoles],
   ["/portal/applications/[id]", standardPortalRoles],
   ["/portal/chat", allRoles],
+  ["/portal/community/donor-letter", allRoles],
   ["/portal/community/testimonials", allRoles],
   ["/portal/feedback", allRoles],
   ["/portal/files", standardPortalRoles],
