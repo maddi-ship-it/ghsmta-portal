@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     const input: DonorLetterFields = {
       letterDate: formatDate(letterDate),
       recipientName: field(formData, "recipient_name", "Recipient name", 100),
-      recipientTitle: field(formData, "recipient_title", "Recipient title", 100),
+      recipientTitle: field(formData, "recipient_title", "Recipient title", 120),
       companyName,
       address: field(formData, "address", "Address", 160),
       city: field(formData, "city", "City", 80),

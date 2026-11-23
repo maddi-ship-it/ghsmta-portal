@@ -109,7 +109,7 @@ export default async function CommunityDonorLetterPage() {
               </div>
               <div className="field">
                 <label htmlFor="recipient_title">Recipient title</label>
-                <input autoComplete="organization-title" className="input" id="recipient_title" maxLength={100} name="recipient_title" placeholder="Community Relations Director" required />
+                <input autoComplete="organization-title" className="input" id="recipient_title" maxLength={120} name="recipient_title" placeholder="Community Relations Director" required />
               </div>
               <div className="field">
                 <label htmlFor="company_name">Company name</label>
