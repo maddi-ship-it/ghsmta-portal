@@ -465,16 +465,17 @@ async function loadContracts(params: URLSearchParams): Promise<LoadedReport> {
     );
   }
 
-  const [contractsResult, paymentsResult, productionsResult] = await Promise.all([
+  const [contractsResult, paymentsResult, productionsResult, budgetLinesResult] = await Promise.all([
     contractQuery,
     supabase
       .from("ghsmta_operations_contract_payments")
-      .select("contract_id,installment_order,label,deliverable,amount,due_date,status,invoice_received_at,paid_at,notes")
+      .select("contract_id,installment_order,label,deliverable,amount,due_date,status,budget_line_id,invoice_received_at,paid_at")
       .order("installment_order")
       .order("due_date", { nullsFirst: false }),
     supabase.from("ghsmta_operations_productions").select("id,name"),
+    supabase.from("ghsmta_operations_budget_lines").select("id,gl_code"),
   ]);
-  const error = contractsResult.error || paymentsResult.error || productionsResult.error;
+  const error = contractsResult.error || paymentsResult.error || productionsResult.error || budgetLinesResult.error;
   if (error) throw new Error(error.message);
 
   const contracts = (contractsResult.data ?? []) as DataRow[];
@@ -483,6 +484,7 @@ async function loadContracts(params: URLSearchParams): Promise<LoadedReport> {
     contractIds.has(text(payment.contract_id)),
   );
   const productions = mapById((productionsResult.data ?? []) as DataRow[], "name");
+  const budgetLineCodes = mapById((budgetLinesResult.data ?? []) as DataRow[], "gl_code");
 
   if (variant === "payments") {
     const contractMap = new Map(contracts.map((contract) => [text(contract.id), contract]));
@@ -512,7 +514,7 @@ async function loadContracts(params: URLSearchParams): Promise<LoadedReport> {
         status: label(payment.status),
         invoice_received: dateOnly(payment.invoice_received_at),
         paid: dateOnly(payment.paid_at),
-        account_code: text(payment.notes),
+        account_code: budgetLineCodes.get(text(payment.budget_line_id)) || "",
       };
     });
     return report("contract-payment-schedule", "GHSMTA Contract Payment Schedule", columns, rows);

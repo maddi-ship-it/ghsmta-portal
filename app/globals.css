@@ -21129,6 +21129,63 @@ html[data-theme="light"] .testimonial-status-pending {
   padding-left: 20px;
 }
 
+.donor-letter-request-list {
+  display: grid;
+  gap: 14px;
+}
+
+.donor-letter-request-card {
+  background: var(--portal-surface-2, var(--surface));
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 16px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.donor-letter-request-main {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.donor-letter-request-main h3,
+.donor-letter-request-main p {
+  margin: 0;
+}
+
+.donor-letter-request-main h3 {
+  margin-top: 4px;
+}
+
+.donor-letter-request-main p,
+.donor-letter-request-meta,
+.donor-letter-empty-state p {
+  color: var(--portal-muted, var(--muted));
+}
+
+.donor-letter-request-meta {
+  border-top: 1px solid var(--portal-line, var(--line));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding-top: 12px;
+}
+
+.donor-letter-request-meta span {
+  line-height: 1.45;
+}
+
+.donor-letter-empty-state {
+  padding: 24px;
+  text-align: center;
+}
+
+.donor-letter-empty-state p {
+  margin: 6px 0 0;
+}
+
 @media (max-width: 900px) {
   .donor-letter-layout { grid-template-columns: 1fr; }
 }
@@ -21138,4 +21195,7 @@ html[data-theme="light"] .testimonial-status-pending {
   .donor-letter-field-wide { grid-column: auto; }
   .donor-letter-form-actions { align-items: stretch; flex-direction: column; }
   .donor-letter-form-actions .button { width: 100%; }
+  .donor-letter-request-main { align-items: stretch; flex-direction: column; }
+  .donor-letter-request-main .button { width: 100%; }
+  .donor-letter-request-meta { display: grid; }
 }

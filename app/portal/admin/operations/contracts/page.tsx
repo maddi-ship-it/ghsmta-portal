@@ -68,7 +68,6 @@ type Payment = {
   budget_line_id: string | null;
   invoice_received_at: string | null;
   paid_at: string | null;
-  notes: string | null;
 };
 
 const contractStatuses = [
@@ -191,7 +190,7 @@ export default async function ContractsPage({
     contractQuery,
     supabase
       .from("ghsmta_operations_contract_payments")
-      .select("id,contract_id,installment_order,label,deliverable,amount,due_date,status,budget_line_id,invoice_received_at,paid_at,notes")
+      .select("id,contract_id,installment_order,label,deliverable,amount,due_date,status,budget_line_id,invoice_received_at,paid_at")
       .order("installment_order")
       .order("due_date", { nullsFirst: false }),
     supabase
@@ -212,6 +211,7 @@ export default async function ContractsPage({
   const productions = (productionsResult.data ?? []) as Production[];
   const budgetLines = (budgetLinesResult.data ?? []) as BudgetLine[];
   const productionNames = new Map(productions.map((item) => [item.id, item.name]));
+  const budgetLineMap = new Map(budgetLines.map((item) => [item.id, item]));
   const budgetLinesByProduction = new Map<string, BudgetLine[]>();
   budgetLines.forEach((budgetLine) => {
     const rows = budgetLinesByProduction.get(budgetLine.production_id) ?? [];
@@ -351,7 +351,7 @@ export default async function ContractsPage({
                           <div className="field"><label>Invoice received</label><input className="input" defaultValue={dateInput(payment.invoice_received_at)} name="invoice_received_on" type="date" /></div>
                           <div className="field"><label>Paid</label><input className="input" defaultValue={dateInput(payment.paid_at)} name="paid_on" type="date" /></div>
                           <div className="field field-span-2"><label>Deliverable</label><input className="input" defaultValue={payment.deliverable ?? ""} name="deliverable" /></div>
-                          <div className="field field-span-2"><label>Account code</label><input className="input" defaultValue={payment.notes ?? ""} name="notes" placeholder="Account code" /></div>
+                          <div className="field field-span-2"><label>Account code</label><input className="input" readOnly value={payment.budget_line_id ? budgetLineMap.get(payment.budget_line_id)?.gl_code ?? "Budget line unavailable" : "Select a budget line"} /><small>Automatically pulled from the selected budget line.</small></div>
                           <div className="operations-form-actions field-span-2"><button className="button button-secondary button-compact" type="submit">Save payment</button></div>
                         </form>
                         <form action={deleteContractPayment} className="operations-inline-delete"><input name="payment_id" type="hidden" value={payment.id} /><input name="production_id" type="hidden" value={contract.production_id ?? ""} /><ConfirmedSubmitButton className="text-button danger-text" destructive description="This permanently removes this payment installment and its linked budget transaction." label="Delete payment" title={`Delete ${payment.label}?`} /></form>
@@ -378,7 +378,7 @@ export default async function ContractsPage({
                         <small>{!contract.production_id ? "Choose a production on the contract first." : contractBudgetLines.length === 0 ? "Add a budget line to this production first." : "The linked budget entry will be created when this installment is added."}</small>
                       </div>
                       <div className="field"><label>Deliverable</label><input className="input" name="deliverable" /></div>
-                      <div className="field field-span-2"><label>Account code</label><input className="input" name="notes" placeholder="Account code" /></div>
+                      <div className="field field-span-2"><label>Account code</label><input className="input" readOnly value="Pulled from the selected budget line" /></div>
                       <div className="operations-form-actions field-span-2"><button className="button button-primary button-compact" type="submit">Add installment</button></div>
                     </form>
                   </details>

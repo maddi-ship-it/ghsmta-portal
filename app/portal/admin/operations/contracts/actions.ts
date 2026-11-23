@@ -332,7 +332,6 @@ export async function createContractPayment(formData: FormData) {
     due_date: nullable(formData, "due_date"),
     status: text(formData, "status") || "scheduled",
     budget_line_id: nullable(formData, "budget_line_id"),
-    notes: nullable(formData, "notes"),
     created_by: owner.id,
     updated_by: owner.id,
   });
@@ -356,7 +355,6 @@ export async function updateContractPayment(formData: FormData) {
       budget_line_id: nullable(formData, "budget_line_id"),
       invoice_received_at: dateAtNoonUtc(formData, "invoice_received_on"),
       paid_at: dateAtNoonUtc(formData, "paid_on"),
-      notes: nullable(formData, "notes"),
       updated_by: owner.id,
     })
     .eq("id", paymentId);

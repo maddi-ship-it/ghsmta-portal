@@ -1,4 +1,27 @@
 import { requireProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+
+type DonorLetterRequest = {
+  id: string;
+  requested_by: string;
+  letter_date: string;
+  recipient_name: string;
+  recipient_title: string;
+  company_name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  created_at: string;
+};
+
+type RequesterProfile = {
+  id: string;
+  full_name: string | null;
+  preferred_name: string | null;
+  email: string | null;
+};
 
 function easternToday() {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -11,8 +34,46 @@ function easternToday() {
   return `${value.year}-${value.month}-${value.day}`;
 }
 
+function formatStoredDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T12:00:00Z`));
+}
+
+function formatCreatedAt(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/New_York",
+  }).format(new Date(value));
+}
+
 export default async function CommunityDonorLetterPage() {
-  await requireProfile();
+  const profile = await requireProfile();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("community_donor_letter_requests")
+    .select(
+      "id,requested_by,letter_date,recipient_name,recipient_title,company_name,address,city,state,zip,created_at",
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  const requests = (data ?? []) as DonorLetterRequest[];
+
+  const requesterMap = new Map<string, RequesterProfile>();
+  if (profile.role === "owner" && requests.length) {
+    const requesterIds = [...new Set(requests.map((request) => request.requested_by))];
+    const admin = createAdminClient();
+    const { data: requesterData, error: requesterError } = await admin
+      .from("profiles")
+      .select("id,full_name,preferred_name,email")
+      .in("id", requesterIds);
+    if (requesterError) throw new Error(requesterError.message);
+    for (const requester of (requesterData ?? []) as RequesterProfile[]) {
+      requesterMap.set(requester.id, requester);
+    }
+  }
 
   return (
     <div className="page-stack donor-letter-page">
@@ -75,8 +136,8 @@ export default async function CommunityDonorLetterPage() {
 
             <div className="donor-letter-form-actions">
               <div>
-                <strong>Your recipient information is not saved.</strong>
-                <small>It is used only to create the PDF download.</small>
+                <strong>Your request is saved securely.</strong>
+                <small>You can re-download it later, and GHSMTA Owners can view every request.</small>
               </div>
               <button className="button button-primary" type="submit">Generate donor letter PDF</button>
             </div>
@@ -102,6 +163,72 @@ export default async function CommunityDonorLetterPage() {
           </div>
         </aside>
       </div>
+
+      <section className="panel donor-letter-history">
+        <div className="panel-header">
+          <div>
+            <span className="eyebrow">
+              {profile.role === "owner" ? "Owner view" : "Your history"}
+            </span>
+            <h2>
+              {profile.role === "owner" ? "All donor letter requests" : "Your donor letter requests"}
+            </h2>
+            <p>
+              {profile.role === "owner"
+                ? "Review every letter requested through the portal and download a fresh copy at any time."
+                : "Download a fresh copy of any donor letter you have created."}
+            </p>
+          </div>
+          <span className="badge">{requests.length} total</span>
+        </div>
+
+        <div className="panel-body donor-letter-request-list">
+          {requests.length ? (
+            requests.map((letterRequest) => {
+              const requester = requesterMap.get(letterRequest.requested_by);
+              const requesterName =
+                requester?.preferred_name ??
+                requester?.full_name ??
+                requester?.email ??
+                "Portal user";
+
+              return (
+                <article className="donor-letter-request-card" key={letterRequest.id}>
+                  <div className="donor-letter-request-main">
+                    <div>
+                      <span className="eyebrow">{formatStoredDate(letterRequest.letter_date)}</span>
+                      <h3>{letterRequest.company_name}</h3>
+                      <p>{letterRequest.recipient_name} · {letterRequest.recipient_title}</p>
+                    </div>
+                    <a
+                      className="button button-secondary"
+                      href={`/api/community/donor-letter?request=${letterRequest.id}`}
+                    >
+                      Download PDF
+                    </a>
+                  </div>
+
+                  <div className="donor-letter-request-meta">
+                    {profile.role === "owner" ? (
+                      <span><strong>Requested by:</strong> {requesterName}</span>
+                    ) : null}
+                    <span><strong>Created:</strong> {formatCreatedAt(letterRequest.created_at)}</span>
+                    <span>
+                      <strong>Recipient address:</strong>{" "}
+                      {letterRequest.address}, {letterRequest.city}, {letterRequest.state} {letterRequest.zip}
+                    </span>
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            <div className="empty-state donor-letter-empty-state">
+              <strong>No donor letters have been requested yet.</strong>
+              <p>Completed requests will appear here after their PDFs are generated.</p>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
