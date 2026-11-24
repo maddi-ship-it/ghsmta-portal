@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   outputFileTracingIncludes: {
+    "/api/community/donor-letter": [
+      "./public/fonts/liberation-sans/LiberationSans-Regular.ttf",
+      "./public/fonts/liberation-sans/LiberationSans-Bold.ttf",
+    ],
     "/api/admin/operations/contracts/[contractId]/document": [
       "./public/templates/ghsmta-work-for-hire-contract.docx",
     ],

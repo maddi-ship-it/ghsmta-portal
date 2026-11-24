@@ -1,3 +1,4 @@
+import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,
   PDFFont,
@@ -15,6 +16,11 @@ export type DonorLetterFields = {
   city: string;
   state: string;
   zip: string;
+};
+
+export type DonorLetterFontBytes = {
+  regular: Uint8Array;
+  bold: Uint8Array;
 };
 
 type StyledRun = {
@@ -211,6 +217,7 @@ function drawStyledParagraph({
 export async function buildDonorLetterPdf(
   templateBytes: Uint8Array,
   input: DonorLetterFields,
+  fontBytes?: DonorLetterFontBytes,
 ) {
   const template = await PDFDocument.load(templateBytes);
   const templatePage = template.getPages()[0];
@@ -231,8 +238,13 @@ export async function buildDonorLetterPdf(
     width: 612,
     height: PAGE_HEIGHT,
   });
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  if (fontBytes) pdf.registerFontkit(fontkit);
+  const regular = fontBytes
+    ? await pdf.embedFont(fontBytes.regular, { subset: true })
+    : await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = fontBytes
+    ? await pdf.embedFont(fontBytes.bold, { subset: true })
+    : await pdf.embedFont(StandardFonts.HelveticaBold);
   const fields = {
     letterDate: clean(input.letterDate),
     recipientName: clean(input.recipientName),

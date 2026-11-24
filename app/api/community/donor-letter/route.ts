@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { NextResponse } from "next/server";
 
 import { requireProfile } from "@/lib/auth";
@@ -12,6 +15,12 @@ export const dynamic = "force-dynamic";
 
 const TEMPLATE_URL =
   "https://www.dropbox.com/scl/fi/lvaofyo9ghbzhwph1pdvy/Shuler_Lasting_Legacy_Letter-FINAL.pdf?rlkey=orzka21w9hdxqpah7qjpqijx4&st=3ae76j2y&dl=1";
+const FONT_DIRECTORY = join(
+  process.cwd(),
+  "public",
+  "fonts",
+  "liberation-sans",
+);
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -70,9 +79,23 @@ async function loadTemplate() {
   return new Uint8Array(await templateResponse.arrayBuffer());
 }
 
+async function loadFonts() {
+  const [regular, bold] = await Promise.all([
+    readFile(join(FONT_DIRECTORY, "LiberationSans-Regular.ttf")),
+    readFile(join(FONT_DIRECTORY, "LiberationSans-Bold.ttf")),
+  ]);
+  return {
+    regular: new Uint8Array(regular),
+    bold: new Uint8Array(bold),
+  };
+}
+
 async function pdfResponse(input: DonorLetterFields) {
-  const templateBytes = await loadTemplate();
-  const pdf = await buildDonorLetterPdf(templateBytes, input);
+  const [templateBytes, fontBytes] = await Promise.all([
+    loadTemplate(),
+    loadFonts(),
+  ]);
+  const pdf = await buildDonorLetterPdf(templateBytes, input, fontBytes);
   const filename = `ghsmta-lasting-legacy-letter-${safeFilename(input.companyName)}.pdf`;
 
   return new NextResponse(Buffer.from(pdf), {
@@ -115,8 +138,11 @@ export async function POST(request: Request) {
       zip: field(formData, "zip", "ZIP code", 15),
     };
 
-    const templateBytes = await loadTemplate();
-    const pdf = await buildDonorLetterPdf(templateBytes, input);
+    const [templateBytes, fontBytes] = await Promise.all([
+      loadTemplate(),
+      loadFonts(),
+    ]);
+    const pdf = await buildDonorLetterPdf(templateBytes, input, fontBytes);
     const supabase = await createClient();
     const { error } = await supabase.from("community_donor_letter_requests").insert({
       requested_by: profile.id,

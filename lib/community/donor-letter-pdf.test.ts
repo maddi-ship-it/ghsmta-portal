@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
@@ -14,16 +16,27 @@ describe("GHSMTA donor letter PDF", () => {
     });
     const templateBytes = await template.save();
 
-    const result = await buildDonorLetterPdf(templateBytes, {
-      letterDate: "November 22, 2026",
-      recipientName: "Jordan Smith",
-      recipientTitle: "Community Relations Director",
-      companyName: "Georgia Community Foundation",
-      address: "123 Peachtree Street NE",
-      city: "Atlanta",
-      state: "GA",
-      zip: "30339",
-    });
+    const [regular, bold] = await Promise.all([
+      readFile("public/fonts/liberation-sans/LiberationSans-Regular.ttf"),
+      readFile("public/fonts/liberation-sans/LiberationSans-Bold.ttf"),
+    ]);
+    const result = await buildDonorLetterPdf(
+      templateBytes,
+      {
+        letterDate: "November 22, 2026",
+        recipientName: "Jordan Smith",
+        recipientTitle: "Community Relations Director",
+        companyName: "Georgia Community Foundation",
+        address: "123 Peachtree Street NE",
+        city: "Atlanta",
+        state: "GA",
+        zip: "30339",
+      },
+      {
+        regular: new Uint8Array(regular),
+        bold: new Uint8Array(bold),
+      },
+    );
 
     expect(Buffer.from(result).subarray(0, 5).toString()).toBe("%PDF-");
     const pdf = await PDFDocument.load(result);
