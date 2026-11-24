@@ -37,6 +37,7 @@ type StyledWord = {
 const PAGE_HEIGHT = 792;
 const LEFT = 54.24;
 const TEXT_WIDTH = 503.52;
+const ADDRESS_FONT_SIZE = 9.5;
 const WHITE = rgb(1, 1, 1);
 const BLACK = rgb(0, 0, 0);
 
@@ -93,10 +94,73 @@ function drawLine({
   }
   page.drawText(safeText, {
     x: LEFT,
-    y: PAGE_HEIGHT - bottom + fittedSize * 0.18,
+    y: PAGE_HEIGHT - bottom + fittedSize * 0.23,
     size: fittedSize,
     font,
     color: BLACK,
+  });
+}
+
+function wrapText(font: PDFFont, text: string, size: number, maxWidth: number) {
+  const words = safeForFont(font, text).split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+
+  words.forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+      lines.push(line);
+      line = word;
+      return;
+    }
+    line = candidate;
+  });
+
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawAddressBlock({
+  page,
+  font,
+  fields,
+}: {
+  page: PDFPage;
+  font: PDFFont;
+  fields: DonorLetterFields;
+}) {
+  const titleAndCompany = `${fields.recipientTitle} | ${fields.companyName}`;
+  const titleLines = wrapText(
+    font,
+    titleAndCompany,
+    ADDRESS_FONT_SIZE,
+    TEXT_WIDTH,
+  );
+  if (titleLines.length > 2) {
+    throw new Error("The recipient title and company are too long for the donor letter template.");
+  }
+
+  const rows = [
+    fields.letterDate,
+    fields.recipientName,
+    ...titleLines,
+    fields.address,
+    `${fields.city}, ${fields.state} ${fields.zip}`,
+  ];
+  const bottoms =
+    rows.length === 5
+      ? [105.8, 116.2, 126.5, 136.8, 147.2]
+      : [99.9, 110.2, 120.5, 130.8, 141.1, 151.4];
+
+  cover(page, rows.length === 5 ? 95.8 : 89.7, rows.length === 5 ? 147.2 : 151.4);
+  rows.forEach((text, index) => {
+    page.drawText(safeForFont(font, text), {
+      x: LEFT,
+      y: PAGE_HEIGHT - bottoms[index] + ADDRESS_FONT_SIZE * 0.23,
+      size: ADDRESS_FONT_SIZE,
+      font,
+      color: BLACK,
+    });
   });
 }
 
@@ -256,11 +320,7 @@ export async function buildDonorLetterPdf(
     zip: clean(input.zip),
   };
 
-  drawLine({ page, font: regular, text: fields.letterDate, top: 95.8, bottom: 105.8, size: 9.12 });
-  drawLine({ page, font: regular, text: fields.recipientName, top: 106.1, bottom: 116.2, size: 9.12 });
-  drawLine({ page, font: regular, text: `${fields.recipientTitle} | ${fields.companyName}`, top: 116.4, bottom: 126.5, size: 9.12 });
-  drawLine({ page, font: regular, text: fields.address, top: 126.8, bottom: 136.8, size: 9.12 });
-  drawLine({ page, font: regular, text: `${fields.city}, ${fields.state} ${fields.zip}`, top: 137.1, bottom: 147.2, size: 9.12 });
+  drawAddressBlock({ page, font: regular, fields });
   drawLine({ page, font: regular, text: `Dear ${fields.recipientName},`, top: 154.9, bottom: 166.4, size: 10.08 });
 
   drawStyledParagraph({
