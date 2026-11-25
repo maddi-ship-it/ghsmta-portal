@@ -6544,6 +6544,231 @@ body.modal-open {
   }
 }
 
+/* Student, guardian, and alumni portal */
+.student-profile-layout,
+.student-application-form,
+.student-program-list,
+.student-file-list,
+.student-guardian-layout,
+.guardian-response-grid,
+.student-program-card-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.two-column-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three-column-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-grid-span {
+  grid-column: 1 / -1;
+}
+
+.student-sticky-save {
+  align-items: center;
+  background: color-mix(in srgb, var(--portal-surface, var(--surface)) 94%, transparent);
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 18px;
+  bottom: 18px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 18%);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 14px;
+  position: sticky;
+  z-index: 12;
+}
+
+.student-document-grid,
+.student-guardian-layout,
+.student-program-admin-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.student-upload-control,
+.student-guardian-invite {
+  background: var(--portal-surface-2, var(--surface));
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.student-upload-row,
+.student-approval-card,
+.student-assignment-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.student-upload-row .input {
+  min-width: 0;
+}
+
+.student-guardian-layout > div:first-child,
+.student-program-list {
+  align-content: start;
+}
+
+.student-program-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.student-program-card,
+.student-program-list-card,
+.student-announcement,
+.guardian-response,
+.student-form-content {
+  background: var(--portal-surface-2, var(--surface));
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 16px;
+  color: inherit;
+  padding: 18px;
+  text-decoration: none;
+}
+
+.student-program-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.student-program-card h3,
+.student-program-card p,
+.student-announcement h3,
+.student-announcement p,
+.student-approval-card p {
+  margin: 6px 0 0;
+}
+
+.student-program-list-card {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.student-form-field .panel-body > label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.required-mark {
+  color: var(--gold);
+  font-size: 0.78rem;
+  margin-left: 8px;
+  text-transform: uppercase;
+}
+
+.student-option-list,
+.student-delivery-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+.student-program-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.student-program-summary > div {
+  background: var(--portal-surface-2, var(--surface));
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 14px;
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.student-program-summary strong {
+  color: var(--gold);
+  font-size: 1.35rem;
+}
+
+.guardian-response-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.guardian-response {
+  display: grid;
+  gap: 7px;
+}
+
+.guardian-response small {
+  color: var(--portal-muted, var(--muted));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.owner-student-submission {
+  background: var(--portal-surface-2, var(--surface));
+  border: 1px solid var(--portal-line, var(--line));
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.owner-student-submission > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  padding: 18px;
+}
+
+.owner-student-submission > summary span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.owner-student-submission-form {
+  border-top: 1px solid var(--portal-line, var(--line));
+  padding: 18px;
+}
+
+.metric-value-small {
+  font-size: clamp(1.5rem, 4vw, 2.6rem);
+}
+
+.preserve-lines {
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .student-document-grid,
+  .student-guardian-layout,
+  .student-program-admin-grid,
+  .student-program-card-grid,
+  .two-column-form-grid,
+  .three-column-form-grid,
+  .guardian-response-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-program-list-card,
+  .student-approval-card,
+  .student-upload-row,
+  .student-assignment-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .student-program-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* --------------------------------------------------------------------------
    School file library
    -------------------------------------------------------------------------- */

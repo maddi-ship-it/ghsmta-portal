@@ -16,7 +16,7 @@ const eligibleProfile = {
 };
 
 describe("Owner impersonation access", () => {
-  it("allows active applicants, adjudicators, Advisory Committee, and Production members", () => {
+  it("allows every active portal role", () => {
     expect(canOwnerImpersonateProfile(eligibleProfile, ownerId)).toBe(true);
     expect(
       canOwnerImpersonateProfile(
@@ -36,15 +36,14 @@ describe("Owner impersonation access", () => {
         ownerId,
       ),
     ).toBe(true);
+    for (const role of ["student", "guardian", "alumni", "program_manager", "owner"] as const) {
+      expect(
+        canOwnerImpersonateProfile({ ...eligibleProfile, role }, ownerId),
+      ).toBe(true);
+    }
   });
 
-  it("does not allow other roles or unavailable accounts", () => {
-    expect(
-      canOwnerImpersonateProfile(
-        { ...eligibleProfile, role: "program_manager" },
-        ownerId,
-      ),
-    ).toBe(false);
+  it("does not allow unavailable accounts", () => {
     expect(
       canOwnerImpersonateProfile(
         { ...eligibleProfile, active: false },

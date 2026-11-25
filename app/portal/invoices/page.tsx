@@ -5,7 +5,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function InvoicesPage() {
-  const profile = await requireProfile();
+  const profile = await requireProfile(["applicant", "adjudicator", "advisory_member", "program_manager", "owner"]);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("school_invoices")

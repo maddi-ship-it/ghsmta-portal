@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OwnerDashboardActionCenter } from "@/components/owner-dashboard-action-center";
+import { StudentPortalDashboard } from "@/components/student-portal-dashboard";
 import { requireProfile } from "@/lib/auth";
 import { buildOwnerDashboardActions } from "@/lib/owner-dashboard-actions";
 import { loadOwnerPostAdjudicationVisits } from "@/lib/owner-dashboard-data";
@@ -43,6 +44,9 @@ function formatAdjudicationTime(start: string, end: string) {
 
 export default async function PortalDashboard() {
   const profile = await requireProfile();
+  if (["student", "guardian", "alumni"].includes(profile.role)) {
+    return <StudentPortalDashboard profile={profile} />;
+  }
   const supabase = await createClient();
   const { data } = await supabase
     .from("applications")

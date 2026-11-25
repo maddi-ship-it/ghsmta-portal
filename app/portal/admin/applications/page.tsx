@@ -68,7 +68,7 @@ export default async function ApplicationsPage({
 }: {
   searchParams: Promise<ApplicationSearchParams>;
 }) {
-  const profile = await requireProfile();
+  const profile = await requireProfile(["applicant", "adjudicator", "advisory_member", "program_manager", "owner"]);
   const params = await searchParams;
   const supabase = await createClient();
 

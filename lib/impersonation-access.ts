@@ -2,9 +2,14 @@ import type { AppRole } from "@/lib/types";
 
 export const IMPERSONATABLE_ROLES: AppRole[] = [
   "applicant",
+  "student",
+  "guardian",
+  "alumni",
   "adjudicator",
   "advisory_member",
+  "program_manager",
   "production",
+  "owner",
 ];
 
 export function canOwnerImpersonateProfile(
@@ -27,9 +32,14 @@ export function canOwnerImpersonateProfile(
 }
 
 export function impersonationRoleName(role: AppRole) {
+  if (role === "student") return "student";
+  if (role === "guardian") return "parent / guardian";
+  if (role === "alumni") return "alumni";
   if (role === "advisory_member") return "Advisory Committee member";
   if (role === "adjudicator") return "adjudicator";
+  if (role === "program_manager") return "program manager";
   if (role === "production") return "Production team member";
+  if (role === "owner") return "Owner";
   return "applicant";
 }
 

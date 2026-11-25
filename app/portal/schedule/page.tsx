@@ -302,7 +302,7 @@ export default async function SchedulePage({
 }: {
   searchParams: Promise<ScheduleSearchParams>;
 }) {
-  const profile = await requireProfile();
+  const profile = await requireProfile(["applicant", "adjudicator", "advisory_member", "program_manager", "owner"]);
   const params = await searchParams;
   const supportsWaitlistFilters = profile.role === "applicant";
   const allowedSorts: ScheduleSort[] = [

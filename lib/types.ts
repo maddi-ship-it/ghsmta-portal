@@ -1,5 +1,8 @@
 export type AppRole =
   | "applicant"
+  | "student"
+  | "guardian"
+  | "alumni"
   | "adjudicator"
   | "advisory_member"
   | "program_manager"
@@ -72,6 +75,97 @@ export type Profile = {
   force_password_reset?: boolean;
   password_reset_requested_at?: string | null;
   theme_preference?: "system" | "light" | "dark";
+};
+
+export type StudentProfileStatus =
+  | "pending_school"
+  | "active"
+  | "alumni"
+  | "archived";
+
+export type StudentProfile = {
+  user_id: string;
+  legal_name: string | null;
+  preferred_name: string | null;
+  pronouns: string | null;
+  school_id: string | null;
+  school_name_snapshot: string | null;
+  graduation_year: number | null;
+  emergency_contact_name: string | null;
+  emergency_contact_relationship: string | null;
+  emergency_contact_phone: string | null;
+  performer_credits: string | null;
+  production_credits: string | null;
+  accessibility_accommodations: string | null;
+  tshirt_size: string | null;
+  dietary_needs: string | null;
+  status: StudentProfileStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  archived_by: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentProgram = {
+  id: string;
+  name: string;
+  description: string | null;
+  availability: "open" | "assigned";
+  status: "draft" | "open" | "closed" | "archived";
+  opens_at: string | null;
+  closes_at: string | null;
+  requires_guardian_signature: boolean;
+  instructions: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentProgramFieldType =
+  | "short_text"
+  | "long_text"
+  | "email"
+  | "phone"
+  | "number"
+  | "date"
+  | "select"
+  | "multi_select"
+  | "yes_no"
+  | "checkbox"
+  | "file"
+  | "content";
+
+export type StudentProgramField = {
+  id: string;
+  program_id: string;
+  field_key: string;
+  label: string;
+  description: string | null;
+  field_type: StudentProgramFieldType;
+  required: boolean;
+  options: string[];
+  settings: Record<string, unknown>;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentSubmission = {
+  id: string;
+  program_id: string;
+  student_user_id: string;
+  assignment_id: string | null;
+  status: "draft" | "submitted" | "returned" | "complete" | "archived";
+  responses: Record<string, unknown>;
+  owner_notes: string | null;
+  submitted_at: string | null;
+  returned_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AwardCycle = {

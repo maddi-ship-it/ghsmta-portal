@@ -3,6 +3,9 @@ import type { AppRole, ApplicationStatus } from "@/lib/types";
 export function roleLabel(role: AppRole): string {
   const labels: Record<AppRole, string> = {
     applicant: "Applicant",
+    student: "Student",
+    guardian: "Parent / Guardian",
+    alumni: "Alumni",
     adjudicator: "Adjudicator",
     advisory_member: "Advisory Member",
     program_manager: "Program Manager",

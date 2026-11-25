@@ -35,6 +35,9 @@ export default function LandingPage() {
             <Link className="public-home-nav-choice is-primary" href="/signup">
               SIGN-UP
             </Link>
+            <Link className="public-home-nav-choice" href="/student-signup">
+              STUDENT SIGN UP
+            </Link>
             <Link className="public-home-nav-choice" href="/staff-signup">
               STAFF SIGN UP
             </Link>

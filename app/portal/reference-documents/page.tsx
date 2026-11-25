@@ -2,7 +2,7 @@ import { ReferenceDocumentLibrary } from "@/components/reference-document-librar
 import { requireProfile } from "@/lib/auth";
 
 export default async function ReferenceDocumentsPage() {
-  const profile = await requireProfile();
+  const profile = await requireProfile(["applicant", "adjudicator", "advisory_member", "program_manager", "owner"]);
 
   return (
     <>

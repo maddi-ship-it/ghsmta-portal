@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         <p className="eyebrow">Privacy policy</p>
         <h1>How we protect and use portal information</h1>
         <p className="policy-effective-date">
-          Effective and last updated October 17, 2026
+          Effective and last updated November 24, 2026
         </p>
 
         <p>
@@ -44,6 +44,12 @@ export default function PrivacyPage() {
             <strong>Program information:</strong> applications, scheduling,
             eligibility, student and production information, nominations,
             adjudication materials, scores, comments, appeals, and results.
+          </li>
+          <li>
+            <strong>Student and guardian information:</strong> school and
+            graduation year, emergency contacts, guardian relationships,
+            participation history, headshots, résumés, accommodations, dietary
+            needs, clothing size, applications, and guardian acknowledgements.
           </li>
           <li>
             <strong>Portal content:</strong> chat messages, uploaded files,
@@ -131,12 +137,21 @@ export default function PrivacyPage() {
 
         <h2>Information involving minors</h2>
         <p>
-          The GHSMTA program concerns high school productions and may include
-          information about students. School representatives and other users
-          must submit student information only when authorized to do so and
-          must follow applicable school, district, parent or guardian, and
-          program requirements. The portal is not intended for a child to
-          create an account without appropriate authorization.
+          Student accounts are intended for current high-school students age
+          13 or older. A GHSMTA Owner must approve a student&apos;s school
+          connection before full student access is available. Students may
+          invite one or more parents or guardians to separate guardian
+          accounts. Guardians may review the connected student&apos;s submissions,
+          deadlines, and forms and may complete required acknowledgements.
+          School representatives and other users must submit student
+          information only when authorized to do so and must follow applicable
+          school, district, parent or guardian, and program requirements.
+        </p>
+        <p>
+          Student accounts cannot view other students, adult contact
+          directories, school applications, nomination status, adjudication
+          scores, or adjudicator comments. Student and guardian messages are
+          limited to authorized GHSMTA Owner support channels.
         </p>
 
         <h2>Security and retention</h2>

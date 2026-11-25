@@ -51,7 +51,7 @@ export default async function ApplicationDetailPage({
     owner_tools?: string;
   }>;
 }) {
-  const profile = await requireProfile();
+  const profile = await requireProfile(["applicant", "adjudicator", "advisory_member", "program_manager", "owner"]);
   const { id } = await params;
   const query = await searchParams;
   const supabase = await createClient();

@@ -24,7 +24,7 @@ function resumableStorageEndpoint() {
   return new URL("/storage/v1/upload/resumable", url).toString();
 }
 
-async function uploadSchoolFileResumable({
+async function uploadPortalFileResumable({
   accessToken,
   file,
   publishableKey,
@@ -84,7 +84,9 @@ export type PortalFileContext =
   | "bug_report"
   | "feature_request"
   | "application"
-  | "scholarship_request";
+  | "scholarship_request"
+  | "student_profile"
+  | "student_submission";
 
 export async function uploadPortalFiles({
   files,
@@ -147,7 +149,7 @@ export async function uploadPortalFiles({
     });
     let storagePath = `${userId}/${contextType}/${contextId}/${crypto.randomUUID()}-${generatedName}`;
 
-    if (contextType === "application" && file.size > RESUMABLE_CHUNK_SIZE) {
+    if (file.size > RESUMABLE_CHUNK_SIZE) {
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
@@ -160,7 +162,7 @@ export async function uploadPortalFiles({
         );
       }
 
-      storagePath = await uploadSchoolFileResumable({
+      storagePath = await uploadPortalFileResumable({
         accessToken,
         file,
         publishableKey,

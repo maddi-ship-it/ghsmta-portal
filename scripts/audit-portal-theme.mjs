@@ -8,6 +8,9 @@ const portalLayoutPath = path.join(portalRoot, "layout.tsx");
 
 const roles = [
   "applicant",
+  "student",
+  "guardian",
+  "alumni",
   "adjudicator",
   "advisory_member",
   "program_manager",
@@ -16,9 +19,16 @@ const roles = [
 ];
 
 const allRoles = [...roles];
-const standardPortalRoles = roles.filter((role) => role !== "production");
+const standardPortalRoles = [
+  "applicant",
+  "adjudicator",
+  "advisory_member",
+  "program_manager",
+  "owner",
+];
 const reviewRoles = ["adjudicator", "advisory_member", "owner"];
 const ownerOnly = ["owner"];
+const studentAndAlumni = ["student", "alumni"];
 
 const routeRoleCoverage = new Map([
   ["/portal", allRoles],
@@ -63,8 +73,20 @@ const routeRoleCoverage = new Map([
   ["/portal/admin/scoring", ownerOnly],
   ["/portal/admin/scoring/rubrics/[id]", ownerOnly],
   ["/portal/admin/setup", ownerOnly],
+  ["/portal/admin/student-announcements", ownerOnly],
+  ["/portal/admin/student-programs", ownerOnly],
+  ["/portal/admin/student-programs/[id]", ownerOnly],
+  ["/portal/admin/students", ownerOnly],
+  ["/portal/admin/students/[id]", ownerOnly],
   ["/portal/admin/users", ownerOnly],
   ["/portal/admin/workflows", ownerOnly],
+  ["/portal/guardian", ["guardian"]],
+  ["/portal/guardian/submissions/[id]", ["guardian"]],
+  ["/portal/student/applications", studentAndAlumni],
+  ["/portal/student/applications/[id]", studentAndAlumni],
+  ["/portal/student/applications/programs/[id]", ["student"]],
+  ["/portal/student/profile", studentAndAlumni],
+  ["/portal/students", ["applicant"]],
 ]);
 
 function walk(directory) {

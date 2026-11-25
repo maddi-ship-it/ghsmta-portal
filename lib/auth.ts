@@ -8,6 +8,7 @@ import {
 import { isActiveOwnerImpersonation } from "@/lib/impersonation-access";
 import { createClient } from "@/lib/supabase/server";
 import { PHONE_VERIFICATION_ENABLED } from "@/lib/security-features";
+import { applyStudentLifecycle } from "@/lib/student-lifecycle";
 import type { AppRole, Profile } from "@/lib/types";
 
 const PROFILE_COLUMNS = [
@@ -49,7 +50,7 @@ export async function requireProfile(
     redirect("/login?error=access");
   }
 
-  const typedProfile = profile as unknown as Profile;
+  const typedProfile = await applyStudentLifecycle(profile as unknown as Profile);
   if (!typedProfile.active) {
     redirect("/login?error=access");
   }

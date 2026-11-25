@@ -93,7 +93,7 @@ export async function startUserImpersonation(targetUserId: string, formData: For
     )
   ) {
     throw new Error(
-      "Only active applicant, adjudicator, and Advisory Committee accounts with email sign-in can be impersonated.",
+      "Only active portal accounts with email sign-in can be impersonated.",
     );
   }
   const targetRoleName = impersonationRoleName(targetRole);

@@ -24,6 +24,33 @@ function buildNavigation(profile: Profile) {
     },
   ];
 
+  if (["student", "guardian", "alumni"].includes(profile.role)) {
+    if (profile.role === "guardian") {
+      primary.push({ href: "/portal/guardian", label: "My students", shortLabel: "Students", icon: "♟" });
+    } else {
+      primary.push(
+        { href: "/portal/student/profile", label: "My profile", shortLabel: "Profile", icon: "♙" },
+        { href: "/portal/student/applications", label: profile.role === "alumni" ? "My history" : "Applications", shortLabel: "Applications", icon: "▤" },
+      );
+      if (profile.role === "student") {
+        primary.push({ href: "/portal/chat", label: "Message GHSMTA", shortLabel: "Messages", icon: "◫" });
+      }
+    }
+
+    return {
+      primary,
+      community: [] as NavItem[],
+      resources: [] as NavItem[],
+      production: [] as NavItem[],
+      management: [] as NavItem[],
+      mobile: [
+        ...primary,
+        { href: "/portal/notifications", label: "Announcements", icon: "!" },
+        { href: "/portal/account", label: "Account", icon: "♙" },
+      ],
+    };
+  }
+
   if (profile.role === "production") {
     primary.push({
       href: "/portal/chat",
@@ -159,6 +186,12 @@ function buildNavigation(profile: Profile) {
         shortLabel: "Results",
         icon: "★",
       },
+      {
+        href: "/portal/students",
+        label: "Invite students",
+        shortLabel: "Students",
+        icon: "♙",
+      },
     );
   } else if (profile.role !== "production") {
     primary.push({
@@ -227,6 +260,24 @@ function buildNavigation(profile: Profile) {
     );
 
     management.push(
+      {
+        href: "/portal/admin/students",
+        label: "Students & guardians",
+        shortLabel: "Students",
+        icon: "♟",
+      },
+      {
+        href: "/portal/admin/student-programs",
+        label: "Student applications",
+        shortLabel: "Student forms",
+        icon: "▤",
+      },
+      {
+        href: "/portal/admin/student-announcements",
+        label: "Student announcements",
+        shortLabel: "Announcements",
+        icon: "!",
+      },
       {
         href: "/portal/admin/billing",
         label: "Billing & invoices",

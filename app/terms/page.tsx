@@ -22,7 +22,7 @@ export default function TermsPage() {
         <p className="eyebrow">Terms &amp; conditions</p>
         <h1>Terms for using the GHSMTA Awards Portal</h1>
         <p className="policy-effective-date">
-          Effective and last updated October 17, 2026
+          Effective and last updated November 24, 2026
         </p>
 
         <p>
@@ -41,6 +41,24 @@ export default function TermsPage() {
           only in the role assigned to you. If you submit information about a
           student or another person, you represent that you have authority and
           any required permission to do so.
+        </p>
+
+        <h2>Student and guardian accounts</h2>
+        <p>
+          Student accounts are for current high-school students age 13 or
+          older. Student school connections require GHSMTA Owner approval.
+          Parent and guardian accounts must be used only for students to whom
+          the account holder is properly connected. A guardian acknowledgement
+          records the guardian account, typed name, date, and related audit
+          information. Unless a particular form says otherwise, one connected
+          guardian acknowledgement satisfies a student form&apos;s guardian
+          requirement.
+        </p>
+        <p>
+          Students and guardians may access only their own or properly linked
+          records. They may not attempt to discover nominations, internal
+          review status, adjudication materials, other students, or adult
+          contact information that the portal does not display to their role.
         </p>
 
         <h2>Accounts and security</h2>

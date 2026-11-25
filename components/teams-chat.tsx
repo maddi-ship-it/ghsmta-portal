@@ -461,6 +461,12 @@ function roleName(role: AppRole) {
   switch (role) {
     case "applicant":
       return "Applicant";
+    case "student":
+      return "Student";
+    case "guardian":
+      return "Parent / Guardian";
+    case "alumni":
+      return "Alumni";
     case "adjudicator":
       return "Adjudicator";
     case "advisory_member":
@@ -2397,7 +2403,7 @@ export function TeamsChat({
     activeChannel?.channel_type === "scheduling";
   const isThreaded = isCommunityFeed || isStaffFeed;
   const isPortalUpdates = activeChannel?.channel_type === "portal_updates";
-  const canPostToActiveChannel = !isPortalUpdates || profile.role === "owner";
+  const canPostToActiveChannel = profile.role !== "alumni" && (!isPortalUpdates || profile.role === "owner");
   const canSeeActiveChannelMembers = !isPortalUpdates || profile.role === "owner";
   const canAddActiveChannelMembers =
     profile.role === "owner" &&
@@ -2408,7 +2414,7 @@ export function TeamsChat({
       (candidate) => !memberIds.has(candidate.user_id),
     );
   }, [members, ownerChannelCandidates]);
-  const allowDirectMessages = profile.role !== "applicant";
+  const allowDirectMessages = !["applicant", "student", "guardian", "alumni"].includes(profile.role);
   const activeChannelTitle =
     activeChannel && isSchoolConversation(activeChannel)
       ? (activeChannel.school_name ?? activeChannel.channel_name)

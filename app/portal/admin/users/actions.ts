@@ -26,6 +26,39 @@ function revalidateUsers() {
   revalidatePath("/portal/chat");
 }
 
+async function ensureStudentLifecycleRecord(userId: string, role: AppRole, fullName: string | null) {
+  if (!["student", "alumni"].includes(role)) return;
+  const admin = createAdminClient();
+  const { error: insertError } = await admin.from("student_profiles").upsert({
+    user_id: userId,
+    legal_name: fullName,
+    status: role === "alumni" ? "alumni" : "pending_school",
+  }, { onConflict: "user_id", ignoreDuplicates: true });
+  if (insertError) throw new Error(insertError.message);
+  if (role === "alumni") {
+    const { error } = await admin.from("student_profiles").update({ status: "alumni" }).eq("user_id", userId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await admin.from("student_profiles").update({ status: "pending_school" }).eq("user_id", userId).eq("status", "alumni");
+    if (error) throw new Error(error.message);
+  }
+}
+
+async function syncOwnerStudentSupportChannels(userId: string, addedBy: string, shouldHaveAccess: boolean) {
+  const admin = createAdminClient();
+  const { data: channels, error } = await admin.from("chat_channels").select("id").eq("channel_type", "group_direct_message").ilike("description", "GHSMTA Student Support%");
+  if (error) throw new Error(error.message);
+  const channelIds = (channels ?? []).map((channel) => channel.id);
+  if (channelIds.length === 0) return;
+  if (shouldHaveAccess) {
+    const { error: addError } = await admin.from("chat_direct_participants").upsert(channelIds.map((channelId) => ({ channel_id: channelId, user_id: userId, added_by: addedBy })), { onConflict: "channel_id,user_id", ignoreDuplicates: true });
+    if (addError) throw new Error(addError.message);
+  } else {
+    const { error: removeError } = await admin.from("chat_direct_participants").delete().eq("user_id", userId).in("channel_id", channelIds);
+    if (removeError) throw new Error(removeError.message);
+  }
+}
+
 function selectedText(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
@@ -266,7 +299,7 @@ export async function updateUserAccess(userId: string, formData: FormData) {
   const supabase = await createClient();
   const { data: existing } = await supabase
     .from("profiles")
-    .select("phone_e164")
+    .select("phone_e164,full_name,role")
     .eq("id", userId)
     .single();
   const phoneChanged = (existing?.phone_e164 ?? null) !== phone;
@@ -279,6 +312,9 @@ export async function updateUserAccess(userId: string, formData: FormData) {
     phone_required_at: phoneChanged ? null : undefined,
   }).eq("id", userId);
   if (error) throw new Error(error.message);
+  await ensureStudentLifecycleRecord(userId, role, existing?.full_name ?? null);
+  if (role === "owner" && existing?.role !== "owner") await syncOwnerStudentSupportChannels(userId, owner.id, true);
+  if (role !== "owner" && existing?.role === "owner") await syncOwnerStudentSupportChannels(userId, owner.id, false);
   revalidateUsers();
 }
 
@@ -316,8 +352,26 @@ export async function bulkUpdateUsers(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const { data: priorProfiles, error: priorError } = operation === "role"
+    ? await supabase.from("profiles").select("id,role").in("id", userIds)
+    : { data: [], error: null };
+  if (priorError) throw new Error(priorError.message);
   const { error } = await supabase.from("profiles").update(updates).in("id", userIds);
   if (error) throw new Error(error.message);
+  if (operation === "role" && ["student", "alumni"].includes(String(updates.role))) {
+    const admin = createAdminClient();
+    const { data: changedProfiles, error: profileError } = await admin.from("profiles").select("id,full_name").in("id", userIds);
+    if (profileError) throw new Error(profileError.message);
+    await Promise.all((changedProfiles ?? []).map((profile) => ensureStudentLifecycleRecord(profile.id, updates.role as AppRole, profile.full_name)));
+  }
+  if (operation === "role") {
+    const nextRole = updates.role as AppRole;
+    await Promise.all((priorProfiles ?? []).flatMap((profile) => {
+      if (nextRole === "owner" && profile.role !== "owner") return [syncOwnerStudentSupportChannels(profile.id, owner.id, true)];
+      if (nextRole !== "owner" && profile.role === "owner") return [syncOwnerStudentSupportChannels(profile.id, owner.id, false)];
+      return [];
+    }));
+  }
   revalidateUsers();
   redirect(`${USER_PATH}?updated=${userIds.length}`);
 }
